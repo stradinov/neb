@@ -10,12 +10,21 @@ set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 
+# Auto-detectar si neb vive como subtree (e.g. methodology) o en la raíz del repo
+if [ -d "$ROOT/neb/changelog.d" ]; then
+  CHANGELOG_D="neb/changelog.d"
+  ASSEMBLER="$ROOT/neb/bootstrap/assemble-changelog.py"
+else
+  CHANGELOG_D="changelog.d"
+  ASSEMBLER="$ROOT/bootstrap/assemble-changelog.py"
+fi
+
 # Solo actúa si hay commits a pushear que tocan changelog.d/
 # @{push} requiere upstream configurado; si no hay, salir silencioso
 if ! git rev-parse --abbrev-ref "@{push}" >/dev/null 2>&1; then
   exit 0
 fi
-if ! git diff --name-only "@{push}..HEAD" 2>/dev/null | grep -q '^changelog\.d/'; then
+if ! git diff --name-only "@{push}..HEAD" 2>/dev/null | grep -q "^${CHANGELOG_D}/"; then
   exit 0
 fi
 
@@ -31,7 +40,7 @@ else
 fi
 
 # Verificar sincronía
-if "$PY" "$ROOT/bootstrap/assemble-changelog.py" --check >/dev/null 2>&1; then
+if "$PY" "$ASSEMBLER" --check >/dev/null 2>&1; then
   exit 0
 fi
 
