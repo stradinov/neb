@@ -18,6 +18,23 @@ fi
 GUIDE_DIR="${NEB_HOME:-$HOME/.claude/neb}"
 PROJECT="$(cd "$PROJECT" && pwd)"
 
+# ---------------------------------------------------------------------------
+# Private overlay hooks (stubs — overridden by sourcing detect-stack.local.sh)
+# ---------------------------------------------------------------------------
+detect_stack_local()   { echo "unknown"; }
+get_private_stack_imports() { :; }          # prints nothing by default
+get_framework_imports() {
+  echo "@~/.claude/neb/general/startup.md"
+  echo "@~/.claude/neb/workflow/index.md"
+}
+
+# Source overlay if present (e.g. Onibex: neb/ + onibex/ sibling dirs)
+_LNK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+_OVERLAY="${_LNK_DIR}/../../onibex/overlays/detect-stack.local.sh"
+# shellcheck source=/dev/null
+[ -f "$_OVERLAY" ] && source "$_OVERLAY"
+unset _LNK_DIR _OVERLAY
+
 bold() { printf "\033[1m%s\033[0m\n" "$*"; }
 info() { printf "  %s\n" "$*"; }
 ok()   { printf "  \033[32m%s\033[0m\n" "$*"; }
@@ -38,6 +55,12 @@ detect_stack() {
   if [ -f "$PROJECT/methodology/principles.md" ] && [ -f "$PROJECT/process/plan-review.md" ] && [ -f "$PROJECT/general/index.md" ]; then
     echo "self-applied"; return
   fi
+  # Fall through to private overlay detection
+  local _priv
+  _priv=$(detect_stack_local)
+  if [ "$_priv" != "unknown" ]; then
+    echo "$_priv"; return
+  fi
   echo "unknown"
 }
 
@@ -53,14 +76,18 @@ bold "CLAUDE.md"
 CLAUDE_FILE="$PROJECT/CLAUDE.md"
 PROJECT_NAME="$(basename "$PROJECT")"
 
-IMPORTS=(
-  "@~/.claude/neb/general/startup.md"
-  "@~/.claude/neb/workflow/index.md"
-)
+IMPORTS=()
+while IFS= read -r _imp; do IMPORTS+=("$_imp"); done < <(get_framework_imports)
+
 if [ "$STACK" != "unknown" ]; then
-  IMPORTS+=("@~/.claude/neb/stacks/$STACK/index.md")
-  if [ -f "$GUIDE_DIR/stacks/$STACK/servers.md" ]; then
-    IMPORTS+=("@~/.claude/neb/stacks/$STACK/servers.md")
+  _priv=$(get_private_stack_imports "$STACK")
+  if [ -n "$_priv" ]; then
+    while IFS= read -r _imp; do IMPORTS+=("$_imp"); done <<< "$_priv"
+  else
+    IMPORTS+=("@~/.claude/neb/stacks/$STACK/index.md")
+    if [ -f "$GUIDE_DIR/stacks/$STACK/servers.md" ]; then
+      IMPORTS+=("@~/.claude/neb/stacks/$STACK/servers.md")
+    fi
   fi
 fi
 
