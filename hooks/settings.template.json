@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $NEB_HOME/hooks/save-approved-plan.sh"
+            "command": "bash \"${NEB_HOME:-$HOME/.claude/neb}/hooks/save-approved-plan.sh\""
           }
         ]
       }
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash $NEB_HOME/hooks/usage-tracker.sh"
+            "command": "bash \"${NEB_HOME:-$HOME/.claude/neb}/hooks/usage-tracker.sh\""
           }
         ]
       }
