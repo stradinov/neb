@@ -1,0 +1,139 @@
+# <título descriptivo del requerimiento>
+
+<!-- Estado: ENUM canónico en workflow/index.md "Estados del requerimiento".
+     Valores: En progreso | En validación | Listo para aprobación | Cerrado.
+     Bloqueado se anota como sufijo: "En progreso (bloqueado por X)". -->
+
+**Estado:** En progreso
+**Fecha inicio:** YYYY-MM-DD
+**Fecha cierre:** —
+**Complejidad estimada:** baja | media | alta
+**Complejidad real:** —
+**Riesgo de regresión:** bajo | medio | alto  <!-- ver [planning.md](../process/planning.md) "Riesgo de regresión" -->
+
+
+## Contexto
+
+<!-- Por qué se pidió este cambio. Problema o necesidad. -->
+
+## Alcance
+
+### Entra
+- ...
+
+### No entra
+- ...
+
+## Plan de pruebas
+
+<!-- Flujos a validar, datos de entrada, criterios de éxito, orden.
+     En stack `self-applied` (cambios a la metodología): walkthroughs mentales aquí + validación diferida en uso (ver Trazabilidad/pendings tag <slug>-validacion-uso). -->
+
+- [ ] ...
+- [ ] ...
+
+### Resultado
+
+(Obligatorio en complejidad media/alta. Para baja, marcar el checklist arriba con `[x]` basta.)
+
+| # | Flujo | Resultado |
+|---|-------|-----------|
+| 1 |       | ✅ \| ❌    |
+| 2 | `[crítico]` <flujo> |       |
+
+**Fecha:** YYYY-MM-DD
+**Validador:** dev (default; nombrar solo si fue Claude o validación delegada)
+
+Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/delivery.md) "Definición de done").
+
+**Riesgo medio/alto** requiere ≥1 fila con prefijo `[crítico]` (flujos sensibles a re-validar). Si una fila `[crítico]` está ❌, el cierre se bloquea.
+
+## Plan de elaboración
+
+<!-- Una línea por elemento. Riesgos identificados. El stack determina qué son "elementos" (archivos, secciones del documento, etc.). -->
+
+| Elemento | Cambio |
+|---|---|
+| ... | ... |
+
+## Avances realizados
+
+<!-- Se llena durante la elaboración. Una línea por elemento. -->
+
+## Incidencias
+
+<!-- Cambios menores surgidos durante la implementación. Qué fue, cómo se resolvió, impacto en deploy. -->
+
+## Entregas
+
+### Revisión
+- Entrega ejecutada:
+- Fecha:
+
+### Final (Aprobación)
+- Entrega ejecutada:
+- Fecha:
+- Autorización por:
+
+## Resultado post-entrega
+
+<!-- Validación post-entrega. Capturas, logs, lo relevante. -->
+
+## Diagnóstico de defectos
+
+<!-- Opcional. Completar solo si este REQ detectó defectos durante o post-cierre.
+     Ver [improvement.md](../process/improvement.md) "Diagnóstico de origen del defecto". -->
+
+| Defecto | Etapa de origen | Tipo de causa | Patrón / aislado | REQ derivado |
+|---|---|---|---|---|
+| ... | Fase X | plan / ejecución / validación / producción / documentación / loop / transversal | aislado o ≥3 similares | REQ-NNN o `—` (pendiente) |
+
+## Trazabilidad
+
+- **Plan aprobado:** `~/.claude/approved-plans/<archivo>.md` (media/alta: hook en plan mode, o el path del `Write` conversacional; `—` en trivial/baja/no-formal)
+- **Commits:** `<hash>` o `<hash-inicial>..<hash-final>`
+- **Pendientes generados:** ver `~/.claude/pendings.md` tag `[<slug>]` (o `ninguno`)
+
+## Métricas
+
+| Métrica                                          | Valor |
+|--------------------------------------------------|-------|
+| Turnos — Fase 1 Clarificación                    |       |
+| Turnos — Fase 2 Estimación                       |       |
+| Turnos — Fase 3 Propuesta                        |       |
+| Turnos — Fase 4 Implementación                   |       |
+| Turnos — Fase 5 Validación                       |       |
+| Turnos — Fase 6 Control de cambios               |       |
+| Turnos — Fase 7 Producción                       |       |
+| Turnos — Fase 8 Documentación                    |       |
+| Turnos — Fase 9 Retroalimentación de Metodología |       |
+| **Turnos total**                                 |       |
+| Re-entregas en validación                        |       |
+| Incidencias surgidas                             |       |
+| Errores de implementación de Claude              |       |
+| Faltas de contexto                               |       |
+| Implementaciones sin aprobación                  |       |
+| Acciones destructivas no autorizadas             |       |
+| Out-of-scope edits                               |       |
+| Complejidad estimada / real                      |  /    |
+
+## Reporte de cierre
+
+<!-- Completar al cerrar en Fase 8. Claude presenta este bloque al dev antes de "¿Damos por terminado?". -->
+
+| Señal | Valor |
+|---|---|
+| Turnos total | — |
+| Re-entregas | — |
+| Complejidad estimada / real | — / — |
+
+**Uso de API** *(auto — `usage-tracker.sh`)*
+
+<!-- usage-tracker-start -->
+| Modelo | Tokens (in · out · cache_w · cache_r) | Costo USD |
+|---|---|---|
+| — | — | — |
+| **Total** | — | **—** |
+<!-- usage-tracker-end -->
+
+*Si el bloque anterior muestra `—`, el hook no encontró REQ activo o no se ejecutó en esta sesión. Ver `hooks/README.md §usage-tracker`.*

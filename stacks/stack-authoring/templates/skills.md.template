@@ -1,0 +1,17 @@
+# Skills (stack: {{STACK_NAME}})
+
+<!-- Opción A: sin skills propios -->
+Este stack no tiene skills propios actualmente. El conocimiento vive en los MDs del stack mismo.
+
+Ver inventario completo en [`skills/README.md`](../../skills/README.md).
+
+<!-- Opción B: con skills propios — reemplazar el bloque anterior por: -->
+<!--
+Skills aplicables a este stack:
+
+| Skill | Aplica en | Descripción |
+|---|---|---|
+| `<nombre>` | <!-- fases o contextos --> | <!-- qué aporta --> |
+
+Ver instalación en `bootstrap/install-skills.sh` y registros en `skills/README.md`.
+-->

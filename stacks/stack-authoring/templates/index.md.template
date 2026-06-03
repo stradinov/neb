@@ -1,0 +1,45 @@
+# Stack: {{STACK_NAME}}
+
+<!-- Una línea de descripción del stack -->
+
+## Cuándo aplica este stack
+
+<!-- Si es overlay: -->
+Overlay sobre `{{STACK_BASE}}`. Se activa cuando:
+
+- El cwd está dentro de `<!-- path pattern -->`.
+- El REQ pide <!-- tipo de trabajo -->.
+
+<!-- Si es raíz: -->
+<!-- Se activa cuando el repo contiene <!-- indicadores estructurales -->. -->
+
+## Glosario del stack
+
+| Término | Significado |
+|---|---|
+| <!-- término --> | <!-- concretización del vocabulario abstracto de methodology/vocabulary.md --> |
+
+## Fases adaptadas
+
+| Fase general | Adaptación en {{STACK_NAME}} |
+|---|---|
+| **Fase 1 — Clarificación** | <!-- qué identificar específico de este stack --> |
+| **Fase 3 — Propuesta** | <!-- qué lista el plan --> |
+| **Fase 4 — Implementación** | <!-- comandos exactos, paths --> |
+| **Fase 5 — Validación** | <!-- cómo validar el entregable --> |
+| **Fase 6–7 — Entrega** | <!-- cómo entregar --> |
+| **Fase 8 — Documentación** | <!-- qué documentar --> |
+| **Fase 9 — Retrospectiva** | <!-- qué anotar --> |
+
+## Archivos clave del stack
+
+| Propósito | Archivo |
+|---|---|
+| <!-- propósito --> | `stacks/{{STACK_NAME}}/<!-- archivo -->` |
+
+## Documentos
+
+1. [Deployment](deployment.md) — cómo se deploya + validación.
+2. [Conventions](conventions.md) — convenciones específicas del stack.
+3. [Troubleshooting](troubleshooting.md) — síntomas y soluciones.
+4. [Roles](roles.md) — rol principal y revisores.

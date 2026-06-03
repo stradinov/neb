@@ -1,0 +1,22 @@
+# Deployment (stack: {{STACK_NAME}})
+
+## Deploy
+
+<!-- Comandos exactos. Para overlays sobre self-applied, puede heredar: -->
+<!-- Hereda de stacks/self-applied/deployment.md: deploy = git push. -->
+
+```bash
+<!-- comando de deploy -->
+```
+
+## Ambiente
+
+<!-- Describir los ambientes: QA, producción, o "único" si es como self-applied -->
+
+## Validación
+
+<!-- Cómo verificar que el entregable funciona. Para stacks de proceso: diferida en uso. -->
+
+## Distribución al equipo
+
+<!-- Pasos para que otros devs reciban los cambios -->

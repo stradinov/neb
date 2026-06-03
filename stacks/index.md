@@ -1,0 +1,42 @@
+# Stacks
+
+Metodologías específicas por tipo de proyecto. Abstrae lo que NO es universal: comandos de build, paths de deploy, keys SSH, convenciones de framework, troubleshooting.
+
+## Disponibles
+
+- [requirements-analysis](requirements-analysis/index.md) — Análisis iterativo de requerimientos para cualquier tipo de proyecto. Entregable: documento de Clarificación aprobado por el stakeholder. Stack genérico (sin detección automática); los proyectos lo importan explícitamente.
+- [stack-authoring](stack-authoring/index.md) — Autoría, mantenimiento y distribución de stacks de la metodología. Overlay sobre `self-applied`.
+- [skill-authoring](skill-authoring/index.md) — Autoría, mantenimiento y distribución de skills de Claude Code. Overlay sobre `self-applied`.
+- [self-applied](self-applied/index.md) — Proyectos auto-aplicados — la metodología que se edita es la que se aplica (caso canónico: el propio repo `neb`). Validación **diferida en uso**.
+- [research](research/index.md) — Investigación multi-LLM: consultar fuentes independientes, sintetizar resultados y producir documentos citables desde cualquier stack o requerimiento. Overlay sobre `self-applied`.
+
+## Pendientes
+
+- `prestashop` — tiendas sobre PrestaShop.
+- `react-native` — aplicaciones móviles React Native (Expo).
+- `python-poetry` — proyectos Python con Poetry.
+
+## Heurística de detección
+
+Single source of truth — consumida por:
+
+- `bootstrap/link-into-project.sh` función `detect_stack` al onboarding del proyecto.
+- Claude al iniciar trabajo y al re-evaluar stack durante la sesión (ver [`general/stack-detection.md`](../general/stack-detection.md)).
+
+Ambos consumidores derivan de esta tabla. Si la tabla cambia, actualizar `detect_stack` en `bootstrap/link-into-project.sh` en el mismo commit.
+
+Inspeccionando el repo, el primer indicador que coincide gana:
+
+| Indicador | Stack |
+|---|---|
+| **cwd dentro de `*/<neb>/stacks/<nombre>/`** (overlay sobre `self-applied`; `<neb>` = dir del checkout) | `stack-authoring` |
+| **cwd dentro de `*/<neb>/skills/<nombre>/`** (overlay sobre `self-applied`) | `skill-authoring` |
+| **cwd dentro de `*/<neb>/research/`** (overlay sobre `self-applied`); para investigación en `<proyecto>/research/` o `~/.claude/research/` la activación es **explícita** por el dev | `research` |
+| `methodology/principles.md` + `process/plan-review.md` + `general/index.md` con fases canónicas | `self-applied` |
+| `app/` + `composer.json` con `prestashop/prestashop` | `prestashop` (futuro) |
+| `app.json` + `expo` en deps | `react-native` (futuro) |
+| `pyproject.toml` + Poetry | `python-poetry` (futuro) |
+
+Si ningún indicador coincide, el bootstrap deja al dev importar manualmente o avisa que falta soporte.
+
+(Para agregar un stack nuevo: ver [`CLAUDE.md`](../CLAUDE.md) del repo.)

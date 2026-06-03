@@ -1,0 +1,122 @@
+{
+  "autoUpdatesChannel": "stable",
+  "autoCompactEnabled": true,
+  "env": {
+    "CLAUDE_CODE_USE_POWERSHELL_TOOL": "1",
+    "BASH_DEFAULT_TIMEOUT_MS": "600000",
+    "DO_NOT_TRACK": "1",
+    "CLAUDE_TELEMETRY_DISABLED": "1",
+    "DISABLE_ERROR_REPORTING": "1",
+    "DISABLE_BUG_COMMAND": "1"
+  },
+  "hooks": {
+    "PreCompact": [
+      {
+        "matcher": "auto",
+        "hooks": [
+          {
+            "type": "agent",
+            "timeout": 120,
+            "statusMessage": "Preservando estado del requerimiento activo...",
+            "prompt": "Eres un asistente de documentación. Tu única tarea es preservar el estado de un requerimiento activo antes de una auto-compactación.\n\n1. Lee el archivo MEMORY.md en el directorio de memoria del proyecto activo (~/.claude/projects/<project-id>/memory/MEMORY.md). El project-id es el CWD sanitizado (separadores → guiones). Encuéntralo listando ~/.claude/projects/ y buscando el directorio más reciente que contenga una carpeta memory/.\n2. Busca archivos project_*.md en ese directorio que contengan una sección '## Requerimiento activo'\n3. Si encuentras uno:\n   a. Lee el archivo project_*.md completo\n   b. Extrae los valores de 'Path del proyecto' y 'Draft changes MD'\n   c. Actualiza (o crea) el draft en <Path del proyecto>/<Draft changes MD> con el estado actual extraído de la memoria\n   d. Incluye: estado, plan resumido, archivos modificados, próximos pasos\n4. Si no hay requerimiento activo, no hacer nada."
+          }
+        ]
+      },
+      {
+        "_os_note": "WINDOWS (PowerShell) — usar este bloque en Windows. Para Linux/Mac usar el bloque bash de más abajo (eliminar este).",
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "timeout": 10,
+            "command": "$memBase = Join-Path $env:USERPROFILE '.claude\\projects'; $memDir = Get-ChildItem $memBase -Directory -ErrorAction SilentlyContinue | Where-Object { Test-Path (Join-Path $_.FullName 'memory') } | Sort-Object LastWriteTime -Descending | Select-Object -First 1 | ForEach-Object { Join-Path $_.FullName 'memory' }; if (-not $memDir) { '{\"continue\": true}'; exit }; $reqFile = Get-ChildItem $memDir -Filter 'project_*.md' -ErrorAction SilentlyContinue | Where-Object { Select-String -Path $_.FullName -Pattern '## Requerimiento activo' -Quiet } | Select-Object -First 1; if (-not $reqFile) { '{\"continue\": true}'; exit }; $content = Get-Content $reqFile.FullName -Raw; $draft = (($content -split \"`n\" | Select-String 'Draft changes MD' | Select-Object -First 1).Line -replace '.*: ','').Trim(); $proj = (($content -split \"`n\" | Select-String 'Path del proyecto' | Select-Object -First 1).Line -replace '.*: ','').Trim(); if (-not $draft -or -not $proj) { '{\"continue\": true}'; exit }; $fullPath = Join-Path $proj $draft; if ((Test-Path $fullPath) -and ((Get-Item $fullPath).LastWriteTime -gt (Get-Date).AddMinutes(-15))) { '{\"continue\": true}' } else { '{\"continue\": false, \"stopReason\": \"Requerimiento activo sin draft reciente. Actualiza ' + $draft + ' y vuelve a ejecutar /compact.\"}' }"
+          }
+        ]
+      },
+      {
+        "_os_note": "LINUX/MAC (bash) — alternativa al bloque Windows de arriba. Requiere: bash, grep, stat. Eliminar el bloque Windows al usar este.",
+        "matcher": "manual",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "mem_dir=$(ls -dt ~/.claude/projects/*/memory 2>/dev/null | head -1); [ -z \"$mem_dir\" ] && echo '{\"continue\": true}' && exit 0; req_file=$(grep -rl '## Requerimiento activo' \"$mem_dir\"/project_*.md 2>/dev/null | head -1); [ -z \"$req_file\" ] && echo '{\"continue\": true}' && exit 0; draft=$(grep 'Draft changes MD' \"$req_file\" | head -1 | sed 's/.*: //'); proj=$(grep 'Path del proyecto' \"$req_file\" | head -1 | sed 's/.*: //'); [ -z \"$draft\" ] || [ -z \"$proj\" ] && echo '{\"continue\": true}' && exit 0; full_path=\"$proj/$draft\"; if [ -f \"$full_path\" ] && [ $(( $(date +%s) - $(stat -c %Y \"$full_path\" 2>/dev/null || stat -f %m \"$full_path\") )) -lt 900 ]; then echo '{\"continue\": true}'; else echo \"{\\\"continue\\\": false, \\\"stopReason\\\": \\\"Requerimiento activo sin draft reciente. Actualiza $draft y vuelve a ejecutar /compact.\\\"}\"; fi"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "_doc": "preprocess-prompt — hook opt-in personal que corrige ortografía/sintaxis y prepara eco + confirmación antes de que Claude actúe. Ver tooling/prompt-preprocessing.md. Requiere Python 3 + claude CLI en PATH. Latencia 13-25s por prompt no trivial (excepción documentada a < 100ms de hooks). Elegir bloque OS apropiado y eliminar el otro.",
+        "_os_note": "WINDOWS — usar `shell: \"powershell\"` con `$env:VAR`. La sintaxis `cmd /c py \"%NEB_HOME%\\...\"` desbloquea la sesión pero NO entrega el stdin JSON al script Python (Claude Code spawn de cmd termina interpretando el JSON como segundo comando) — bug real detectado en v2.23.2. Con `shell: \"powershell\"`, Claude Code envuelve el comando vía `powershell -NoProfile -Command \"...\"` y propaga stdin correctamente al subprocess. Usa `py` (Python launcher) que viene con la instalación oficial de Python; si solo está python, sustituye `py` por `python`.",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "timeout": 30,
+            "command": "py \"$env:NEB_HOME\\hooks\\preprocess-prompt.py\""
+          }
+        ]
+      },
+      {
+        "_os_note": "LINUX/MAC (bash) — alternativa al bloque Windows de arriba. Eliminar el bloque Windows al usar este.",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 30,
+            "command": "python3 \"$NEB_HOME/hooks/preprocess-prompt.py\""
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "_doc": "notify-on-stop — hook opt-in personal que reproduce un chime al cierre de cada turno de Claude. Ver tooling/notify-on-stop.md. Defaults: 1 chime + 1 por minuto del turno, max 5, skip si < 10s. Configurable en ~/.claude/notify-on-stop.json. Elegir bloque OS apropiado y eliminar el otro.",
+        "_os_note": "WINDOWS — usa `shell: \"powershell\"` con `$env:VAR`. Requiere NEB_HOME seteado. Defensivo: ante cualquier falla, exit 0 silencioso. Incluye recursion guard via CLAUDE_PREPROCESS_RECURSION para evitar chime fantasma cuando preprocess-prompt.py invoca claude -p como subproceso.",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "timeout": 10,
+            "command": "powershell -NoProfile -File \"$env:NEB_HOME\\hooks\\notify-on-stop.ps1\""
+          }
+        ]
+      },
+      {
+        "_os_note": "LINUX/MAC (bash) — alternativa al bloque Windows de arriba. Requiere bash + jq + un player (afplay/paplay/aplay/play). Eliminar el bloque Windows al usar este.",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "bash \"$NEB_HOME/hooks/notify-on-stop.sh\""
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "_doc": "notify-on-permission — hook opt-in personal que reproduce 1 chime cuando Claude pide permiso para una herramienta o el prompt input lleva idle > 60s. Ver tooling/notify-on-permission.md. Configurable en ~/.claude/notify-on-permission.json (enabled, wav). Coexiste con el bloque Stop (notify-on-stop): eventos semánticamente distintos. Elegir bloque OS apropiado y eliminar el otro.",
+        "_os_note": "WINDOWS — usa `shell: \"powershell\"` con `$env:VAR`. Requiere NEB_HOME seteado. Defensivo: ante cualquier falla, exit 0 silencioso. Incluye recursion guard via CLAUDE_PREPROCESS_RECURSION.",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "timeout": 10,
+            "command": "powershell -NoProfile -File \"$env:NEB_HOME\\hooks\\notify-on-permission.ps1\""
+          }
+        ]
+      },
+      {
+        "_os_note": "LINUX/MAC (bash) — alternativa al bloque Windows de arriba. Requiere bash + un player (afplay/paplay/aplay/play). jq es blando. Eliminar el bloque Windows al usar este.",
+        "hooks": [
+          {
+            "type": "command",
+            "timeout": 10,
+            "command": "bash \"$NEB_HOME/hooks/notify-on-permission.sh\""
+          }
+        ]
+      }
+    ]
+  }
+}

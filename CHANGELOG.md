@@ -1,0 +1,22 @@
+# Changelog
+
+Todos los cambios relevantes a esta metodología quedan registrados aquí. Formato: [keep a changelog](https://keepachangelog.com/en/1.1.0/). Versionado SemVer.
+
+## [Unreleased]
+
+## [1.0.0] - 2026-06-02
+
+Primera versión pública de **neb** — corte open source del núcleo del framework.
+
+### Added
+- Núcleo agnóstico del framework: `general/`, `methodology/`, `process/`, `workflow/`, `tooling/`.
+- Stacks publicables: `self-applied`, `requirements-analysis`, `stack-authoring`, `skill-authoring`, `research`.
+- Subagentes revisores transversales: `qa-process-engineer`, `process-improvement-analyst`, `skill-qa-engineer`, `fact-check-reviewer`, `context-completeness-reviewer`.
+- Skill de bienvenida (`/welcome`) para onboarding guiado.
+- Andamiaje OSS: `LICENSE` (MIT), `README`, `CONTRIBUTING`.
+- Instalador Modelo A (`bootstrap/install.sh`): clona el repo, enlaza los `@import` en el `CLAUDE.md` del adoptante e instala skills, agents y hooks.
+- Plantillas de artefactos (`templates/`) y hooks de soporte (`hooks/`).
+
+### Notes
+- Esta versión publica una **copia saneada** del núcleo; el set público no contiene PII, marcas ni stacks de dominio privados.
+- Idioma de los lineamientos: español (la traducción a inglés es trabajo futuro).

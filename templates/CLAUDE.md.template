@@ -1,0 +1,35 @@
+# CLAUDE.md — <PROYECTO>
+
+## Metodología (no editar — proviene de methodology)
+
+@~/.claude/neb/general/index.md
+@~/.claude/neb/workflow/index.md
+@~/.claude/neb/stacks/<STACK>/index.md
+@~/.claude/neb/stacks/<STACK>/servers.md
+
+<!-- Personal override del proyecto, si existe (gitignored): -->
+<!-- @./.claude/personal.md -->
+
+---
+
+## Proyecto <PROYECTO>
+
+> Lo específico de ESTE proyecto: arquitectura, módulos, BD, crons, decisiones particulares. NO duplica metodología (vive en methodology).
+
+### Stack
+
+<!-- versión de PHP, BD, framework si conviene aclararlo -->
+
+### Estructura particular
+
+<!-- subdirectorios relevantes, módulos custom, integraciones -->
+
+### Convenciones del proyecto
+
+<!-- patrones específicos que un futuro Claude necesita -->
+
+### Comandos comunes
+
+<!-- build, test, deploy específicos del proyecto si difieren del stack -->
+
+### Notas

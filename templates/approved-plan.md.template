@@ -1,0 +1,9 @@
+# Plan aprobado — YYYY-MM-DD HH:MM:SS
+
+**Proyecto:** <basename del cwd>
+**Sesión:** <session_id>
+**CWD:** <ruta completa>
+
+<!-- Referencia visual. hooks/save-approved-plan.sh sobreescribe el archivo entero con el contenido del plan aprobado, no usa esta plantilla literalmente. -->
+
+<contenido completo del plan que pasó a ExitPlanMode>

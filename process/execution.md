@@ -1,0 +1,84 @@
+# Execution
+
+Estándares de implementación, plan mode, gestión de tareas, incidencias.
+
+## Insumos de contexto (Fase 4)
+
+Al implementar en un proyecto cuyo stack tiene un skill asociado (ver `stacks/<stack>/skills.md`), consultarlo antes de modificar código para:
+
+- Mapear callers/dependientes antes de tocar un método o campo compartido (convención de `personal/<usuario>.md`).
+- Identificar el patrón de override correcto si se toca código del core/upstream.
+
+## Estándares
+
+Los estándares de código (baseline: sin comentarios salvo WHY no obvio, sanitizar en fronteras, sin features/refactors no pedidos, sin backwards-compat innecesario) viven en [`../methodology/coding-standards.md`](../methodology/coding-standards.md); cada stack los concreta en `stacks/<stack>/conventions.md`. Al terminar la implementación: lista de archivos modificados con una línea por cambio.
+
+## Plan mode
+
+- Solo acciones read-only y edición del archivo de plan.
+- Cierra con `ExitPlanMode` (aprobación del usuario).
+- Al ejecutar `ExitPlanMode`, salir también de auto mode si estaba activo.
+- Cada plan aprobado en plan mode se guarda automáticamente vía hook; los aprobados conversacionalmente (media/alta) se persisten vía `Write` (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
+
+Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquitectónicas, o conviene ver el plan antes de gastar tiempo en código.
+
+NO usar para: bug fix de una línea, renames triviales, tareas exploratorias.
+
+Selección de modelo en plan mode: ver [models.md](../general/models.md).
+
+## Tareas
+
+Para 3+ pasos discretos, usar `TaskCreate` y `TaskUpdate`. Marcar `in_progress` al iniciar y `completed` al terminar — no batchear.
+
+Si una tarea se bloquea, mantenerla `in_progress` y crear una nueva describiendo el bloqueo. No marcar completada si tests fallan, hay implementación parcial, o errores sin resolver.
+
+## Confirmación del cambio en Fase 4
+
+Antes de cada confirmación del cambio que toque el entregable del proyecto destino, Claude espera OK explícito del dev. La regla canónica (alcance, granularidad, excepciones) vive en [`change-control.md`](change-control-gate.md) § "Autorización de la confirmación del cambio"; su concretización git (qué es un `git commit`, exclusiones de gobernanza) en [`process/version-control.md`](version-control.md).
+
+## Cierre de Fase 4 (gate de subagente)
+
+Antes de declarar Fase 4 terminada y transicionar a Fase 5, el rol principal (persona) invoca al menos un subagente del stack como gate adversarial del **artefacto implementado** — no del plan. El subagente recibe un briefing explícito con el artefacto final usando la misma plantilla que Fase 3 (ver [`process/plan-review.md`](plan-review.md) "Plantilla de briefing"), adaptando la sección "Plan propuesto" para describir el artefacto producido.
+
+Qué subagente por stack (default + paralelos por dimensión): ver la matriz columna **F4** en [`roles-invocation.md`](roles-invocation.md) § "Cobertura mínima por fase". Si el stack no tiene subagente formalizado, el dev declara override explícito antes de avanzar a Fase 5.
+
+**Adicional transversal**: el `context-completeness-reviewer` se invoca en este gate cuando el artefacto producido difiere del plan aprobado en ≥1 archivo no listado o ≥1 sección no descrita, o cuando el rol principal detecta que hubo decisiones tomadas en implementación que no estaban en el plan. Aplica a cualquier stack. Output: tabla de suposiciones contexto/dominio; si hay filas no resueltas, el cierre del gate queda bloqueado hasta resolver. Ver [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`".
+
+## Gestión de sesiones (handoff)
+
+### Retomar una sesión interrumpida
+
+Al retomar un requerimiento interrumpido:
+
+1. Leer la memoria del proyecto (`project_<nombre>.md`).
+2. Leer el MD del requerimiento (`<proyecto>/changes/<fecha>-<nombre>.md`) para ver estado.
+3. Si hay "Pendiente de entrega" → atender primero.
+4. Si la última fase no está cerrada → continuar desde ahí.
+5. Si la sesión se reanudó vía `claude --resume <nombre>`, eliminar la entrada correspondiente en `pendings.md` §"Sesiones pausadas".
+
+Resumir el estado en una línea al inicio:
+
+> "Retomamos `proteger-textos-zonacliente` (en Fase 5 — validación pendiente). ¿Validaste el flujo principal?"
+
+### Pausar y reanudar la misma sesión Claude
+
+Cuando el dev anuncia que pausará para continuar después en otra sesión, la sesión actual debe quedar recuperable por nombre — `claude --continue` solo recupera la última, y si el dev abre una sesión intermedia se pierde el hilo. La **acción de Claude** al detectar el anuncio de pausa (nombrar la sesión, registrar en `pendings.md`, confirmar) vive en [`../general/communication.md`](../general/communication.md) §"Hilo de la metodología".
+
+**Comandos disponibles para el dev**:
+
+- `claude --resume <nombre>` — reanudar por nombre.
+- `claude --resume` — picker interactivo (todas las sesiones del proyecto; `Ctrl+A` para todos los proyectos).
+- `claude -n <nombre>` — nombrar al iniciar una sesión nueva (si el dev quiere prefijar antes del primer turno).
+
+## Incidencias durante el trabajo
+
+(Para incidentes detectados post-entrega final, ver [incidents.md](../general/incidents.md).)
+
+Cambios menores que surgen durante el trabajo (rename de columna, archivo SQL faltante, bug detectado en repaso) se tratan como **incidencias durante el trabajo** — no como sub-requerimientos — siempre que no afecten el plan original.
+
+Claude propone el cambio en una línea y procede con aprobación implícita o explícita. **No vuelve a clarificación ni genera estimado nuevo.**
+
+Al resolver, documentar de inmediato en la memoria del proyecto:
+- Qué fue (una línea).
+- Cómo se resolvió (una línea).
+- Si requiere paso adicional en la entrega final.

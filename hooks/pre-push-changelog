@@ -1,0 +1,48 @@
+#!/usr/bin/env bash
+# managed-by: neb/hooks/pre-push-changelog
+# Hook pre-push: verifica que CHANGELOG.md esté sincronizado con changelog.d/
+# antes de publicar commits que tocan changelog.d/.
+#
+# Instalado automáticamente por bootstrap/install.sh.
+# Bypass (requiere autorización explícita del dev): git push --no-verify
+
+set -euo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+
+# Solo actúa si hay commits a pushear que tocan changelog.d/
+# @{push} requiere upstream configurado; si no hay, salir silencioso
+if ! git rev-parse --abbrev-ref "@{push}" >/dev/null 2>&1; then
+  exit 0
+fi
+if ! git diff --name-only "@{push}..HEAD" 2>/dev/null | grep -q '^changelog\.d/'; then
+  exit 0
+fi
+
+# Detectar Python
+if command -v py >/dev/null 2>&1; then
+  PY=py
+elif command -v python3 >/dev/null 2>&1; then
+  PY=python3
+else
+  echo >&2 "[pre-push] Python no encontrado (py / python3)."
+  echo >&2 "           Verifica tu instalación o usa: git push --no-verify"
+  exit 1
+fi
+
+# Verificar sincronía
+if "$PY" "$ROOT/bootstrap/assemble-changelog.py" --check >/dev/null 2>&1; then
+  exit 0
+fi
+
+echo >&2 ""
+echo >&2 "[pre-push] CHANGELOG.md desactualizado respecto a changelog.d/"
+echo >&2 ""
+echo >&2 "  Regenera y commitea antes de hacer push:"
+echo >&2 "    py bootstrap/assemble-changelog.py"
+echo >&2 "    git add CHANGELOG.md"
+echo >&2 "    git commit -m 'docs: regenerar CHANGELOG'"
+echo >&2 "    git push"
+echo >&2 ""
+echo >&2 "  Bypass (requiere autorización explícita del dev): git push --no-verify"
+exit 1

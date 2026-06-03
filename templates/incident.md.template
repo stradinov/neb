@@ -1,0 +1,30 @@
+# INCIDENT — <título descriptivo>
+
+**Severidad:** P1 | P2
+**Estado:** Abierto | Mitigado | Cerrado
+**Detección:** YYYY-MM-DD HH:MM
+**Mitigación:** YYYY-MM-DD HH:MM
+**Cierre:** YYYY-MM-DD
+**Sistema:** <proyecto> / <módulo>
+**Originado por:** changes/<fecha>-<req>.md (commit <hash>)
+
+## Impacto
+
+<!-- Usuarios o transacciones afectadas, ventana de tiempo. -->
+
+## Mitigación aplicada
+
+<!-- Qué se hizo: rollback (qué archivos, comandos), fix forward (commit hash), workaround temporal. -->
+
+## Causa raíz
+
+<!-- Solo P1. Por qué falló. Cinco porqués si aplica. -->
+
+## Prevención
+
+<!-- Solo P1. Qué cambia para que no vuelva a pasar: código, monitoring, proceso. -->
+
+## Lecciones para la metodología
+
+<!-- Solo P1, solo si aplica. Qué fase o política debería cambiar y por qué.
+Ingresar a Fase 9 (improvement.md) al cierre del INCIDENT. -->

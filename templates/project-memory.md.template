@@ -1,0 +1,32 @@
+---
+name: Proyecto <NOMBRE>
+description: <una línea — qué tipo de proyecto, qué stack, qué cliente>
+type: project
+---
+
+# Proyecto <NOMBRE>
+
+## Stack y arquitectura
+
+<!-- una línea sobre framework, BD, tipo. Solo lo no evidente del CLAUDE.md del repo. -->
+
+## Convenciones del proyecto
+
+<!-- patrones, módulos, decisiones de diseño no obvias -->
+
+## Bugs resueltos importantes
+
+<!-- una línea + commit hash -->
+
+## Pendiente de entrega
+
+> Se elimina cuando la entrega final se completa. Si está vacía, eliminar la sección.
+
+Artefactos listos para entrega:
+- <archivo> (commit <hash>)
+
+Pasos exactos:
+1. <comando de deploy: scp/ssh/migración de BD/...>
+2. ...
+
+Crons o configuración a verificar.

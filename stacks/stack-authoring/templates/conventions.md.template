@@ -1,0 +1,13 @@
+# Convenciones (stack: {{STACK_NAME}})
+
+## <!-- Sección principal de convenciones -->
+
+<!-- Describir estructura de archivos, naming, patrones específicos del stack -->
+
+## Imports
+
+<!-- Política de imports dentro del stack y desde proyectos cliente -->
+
+## Separación core vs stack
+
+<!-- Qué vive en general/meta/ vs qué vive en este stack -->

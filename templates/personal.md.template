@@ -1,0 +1,34 @@
+---
+name: Override personal de <USUARIO>
+description: Reglas personales que estrechan o agregan a la metodología baseline
+type: personal
+---
+
+# Personal — <USUARIO>
+
+> Puede **estrechar** o **agregar** sobre las reglas generales, **nunca relajarlas**. Ver [methodology/personal-vs-team.md](../methodology/personal-vs-team.md).
+
+## Atajos personales
+
+<!-- abreviaciones, formatos de salida, alias mentales -->
+
+## Preferencias de comunicación
+
+<!-- ej. "respuestas <100 palabras" o "tablas en lugar de bullets cuando hay 5+ ítems" -->
+
+## Convenciones individuales
+
+<!-- ej. "siempre commit con --signoff" si no contradice process/delivery.md -->
+
+## Notas privadas
+
+<!-- contexto del dev individual, no aplicable al equipo -->
+
+## Directorio de repos locales
+
+Claude consulta esta tabla para encontrar repos sin asumir paths. Actualizar al clonar uno nuevo.
+
+| Repo (Git) | Path local |
+|---|---|
+| `tu-org/repo-a` | `<ruta>` |
+| `tu-org/repo-b` | `<ruta>` |
