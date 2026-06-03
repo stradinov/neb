@@ -4,6 +4,17 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [1.3.0] — 2026-06-03
+
+### Added
+
+- **`docs/user-guide.md`** — adopter how-to guide: mounting your own overlay (git subtree), adding stacks/skills/subagents, versioning your `personal/` config, and where change MDs live. Extracts the "how-to" content from `docs/how-it-works.md` (Diátaxis split: explanation vs. how-to).
+- **`docs/` layer documented** — `methodology/principles.md` and `general/index.md` now state that `docs/` (adopter-facing documentation) sits outside the layer-pertinence test; its files are not classified as Methodology/Process.
+
+### Changed
+
+- **`docs/how-it-works.md`** — now explanation-only; the extension how-to moved to `user-guide.md`.
+
 ## [1.2.0] — 2026-06-02
 
 ### Added

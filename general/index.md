@@ -34,6 +34,7 @@ Referencia (on-demand):
 - [`process/`](../process/index.md) — fases, gates y mecanismos de control (planning → improvement, plan-review, version-control…).
 - [`workflow/`](../workflow/index.md) — artefactos (changes, pendings, approved-plans, metrics, traceability).
 - [`tooling/`](../tooling/index.md) — hooks y recursos opt-in personales.
+- [`docs/`](../docs/how-it-works.md) — documentación de cara al adoptante (explicación + guías how-to); **fuera de las capas del flujo** (ver [`../methodology/principles.md`](../methodology/principles.md) § "Capas del repo y test de pertenencia").
 
 ## Flujo
 

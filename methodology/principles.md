@@ -39,6 +39,8 @@ Cada `.md` vive en la capa cuyo test de pertenencia cumple (mapa de capas en [`.
 | `workflow/` | ¿Describe el ciclo de vida de un ARTEFACTO que se produce/persiste? |
 | `tooling/` | ¿Es hook/recurso opt-in, no lineamiento del baseline? |
 
+> **Excepción `docs/`**: la carpeta `docs/` (documentación de cara al adoptante — explicación en `how-it-works.md`, guías how-to en `user-guide.md`) **no** se gobierna por este test: es documentación para humanos, no lineamiento que el agente aplique en el flujo. Sus archivos no se clasifican como Metodología/Proceso.
+
 ### Fronteras cohesivas deliberadas
 
 Algunos archivos mezclan capas **por cohesión de dominio** y NO se fragmentan: separar dañaría más la navegación de lo que la pureza aportaría. Son excepciones explícitas, no deuda:

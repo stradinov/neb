@@ -1,7 +1,8 @@
 ﻿# Cómo funciona neb
 
-Documentación técnica para quienes deseen comprender la mecánica interna
-del framework: estructura del flujo, componentes y mecanismos de extensión.
+Documentación técnica para comprender la **mecánica interna** del framework:
+estructura del flujo, componentes y mecanismos. Las **guías de uso** (extender,
+montar tu overlay, versionar tu configuración) viven en [user-guide.md](user-guide.md).
 
 ---
 
@@ -71,35 +72,6 @@ Contrato: un override puede *estrechar o agregar* sobre el baseline, pero
 
 Convenciones de commit, estándares de código, definición de done y reglas
 de deploy. Aplican a todos los integrantes que utilicen el stack.
-
----
-
-## Extensión — agregar capacidades propias
-
-El núcleo no requiere modificación para incorporar capacidades nuevas.
-
-### Nuevo stack
-
-```bash
-bash bootstrap/init-stack-subproject.sh <nombre>
-```
-
-Genera el scaffold con los archivos mínimos. Referencia completa:
-[`methodology/stacks.md`](../methodology/stacks.md).
-
-### Nuevo skill
-
-1. Crear `skills/<nombre>/SKILL.md` con los campos `name` y `description`.
-2. Agregar archivos de contenido y scripts si aplica.
-3. Registrar en `skills/README.md` y en el stack correspondiente.
-
-El agente los descubre automáticamente.
-
-### Nuevo subagente revisor
-
-1. Crear `agents/<nombre>.md` con los campos `name`, `description` y `tools`.
-2. El cuerpo constituye el system prompt del rol.
-3. Registrar en `bootstrap/install-agents.sh`.
 
 ---
 
