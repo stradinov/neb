@@ -29,12 +29,11 @@ get_framework_imports() {
 }
 
 # Source the private overlay if present — generic discovery, no hardcoded name.
-# NEB_HOME = the neb checkout; the private overlay lives as a sibling of neb/ in the
-# governance root (dirname of NEB_HOME). Fallback: infer neb/ from this script's path.
-_NEB_DIR="${NEB_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-_GOV_ROOT="$(dirname "$_NEB_DIR")"
+# NEB_WORKSPACE = the governance root (contains neb/ + your overlay). Fallbacks:
+# dirname(NEB_HOME), then this script's grandparent dir.
+_WS="${NEB_WORKSPACE:-$(dirname "${NEB_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}")}"
 _ov_used=""
-for _ov in "$_GOV_ROOT"/*/overlays/detect-stack.local.sh; do
+for _ov in "$_WS"/*/overlays/detect-stack.local.sh; do
   [ -f "$_ov" ] || continue          # no match → glob stays literal → skip
   if [ -n "$_ov_used" ]; then
     echo "  aviso: overlay múltiple; usando $_ov_used (ignorado: $_ov)" >&2
@@ -43,7 +42,7 @@ for _ov in "$_GOV_ROOT"/*/overlays/detect-stack.local.sh; do
   # shellcheck source=/dev/null
   source "$_ov"; _ov_used="$_ov"
 done
-unset _NEB_DIR _GOV_ROOT _ov _ov_used
+unset _WS _ov _ov_used
 
 bold() { printf "\033[1m%s\033[0m\n" "$*"; }
 info() { printf "  %s\n" "$*"; }

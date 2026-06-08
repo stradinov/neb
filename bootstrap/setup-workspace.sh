@@ -4,13 +4,14 @@ set -euo pipefail
 # setup-workspace.sh — configura o repara el entorno de gobernanza de Neb.
 #
 # Idempotente: seguro de correr varias veces. Cubre tres escenarios:
-#   - Adoptante nuevo: completa el scaffolding (overlay + personal/ + changes/) y la env var.
-#   - Migración (dev con versión antigua tras traer neb/): corrige NEB_HOME y avisa de imports rotos.
+#   - Adoptante nuevo: completa el scaffolding (overlay + personal/ + changes/) y las env vars.
+#   - Migración (dev con versión antigua tras traer neb/): corrige las vars y avisa de imports rotos.
 #   - Reset: reconfigura sin duplicar.
 #
 # Debe correrse DESDE la raíz del repo de gobernanza (el que contiene neb/ como subtree).
-# Modelo de variable: NEB_HOME = el checkout de neb (= <raíz>/neb). La raíz de gobernanza
-# se deriva como dirname(NEB_HOME); el overlay vive como hermano de neb/.
+# Modelo de variables (2):
+#   NEB_HOME      = el checkout de neb (= <raíz>/neb). Hooks, templates, bootstrap del núcleo.
+#   NEB_WORKSPACE = la raíz de gobernanza. Overlay, personal/, changes/.
 #
 # Uso:
 #   bash neb/bootstrap/setup-workspace.sh [--overlay <nombre>] [--dry-run]
@@ -49,9 +50,11 @@ if [ ! -f "$ROOT/neb/general/startup.md" ]; then
 fi
 bold "Repo de gobernanza: $ROOT"
 
-# 2. NEB_HOME = el checkout de neb (= <raíz>/neb), variable canónica
+# 2. Variables canónicas
 NEB_HOME_VAL="$ROOT/neb"
-info "NEB_HOME → $NEB_HOME_VAL"
+NEB_WORKSPACE_VAL="$ROOT"
+info "NEB_HOME      → $NEB_HOME_VAL"
+info "NEB_WORKSPACE → $NEB_WORKSPACE_VAL"
 
 # 3. Scaffolding idempotente: overlay (hermano de neb/), personal/, changes/
 bold "Overlay privado"
@@ -83,28 +86,24 @@ fi
 [ -d "$ROOT/personal" ] && ok "personal/ ya existe" || { run "mkdir -p \"$ROOT/personal\""; run "touch \"$ROOT/personal/.gitkeep\""; ok "Creado personal/"; }
 [ -d "$ROOT/changes" ]  && ok "changes/ ya existe"  || { run "mkdir -p \"$ROOT/changes\"";  run "touch \"$ROOT/changes/.gitkeep\"";  ok "Creado changes/"; }
 
-# 4. Setear NEB_HOME en el shell profile (idempotente, con backup, portable BSD/GNU)
-bold "Variable de entorno NEB_HOME (shell profile)"
+# 4. Setear NEB_HOME + NEB_WORKSPACE en el shell profile (idempotente, 1 backup, portable)
+bold "Variables de entorno (shell profile)"
 PROFILE=""
 for cand in "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
   [ -f "$cand" ] && { PROFILE="$cand"; break; }
 done
 if [ -z "$PROFILE" ]; then
-  warn "No encontré un shell profile (~/.bashrc, etc.). Agregá manualmente: export NEB_HOME=\"$NEB_HOME_VAL\""
-elif grep -q '^[[:space:]]*export[[:space:]]\+NEB_HOME=' "$PROFILE"; then
-  if grep -qF "export NEB_HOME=\"$NEB_HOME_VAL\"" "$PROFILE"; then
-    ok "NEB_HOME ya correcto en $PROFILE"
-  else
-    run "cp \"$PROFILE\" \"$PROFILE.bak\""
-    # reescritura portable (sin sed -i, que difiere GNU vs BSD): filtrar + append
-    run "grep -v '^[[:space:]]*export[[:space:]]\\+NEB_HOME=' \"$PROFILE\" > \"$PROFILE.tmp\" && printf 'export NEB_HOME=\"%s\"\\n' \"$NEB_HOME_VAL\" >> \"$PROFILE.tmp\" && mv \"$PROFILE.tmp\" \"$PROFILE\""
-    ok "Actualizado NEB_HOME en $PROFILE (backup .bak)"
-  fi
+  warn "Sin shell profile (~/.bashrc, etc.). Agregá a mano:"
+  info "  export NEB_HOME=\"$NEB_HOME_VAL\""
+  info "  export NEB_WORKSPACE=\"$NEB_WORKSPACE_VAL\""
+elif grep -qF "export NEB_HOME=\"$NEB_HOME_VAL\"" "$PROFILE" && grep -qF "export NEB_WORKSPACE=\"$NEB_WORKSPACE_VAL\"" "$PROFILE"; then
+  ok "NEB_HOME y NEB_WORKSPACE ya correctos en $PROFILE"
 else
-  run "printf '\\nexport NEB_HOME=\"%s\"\\n' \"$NEB_HOME_VAL\" >> \"$PROFILE\""
-  ok "Agregado NEB_HOME a $PROFILE"
+  run "cp \"$PROFILE\" \"$PROFILE.bak\""
+  run "grep -vE '^[[:space:]]*export[[:space:]]+(NEB_HOME|NEB_WORKSPACE)=' \"$PROFILE\" > \"$PROFILE.tmp\" && { printf 'export NEB_HOME=\"%s\"\\n' \"$NEB_HOME_VAL\"; printf 'export NEB_WORKSPACE=\"%s\"\\n' \"$NEB_WORKSPACE_VAL\"; } >> \"$PROFILE.tmp\" && mv \"$PROFILE.tmp\" \"$PROFILE\""
+  ok "NEB_HOME y NEB_WORKSPACE seteados en $PROFILE (backup .bak)"
 fi
-info "Para esta sesión: export NEB_HOME=\"$NEB_HOME_VAL\""
+info "Para esta sesión: export NEB_HOME=\"$NEB_HOME_VAL\"; export NEB_WORKSPACE=\"$NEB_WORKSPACE_VAL\""
 
 # 5. Verificar ~/CLAUDE.md (no destructivo: NO sobreescribe contenido propio)
 bold "~/CLAUDE.md (verificación, sin sobreescribir)"
@@ -122,5 +121,5 @@ else
 fi
 
 bold "Listo"
-info "Pendiente (no automatizado aquí): NEB_HOME en ~/.claude/settings.json y reapuntar hooks a \$NEB_HOME/hooks — ver wakeup / migración (F5)."
+info "Pendiente (no automatizado aquí): NEB_HOME/NEB_WORKSPACE en ~/.claude/settings.json y reapuntar hooks a \$NEB_HOME/hooks — ver wakeup / migración (F5)."
 [ "$DRY_RUN" -eq 1 ] && info "(fue --dry-run: no se escribió nada)"
