@@ -41,6 +41,23 @@ El `--squash` mantiene tu historia limpia. Tu overlay y `neb/` quedan en árbole
 
 **Camino simple**: forkeás `neb` y traés mejoras con `git pull` del upstream — sirve para empezar, pero mezcla tu historia con la del núcleo.
 
+### Configurar el entorno
+
+Con `neb/` ya en tu repo, corré el script de setup (idempotente — seguro de repetir, sirve para reset o migración):
+
+```bash
+bash neb/bootstrap/setup-workspace.sh [--overlay <nombre>]
+```
+
+Crea lo que falte (`overlay/`, `personal/`, `changes/`) y setea **dos variables** en tu shell profile (con backup):
+
+| Variable | Apunta a | Para |
+|---|---|---|
+| `NEB_HOME` | el checkout de neb (`<repo>/neb`) | hooks (`$NEB_HOME/hooks`), templates y bootstrap del núcleo |
+| `NEB_WORKSPACE` | la raíz de tu repo de gobernanza | tu overlay, `personal/`, `changes/` |
+
+Reiniciá tu shell para que tomen efecto. El tour `/wakeup` corre este paso por vos de forma interactiva. El script detecta un overlay preexistente y no lo pisa; `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (default `overlay`).
+
 ## Definir tu primer stack
 
 Un *stack* concreta Neb para un tipo de proyecto (comandos de build, convenciones de commit, proceso de deploy, revisores aplicables) — es lo que hace a Neb útil para tu dominio. Materializalo en **tu overlay**, no en `neb/`.

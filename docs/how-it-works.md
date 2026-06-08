@@ -89,6 +89,8 @@ en su `CLAUDE.md`:
 @~/.claude/neb/general/startup.md
 ```
 
+En un setup con repo de gobernanza (`neb/` como subtree de Neb), dos variables fijan los paths del entorno: `NEB_HOME` (el checkout de neb) y `NEB_WORKSPACE` (la raíz, donde viven el overlay y `personal/`). Cómo setearlas: [user-guide § Configurar el entorno](user-guide.md).
+
 ---
 
 ## Artefactos del flujo
