@@ -63,7 +63,7 @@ install_skill() {
 }
 
 bold "Instalando skills"
-install_skill "welcome"
+install_skill "wakeup"
 
 bold "Listo"
 info "Skills instalados en $SKILLS_DST"

@@ -1,13 +1,13 @@
-# Cómo contribuir a neb
+# Cómo contribuir a Neb
 
 > Stub inicial (MVP). Se ampliará a medida que el proyecto reciba contribuciones externas.
 
-Gracias por tu interés en mejorar **neb**. El framework se gobierna con sus propias reglas (stack `self-applied`): cada cambio a la metodología es un requerimiento que sigue sus propias fases y gates.
+Gracias por tu interés en mejorar **Neb**. Neb se gobierna con sus propias reglas (stack `self-applied`): cada cambio a la metodología es un requerimiento que sigue sus propias fases y gates.
 
 ## Antes de empezar
 
 - Leé el [README](README.md) para entender el modelo (fases, stacks, artefactos).
-- Revisá [`CLAUDE.md`](CLAUDE.md) — las meta-instrucciones para editar el framework, incluidas las convenciones de versionado SemVer y el flujo de CHANGELOG.
+- Revisá [`CLAUDE.md`](CLAUDE.md) — las meta-instrucciones para editar Neb, incluidas las convenciones de versionado SemVer y el flujo de CHANGELOG.
 
 ## Flujo de una contribución
 
@@ -17,7 +17,7 @@ Gracias por tu interés en mejorar **neb**. El framework se gobierna con sus pro
    - Archivos en `kebab-case.md`, sin prefijos numéricos.
    - Imports internos con paths relativos.
    - Cada carpeta mantiene su `index.md` con orden de lectura.
-4. **Revisá tu diff** — no introduzcas PII, datos de clientes, marcas ni rutas absolutas de tu máquina. El framework es agnóstico de dominio: usá ejemplos genéricos.
+4. **Revisá tu diff** — no introduzcas PII, datos de clientes, marcas ni rutas absolutas de tu máquina. Neb es agnóstica de dominio: usá ejemplos genéricos.
 5. **Registrá el cambio en el CHANGELOG** — agregá un fragment en `changelog.d/<X.Y.Z>.md` (formato [keep a changelog](https://keepachangelog.com/)) y corré `python bootstrap/assemble-changelog.py`.
 6. **Bump SemVer** según el tipo de cambio (ver `CLAUDE.md`):
    - Patch: redacción, typos, aclaraciones.

@@ -5,7 +5,7 @@ Marco teórico/estratégico: principios, vocabulario, criterios, catálogos y EN
 ## Documentos
 
 1. [Principles](principles.md) — qué hace buena a una metodología, fases vs políticas, anti-patrones, lineamientos para editar MDs.
-2. [Promises](promises.md) — promesas verificables que el framework ofrece al adoptante (versión de cara al usuario de las características de diseño).
+2. [Promises](promises.md) — promesas verificables que Neb ofrece al adoptante (versión de cara al usuario de las características de diseño).
 3. [Vocabulary](vocabulary.md) — vocabulario abstracto de la metodología; términos y ENUMs usados en todas las fases.
 4. [Personal vs team](personal-vs-team.md) — cómo conviven baselines del equipo con overrides personales.
 5. [Skills](skills.md) — qué es un skill de Claude Code, cuándo crear uno, estructura, política de contenido y distribución al equipo.

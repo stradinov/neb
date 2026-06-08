@@ -4,6 +4,18 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [1.4.0] — 2026-06-03
+
+### Changed
+
+- **Adoption/onboarding model reworked.** `docs/user-guide.md` is now the single source for the adoption steps (install → mount overlay → define your first stack, with a support skill and reviewer agents as derivatives of the stack). `general/onboarding.md` no longer spells out the tour steps — it defines only the passive-offer trigger and lists the options that point to the user guide. The tour skill executes those steps interactively, with installation-state detection (installed / overlay mounted / propose reinstall).
+- **`welcome` skill renamed to `wakeup`** — the command is now `/wakeup` (Matrix/Nebuchadnezzar theme: "wake up"). Adopters who installed the old `welcome` skill should re-run `bootstrap/install-skills.sh`; the stale `welcome/` skill dir can be removed.
+
+### Removed
+
+- **Adoption levels (L1/L2/L3) removed.** The tour no longer asks the user to choose an adoption level; the construct was never wired to runtime behavior. Mounting an overlay and defining a stack is now the minimal setup to use neb.
+- **Promise #8 ("Adopción guiada" / incremental adoption) removed** from `methodology/promises.md` (a user-facing contract change). The remaining promises were renumbered 9→8, 10→9, 11→10 — the framework now declares 10 promises.
+
 ## [1.3.0] — 2026-06-03
 
 ### Added

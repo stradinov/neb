@@ -29,7 +29,7 @@ git clone https://github.com/tu-org/neb.git ~/.claude/neb
 bash ~/.claude/neb/bootstrap/install.sh
 ```
 
-Luego abre Claude Code y escribe `/welcome`.
+Luego abre Claude Code y escribe `/wakeup`.
 
 ---
 
@@ -39,7 +39,7 @@ Luego abre Claude Code y escribe `/welcome`.
 * **Aprobación en puntos críticos** — Ningún cambio relevante avanza sin tu validación explícita.
 * **Consistencia entre sesiones y desarrolladores** — El método no varía según quién haya trabajado en la sesión anterior.
 * **Adaptable al stack del proyecto** — Las reglas genéricas aplican a cualquier proyecto; las específicas del equipo se incorporan sin modificar el núcleo.
-* **Adopción incremental** — Es posible comenzar con un flujo básico e incorporar controles de calidad conforme el proyecto los requiera.
+* **Adopción guiada** — El tour inicial (`/wakeup`) te lleva por el setup: montar tu capa propia y definir tu primer stack.
 * **Trazabilidad completa** — Cada decisión queda documentada para auditorías, incorporación de nuevos integrantes o revisiones futuras.
 * **Reflexivo** — Neb se aplica a sí mismo; cada modificación al framework ha seguido el mismo método que describe.
 
@@ -47,4 +47,4 @@ Luego abre Claude Code y escribe `/welcome`.
 
 <!-- /human -->
 
-[Cómo funciona por dentro](docs/how-it-works.md) · [Contribuir](CONTRIBUTING.md) · [Licencia MIT](LICENSE)
+[Cómo funciona por dentro](docs/how-it-works.md) · [Guía del usuario](docs/user-guide.md) · [Contribuir](CONTRIBUTING.md) · [Licencia MIT](LICENSE)

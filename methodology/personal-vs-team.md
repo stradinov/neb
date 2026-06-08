@@ -2,7 +2,7 @@
 
 ## Punto de extensión (promesa 5 — Customizable)
 
-Este archivo define el contrato de customización del framework. Para adaptar defaults y reglas a tu contexto sin forkear el núcleo, creá `personal/<usuario>.md` a partir de [`templates/personal.md.template`](../templates/personal.md.template).
+Este archivo define el contrato de customización de Neb. Para adaptar defaults y reglas a tu contexto sin forkear el núcleo, creá `personal/<usuario>.md` a partir de [`templates/personal.md.template`](../templates/personal.md.template).
 
 Pasos:
 

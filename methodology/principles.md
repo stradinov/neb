@@ -12,7 +12,7 @@ Qué características hacen útil a una metodología de trabajo con un agente de
 6. **Importable** — los proyectos referencian al repo vía `@imports` estables sobre los `index.md`.
 7. **Reflexiva** — la metodología se aplica a sí misma: editarla es un requerimiento que sigue sus propias fases y gates (stack `self-applied`), por lo que el repo es ejemplo vivo de su propio uso (dogfooding). `self-applied` no es un stack de dominio periférico sino parte integral del núcleo.
 
-> Estas características son las **promesas** que el framework ofrece al adoptante. Su enunciado de cara al usuario y los criterios de aceptación verificables viven en [promises.md](promises.md).
+> Estas características son las **promesas** que Neb ofrece al adoptante. Su enunciado de cara al usuario y los criterios de aceptación verificables viven en [promises.md](promises.md).
 
 ## Fases vs políticas
 

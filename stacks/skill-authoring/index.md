@@ -1,6 +1,6 @@
 # Stack: skill-authoring
 
-Autoría, mantenimiento y distribución de skills de Claude Code bajo la metodología. Parte del mecanismo de la [promesa 6 (Expandible)](../../methodology/promises.md) — el adoptante agrega skills propios sin modificar el núcleo del framework.
+Autoría, mantenimiento y distribución de skills de Claude Code bajo la metodología. Parte del mecanismo de la [promesa 6 (Expandible)](../../methodology/promises.md) — el adoptante agrega skills propios sin modificar el núcleo de Neb.
 
 ## Cuándo aplica este stack
 
