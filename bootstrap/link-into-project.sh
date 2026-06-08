@@ -28,12 +28,22 @@ get_framework_imports() {
   echo "@~/.claude/neb/workflow/index.md"
 }
 
-# Source overlay if present (e.g. Onibex: neb/ + onibex/ sibling dirs)
-_LNK_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-_OVERLAY="${_LNK_DIR}/../../onibex/overlays/detect-stack.local.sh"
-# shellcheck source=/dev/null
-[ -f "$_OVERLAY" ] && source "$_OVERLAY"
-unset _LNK_DIR _OVERLAY
+# Source the private overlay if present — generic discovery, no hardcoded name.
+# NEB_HOME = the neb checkout; the private overlay lives as a sibling of neb/ in the
+# governance root (dirname of NEB_HOME). Fallback: infer neb/ from this script's path.
+_NEB_DIR="${NEB_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+_GOV_ROOT="$(dirname "$_NEB_DIR")"
+_ov_used=""
+for _ov in "$_GOV_ROOT"/*/overlays/detect-stack.local.sh; do
+  [ -f "$_ov" ] || continue          # no match → glob stays literal → skip
+  if [ -n "$_ov_used" ]; then
+    echo "  aviso: overlay múltiple; usando $_ov_used (ignorado: $_ov)" >&2
+    break
+  fi
+  # shellcheck source=/dev/null
+  source "$_ov"; _ov_used="$_ov"
+done
+unset _NEB_DIR _GOV_ROOT _ov _ov_used
 
 bold() { printf "\033[1m%s\033[0m\n" "$*"; }
 info() { printf "  %s\n" "$*"; }
