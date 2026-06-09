@@ -13,7 +13,7 @@ Al entrar a un directorio de proyecto, Claude detecta el stack:
 
    Prioridad canónica y heurísticas estructurales: [`stacks/index.md`](../stacks/index.md).
 1. **Identificar la raíz del proyecto** — subir hasta encontrar `.git` (o equivalente) si el cwd es un subdirectorio.
-2. **Leer `CLAUDE.md` del proyecto** si existe — confirmar imports `@~/.claude/neb/stacks/<stack>/...`.
+2. **Leer `CLAUDE.md` del proyecto** si existe — confirmar imports `@~/.claude/neb/stacks/<stack>/...` y revisar el **marcador de opt-out** (ver §"Opt-out de stack / Neb por proyecto"): si el proyecto declaró `neb-stack: none`, continúa genérico **sin sugerir stack** (no se ejecuta el paso 4 para stack desconocido).
 3. **Si imports incompletos o ausentes**, ejecutar heurísticas de [`stacks/index.md`](../stacks/index.md) — primer match gana.
 4. **Actuar según resultado**:
 
@@ -22,9 +22,25 @@ Al entrar a un directorio de proyecto, Claude detecta el stack:
 | **Stack disponible** y CLAUDE.md ya importa | Continúa sin aviso |
 | **Stack disponible** y CLAUDE.md no importa | Aviso: *"Detecté stack `<X>`. CLAUDE.md no lo importa. Sugerencia: ejecutar `bootstrap/link-into-project.sh`."* |
 | **Stack pendiente** (listado sin `stacks/<X>/`) | Aviso: *"Detecté stack `<X>` (Pendiente). Sin convenciones específicas. ¿Crear el stack siguiendo el patrón de `stacks/self-applied/` (ver [CLAUDE.md interno del repo](../CLAUDE.md) "Agregar un stack nuevo") o continuar genérico?"* |
-| **Stack desconocido** (ningún indicador match) | Aviso: *"No detecté stack conocido. ¿Continuamos genérico o agregamos heurística + nuevo stack?"* |
+| **Stack desconocido** (ningún indicador match) | Aviso: *"No detecté stack conocido. ¿Continuamos genérico, agregamos heurística + nuevo stack, o marco este dir como sin-stack (`neb-stack: none`) para no volver a sugerirlo?"* |
 
 Heurísticas y prioridad: orden de tabla en [`stacks/index.md`](../stacks/index.md).
+
+## Opt-out de stack / Neb por proyecto
+
+Un proyecto puede declarar, mediante un **marcador en su `CLAUDE.md`**, que no quiere sugerencias de stack o que no use Neb. El marcador es persistente (sobrevive entre sesiones) y se respeta **antes** de sugerir nada — evita que Claude vuelva a proponer un stack en cada sesión sobre un dir que el dev ya decidió dejar genérico.
+
+| Marcador (en el `CLAUDE.md` del proyecto) | Semántica | Quién lo consume |
+|---|---|---|
+| `<!-- neb-stack: none -->` | El proyecto **usa Neb** pero no tiene stack: trabajo genérico. Claude no vuelve a sugerir detectar/crear stack en ese dir. | Esta detección (pasos 2 y 4) |
+| `<!-- neb: skip -->` | El proyecto **no usa Neb**: no se inyecta la metodología. Para proyectos ajenos a Neb donde el arranque por hook del plugin no debe actuar. | El hook `SessionStart` del plugin (empaquetado del plugin) |
+
+Reglas del marcador:
+
+- **Idempotente**: si el marcador ya está presente, no se duplica.
+- **Respeta contenido humano**: se inserta en una zona neutra del `CLAUDE.md`, nunca dentro de bloques `<!-- human -->` … `<!-- /human -->` (ver [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md)).
+- **Sin `CLAUDE.md`**: si el proyecto no tiene `CLAUDE.md` y el dev elige marcarlo sin-stack, Claude crea uno mínimo con el marcador.
+- **Reversible**: el dev revierte el opt-out borrando el marcador.
 
 ## Stack activo durante la sesión
 
@@ -38,7 +54,7 @@ Claude vuelve a aplicar la heurística de [`stacks/index.md`](../stacks/index.md
 2. **Referencia path fuera del cwd** — el dev menciona un archivo, dir o repo cuyo path matchea heurística distinta a la del stack activo.
 3. **Pide artefacto de otro stack** — edición/lectura de archivo cuyo path encaja en otra fila de la tabla.
 
-No disparan re-detección: saludos, conversación trivial, preguntas meta sin path.
+No disparan re-detección: saludos, conversación trivial, preguntas meta sin path. Tampoco re-dispara en un dir con `neb-stack: none` (el opt-out persiste durante la sesión).
 
 ### Política de anuncio
 

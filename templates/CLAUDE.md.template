@@ -10,6 +10,10 @@
 <!-- Personal override del proyecto, si existe (gitignored): -->
 <!-- @./.claude/personal.md -->
 
+<!-- Opt-out de Neb (opcional; ver neb/general/stack-detection.md "Opt-out de stack / Neb"):
+     neb-stack: none   → este proyecto usa Neb pero sin stack (Claude no sugiere stack)
+     neb: skip         → este proyecto no usa Neb (el hook del plugin no inyecta metodología) -->
+
 ---
 
 ## Proyecto <PROYECTO>
