@@ -53,7 +53,6 @@ fijo durante la sesión y cambia únicamente cuando el contexto lo requiere.
 ### Stacks incluidos en el núcleo
 
 - `self-applied` — la propia Neb (el repo se gobierna con sus propias reglas)
-- `requirements-analysis` — análisis iterativo de requerimientos
 - `stack-authoring` — creación de un stack nuevo
 - `skill-authoring` — creación de un skill nuevo
 - `research` — investigación multi-fuente con verificación adversarial

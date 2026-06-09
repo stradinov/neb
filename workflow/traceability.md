@@ -66,7 +66,7 @@ Así, `commit → REQ` desde cualquier proyecto se resuelve por el mensaje del c
 
 ## Trazabilidad por stack
 
-La cadena hasta el commit aplica a stacks versionados con git. Para stacks cuyo entregable no es código (ej. `requirements-analysis`, donde el entregable es un Documento de Clarificación), el eslabón final no es un commit sino la **Entrega final** del stack en su vocabulario concreto (ver el glosario de [`../methodology/vocabulary.md`](../methodology/vocabulary.md) y `stacks/<stack>/index.md`). El Change MD sigue siendo el eje; cambia solo qué representa el último eslabón.
+La cadena hasta el commit aplica a stacks versionados con git. Para stacks cuyo entregable no es código (ej. `self-applied`, donde el entregable son archivos markdown de la metodología), el eslabón final no es un commit sino la **Entrega final** del stack en su vocabulario concreto (ver el glosario de [`../methodology/vocabulary.md`](../methodology/vocabulary.md) y `stacks/<stack>/index.md`). El Change MD sigue siendo el eje; cambia solo qué representa el último eslabón.
 
 ## Casos especiales
 

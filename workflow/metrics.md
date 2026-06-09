@@ -46,7 +46,6 @@ Captura: las 3 primeras dependen de señal explícita o ausencia de ella; las 3 
 | Stack | Auditor |
 |---|---|
 | `self-applied` | QA Process Engineer |
-| `requirements-analysis` | QA Process Engineer |
 | Stacks de software (futuros) | Code Reviewer |
 
 El auditor revisa la conversación del REQ y completa los conteos. Si el dev nota discrepancia al revisar el MD pre-cierre, ajusta los counts.

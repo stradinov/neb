@@ -4,7 +4,6 @@ Metodologías específicas por tipo de proyecto. Abstrae lo que NO es universal:
 
 ## Disponibles
 
-- [requirements-analysis](requirements-analysis/index.md) — Análisis iterativo de requerimientos para cualquier tipo de proyecto. Entregable: documento de Clarificación aprobado por el stakeholder. Stack genérico (sin detección automática); los proyectos lo importan explícitamente.
 - [stack-authoring](stack-authoring/index.md) — Autoría, mantenimiento y distribución de stacks de la metodología. Overlay sobre `self-applied`.
 - [skill-authoring](skill-authoring/index.md) — Autoría, mantenimiento y distribución de skills de Claude Code. Overlay sobre `self-applied`.
 - [self-applied](self-applied/index.md) — Proyectos auto-aplicados — la metodología que se edita es la que se aplica (caso canónico: el propio repo `neb`). Validación **diferida en uso**.

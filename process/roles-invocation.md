@@ -16,7 +16,6 @@ Claude propone los roles en Fase 3 (Propuesta) antes de generar el plan inicial.
 | `stack-authoring` | Stack Author | QA Process Engineer (F3/F4/F7) + Process Improvement Analyst (F9/Incidentes) | [stacks/stack-authoring/roles.md](../stacks/stack-authoring/roles.md) |
 | `skill-authoring` | Skill Author | Skill QA Engineer (Fase 5) + Skill Maintainer (periódico) | [stacks/skill-authoring/roles.md](../stacks/skill-authoring/roles.md) |
 | `research` | Process Architect | Fact-Check Reviewer (F4 condicional + F7 siempre) | [stacks/research/roles.md](../stacks/research/roles.md) |
-| `requirements-analysis` | Business Analyst | QA Process Engineer | [stacks/requirements-analysis/index.md](../stacks/requirements-analysis/index.md) |
 | Otros stacks de software (futuros) | Software Engineer | Code Reviewer | — |
 | Stack desconocido | (Claude pregunta al dev) | — | — |
 
@@ -28,7 +27,7 @@ Cuando el plan toca dimensiones específicas, se agregan revisores adicionales (
 
 Antes de generar el plan, Claude identifica las dimensiones tocadas por los archivos del plan según la tabla anterior, deduplica revisores, agrega el rol principal del stack y reporta la lista consolidada al dev (modo según tabla "Modo de anuncio").
 
-Stack `self-applied` y `requirements-analysis` usan roles fijos sin detección por dimensiones (entregable es markdown/documento, no código).
+Stack `self-applied` usa roles fijos sin detección por dimensiones (entregable es markdown/documento, no código).
 
 ## Modo de anuncio
 
@@ -67,7 +66,6 @@ Las fases 1, 2, 6, 8 se omiten (nunca tienen subagente). `—` = fase conducida 
 | `stack-authoring` | `qa-process-engineer` + `process-improvement-analyst` | `qa-process-engineer` | — | `qa-process-engineer` | `process-improvement-analyst` | `process-improvement-analyst` |
 | `skill-authoring` | `skill-qa-engineer` | `skill-qa-engineer` | `skill-qa-engineer` | `skill-qa-engineer` | `process-improvement-analyst` | `process-improvement-analyst` |
 | `research` | `qa-process-engineer` + `process-improvement-analyst` (si `propósito = decisión`) | `fact-check-reviewer` (si `propósito = decisión` o divergencia material no resuelta en `[crítico]`) | — | `fact-check-reviewer` (siempre) | `process-improvement-analyst` | `process-improvement-analyst` |
-| `requirements-analysis` | `qa-process-engineer` | `qa-process-engineer` | — | `qa-process-engineer` | `process-improvement-analyst` | `process-improvement-analyst` |
 | Stacks de software (futuros) | por dim.: Code Reviewer / Security Reviewer / Database Engineer | Code Reviewer (+ paralelos por dim.) | Security Reviewer (si auth/pagos críticos) | Code Reviewer default | `process-improvement-analyst` | `process-improvement-analyst` |
 
 `process-improvement-analyst` es universal en F9 e Incidentes (no por stack).

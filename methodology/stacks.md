@@ -26,7 +26,7 @@ Solo crear un stack cuando un tipo de proyecto requerirá al menos `index.md` + 
 | Tipo | Descripción | Detección | Ejemplos |
 |---|---|---|---|
 | **Raíz** | El stack **es el repo entero** (repo autónomo con `.git` propio). Heurística por indicadores estructurales del repo. | Archivos/carpetas característicos del repo (e.g. `package.json` + estructura del framework, `*.sql` + script de carga) | `node-api`, `data-pipeline` |
-| **Overlay** | El stack cubre un **subdirectorio o tipo de trabajo *dentro*** de un repo ya detectado por otro stack. No sube al `.git` padre; va con prioridad alta en `stacks/index.md`. | Path pattern sobre el cwd absoluto (e.g. `*/reqs/<X>/`, `*/skills/<X>/`) | `skill-authoring`, `stack-authoring`, `requirements-analysis` |
+| **Overlay** | El stack cubre un **subdirectorio o tipo de trabajo *dentro*** de un repo ya detectado por otro stack. No sube al `.git` padre; va con prioridad alta en `stacks/index.md`. | Path pattern sobre el cwd absoluto (e.g. `*/skills/<X>/`, `*/stacks/<X>/`) | `skill-authoring`, `stack-authoring` |
 
 Regla: si el trabajo produce un tipo de entregable diferente al repo padre y ocurre en un subdirectorio propio y recurrente, usar overlay.
 
@@ -61,7 +61,7 @@ Regla: si el trabajo produce un tipo de entregable diferente al repo padre y ocu
 
 - `kebab-case`. Sin prefijos numéricos ni versiones en el nombre.
 - Stacks de autoría: sufijo `-authoring` (e.g. `skill-authoring`, `stack-authoring`).
-- Stacks de análisis: prefijo del dominio + `-analysis` (e.g. `requirements-analysis`, `security-analysis`).
+- Stacks de análisis: prefijo del dominio + `-analysis` (e.g. `security-analysis`, `data-analysis`).
 - Stacks de implementación: nombre del framework o dominio (e.g. `node-api`, `react-native`).
 - Stacks auto-aplicados / reflexivos: sin sufijo de dominio (e.g. `self-applied`); la justificación de omitir el sustantivo va en el `index.md` del stack — el stack cubre cualquier marco (metodología, proceso, artefactos) auto-aplicado y no se restringe a un dominio.
 

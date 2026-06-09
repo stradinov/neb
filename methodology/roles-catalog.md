@@ -74,7 +74,6 @@ Tracking del valor real de cada rol/sub-foco. Score se ajusta en Fase 9 (ver [`.
 
 | Rol | Tipo | Impl. | Stack | Utilidad | Última act. |
 |---|---|---|---|---|---|
-| Business Analyst | principal | persona | requirements-analysis | 1.0 | 2026-05-06 |
 | Process Architect | principal | persona | self-applied | 1.0 | 2026-05-03 |
 | Stack Author | principal | persona | stack-authoring | 1.0 | 2026-05-15 |
 | QA Process Engineer | revisor | **subagente** (`qa-process-engineer`) | self-applied | 0.0 | 2026-05-17 |
