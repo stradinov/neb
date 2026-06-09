@@ -46,6 +46,12 @@ TODAY="$(date +%Y-%m-%d 2>/dev/null || echo 'YYYY-MM-DD')"
 
 bold "Bump $LEVEL: $CUR → $NEW"
 
+# Aviso si plugin.json.version diverge de VERSION (no bloquea; el bump las unifica)
+if [ -f "$PLUGIN_JSON" ]; then
+  PJV="$(python -c "import json,io;print(json.load(io.open('$PLUGIN_JSON',encoding='utf-8')).get('version',''))" 2>/dev/null || echo '')"
+  [ -n "$PJV" ] && [ "$PJV" != "$CUR" ] && info "AVISO: plugin.json.version ($PJV) != VERSION ($CUR) estaban desincronizados; el bump unifica en $NEW."
+fi
+
 if [ "$DRY_RUN" -eq 1 ]; then
   info "[dry-run] VERSION → $NEW"
   info "[dry-run] crearia changelog.d/$NEW.md"

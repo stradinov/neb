@@ -39,7 +39,8 @@ def main():
         sys.exit(1)
 
     data = {}
-    if os.path.isfile(settings):
+    existed = os.path.isfile(settings)
+    if existed:
         try:
             with open(settings, encoding='utf-8') as fh:
                 data = json.load(fh)
@@ -49,7 +50,6 @@ def main():
         if not isinstance(data, dict):
             sys.stderr.write("settings.json no es un objeto JSON; abortando.\n")
             sys.exit(1)
-        shutil.copy2(settings, settings + '.bak')
 
     env = data.setdefault('env', {})
     if not isinstance(env, dict):
