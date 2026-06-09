@@ -58,12 +58,21 @@ install_agent() {
   fi
 }
 
-bold "Instalando agentes"
-install_agent "qa-process-engineer"
-install_agent "process-improvement-analyst"
-install_agent "skill-qa-engineer"
-install_agent "fact-check-reviewer"
-install_agent "context-completeness-reviewer"
+bold "Instalando agentes del núcleo"
+for _a in "$AGENTS_SRC"/*.md; do
+  [ -f "$_a" ] || continue
+  install_agent "$(basename "$_a" .md)"
+done
+
+# Extension point del overlay: instalador propio del adoptante (opcional).
+# El overlay provee <overlay>/bootstrap/install-agents.local.sh autónomo con sus agentes.
+_WS="${NEB_WORKSPACE:-$(dirname "$GUIDE_DIR")}"
+for _local in "$_WS"/*/bootstrap/install-agents.local.sh; do
+  [ -f "$_local" ] || continue
+  bold "Instalando agentes del overlay"
+  bash "$_local" || warn "install-agents.local.sh del overlay falló (continúo)"
+  break
+done
 
 bold "Listo"
 info "Agentes instalados en $AGENTS_DST"

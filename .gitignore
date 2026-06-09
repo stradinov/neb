@@ -1,9 +1,3 @@
-# Personal overrides — cada dev tiene el suyo, no se sincronizan
-personal/*
-!personal/.gitkeep
-!personal/README.md
-!personal/*.example.md
-
 # Settings locales
 .claude/settings.local.json
 .claude/personal.md

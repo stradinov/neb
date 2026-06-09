@@ -1,31 +1,42 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# init-stack-subproject.sh <nombre-stack> [--overlay-base self-applied|none]
-# Inicializa un stack nuevo bajo stacks/<nombre>/ con los 6 archivos mínimos
-# desde las plantillas en stacks/stack-authoring/templates/.
+# init-stack-subproject.sh <nombre-stack> [--overlay-base self-applied|none] [--core]
+# Inicializa un stack nuevo con los 6 archivos mínimos desde las plantillas en
+# stacks/stack-authoring/templates/.
 #
-# Pre-condición: ejecutar desde la raíz del repo neb,
-#                o setear NEB_HOME para localizar el repo.
+# Destino (importante):
+#   - Por DEFECTO el stack se crea en el OVERLAY del adoptante
+#     ($NEB_WORKSPACE/<overlay>/stacks/<nombre>), nunca dentro del núcleo neb.
+#   - El MAINTAINER del framework usa --core para crear en neb/stacks/<nombre>
+#     (el stack se publicará al núcleo vía git subtree push).
+#
+# Pre-condición: NEB_HOME apunta al checkout de neb (núcleo); NEB_WORKSPACE a la
+# raíz de gobernanza (donde vive el overlay). Si no están seteadas, se derivan.
 
 STACK_NAME="${1:-}"
 OVERLAY_BASE="none"
+TARGET="overlay"   # overlay (default, adoptante) | core (maintainer, --core)
 
 if [ -z "$STACK_NAME" ]; then
-  echo "Uso: $0 <nombre-stack> [--overlay-base self-applied|none]"
-  echo "  Ejemplo: $0 node-api --overlay-base none"
-  echo "  Ejemplo: $0 react-native --overlay-base none"
-  echo "  Ejemplo: $0 my-workflow-stack --overlay-base self-applied"
+  echo "Uso: $0 <nombre-stack> [--overlay-base self-applied|none] [--core]"
+  echo "  Ejemplo (adoptante): $0 node-api                 # → \$NEB_WORKSPACE/<overlay>/stacks/node-api"
+  echo "  Ejemplo (maintainer): $0 react-native --core      # → neb/stacks/react-native"
+  echo "  Ejemplo (overlay base): $0 my-stack --overlay-base self-applied"
   exit 1
 fi
 
-# Parsear flag opcional
+# Parsear flags opcionales
 shift
 while [ $# -gt 0 ]; do
   case "$1" in
     --overlay-base)
       OVERLAY_BASE="${2:-none}"
       shift 2
+      ;;
+    --core)
+      TARGET="core"
+      shift
       ;;
     *)
       echo "Argumento desconocido: $1"
@@ -36,7 +47,23 @@ done
 
 GUIDE_DIR="${NEB_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || echo "$HOME/.claude/neb")}"
 TEMPLATES_DIR="$GUIDE_DIR/stacks/stack-authoring/templates"
-STACK_DIR="$GUIDE_DIR/stacks/$STACK_NAME"
+
+# Resolver el directorio destino del stack según el TARGET.
+if [ "$TARGET" = "core" ]; then
+  STACK_DIR="$GUIDE_DIR/stacks/$STACK_NAME"
+else
+  # Overlay del adoptante: descubrir el dir de overlay bajo $NEB_WORKSPACE
+  # (mismo patrón que setup-workspace.sh); fallback a "<workspace>/overlay".
+  WS="${NEB_WORKSPACE:-$(dirname "$GUIDE_DIR")}"
+  OVERLAY_DIR=""
+  for _o in "$WS"/*/overlays/detect-stack.local.sh; do
+    [ -f "$_o" ] || continue
+    OVERLAY_DIR="$(dirname "$(dirname "$_o")")"
+    break
+  done
+  [ -n "$OVERLAY_DIR" ] || OVERLAY_DIR="$WS/overlay"
+  STACK_DIR="$OVERLAY_DIR/stacks/$STACK_NAME"
+fi
 
 bold() { printf "\033[1m%s\033[0m\n" "$*"; }
 info() { printf "  %s\n" "$*"; }
@@ -59,12 +86,13 @@ fi
 # Verificar que existen los templates
 if [ ! -d "$TEMPLATES_DIR" ]; then
   echo "Error: directorio de templates no encontrado: $TEMPLATES_DIR"
-  echo "  Verificar que GUIDE_DIR apunte al repo neb: $GUIDE_DIR"
+  echo "  Verificar que NEB_HOME apunte al checkout de neb: $GUIDE_DIR"
   exit 1
 fi
 
 bold "Inicializando stack"
 bold "  Nombre      : $STACK_NAME"
+bold "  Destino     : $([ "$TARGET" = "core" ] && echo 'núcleo (neb/stacks) — se publica al framework' || echo 'overlay del adoptante')"
 bold "  Overlay base: $OVERLAY_BASE"
 bold "  Path        : $STACK_DIR"
 
@@ -98,32 +126,49 @@ create_from_template "$TEMPLATES_DIR/skills.md.template"        "$STACK_DIR/skil
 
 bold "Listo — $STACK_DIR"
 echo ""
-bold "Checklist de acoples pendientes (completar manualmente):"
-info ""
-info "  1. stacks/index.md"
-info "     - Agregar fila en 'Disponibles': $STACK_NAME — descripción"
-info "     - Agregar fila en tabla 'Heurística de detección' con la prioridad correcta"
-info ""
-info "  2. bootstrap/link-into-project.sh función detect_stack"
-info "     - Agregar chequeo para el stack (overlay por path o heurística estructural)"
-info "     - Mantener sincronía con stacks/index.md (mismo commit)"
-info ""
-info "  3. process/roles-invocation.md"
-info "     - Agregar fila en tabla 'Default por stack'"
-info "     - Agregar fila en matriz 'Cobertura mínima por fase'"
-info ""
-info "  4. process/delivery.md"
-info "     - Agregar fila en tabla 'Pre-ejecución de Fase 7 (gate de subagente)'"
-info ""
-info "  5. process/execution.md"
-info "     - Agregar fila en tabla 'Cierre de Fase 4 (gate de subagente)'"
-info ""
-info "  6. CHANGELOG.md"
-info "     - Entrada nueva + bump minor (o major si rompe imports)"
-info ""
-if [ "$OVERLAY_BASE" != "none" ]; then
-  info "  7. general/stack-detection.md paso 0 (overlay por path)"
-  info "     - Agregar mención del overlay si tiene prioridad máxima"
+
+if [ "$TARGET" = "overlay" ]; then
+  bold "Checklist de acoples (overlay del adoptante):"
   info ""
+  info "  1. <overlay>/overlays/detect-stack.local.sh"
+  info "     - En detect_stack_local(): devolver \"$STACK_NAME\" según el path/contenido del proyecto"
+  info "     - En get_private_stack_imports(): imprimir los @-imports de stacks/$STACK_NAME/index.md"
+  info ""
+  info "  2. stacks/$STACK_NAME/roles.md"
+  info "     - Definir el rol principal del stack; heredar revisores del overlay o definir propios"
+  info ""
+  info "  3. Si el stack define revisores propios (subagentes):"
+  info "     - Crear <overlay>/agents/<nombre>.md y registrarlo en tu instalador local de agents"
+  info ""
+  info "El stack NO se publica al núcleo neb. Vive solo en tu overlay."
+else
+  bold "Checklist de acoples (núcleo — se publica al framework):"
+  info ""
+  info "  1. stacks/index.md"
+  info "     - Agregar fila en 'Disponibles': $STACK_NAME — descripción"
+  info "     - Agregar fila en tabla 'Heurística de detección' con la prioridad correcta"
+  info ""
+  info "  2. bootstrap/link-into-project.sh función detect_stack"
+  info "     - Agregar chequeo para el stack (overlay por path o heurística estructural)"
+  info "     - Mantener sincronía con stacks/index.md (mismo commit)"
+  info ""
+  info "  3. process/roles-invocation.md"
+  info "     - Agregar fila en tabla 'Default por stack'"
+  info "     - Agregar fila en matriz 'Cobertura mínima por fase'"
+  info ""
+  info "  4. process/delivery.md"
+  info "     - Agregar fila en tabla 'Pre-ejecución de Fase 7 (gate de subagente)'"
+  info ""
+  info "  5. process/execution.md"
+  info "     - Agregar fila en tabla 'Cierre de Fase 4 (gate de subagente)'"
+  info ""
+  info "  6. CHANGELOG.md"
+  info "     - Fragment en changelog.d/<version>.md + bump minor (o major si rompe imports)"
+  info ""
+  if [ "$OVERLAY_BASE" != "none" ]; then
+    info "  7. general/stack-detection.md paso 0 (overlay por path)"
+    info "     - Agregar mención del overlay si tiene prioridad máxima"
+    info ""
+  fi
+  info "Ver procedimiento completo en methodology/stacks.md y convenciones en stacks/stack-authoring/conventions.md."
 fi
-info "Ver procedimiento completo en methodology/stacks.md y convenciones en stacks/stack-authoring/conventions.md."

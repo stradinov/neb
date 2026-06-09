@@ -62,8 +62,21 @@ install_skill() {
   fi
 }
 
-bold "Instalando skills"
-install_skill "wakeup"
+bold "Instalando skills del núcleo"
+for _s in "$SKILLS_SRC"/*/; do
+  [ -d "$_s" ] && [ -f "${_s}SKILL.md" ] || continue
+  install_skill "$(basename "$_s")"
+done
+
+# Extension point del overlay: instalador propio del adoptante (opcional).
+# El overlay provee <overlay>/bootstrap/install-skills.local.sh autónomo con sus skills.
+_WS="${NEB_WORKSPACE:-$(dirname "$GUIDE_DIR")}"
+for _local in "$_WS"/*/bootstrap/install-skills.local.sh; do
+  [ -f "$_local" ] || continue
+  bold "Instalando skills del overlay"
+  bash "$_local" || warn "install-skills.local.sh del overlay falló (continúo)"
+  break
+done
 
 bold "Listo"
 info "Skills instalados en $SKILLS_DST"

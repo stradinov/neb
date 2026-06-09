@@ -49,7 +49,8 @@ if ($cfg.scaling -ne 'fixed' -and $cfg.scaling -ne 'per-minute') {
 
 # --- Resolver WAV -----------------------------------------------------------
 
-$nebHome = $env:NEB_HOME
+# personal/ vive en el workspace de gobernanza (NEB_WORKSPACE), no en el checkout de neb
+$nebHome = if ($env:NEB_WORKSPACE) { $env:NEB_WORKSPACE } else { $env:NEB_HOME }
 $wav = $cfg.wav
 if (-not $wav) {
     $wav = Join-Path $nebHome 'personal\chimes-loud.wav'

@@ -53,7 +53,7 @@ fi
 
 # --- Resolver WAV -----------------------------------------------------------
 
-DEFAULT_WAV="$NEB_HOME/personal/chimes-loud.wav"
+DEFAULT_WAV="${NEB_WORKSPACE:-$NEB_HOME}/personal/chimes-loud.wav"
 if [ -z "$WAV" ]; then
     WAV="$DEFAULT_WAV"
 elif [ ! -f "$WAV" ]; then
