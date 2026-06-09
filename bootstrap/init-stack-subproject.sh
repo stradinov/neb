@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# init-stack-subproject.sh <nombre-stack> [--overlay-base self-applied|none] [--core]
+# init-stack-subproject.sh <nombre-stack> [--overlay-base self-applied|none] [--core] [--dry-run]
 # Inicializa un stack nuevo con los 6 archivos mínimos desde las plantillas en
 # stacks/stack-authoring/templates/.
 #
@@ -10,6 +10,7 @@ set -euo pipefail
 #     ($NEB_WORKSPACE/<overlay>/stacks/<nombre>), nunca dentro del núcleo neb.
 #   - El MAINTAINER del framework usa --core para crear en neb/stacks/<nombre>
 #     (el stack se publicará al núcleo vía git subtree push).
+#   - --dry-run muestra el destino y lo que se crearía, sin escribir nada.
 #
 # Pre-condición: NEB_HOME apunta al checkout de neb (núcleo); NEB_WORKSPACE a la
 # raíz de gobernanza (donde vive el overlay). Si no están seteadas, se derivan.
@@ -17,12 +18,13 @@ set -euo pipefail
 STACK_NAME="${1:-}"
 OVERLAY_BASE="none"
 TARGET="overlay"   # overlay (default, adoptante) | core (maintainer, --core)
+DRY_RUN=0
 
 if [ -z "$STACK_NAME" ]; then
-  echo "Uso: $0 <nombre-stack> [--overlay-base self-applied|none] [--core]"
+  echo "Uso: $0 <nombre-stack> [--overlay-base self-applied|none] [--core] [--dry-run]"
   echo "  Ejemplo (adoptante): $0 node-api                 # → \$NEB_WORKSPACE/<overlay>/stacks/node-api"
   echo "  Ejemplo (maintainer): $0 react-native --core      # → neb/stacks/react-native"
-  echo "  Ejemplo (overlay base): $0 my-stack --overlay-base self-applied"
+  echo "  Ejemplo (dry-run): $0 my-stack --dry-run          # muestra el destino sin escribir"
   exit 1
 fi
 
@@ -38,12 +40,21 @@ while [ $# -gt 0 ]; do
       TARGET="core"
       shift
       ;;
+    --dry-run)
+      DRY_RUN=1
+      shift
+      ;;
     *)
       echo "Argumento desconocido: $1"
       exit 1
       ;;
   esac
 done
+
+bold() { printf "\033[1m%s\033[0m\n" "$*"; }
+info() { printf "  %s\n" "$*"; }
+ok()   { printf "  \033[32m%s\033[0m\n" "$*"; }
+warn() { printf "  \033[33m%s\033[0m\n" "$*"; }
 
 GUIDE_DIR="${NEB_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || echo "$HOME/.claude/neb")}"
 TEMPLATES_DIR="$GUIDE_DIR/stacks/stack-authoring/templates"
@@ -61,14 +72,12 @@ else
     OVERLAY_DIR="$(dirname "$(dirname "$_o")")"
     break
   done
-  [ -n "$OVERLAY_DIR" ] || OVERLAY_DIR="$WS/overlay"
+  if [ -z "$OVERLAY_DIR" ]; then
+    OVERLAY_DIR="$WS/overlay"
+    warn "No encontré un overlay preexistente bajo $WS — uso el fallback $OVERLAY_DIR (se creará). Si no es el destino esperado, montá tu overlay (wakeup/setup-workspace) o usá --core."
+  fi
   STACK_DIR="$OVERLAY_DIR/stacks/$STACK_NAME"
 fi
-
-bold() { printf "\033[1m%s\033[0m\n" "$*"; }
-info() { printf "  %s\n" "$*"; }
-ok()   { printf "  \033[32m%s\033[0m\n" "$*"; }
-warn() { printf "  \033[33m%s\033[0m\n" "$*"; }
 
 # Validar nombre (kebab-case, sin espacios, sin caracteres especiales)
 if ! echo "$STACK_NAME" | grep -qE '^[a-z][a-z0-9-]+$'; then
@@ -95,6 +104,13 @@ bold "  Nombre      : $STACK_NAME"
 bold "  Destino     : $([ "$TARGET" = "core" ] && echo 'núcleo (neb/stacks) — se publica al framework' || echo 'overlay del adoptante')"
 bold "  Overlay base: $OVERLAY_BASE"
 bold "  Path        : $STACK_DIR"
+
+if [ "$DRY_RUN" -eq 1 ]; then
+  echo ""
+  bold "[dry-run] No se escribe nada. Se crearía:"
+  info "$STACK_DIR/ con: index.md, deployment.md, conventions.md, troubleshooting.md, roles.md, skills.md"
+  exit 0
+fi
 
 TODAY="$(date +%Y-%m-%d 2>/dev/null || echo "YYYY-MM-DD")"
 

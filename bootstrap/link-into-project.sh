@@ -88,7 +88,16 @@ PROJECT_NAME="$(basename "$PROJECT")"
 IMPORTS=()
 while IFS= read -r _imp; do IMPORTS+=("$_imp"); done < <(get_framework_imports)
 
-if [ "$STACK" != "unknown" ]; then
+# Opt-out de stack: si el proyecto ya declaró `neb-stack: none` en su CLAUDE.md,
+# respetar ese marcador y NO inyectar imports de stack (ver general/stack-detection.md
+# "Opt-out de stack / Neb"). link-into-project.sh es el 2º consumidor de la detección.
+OPT_OUT_STACK=0
+if [ -f "$CLAUDE_FILE" ] && grep -qiE 'neb-stack:[[:space:]]*none' "$CLAUDE_FILE"; then
+  OPT_OUT_STACK=1
+  info "Opt-out detectado (neb-stack: none) — no se inyectan imports de stack."
+fi
+
+if [ "$STACK" != "unknown" ] && [ "$OPT_OUT_STACK" -eq 0 ]; then
   _priv=$(get_private_stack_imports "$STACK")
   if [ -n "$_priv" ]; then
     while IFS= read -r _imp; do IMPORTS+=("$_imp"); done <<< "$_priv"

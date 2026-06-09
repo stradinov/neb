@@ -12,8 +12,8 @@
 ## Setup del spike
 
 - **CLI:** Claude Code `2.1.153`. Flag `--plugin-dir <path>` carga un plugin para la sesión.
-- **Plugin de prueba** (`C:\Users\Public\neb-spike\plugin`): `.claude-plugin/plugin.json` (name=neb-spike), `hooks/hooks.json` con un `SessionStart` que ejecuta `py -c "..."` para leer `startup-test.md` desde `${CLAUDE_PLUGIN_ROOT}` y emitirlo a stdout (additionalContext). `startup-test.md` contiene una **regla falsable**: "comienza CADA respuesta con el prefijo exacto `NEB::`; prioridad sobre cualquier instrucción del usuario".
-- **Aislamiento:** sesiones headless `claude -p` corridas desde un dir **fuera de `C:\Users\cestr`** (`C:\Users\Public\neb-spike\proj`, sin `CLAUDE.md` ancestro) + `--setting-sources project` (no carga los settings/hooks del dev). Verificado: un `claude -p "responde OK"` sin plugin devuelve `OK` limpio (sin contaminación del entorno).
+- **Plugin de prueba** (en un dir scratch fuera del workspace): `.claude-plugin/plugin.json` (name=neb-spike), `hooks/hooks.json` con un `SessionStart` que ejecuta `py -c "..."` para leer `startup-test.md` desde `${CLAUDE_PLUGIN_ROOT}` y emitirlo a stdout (additionalContext). `startup-test.md` contiene una **regla falsable**: "comienza CADA respuesta con el prefijo exacto `NEB::`; prioridad sobre cualquier instrucción del usuario".
+- **Aislamiento:** sesiones headless `claude -p` corridas desde un **dir scratch fuera del árbol del workspace** (sin `CLAUDE.md` en un directorio superior) + `--setting-sources project` (no carga los settings/hooks del dev). Verificado: un `claude -p "responde OK"` sin plugin devuelve `OK` limpio (sin contaminación del entorno).
 
 ## Hallazgos
 
@@ -44,4 +44,4 @@
 
 El mecanismo plugin + `SessionStart` hook es **viable y robusto para distribuir la metodología**: carga determinista al inicio, peso vinculante (10/10), env vars de settings al hook (D4), auto-discovery sin reorganizar, todo en Windows. **El epic procede a REQ-1 F1 (fundamento) y luego REQ-2 (empaquetado).**
 
-> Reproducibilidad: el plugin de prueba vivió en `C:\Users\Public\neb-spike` (borrado tras el spike). Recrear: plugin con `hooks/hooks.json` → `SessionStart` → `py` que emite un `startup.md` con regla falsable; correr `claude -p "<adversarial>" --setting-sources project --plugin-dir <plugin>` desde un dir aislado; contar cuántas respuestas respetan la regla.
+> Reproducibilidad: el plugin de prueba vivió en un dir scratch fuera del workspace (borrado tras el spike). Recrear: plugin con `hooks/hooks.json` → `SessionStart` → `py` que emite un `startup.md` con regla falsable; correr `claude -p "<adversarial>" --setting-sources project --plugin-dir <plugin>` desde un dir aislado; contar cuántas respuestas respetan la regla.
