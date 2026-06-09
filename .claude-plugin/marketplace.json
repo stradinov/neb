@@ -1,0 +1,12 @@
+{
+  "name": "neb",
+  "description": "Marketplace del framework de metodología Neb.",
+  "owner": { "name": "stradinov" },
+  "plugins": [
+    {
+      "name": "neb",
+      "source": { "source": "github", "repo": "stradinov/neb" },
+      "description": "Neb — framework de metodología agnóstica para agentes de IA en Claude Code."
+    }
+  ]
+}
