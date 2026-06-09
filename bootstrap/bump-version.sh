@@ -30,6 +30,19 @@ bold() { printf "\033[1m%s\033[0m\n" "$*"; }
 info() { printf "  %s\n" "$*"; }
 ok()   { printf "  \033[32m%s\033[0m\n" "$*"; }
 
+# Resolver de Python: primer interprete que existe Y corre (rechaza el stub python3
+# del Microsoft Store en Windows, que existe en PATH pero no ejecuta).
+neb_python() {
+  local c
+  for c in python3 python py; do
+    if command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1; then
+      printf '%s\n' "$c"; return 0
+    fi
+  done
+  return 1
+}
+PYTHON="$(neb_python || true)"
+
 [ -f "$VERSION_FILE" ] || { echo "No existe $VERSION_FILE" >&2; exit 1; }
 CUR="$(tr -d '[:space:]' < "$VERSION_FILE")"
 if ! echo "$CUR" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -47,8 +60,8 @@ TODAY="$(date +%Y-%m-%d 2>/dev/null || echo 'YYYY-MM-DD')"
 bold "Bump $LEVEL: $CUR → $NEW"
 
 # Aviso si plugin.json.version diverge de VERSION (no bloquea; el bump las unifica)
-if [ -f "$PLUGIN_JSON" ]; then
-  PJV="$(python -c "import json,io;print(json.load(io.open('$PLUGIN_JSON',encoding='utf-8')).get('version',''))" 2>/dev/null || echo '')"
+if [ -f "$PLUGIN_JSON" ] && [ -n "$PYTHON" ]; then
+  PJV="$("$PYTHON" -c "import json,io;print(json.load(io.open('$PLUGIN_JSON',encoding='utf-8')).get('version',''))" 2>/dev/null || echo '')"
   [ -n "$PJV" ] && [ "$PJV" != "$CUR" ] && info "AVISO: plugin.json.version ($PJV) != VERSION ($CUR) estaban desincronizados; el bump unifica en $NEW."
 fi
 
@@ -78,8 +91,8 @@ else
   info "changelog.d/$NEW.md ya existe"
 fi
 
-if [ -f "$PLUGIN_JSON" ]; then
-  python - "$PLUGIN_JSON" "$NEW" <<'PY'
+if [ -f "$PLUGIN_JSON" ] && [ -n "$PYTHON" ]; then
+  "$PYTHON" - "$PLUGIN_JSON" "$NEW" <<'PY'
 import json, sys
 path, new = sys.argv[1], sys.argv[2]
 with open(path, encoding='utf-8') as f:
@@ -90,6 +103,8 @@ with open(path, 'w', encoding='utf-8') as f:
     f.write('\n')
 PY
   ok "plugin.json.version → $NEW"
+elif [ -f "$PLUGIN_JSON" ]; then
+  info "AVISO: sin Python (python3/python/py) — plugin.json.version NO sincronizado a $NEW. Hacelo a mano."
 fi
 
 bold "Listo"

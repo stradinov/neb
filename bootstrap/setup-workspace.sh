@@ -39,6 +39,18 @@ ok()   { printf "  \033[32m%s\033[0m\n" "$*"; }
 info() { printf "  %s\n" "$*"; }
 warn() { printf "  \033[33m%s\033[0m\n" "$*"; }
 
+# Resolver de Python: primer interprete que existe Y corre. Rechaza el stub python3
+# del Microsoft Store en Windows (existe en PATH pero no ejecuta) cayendo a python/py.
+neb_python() {
+  local c
+  for c in python3 python py; do
+    if command -v "$c" >/dev/null 2>&1 && "$c" -c '' >/dev/null 2>&1; then
+      printf '%s\n' "$c"; return 0
+    fi
+  done
+  return 1
+}
+
 # 1. NEB_HOME (nucleo)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 NEB_HOME_VAL="${CLAUDE_PLUGIN_ROOT:-${NEB_HOME:-$(dirname "$SCRIPT_DIR")}}"
@@ -112,8 +124,13 @@ bold "Conectando NEB_HOME + NEB_WORKSPACE"
 if [ "$DRY_RUN" -eq 1 ]; then
   info "[dry-run] set-neb-env.py NEB_HOME=$NEB_HOME_VAL NEB_WORKSPACE=$WS"
 else
-  python "$NEB_HOME_VAL/bootstrap/set-neb-env.py" "NEB_HOME=$NEB_HOME_VAL" "NEB_WORKSPACE=$WS" \
-    || warn "No se pudo actualizar settings.json (revisa python). Seteá NEB_WORKSPACE a mano en ~/.claude/settings.json."
+  PYBIN="$(neb_python || true)"
+  if [ -n "$PYBIN" ]; then
+    "$PYBIN" "$NEB_HOME_VAL/bootstrap/set-neb-env.py" "NEB_HOME=$NEB_HOME_VAL" "NEB_WORKSPACE=$WS" \
+      || warn "No se pudo actualizar settings.json (revisa $PYBIN). Setea NEB_WORKSPACE a mano en ~/.claude/settings.json."
+  else
+    warn "No encontre Python (probe python3/python/py). Setea NEB_HOME/NEB_WORKSPACE a mano en ~/.claude/settings.json."
+  fi
 fi
 
 PROFILE=""
