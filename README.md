@@ -1,5 +1,5 @@
 ﻿<!-- human -->
-# neb
+# Neb
 
 > Un framework metodológico para Claude Code.
 
@@ -18,18 +18,20 @@ En la práctica, defines un *stack* para cada tipo de proyecto: uno para el desa
 
 
 ---
+<!-- /human -->
 
 ## Cómo empezar
 
-```bash
-# 1. Clona el repo
-git clone https://github.com/tu-org/neb.git ~/.claude/neb
+En Claude Code, agrega el marketplace e instala el plugin:
 
-# 2. Corre el instalador (una vez por máquina)
-bash ~/.claude/neb/bootstrap/install.sh
+```
+/plugin marketplace add stradinov/neb
+/plugin install neb@neb
 ```
 
-Luego abre Claude Code y escribe `/wakeup`.
+Reinicia Claude Code (o `/reload-plugins`) para activar el hook de arranque. Luego `/wakeup` monta tu *workspace* (tu overlay + configuración personal) y lo conecta.
+
+> El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores.
 
 ---
 
@@ -45,6 +47,6 @@ Luego abre Claude Code y escribe `/wakeup`.
 
 ---
 
-<!-- /human -->
+
 
 [Cómo funciona por dentro](docs/how-it-works.md) · [Guía del usuario](docs/user-guide.md) · [Contribuir](CONTRIBUTING.md) · [Licencia MIT](LICENSE)
