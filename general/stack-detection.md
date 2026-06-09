@@ -33,7 +33,7 @@ Un proyecto puede declarar, mediante un **marcador en su `CLAUDE.md`**, que no q
 | Marcador (en el `CLAUDE.md` del proyecto) | Semántica | Quién lo consume |
 |---|---|---|
 | `<!-- neb-stack: none -->` | El proyecto **usa Neb** pero no tiene stack: trabajo genérico. Claude no vuelve a sugerir detectar/crear stack en ese dir. | Esta detección (pasos 2 y 4) **y** `bootstrap/link-into-project.sh` (no inyecta imports de stack al re-enganchar) |
-| `<!-- neb: skip -->` | El proyecto **no usa Neb**: no se inyecta la metodología. Para proyectos ajenos a Neb donde el arranque por hook del plugin no debe actuar. **Reservado: sin efecto hasta el empaquetado del plugin** (su único consumidor aún no existe). | El hook `SessionStart` del plugin (cuando se empaquete) |
+| `<!-- neb: skip -->` | El proyecto **no usa Neb**: el hook `SessionStart` detecta el marcador en el `CLAUDE.md` del proyecto activo y **no inyecta el arranque**. Para proyectos ajenos a Neb donde la metodología no debe actuar. | El hook `SessionStart` (`bootstrap/neb-bootstrap-context.py`, vía `CLAUDE_PROJECT_DIR`) — activo desde v2.0.0 |
 
 Reglas del marcador:
 

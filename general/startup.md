@@ -7,6 +7,7 @@ Punto de entrada de la metodología. Carga, vía `@import` (garantizado y determ
 @stack-detection.md
 @../process/phase-transitions.md
 @onboarding.md
+@../workflow/index.md
 
 ---
 

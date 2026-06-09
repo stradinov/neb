@@ -15,6 +15,7 @@ Variables de entorno (provistas por Claude Code / el usuario):
 Defensivo: si algo falta, emite lo que pueda + una guia a /wakeup; nunca aborta.
 """
 import os
+import re
 import sys
 import importlib.util
 
@@ -35,8 +36,30 @@ def _load_assembler(bootstrap_dir):
     return mod
 
 
+def _project_opts_out():
+    """True si el CLAUDE.md del proyecto activo declara el marcador <!-- neb: skip -->.
+
+    El proyecto opta por NO recibir la inyeccion del arranque de Neb. Defensivo: si no hay
+    CLAUDE_PROJECT_DIR o no hay CLAUDE.md legible, devuelve False (comportamiento normal).
+    """
+    proj = os.environ.get('CLAUDE_PROJECT_DIR')
+    if not proj:
+        return False
+    try:
+        with open(os.path.join(proj, 'CLAUDE.md'), encoding='utf-8') as f:
+            content = f.read()
+    except OSError:
+        return False
+    return re.search(r'<!--\s*neb:\s*skip\s*-->', content) is not None
+
+
 def main():
     _utf8_stdout()
+
+    # neb: skip — si el proyecto activo lo declara en su CLAUDE.md, no inyectar nada (D2).
+    if _project_opts_out():
+        return
+
     bootstrap_dir = os.path.dirname(os.path.abspath(__file__))
 
     # NEB_HOME (working copy editable) tiene prioridad sobre el cache del plugin (D4).
