@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ── DEPRECADO (v2.0.0): modelo "clone" ──────────────────────────────────────
+# Neb se distribuye como PLUGIN de Claude Code. El arranque lo inyecta el hook
+# SessionStart y skills/agents/commands se auto-descubren del plugin instalado;
+# este script (modelo clone legacy) NO es necesario. Se conserva para referencia.
+# Adopcion vigente: docs/user-guide.md (/plugin marketplace add + /plugin install).
+# ────────────────────────────────────────────────────────────────────────────
+
 # install.sh — corre una sola vez por máquina/usuario.
 # Idempotente: detecta lo que ya existe y solo agrega lo que falta.
 

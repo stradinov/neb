@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ── DEPRECADO (v2.0.0): modelo "clone" ──────────────────────────────────────
+# Los skills de neb se auto-descubren del PLUGIN instalado; no hace falta copiarlos
+# a ~/.claude/skills. Este script (modelo clone legacy) NO es necesario. Se conserva
+# para referencia. Adopcion vigente: docs/user-guide.md (/plugin install).
+# ────────────────────────────────────────────────────────────────────────────
+
 # install-skills.sh — instala los skills de neb en ~/.claude/skills/
 # Idempotente: si el target ya existe y apunta al guide, no hace nada.
 # Invocado por install.sh o directamente tras un git pull del guide.

@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ── DEPRECADO (v2.0.0): modelo "clone" ──────────────────────────────────────
+# Los agentes de neb se auto-descubren del PLUGIN instalado; no hace falta copiarlos
+# a ~/.claude/agents. Este script (modelo clone legacy) NO es necesario. Se conserva
+# para referencia. Adopcion vigente: docs/user-guide.md (/plugin install).
+# ────────────────────────────────────────────────────────────────────────────
+
 # install-agents.sh — instala los agentes de neb en ~/.claude/agents/
 # Idempotente: si el target ya existe y apunta al guide, no hace nada.
 # Invocado por install.sh o directamente tras un git pull del guide.

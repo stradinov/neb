@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+# ── DEPRECADO (v2.0.0): modelo "clone" ──────────────────────────────────────
+# Neb se distribuye como PLUGIN de Claude Code. El arranque lo inyecta el hook
+# SessionStart (no hace falta inyectar @imports en el CLAUDE.md del proyecto).
+# Este script (modelo clone legacy) NO es necesario. Se conserva para referencia.
+# Adopcion vigente: docs/user-guide.md (/plugin marketplace add + /plugin install).
+# ────────────────────────────────────────────────────────────────────────────
+
 # link-into-project.sh <ruta-proyecto>
 # Engancha un proyecto al framework neb:
 #  - Detecta el stack
