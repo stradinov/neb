@@ -22,7 +22,7 @@ Aspectos donde la metodología difiere de `skill-creator`:
 
 | Diferencia | Convención del equipo |
 |---|---|
-| **Distribución** | Via `bootstrap/install-skills.sh` versionado en `neb`. No es instalación individual por dev — el Skill Maintainer commitea y el equipo jala |
+| **Distribución** | Los skills se auto-descubren del plugin `neb`. No es instalación individual por dev — el Skill Maintainer commitea y el equipo hace `claude plugin update` (`/reload-plugins` para tomar cambios sin reiniciar) |
 | **Asociación a stacks** | Cada skill se registra en `stacks/<stack>/skills.md` y en el inventario `skills/README.md` |
 | **Inventario maestro** | `skills/README.md` como single source of truth del catálogo del equipo |
 | **Validación en uso** | Patrón de pendiente `[<skill>-validacion-uso]` para tracking diferido; procesamiento de gaps como REQ de patch |
@@ -40,7 +40,6 @@ Aspectos donde la metodología difiere de `skill-creator`:
    - Ajustar `description` con los paths/dominios del proyecto y negaciones explícitas.
    - Crear `validation-prompts.md` con al menos 1 caso positivo + 1 negativo.
    - Registrar en `skills/README.md` y en `stacks/<stack>/skills.md`.
-   - Agregar función `install_skill "<nombre>"` en `bootstrap/install-skills.sh`.
    - Revisar restricción de contenido — eliminar cualquier signatura, SQL o número de línea que el wizard haya incluido.
 
 El uso de `skill-creator` es herramienta de conveniencia, no obligatorio. Los skills pueden crearse directamente siguiendo `conventions.md`.

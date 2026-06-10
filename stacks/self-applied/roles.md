@@ -15,7 +15,7 @@ Rol persistente al trabajar sobre la metodología (`methodology` o MDs cargados 
 
 ## Revisores — subagentes
 
-Se invocan como subagentes reales en plan-review (ver [plan-review.md](../../process/plan-review.md) sección "Plantilla de briefing"). Sus archivos de definición están en `agents/` del repo e instalados vía `bootstrap/install-agents.sh`.
+Se invocan como subagentes reales en plan-review (ver [plan-review.md](../../process/plan-review.md) sección "Plantilla de briefing"). Sus archivos de definición se distribuyen en el plugin (`agents/`), auto-descubiertos al instalarlo.
 
 ### QA Process Engineer — `subagente` (`agents/qa-process-engineer.md`)
 

@@ -25,43 +25,33 @@
 
 ---
 
-## detect_stack retorna `unknown` o nombre incorrecto
+## El stack activo es incorrecto o `none` en un directorio cubierto
 
-**Síntomas**: `bash bootstrap/link-into-project.sh <dir>` imprime `Stack detectado: unknown` o el nombre de otro stack.
+**Síntomas**: al abrir una sesión Claude en `stacks/<nombre>/`, el stack activo anunciado es otro o `none`.
 
 **Diagnóstico**:
-1. Leer la función `detect_stack` en `bootstrap/link-into-project.sh` — verificar que existe el chequeo para `stack-authoring` (overlay `*/methodology/stacks/<X>/`).
-2. Verificar el pattern regex: `grep -qE '/methodology/stacks/[^/]+(/|$)'` — el `[^/]+` asegura al menos un segmento de nombre de stack.
-3. Si la heurística está presente pero retorna otro stack, revisar el orden de chequeos — el overlay de `stack-authoring` debe ir antes que la heurística de `self-applied` (`methodology/principles.md + process/plan-review.md`).
+1. Verificar que existe la fila para `stack-authoring` (overlay `*/methodology/stacks/<X>/`) en la tabla "Heurística de detección" de `stacks/index.md`.
+2. Verificar el pattern regex: `/methodology/stacks/[^/]+(/|$)` — el `[^/]+` asegura al menos un segmento de nombre de stack.
+3. Si la heurística está presente pero activa otro stack, revisar el orden — el overlay de `stack-authoring` debe ir antes que la heurística de `self-applied` (`methodology/principles.md + process/plan-review.md`).
 
-**Solución**: actualizar `detect_stack` en `bootstrap/link-into-project.sh` para que el overlay de `stack-authoring` esté en posición 2 (después de `reqs/` y antes de `skills/` y `self-applied`). Ver el orden canónico en `stacks/index.md`.
-
----
-
-## CLAUDE.md del proyecto cliente no importa el stack tras link-into-project.sh
-
-**Síntomas**: tras correr `bash bootstrap/link-into-project.sh <proyecto>`, el CLAUDE.md del proyecto no tiene `@~/.claude/neb/stacks/stack-authoring/index.md`.
-
-**Diagnóstico**: `link-into-project.sh` genera el import `@.../stacks/$STACK/index.md` donde `$STACK` es el resultado de `detect_stack`. Si `detect_stack` retorna `unknown` o el nombre incorrecto, el import no se agrega.
-
-**Solución**: primero corregir `detect_stack` (ver caso anterior). Luego re-correr `link-into-project.sh` — el script agrega imports faltantes sin sobreescribir el archivo.
+**Solución**: corregir la heurística en `stacks/index.md` + `general/stack-detection.md` (Claude la lee en runtime) para que el overlay de `stack-authoring` esté en posición 2 (después de `reqs/` y antes de `skills/` y `self-applied`). Ver el orden canónico en `stacks/index.md`.
 
 ---
 
 ## Regresión: otro stack deja de detectarse tras agregar stack-authoring
 
-**Síntomas**: tras actualizar `detect_stack`, un proyecto que antes retornaba su stack de dominio ahora retorna `stack-authoring`.
+**Síntomas**: tras actualizar la heurística, un proyecto que antes activaba su stack de dominio ahora activa `stack-authoring`.
 
 **Diagnóstico**: el pattern del overlay `stack-authoring` es demasiado amplio y captura paths que no son subdirectorios de `methodology/stacks/`. Ejemplo: si el pattern es `/stacks/` en vez de `/methodology/stacks/`, un proyecto cliente con carpeta `/stacks/` activaría el overlay incorrectamente.
 
-**Solución**: usar el path completo del repo en el pattern: `grep -qE '/methodology/stacks/[^/]+(/|$)'`. Probar con al menos dos proyectos cliente para confirmar que no hay regresión.
+**Solución**: usar el path completo del repo en el pattern: `/methodology/stacks/[^/]+(/|$)`. Probar con al menos dos proyectos cliente para confirmar que no hay regresión.
 
 ---
 
-## Divergencia entre stacks/index.md y detect_stack
+## Divergencia entre stacks/index.md y general/stack-detection.md
 
-**Síntomas**: la tabla en `stacks/index.md` tiene la heurística correcta pero `bootstrap/link-into-project.sh` no la implementa (o viceversa).
+**Síntomas**: la tabla en `stacks/index.md` tiene la heurística correcta pero `general/stack-detection.md` no la refleja (o viceversa).
 
-**Diagnóstico**: cambios en la tabla sin actualizar el script, o actualización del script sin reflejar en la tabla.
+**Diagnóstico**: cambios en la tabla sin actualizar la política de detección runtime, o viceversa.
 
-**Solución**: actualizar ambos en el mismo commit. `stacks/index.md` es la single source of truth; `detect_stack` es la implementación. Ver nota en `stacks/index.md`: "Si la tabla cambia, actualizar `detect_stack` en el mismo commit."
+**Solución**: actualizar ambos en el mismo commit. `stacks/index.md` es la single source of truth de la heurística; `general/stack-detection.md` define cuándo y cómo Claude la aplica en runtime. Ver nota en `stacks/index.md`.

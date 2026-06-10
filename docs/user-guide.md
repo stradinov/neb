@@ -4,59 +4,43 @@ Cómo poner Neb a trabajar en tu equipo: instalarlo, montar tu capa propia y def
 
 ## Instalar
 
-```bash
-# 1. Clona el repo
-git clone https://github.com/tu-org/neb.git ~/.claude/neb
+Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni correr instaladores. Desde Claude Code:
 
-# 2. Corre el instalador (una vez por máquina)
-bash ~/.claude/neb/bootstrap/install.sh
+```
+/plugin marketplace add stradinov/neb
+/plugin install neb@neb
 ```
 
-Luego abrí Claude Code y escribí `/wakeup` — el tour te guía por los pasos de abajo.
+Luego escribí `/wakeup` — el tour monta tu overlay y tu config personal (vía `setup-workspace.sh`) y te guía por los pasos de abajo. Un hook `SessionStart` inyecta el arranque de la metodología en cada sesión; los skills, agents y commands del plugin se auto-descubren.
+
+> El modelo de **clonar el repo + correr `bootstrap/install.sh`** quedó **deprecado** como vía de uso. Solo sigue vigente para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores)).
 
 ## Montar tu overlay
 
-`neb` es el núcleo y lo actualizás como *upstream*. Lo tuyo —stacks de dominio, agents/skills propios, preferencias— vive en una capa aparte (*overlay*), **nunca dentro de `neb/`**, para poder actualizar el núcleo sin conflictos. Montar el overlay es el **paso mínimo para usar Neb**: sin él no tenés dónde definir tu primer stack.
+`neb` es el núcleo y lo consumís vía el plugin instalado. Lo tuyo —stacks de dominio, agents/skills propios, preferencias— vive en una capa aparte (*overlay*), **nunca dentro de `neb/`**, para poder actualizar el núcleo (el plugin) sin conflictos. Montar el overlay es el **paso mínimo para usar Neb**: sin él no tenés dónde definir tu primer stack.
 
-**Con git subtree** (recomendado): un repo de gobernanza propio con `neb/` como subtree + tu overlay:
+El overlay es un directorio propio (`overlay/`, `personal/`, `changes/`) en tu repo de gobernanza o en tu workspace; no necesita ser un subtree de `neb/` para usar Neb. El tour `/wakeup` lo monta por vos vía `setup-workspace.sh`.
 
 ```
-tu-repo/
-├── neb/        ← núcleo (subtree del repo público; no lo editás para meter lo tuyo)
+tu-workspace/
 ├── overlay/    ← tus stacks/agents/skills de dominio
+├── personal/   ← tu config personal (gitignored por defecto)
 ├── changes/    ← tus change MDs
-└── CLAUDE.md   ← importa neb/ + tu overlay/
+└── CLAUDE.md   ← importa tus stacks de dominio (el arranque del núcleo lo inyecta el plugin)
 ```
 
-Setup y mantenimiento:
-
-```bash
-git remote add neb <url-del-repo-neb>
-git subtree add  --prefix neb/ neb main --squash   # traer el núcleo
-git subtree pull --prefix neb/ neb main --squash   # actualizarlo
-git subtree push --prefix neb/ neb main            # contribuir al núcleo (opcional; solo viaja neb/)
-```
-
-El `--squash` mantiene tu historia limpia. Tu overlay y `neb/` quedan en árboles separados: el núcleo se actualiza sin tocar lo tuyo.
-
-**Camino simple**: forkeás `neb` y traés mejoras con `git pull` del upstream — sirve para empezar, pero mezcla tu historia con la del núcleo.
+> El layout con `neb/` como **subtree** del repo y el flujo `git subtree add/pull/push` corresponden al modelo de **contribución al núcleo**, no de uso — ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores).
 
 ### Configurar el entorno
 
-Con `neb/` ya en tu repo, corré el script de setup (idempotente — seguro de repetir, sirve para reset o migración):
-
-```bash
-bash neb/bootstrap/setup-workspace.sh [--overlay <nombre>]
-```
-
-Crea lo que falte (`overlay/`, `personal/`, `changes/`) y setea **dos variables** en tu shell profile (con backup):
+El tour `/wakeup` corre el script de setup por vos (idempotente — seguro de repetir, sirve para reset o migración). El script (`setup-workspace.sh`, viene con el plugin) crea lo que falte (`overlay/`, `personal/`, `changes/`) y setea **dos variables** en tu shell profile (con backup):
 
 | Variable | Apunta a | Para |
 |---|---|---|
-| `NEB_HOME` | el checkout de neb (`<repo>/neb`) | hooks (`$NEB_HOME/hooks`), templates y bootstrap del núcleo |
-| `NEB_WORKSPACE` | la raíz de tu repo de gobernanza | tu overlay, `personal/`, `changes/` |
+| `NEB_HOME` | el directorio del plugin instalado | hooks (`$NEB_HOME/hooks`), templates y bootstrap del núcleo |
+| `NEB_WORKSPACE` | la raíz de tu workspace de gobernanza | tu overlay, `personal/`, `changes/` |
 
-Reiniciá tu shell para que tomen efecto. El tour `/wakeup` corre este paso por vos de forma interactiva. El script detecta un overlay preexistente y no lo pisa; `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (default `overlay`).
+Reiniciá tu shell para que tomen efecto. El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (default `overlay`).
 
 ## Definir tu primer stack
 
@@ -86,10 +70,40 @@ Un stack puede definir revisores adversariales propios (por dimensión: segurida
 
 1. Crear `agents/<nombre>.md` con los campos `name`, `description` y `tools`.
 2. El cuerpo constituye el system prompt del rol.
-3. Registrar en `bootstrap/install-agents.sh`.
+
+Los agents se auto-descubren del plugin: basta con crear el `agents/<nombre>.md`. Tras agregarlo, `/reload-plugins` lo carga sin reiniciar; en sesión nueva ya está.
 
 ## Versionar tu configuración personal
 
-`personal/<usuario>.md` guarda tus preferencias, atajos y overrides individuales (qué son y su contrato "estrecha o agrega, nunca relaja": ver [how-it-works § Personalización](how-it-works.md) y [`methodology/personal-vs-team.md`](../methodology/personal-vs-team.md)). Viene **gitignored** — tu configuración no se publica ni viaja al clonar.
+`personal/<usuario>.md` guarda tus preferencias, atajos y overrides individuales (qué son y su contrato "estrecha o agrega, nunca relaja": ver [how-it-works § Personalización](how-it-works.md) y [`methodology/personal-vs-team.md`](../methodology/personal-vs-team.md)). Viene **gitignored** — tu configuración no se publica ni sale del plugin.
 
 Si querés versionarla (respaldo, portabilidad entre máquinas), quitá la regla `personal/` de **tu** `.gitignore` (no del de `neb/`) y commiteala en tu repo privado. Excluí binarios (`*.wav` y similares). Sus cambios se trazan con el commit normal; no llevan change MD.
+
+## Contribuir al núcleo (mantenedores)
+
+Lo anterior cubre **usar** Neb. **Contribuir al núcleo** —corregir o extender lo que vive en `neb/`, no tu overlay— es un rol de mantenedor y sí requiere una copia del repo, ya sea por fork o por subtree.
+
+**Con git subtree** (recomendado): un repo de gobernanza propio con `neb/` como subtree + tu overlay:
+
+```
+tu-repo/
+├── neb/        ← núcleo (subtree del repo público; no lo editás para meter lo tuyo)
+├── overlay/    ← tus stacks/agents/skills de dominio
+├── changes/    ← tus change MDs
+└── CLAUDE.md   ← importa tus stacks de dominio
+```
+
+Setup y mantenimiento:
+
+```bash
+git remote add neb <url-del-repo-neb>
+git subtree add  --prefix neb/ neb main --squash   # traer el núcleo
+git subtree pull --prefix neb/ neb main --squash   # actualizarlo
+git subtree push --prefix neb/ neb main            # contribuir al núcleo (solo viaja neb/)
+```
+
+El `--squash` mantiene tu historia limpia. Tu overlay y `neb/` quedan en árboles separados: el núcleo se actualiza sin tocar lo tuyo.
+
+**Camino simple**: forkeás `neb` y traés mejoras con `git pull` del upstream — sirve para empezar, pero mezcla tu historia con la del núcleo.
+
+El git hook `pre-push` del repo (corre el gate del CHANGELOG) lo instala el maintainer; el viejo `bootstrap/install.sh` quedó deprecado como vía de adopción.

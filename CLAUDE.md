@@ -53,8 +53,7 @@ Acoples de roles (todo stack nuevo):
 - Agregar filas en `process/execution.md` y `process/delivery.md` tablas de gate.
 
 Para stacks que viven como **overlays por path** dentro de un repo ya detectado:
-- Agregar override de detección por path en `bootstrap/link-into-project.sh` función `detect_stack`.
-- Agregar regla de overlay en `general/stack-detection.md` paso 0 y fila prioritaria en `stacks/index.md`.
+- Actualizar la heurística de detección por path en `stacks/index.md` + `general/stack-detection.md` paso 0 (fila prioritaria en `stacks/index.md`).
 - Bump **major** si el nuevo stack introduce cambios en el ENUM de estados o vocabulario de `general/`.
 
 Para stacks con **subproyectos anidados** que necesitan init propio:
@@ -62,29 +61,26 @@ Para stacks con **subproyectos anidados** que necesitan init propio:
 
 ## Agregar un skill nuevo
 
-1. Crear `skills/<nombre>/SKILL.md` con frontmatter `name` + `description` preciso.
+1. Crear `skills/<nombre>/SKILL.md` con frontmatter `name` + `description` preciso. Bajo el plugin, el skill se expone solo por existir en `skills/<nombre>/SKILL.md` (auto-discovery; no hay registro en un script).
 2. Agregar archivos hermanos de contenido y scripts si aplica.
 3. Registrar en `skills/README.md` (tabla de skills disponibles).
 4. Registrar en `stacks/<stack>/skills.md` del stack correspondiente.
-5. Agregar función `install_skill "<nombre>"` en `bootstrap/install-skills.sh`.
-6. Bump minor + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
+5. Bump minor + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
 
 Ver lineamiento completo en `methodology/skills.md`.
 
 Para stacks que viven como **subproyectos anidados** dentro de otro repo:
 - Crear también `bootstrap/init-<nombre>-subproject.sh` para inicializar el subproyecto.
-- Agregar override de detección por path en `bootstrap/link-into-project.sh` (ver detect_stack overlay).
-- Agregar regla de overlay en `general/stack-detection.md` paso 0 y fila prioritaria en `stacks/index.md`.
+- Actualizar la heurística de detección por path en `stacks/index.md` + `general/stack-detection.md` paso 0 (regla de overlay y fila prioritaria en `stacks/index.md`).
 - Bump **major** si el nuevo stack introduce cambios en el ENUM de estados o vocabulario de `general/`.
 
 ## Agregar un subagente
 
-1. Crear `agents/<nombre>.md` con frontmatter `name`, `description` (cuándo invocarlo) y `tools: [Read, Grep, Glob]` (ampliar solo si el rol necesita una capacidad fuera de ese set — escritura, o lectura de red como `WebFetch` para `fact-check-reviewer` — justificándola en el body). Body = system prompt del rol, que cita o referencia el foco ya definido en `process/roles-invocation.md` o `stacks/<stack>/roles.md` — sin duplicar contenido; la metodología sigue siendo single source of truth.
-2. Agregar `install_agent "<nombre>"` en `bootstrap/install-agents.sh`.
-3. En `process/roles-invocation.md` tabla "Resumen de utilidad": cambiar columna "Impl." de `persona` a `**subagente** (\`<nombre>\`)` para el rol correspondiente.
-4. En `stacks/<stack>/roles.md` del stack que usa el subagente: anotar `— \`subagente\` (\`agents/<nombre>.md\`)` junto al nombre del rol.
-5. Verificar que `process/plan-review.md` paso 2 cubra la lógica de despacho para el nuevo subagente (no debería requerir cambio si el algoritmo ya distingue por presencia de `.md` en `agents/`).
-6. Bump minor + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
+1. Crear `agents/<nombre>.md` con frontmatter `name`, `description` (cuándo invocarlo) y `tools: [Read, Grep, Glob]` (ampliar solo si el rol necesita una capacidad fuera de ese set — escritura, o lectura de red como `WebFetch` para `fact-check-reviewer` — justificándola en el body). Body = system prompt del rol, que cita o referencia el foco ya definido en `process/roles-invocation.md` o `stacks/<stack>/roles.md` — sin duplicar contenido; la metodología sigue siendo single source of truth. Bajo el plugin, el agente se expone solo por existir en `agents/<nombre>.md` (auto-discovery; no hay registro en un script).
+2. En `process/roles-invocation.md` tabla "Resumen de utilidad": cambiar columna "Impl." de `persona` a `**subagente** (\`<nombre>\`)` para el rol correspondiente.
+3. En `stacks/<stack>/roles.md` del stack que usa el subagente: anotar `— \`subagente\` (\`agents/<nombre>.md\`)` junto al nombre del rol.
+4. Verificar que `process/plan-review.md` paso 2 cubra la lógica de despacho para el nuevo subagente (no debería requerir cambio si el algoritmo ya distingue por presencia de `.md` en `agents/`).
+5. Bump minor + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
 
 Ver definición técnica del modelo persona/subagente en [`process/roles-invocation.md`](process/roles-invocation.md) sección "Implementación de roles".
 

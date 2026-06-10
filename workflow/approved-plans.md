@@ -42,6 +42,6 @@ Niveles **baja / trivial / no-formal** no persisten artefacto (ver [`process/pla
 
 ## Configuración del hook
 
-Se configura via `bootstrap/link-into-project.sh`. Detalle en [hooks/README.md](../hooks/README.md). El hook guarda solo planes aprobados **vía plan mode** (`PostToolUse` solo dispara al éxito de `ExitPlanMode`) — es una de las dos vías; la otra es la persistencia conversacional de arriba.
+El hook `save-approved-plan` **no** se auto-registra por el plugin: es **opt-in por proyecto**, declarado en `settings.template.json` (base para el `settings.json` del proyecto). Detalle en [hooks/README.md](../hooks/README.md). (La configuración vía `bootstrap/link-into-project.sh` corresponde al modelo clone **deprecado**.) El hook guarda solo planes aprobados **vía plan mode** (`PostToolUse` solo dispara al éxito de `ExitPlanMode`) — es una de las dos vías; la otra es la persistencia conversacional de arriba.
 
 No es sustituto de la memoria del proyecto ni del Change MD — es bitácora histórica complementaria.

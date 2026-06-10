@@ -19,10 +19,9 @@ Metodologías específicas por tipo de proyecto. Abstrae lo que NO es universal:
 
 Single source of truth — consumida por:
 
-- `bootstrap/link-into-project.sh` función `detect_stack` al onboarding del proyecto.
 - Claude al iniciar trabajo y al re-evaluar stack durante la sesión (ver [`general/stack-detection.md`](../general/stack-detection.md)).
 
-Ambos consumidores derivan de esta tabla. Si la tabla cambia, actualizar `detect_stack` en `bootstrap/link-into-project.sh` en el mismo commit.
+El consumidor es la detección runtime de Claude, que aplica esta tabla vía `general/stack-detection.md`. Si la tabla cambia, actualizar `general/stack-detection.md` en el mismo commit.
 
 Inspeccionando el repo, el primer indicador que coincide gana:
 
@@ -36,6 +35,6 @@ Inspeccionando el repo, el primer indicador que coincide gana:
 | `app.json` + `expo` en deps | `react-native` (futuro) |
 | `pyproject.toml` + Poetry | `python-poetry` (futuro) |
 
-Si ningún indicador coincide, el bootstrap deja al dev importar manualmente o avisa que falta soporte.
+Si ningún indicador coincide, Claude continúa genérico o avisa que falta soporte (ver [`general/stack-detection.md`](../general/stack-detection.md) § "Al iniciar trabajo").
 
 (Para agregar un stack nuevo: ver [`CLAUDE.md`](../CLAUDE.md) del repo.)

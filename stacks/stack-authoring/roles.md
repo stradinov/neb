@@ -7,7 +7,7 @@ Hereda los revisores del stack `self-applied`. Sin subagentes propios adicionale
 Rol activo al crear o modificar un stack. Mandato:
 
 - Diseña la estructura del stack: archivos, heurística de detección, glosario, fases adaptadas.
-- Mantiene coherencia entre el stack y los acoples cross-cutting (`stacks/index.md`, `process/roles-invocation.md`, `process/delivery.md`, `process/execution.md`, `bootstrap/link-into-project.sh`).
+- Mantiene coherencia entre el stack y los acoples cross-cutting (`stacks/index.md`, `general/stack-detection.md`, `process/roles-invocation.md`, `process/delivery.md`, `process/execution.md`).
 - Aplica las convenciones de `stacks/stack-authoring/conventions.md` al redactar.
 - Genera el plan inicial en Fase 3 antes de la revisión paralela.
 
@@ -19,7 +19,7 @@ Se invocan como subagentes en plan-review. Ver [`stacks/self-applied/roles.md`](
 
 Foco al revisar un stack nuevo o modificado:
 
-- Consistencia entre `stacks/index.md`, `detect_stack` en `bootstrap/link-into-project.sh` y los acoples de `process/roles-invocation.md` / `general/`.
+- Consistencia entre `stacks/index.md`, `general/stack-detection.md` (detección runtime) y los acoples de `process/roles-invocation.md` / `general/`.
 - Verificabilidad de la heurística de detección (sin ambigüedad de prioridad, sin falsos positivos evidentes).
 - Casos borde: ¿el overlay se activa sobre directorios no previstos? ¿el stack raíz colisiona con otro?
 - Vocabulario canónico: el glosario del stack concretiza — no contradice — el vocabulario abstracto de `methodology/vocabulary.md`.

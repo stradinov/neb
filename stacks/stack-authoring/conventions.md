@@ -28,13 +28,13 @@ Secciones adicionales permitidas si el stack las necesita (e.g. "Agregar un stac
 
 ## Reglas para la heurística de detección
 
-La heurística vive en `stacks/index.md` (single source of truth) y se replica en `bootstrap/link-into-project.sh` función `detect_stack`. Ambos deben estar sincronizados.
+La heurística vive en `stacks/index.md` (single source of truth); `general/stack-detection.md` define cuándo y cómo Claude la aplica en runtime. Ambos deben estar sincronizados.
 
-- **Solo existencia de paths**: `[ -d ]`, `[ -f ]`, `grep -qE` sobre el path absoluto. Sin leer contenido de archivos (`grep` en contenido solo si es estrictamente necesario).
+- **Solo existencia de paths**: existencia de directorios/archivos o match de pattern sobre el path absoluto. Sin leer contenido de archivos (solo si es estrictamente necesario).
 - **Idempotente**: aplicar la heurística sobre el mismo directorio N veces → mismo resultado.
 - **Prioridad explícita**: los overlays van ANTES que los raíz en `stacks/index.md`. Documentar conflictos potenciales.
-- **Pattern para overlays**: `grep -qE '/<nombre-fijo>(/|$)'` — el `/` al inicio y `(/|$)` al final evitan falsos positivos (`foobar/reqs/` no activa el overlay de `reqs/`).
-- **Actualización sincronizada**: si cambias la heurística en `stacks/index.md`, actualiza `detect_stack` en el mismo commit.
+- **Pattern para overlays**: `/<nombre-fijo>(/|$)` — el `/` al inicio y `(/|$)` al final evitan falsos positivos (`foobar/reqs/` no activa el overlay de `reqs/`).
+- **Actualización sincronizada**: si cambias la heurística en `stacks/index.md`, actualiza `general/stack-detection.md` en el mismo commit.
 
 ## Política de imports
 

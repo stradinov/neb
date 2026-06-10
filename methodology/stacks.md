@@ -45,7 +45,7 @@ Regla: si el trabajo produce un tipo de entregable diferente al repo padre y ocu
 
 ### Opcionales
 
-- `servers.md` — hosts, paths SSH. Incluido en CLAUDE.md por `link-into-project.sh` si existe.
+- `servers.md` — hosts, paths SSH. El proyecto que use el stack lo importa en su `CLAUDE.md` (`@.../stacks/<stack>/servers.md`) si existe.
 - `skills.md` — skills que aplican al stack. Si no hay skills propios, crear stub con puntero a `skills/README.md`.
 - Archivos de dominio adicionales (e.g. `clarification-template.md`, `operation-modes.md`).
 

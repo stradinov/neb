@@ -7,32 +7,17 @@ Cómo instalar, distribuir y verificar un skill tras editarlo.
 | Artefacto | Path |
 |---|---|
 | Fuente versionada | `~/.claude/neb/skills/<nombre>/` (este repo) |
-| Instalación local | `~/.claude/skills/<nombre>/` |
-| Script de instalación | `~/.claude/neb/bootstrap/install-skills.sh` |
+| Exposición | Auto-descubierto del plugin (`skills/<nombre>/SKILL.md`) |
 
 ## Instalar / actualizar
 
+Bajo el plugin no hay script de instalación: el skill se expone solo por existir en `skills/<nombre>/SKILL.md` (auto-discovery). Tras editar la fuente:
+
 ```bash
-bash ~/.claude/neb/bootstrap/install-skills.sh
+/reload-plugins
 ```
 
-El script instala todos los skills registrados. Si solo cambió un skill, el script es idempotente — re-correrlo no rompe los demás.
-
-### Comportamiento por OS
-
-| OS | Comportamiento |
-|---|---|
-| Linux / WSL | Crea symlink. Los cambios en la fuente se reflejan automáticamente sin re-correr el script |
-| Windows (PowerShell admin) | Intenta junction/symlink. Si permisos lo bloquean, cae a copia recursiva |
-| Windows sin permisos elevados | Copia recursiva — **re-correr el script después de cada cambio en la fuente** |
-
-Para verificar qué tipo de instalación quedó en Windows:
-
-```powershell
-Get-Item "$env:USERPROFILE\.claude\skills\<nombre>" | Select-Object LinkType, Target
-```
-
-Si `LinkType` es vacío, es copia. Si es `Junction` o `SymbolicLink`, es link.
+O `claude plugin update <plugin>` para tomar la versión publicada. Una sesión nueva ya carga la versión vigente sin pasos extra.
 
 ## Verificación post-instalación
 
@@ -74,10 +59,10 @@ El Skill Maintainer (asignado en `personal/<usuario>.md`) es quien commitea las 
 
 ## Distribución al equipo
 
-El skill versionado en `neb` llega al resto del equipo cuando:
+El cambio viaja en el plugin. El skill versionado en `neb` llega al resto del equipo cuando:
 
 1. Skill Maintainer commitea + pushea los cambios.
-2. Cada dev corre `git pull` en su clon de `neb`.
-3. Cada dev re-corre `bootstrap/install-skills.sh` para refrescar su instalación local.
+2. Los adoptantes hacen `claude plugin update` (o reinstalan el plugin).
+3. `/reload-plugins` para tomar los cambios sin reiniciar la sesión.
 
 Para cambios que afectan la `description` del frontmatter (pueden cambiar el comportamiento de carga), avisar al equipo explícitamente.

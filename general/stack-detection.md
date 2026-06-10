@@ -20,7 +20,7 @@ Al entrar a un directorio de proyecto, Claude detecta el stack:
 | Caso | Acción |
 |---|---|
 | **Stack disponible** y CLAUDE.md ya importa | Continúa sin aviso |
-| **Stack disponible** y CLAUDE.md no importa | Aviso: *"Detecté stack `<X>`. CLAUDE.md no lo importa. Sugerencia: ejecutar `bootstrap/link-into-project.sh`."* |
+| **Stack disponible** y CLAUDE.md no importa | Aviso: *"Detecté stack `<X>`. CLAUDE.md no lo importa. Sugerencia: instalar/activar el plugin de Neb (`/plugin install neb@neb` + `/reload-plugins`) y agregar el `@import` del stack al CLAUDE.md del proyecto."* |
 | **Stack pendiente** (listado sin `stacks/<X>/`) | Aviso: *"Detecté stack `<X>` (Pendiente). Sin convenciones específicas. ¿Crear el stack siguiendo el patrón de `stacks/self-applied/` (ver [CLAUDE.md interno del repo](../CLAUDE.md) "Agregar un stack nuevo") o continuar genérico?"* |
 | **Stack desconocido** (ningún indicador match) | Aviso: *"No detecté stack conocido. ¿Continuamos genérico, agregamos heurística + nuevo stack, o marco este dir como sin-stack (`neb-stack: none`) para no volver a sugerirlo?"* |
 
@@ -32,7 +32,7 @@ Un proyecto puede declarar, mediante un **marcador en su `CLAUDE.md`**, que no q
 
 | Marcador (en el `CLAUDE.md` del proyecto) | Semántica | Quién lo consume |
 |---|---|---|
-| `<!-- neb-stack: none -->` | El proyecto **usa Neb** pero no tiene stack: trabajo genérico. Claude no vuelve a sugerir detectar/crear stack en ese dir. | Esta detección (pasos 2 y 4) **y** `bootstrap/link-into-project.sh` (no inyecta imports de stack al re-enganchar) |
+| `<!-- neb-stack: none -->` | El proyecto **usa Neb** pero no tiene stack: trabajo genérico. Claude no vuelve a sugerir detectar/crear stack en ese dir. | Esta detección (pasos 2 y 4). El consumo por `bootstrap/link-into-project.sh` corresponde al modelo clone **deprecado** (bajo el plugin no se inyectan imports de stack al re-enganchar). |
 | `<!-- neb: skip -->` | El proyecto **no usa Neb**: el hook `SessionStart` detecta el marcador en el `CLAUDE.md` del proyecto activo y **no inyecta el arranque**. Para proyectos ajenos a Neb donde la metodología no debe actuar. | El hook `SessionStart` (`bootstrap/neb-bootstrap-context.py`, vía `CLAUDE_PROJECT_DIR`) — activo desde v2.0.0 |
 
 Reglas del marcador:

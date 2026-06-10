@@ -13,5 +13,5 @@ Skills aplicables a este stack:
 |---|---|---|
 | `<nombre>` | <!-- fases o contextos --> | <!-- qué aporta --> |
 
-Ver instalación en `bootstrap/install-skills.sh` y registros en `skills/README.md`.
+Los skills se auto-descubren del plugin (basta crear `skills/<nombre>/SKILL.md`); registro en `skills/README.md`.
 -->

@@ -24,15 +24,9 @@ Single source of truth de los skills de Claude Code disponibles. Cualquier REQ q
 
 ## Instalación
 
-```bash
-bash ~/.claude/neb/bootstrap/install-skills.sh
-```
+Los skills se **auto-descubren** del plugin de Neb instalado — no se copian a `~/.claude`. Basta con instalar/actualizar el plugin (ver [docs/user-guide.md](../docs/user-guide.md) § "Instalar"). Tras editar o agregar un skill, `/reload-plugins` (o `claude plugin update neb`) lo refresca sin reiniciar; en sesión nueva ya está disponible.
 
-O como parte del bootstrap inicial:
-
-```bash
-bash ~/.claude/neb/bootstrap/install.sh
-```
+> El modelo de copiar skills a `~/.claude` corriendo `install-skills.sh` / `install.sh` corresponde al modelo clone **deprecado**.
 
 ## Cómo agregar un skill nuevo
 

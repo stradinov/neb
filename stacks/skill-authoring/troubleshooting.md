@@ -15,9 +15,8 @@
    # Linux/WSL
    ls -la ~/.claude/skills/<nombre>
    ```
-2. Si no existe → re-correr `bootstrap/install-skills.sh`.
-3. Si existe como copia (Windows, sin symlink) y la fuente fue modificada → re-correr el script.
-4. Verificar que `SKILL.md` tiene frontmatter YAML válido (`name` + `description` sin syntax errors).
+2. Si no existe → verificar que el plugin está instalado y refrescar con `/reload-plugins` (o `claude plugin update <plugin>`); los skills se auto-descubren del plugin.
+3. Verificar que `SKILL.md` tiene frontmatter YAML válido (`name` + `description` sin syntax errors).
 5. Verificar que el frontmatter no tiene tabs en lugar de espacios (YAML es estricto).
 
 ---

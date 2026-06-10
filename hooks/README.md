@@ -107,15 +107,13 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 ### pre-push-changelog (git hook del repo, no Claude Code)
 
-`.git/hooks/pre-push` instalado por `bootstrap/install.sh`. A diferencia de los anteriores, **no** se engancha vía `settings.json` — es un git hook nativo del repo `methodology`. Corre `py bootstrap/assemble-changelog.py --check` antes de cada push que toca `changelog.d/`; si el `CHANGELOG.md` está desincronizado respecto a los fragments, aborta el push con mensaje claro. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
+`.git/hooks/pre-push` — git hook nativo del repo `methodology`, lo instala el **maintainer** del núcleo (el viejo `bootstrap/install.sh` quedó deprecado). A diferencia de los anteriores, **no** se engancha vía `settings.json`. Corre `py bootstrap/assemble-changelog.py --check` antes de cada push que toca `changelog.d/`; si el `CHANGELOG.md` está desincronizado respecto a los fragments, aborta el push con mensaje claro. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
 
 ## Activación en un proyecto
 
-```
-bash $NEB_HOME/bootstrap/link-into-project.sh <ruta-al-proyecto>
-```
+Bajo el plugin de Neb, el `SessionStart` se auto-registra (ver §"Bajo el plugin de Neb" abajo). Los demás hooks son **opt-in por proyecto**: agregalos al `<proyecto>/.claude/settings.json` tomando [`templates/claude-settings.json.template`](../templates/claude-settings.json.template) (o `settings.template.json`) como base.
 
-Crea `<proyecto>/.claude/settings.json` desde [`templates/claude-settings.json.template`](../templates/claude-settings.json.template).
+> El comando `bash $NEB_HOME/bootstrap/link-into-project.sh <ruta>` que generaba ese `settings.json` automáticamente corresponde al modelo clone **deprecado**.
 
 ## Bajo el plugin de Neb
 

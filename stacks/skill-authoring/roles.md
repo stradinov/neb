@@ -46,7 +46,7 @@
 
 1. **Comando manual en Fase 8**: si el REQ tocó código cubierto por el skill, correr `scripts/regen-maps.py --all` (o el flag pertinente).
 2. **Revisión mensual**: revisar diff de autogen, commitear baselines a main.
-3. **Distribución**: `git push` de cambios de baselines + aviso al equipo para `git pull` + `install-skills.sh`.
+3. **Distribución**: el cambio viaja en el plugin; los adoptantes hacen `claude plugin update` (o reinstalan); `/reload-plugins` para tomar cambios sin reiniciar.
 
 **Único autorizado** para commitear cambios a las secciones autogeneradas (`<!-- autogen-start/end -->`).
 

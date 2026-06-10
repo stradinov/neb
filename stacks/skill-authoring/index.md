@@ -31,7 +31,7 @@ Si el REQ también toca la metodología general (lineamientos, stacks, etc.), el
 |---|---|
 | **Fase 1 — Clarificación** | Identificar: qué skill se crea/actualiza, qué gap cierra, qué archivos hermanos se tocan, qué casos del `validation-prompts.md` aplican |
 | **Fase 3 — Propuesta** | El plan lista archivos fuente a editar/crear + casos de regresión nuevos en `validation-prompts.md` |
-| **Fase 4 — Implementación** | Editar fuente en `methodology/skills/<nombre>/`. Re-correr `bootstrap/install-skills.sh` al final |
+| **Fase 4 — Implementación** | Editar fuente en `methodology/skills/<nombre>/`. Los skills se auto-descubren del plugin; tras editar, `/reload-plugins` (o `claude plugin update <plugin>`) refresca; sesión nueva ya está |
 | **Fase 5 — Validación** | (1) Smoke load: `/skills` en sesión nueva confirma que el skill carga. (2) Correr los casos afectados de `validation-prompts.md` y documentar resultados |
 | **Fase 6–7 — Entrega** | Commit + push al repo `neb`. Aviso al equipo si hay cambios en `description` del frontmatter (puede afectar undertriggering para el resto) |
 | **Fase 8 — Documentación** | Change MD del REQ + bump SemVer (`methodology/skills.md` ← patch, `stacks/` ← minor/patch según alcance) + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py` + actualizar `skills/README.md` (inventario) |
@@ -55,8 +55,7 @@ Si el REQ también toca la metodología general (lineamientos, stacks, etc.), el
 2. Agregar archivos hermanos de contenido y scripts si aplica.
 3. Registrar en `skills/README.md` (inventario maestro).
 4. Registrar en `stacks/<stack>/skills.md` del stack donde aplica.
-5. Agregar `install_skill "<nombre>"` en `bootstrap/install-skills.sh`.
-6. Agregar caso(s) en `skills/<nombre>/validation-prompts.md` (al menos 1 positivo + 1 negativo).
-7. Bump minor + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
+5. Agregar caso(s) en `skills/<nombre>/validation-prompts.md` (al menos 1 positivo + 1 negativo).
+6. Bump minor + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
 
 Ver `methodology/skills.md` para la decisión de si crear un skill es la opción correcta.

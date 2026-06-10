@@ -76,7 +76,7 @@ Claude ejecuta estos pasos como parte de Fase 6/7, antes del push del REQ:
 
 ### Gate pre-push
 
-`.git/hooks/pre-push` instalado por `bootstrap/install.sh` corre `assemble-changelog.py --check` antes de cada push que toca `changelog.d/`. Si retorna 1:
+El git hook `.git/hooks/pre-push` del repo `neb` (lo instala el maintainer; `install.sh` deprecado) corre `assemble-changelog.py --check` antes de cada push que toca `changelog.d/`. Si retorna 1:
 
 - El push aborta con mensaje claro.
 - Claude (leyendo el mensaje del hook) regenera (`py bootstrap/assemble-changelog.py`), commitea `CHANGELOG.md` como commit final del REQ y reintenta push.

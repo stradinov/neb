@@ -55,4 +55,4 @@ Revisión adversarial del plan          → Custom role agent (process/plan-revi
 
 ## Limitación de sesión (custom role agents)
 
-Los custom role agents instalados en `~/.claude/agents/` durante una sesión **no están disponibles hasta la siguiente sesión** — el harness carga las definiciones al inicio. Tras instalar agentes con `bootstrap/install-agents.sh`, ejecutar `/reload-plugins` para forzar la recarga sin reiniciar la sesión.
+Los custom role agents del plugin de Neb se **auto-cargan** al inicio de la sesión — no se copian a `~/.claude/agents/`. Un agent agregado o editado durante una sesión **no está disponible hasta la siguiente** (el harness carga las definiciones al arranque); ejecutar `/reload-plugins` fuerza la recarga sin reiniciar la sesión.

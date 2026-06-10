@@ -62,7 +62,7 @@ Cada rol del catálogo se implementa de una de dos formas:
 2. La isolation mejora la calidad de la revisión de forma observable (subagente no conoce la justificación del autor → revisión más estricta).
 3. Se invoca con frecuencia suficiente para justificar el costo (≥3 invocaciones reales, análogo al criterio de roles ad-hoc).
 
-Los roles definidos como subagentes tienen su `.md` en `agents/` del repo y se instalan con `bootstrap/install-agents.sh`. Los demás son persona.
+Los roles definidos como subagentes tienen su `.md` en `agents/` del repo y se distribuyen en el plugin, auto-descubiertos al instalarlo. Los demás son persona.
 
 ## Roles ad-hoc
 
