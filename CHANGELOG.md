@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [2.0.3] - 2026-06-09
+
+### Fixed
+
+- **El hook `SessionStart` ahora carga al instalar el plugin** — se declaró `"hooks": "./hooks/hooks.json"` en `plugin.json`. En Claude Code (verificado en v2.1.170) los hooks de un plugin **no se auto-descubren** aunque exista `hooks/hooks.json`; sin la declaración explícita, `/reload-plugins` reportaba `0 hooks` y **el arranque de Neb no se inyectaba** en sesiones nuevas del adoptante (los agents sí auto-descubren, por eso cargaban). Con la declaración, el `SessionStart` (arranque framework + overlay + personal) carga correctamente. *Nota: los skills del plugin también reportan `0` en v2.1.170 (p. ej. el tour `wakeup`); a investigar por separado.*
+
 ## [2.0.2] - 2026-06-09
 
 ### Changed

@@ -1,11 +1,12 @@
 {
   "name": "neb",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "Neb — framework de metodología agnóstica para trabajar con agentes de IA en Claude Code (fases, gates, artefactos trazables, stacks por dominio).",
   "author": {
     "name": "stradinov"
   },
   "homepage": "https://github.com/stradinov/neb",
   "repository": "https://github.com/stradinov/neb",
-  "license": "MIT"
+  "license": "MIT",
+  "hooks": "./hooks/hooks.json"
 }
