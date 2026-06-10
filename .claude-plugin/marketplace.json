@@ -5,7 +5,7 @@
   "plugins": [
     {
       "name": "neb",
-      "source": { "source": "github", "repo": "stradinov/neb" },
+      "source": { "source": "url", "url": "https://github.com/stradinov/neb.git" },
       "description": "Neb — framework de metodología agnóstica para agentes de IA en Claude Code."
     }
   ]

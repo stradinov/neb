@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [2.0.1] - 2026-06-09
+
+### Fixed
+
+- **`plugin install` clona por HTTPS** — el `source` del plugin en `.claude-plugin/marketplace.json` pasó de `{"source":"github","repo":"stradinov/neb"}` a `{"source":"url","url":"https://github.com/stradinov/neb.git"}` (URL HTTPS explícita). Con `source: github`, `claude plugin install` clonaba por **SSH sin fallback a HTTPS** (a diferencia de `marketplace add`), y fallaba con "Host key verification failed" en máquinas con git orientado a SSH o sin la host key de github.com — incluso para un repo público. La URL HTTPS explícita fuerza el clone anónimo. (Si la máquina del adoptante tiene además un rewrite git `insteadOf` https→ssh, debe resolverlo en su entorno: `ssh-keyscan github.com >> ~/.ssh/known_hosts` o quitar el rewrite.)
+
 ## [2.0.0] - 2026-06-09
 
 Cambio mayor: Neb pasa del modelo "clone" (imports `@import` en cada `CLAUDE.md`) a un **plugin de Claude Code** que inyecta el arranque por un hook `SessionStart`.
