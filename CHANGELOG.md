@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [2.0.2] - 2026-06-09
+
+### Changed
+
+- **Quitado el prompt de username del install** — se eliminó `userConfig.username` de `plugin.json`. Pedía un "nombre de usuario Neb" al instalar, lo cual confundía y era opcional. El hook `SessionStart` deriva el identificador de `personal/<username>.md` directamente del usuario del SO (`$USER` / `$USERNAME`). La consistencia cross-máquina (mismo identificador aunque el usuario del SO difiera entre máquinas) queda como mejora futura.
+
 ## [2.0.1] - 2026-06-09
 
 ### Fixed
