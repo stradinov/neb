@@ -8,4 +8,4 @@ Dónde guardar un research según su alcance:
 - **Sobre un proyecto que usa el framework** → `<proyecto>/research/`, versionado en el repo del proyecto.
 - **Cross-proyecto o exploratorio sin dueño** → `~/.claude/research/` (no versionado, local del dev).
 
-Ver convenciones de formato, trazabilidad y citación en [`stacks/research/conventions.md`](../stacks/research/conventions.md).
+Ver convenciones de formato, trazabilidad y citación en [`profiles/research/conventions.md`](../profiles/research/conventions.md).

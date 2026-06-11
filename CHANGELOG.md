@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [3.0.2] - 2026-06-11
+
+### Fixed
+
+- **Review de redacción post-3.0.0** (3 revisores por área; veredicto general: redacción sana, sweep limpio): (1) link roto en `research/README.md` a las convenciones de research (apuntaba al path pre-rename `stacks/` — el README es doc vivo aunque las notas de research sean históricas); (2) `general/profile-detection.md` aclara la coexistencia de los dos marcadores de opt-out (`neb: skip` prevalece sobre `neb-profile: none`); (3) la nota histórica del rename en `methodology/profiles.md` ahora enlaza al CHANGELOG § 3.0.0 (trazabilidad).
+
 ## [3.0.1] - 2026-06-11
 
 ### Added

@@ -37,6 +37,7 @@ Un proyecto puede declarar, mediante un **marcador en su `CLAUDE.md`**, que no q
 
 Reglas del marcador:
 
+- **Independientes, `neb: skip` prevalece**: si ambos marcadores están presentes, `neb: skip` gana — apaga toda la inyección del arranque, lo que vuelve irrelevante a `neb-profile: none` (que solo apaga las sugerencias de profile).
 - **Idempotente**: si el marcador ya está presente, no se duplica.
 - **Respeta contenido humano**: se inserta en una zona neutra del `CLAUDE.md`, nunca dentro de bloques `<!-- human -->` … `<!-- /human -->` (ver [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md)).
 - **Sin `CLAUDE.md`**: si el proyecto no tiene `CLAUDE.md` y el dev elige marcarlo sin-profile, Claude crea uno mínimo con el marcador.
