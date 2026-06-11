@@ -76,19 +76,22 @@ de deploy. Aplican a todos los integrantes que utilicen el stack.
 
 ## Mecanismo de arranque
 
-Al iniciar cada sesión, el agente carga mediante `@import` desde
-`general/startup.md` las reglas *always-on*: políticas de comunicación,
-detección de stack y onboarding. El resto del contenido se carga
-on-demand según lo que el contexto requiera.
+Neb se instala como **plugin de Claude Code**. Al iniciar cada sesión, un hook
+`SessionStart` del plugin inyecta el arranque con **peso vinculante** (Claude lo
+respeta como un `CLAUDE.md` de proyecto): las reglas *always-on* —políticas de
+comunicación, detección de stack, onboarding— ensambladas desde
+`general/startup.md`, más el overlay y la configuración personal del adoptante.
+El resto del contenido se carga on-demand según lo que el contexto requiera.
 
-Los proyectos cliente referencian Neb con la siguiente línea
-en su `CLAUDE.md`:
+Los proyectos cliente **no** necesitan ninguna línea de `@import` en su
+`CLAUDE.md`: el hook inyecta el arranque en toda sesión, de modo que un
+`CLAUDE.md` de proyecto conserva solo sus imports de stack y su contenido
+propio. El marcador `<!-- neb: skip -->` en el `CLAUDE.md` de un proyecto
+desactiva la inyección para ese repo.
 
-```
-@~/.claude/neb/general/startup.md
-```
-
-En un setup con repo de gobernanza (`neb/` como subtree de Neb), dos variables fijan los paths del entorno: `NEB_HOME` (el checkout de neb) y `NEB_WORKSPACE` (la raíz, donde viven el overlay y `personal/`). Cómo setearlas: [user-guide § Configurar el entorno](user-guide.md).
+Dos variables fijan los paths del entorno: `NEB_HOME` (el directorio del plugin
+instalado / checkout de neb) y `NEB_WORKSPACE` (la raíz del workspace, donde
+viven el overlay y `personal/`). Cómo setearlas: [user-guide § Configurar el entorno](user-guide.md).
 
 ---
 

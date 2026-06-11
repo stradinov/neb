@@ -4,11 +4,21 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [2.0.4] - 2026-06-10
+
+### Fixed
+
+- **Revertida la declaración `"hooks"` de `plugin.json`** (introducida en 2.0.3 sobre un diagnóstico equivocado). Los hooks de un plugin **se auto-descubren** desde `hooks/hooks.json`; el campo `hooks` del manifest es solo para archivos hook **adicionales**, así que apuntarlo al `hooks/hooks.json` estándar dispara `[ERROR] Duplicate hooks file detected` + `hook-load-failed` (los hooks registran igual porque Claude Code lo salta, pero ensucia el log y marca el plugin como no disponible para MCP). Los plugins oficiales de Anthropic (`explanatory-output-style`, `security-guidance`) traen `SessionStart` **sin** clave `hooks` en `plugin.json`. **Causa real del `0 hooks`/`0 skills` reportado antes**: el plugin estaba **deshabilitado** (`enabledPlugins: { "neb@neb": false }` en `settings.local.json`, que precede al `true` de `settings.json`). Habilitado, el log muestra `Registered 2 hooks from 1 plugins` + `Loaded 1 skills` + `Loaded 5 agents` + `Loaded 1 commands` y el arranque se inyecta. Verificado en Claude Code v2.1.170.
+
+### Added
+
+- **Comando `/wakeup`** (`commands/wakeup.md`) — slash-command que dispara el tour de bienvenida. Antes `wakeup` existía solo como skill (`skills/wakeup/SKILL.md`), por lo que escribir `/wakeup` literal daba "Unknown command"; el comando cierra esa brecha (el skill sigue activándose por intención en lenguaje natural).
+
 ## [2.0.3] - 2026-06-09
 
 ### Fixed
 
-- **El hook `SessionStart` ahora carga al instalar el plugin** — se declaró `"hooks": "./hooks/hooks.json"` en `plugin.json`. En Claude Code (verificado en v2.1.170) los hooks de un plugin **no se auto-descubren** aunque exista `hooks/hooks.json`; sin la declaración explícita, `/reload-plugins` reportaba `0 hooks` y **el arranque de Neb no se inyectaba** en sesiones nuevas del adoptante (los agents sí auto-descubren, por eso cargaban). Con la declaración, el `SessionStart` (arranque framework + overlay + personal) carga correctamente. *Nota: los skills del plugin también reportan `0` en v2.1.170 (p. ej. el tour `wakeup`); a investigar por separado.*
+- **(SUPERSEDED — ver 2.0.4)** Se declaró `"hooks": "./hooks/hooks.json"` en `plugin.json` creyendo que los hooks de un plugin no se auto-descubrían. **El diagnóstico era incorrecto**: los hooks de plugin **sí** se auto-descubren desde `hooks/hooks.json`; el `0 hooks` observado se debía a que el plugin estaba **deshabilitado** en `settings.local.json` (`enabledPlugins: { "neb@neb": false }`, que precede a `settings.json`), no a falta de declaración. La declaración resultó **redundante y dañina** (dispara `Duplicate hooks file detected` + `hook-load-failed`) y se **revierte en 2.0.4**.
 
 ## [2.0.2] - 2026-06-09
 
