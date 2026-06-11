@@ -10,11 +10,15 @@ navegables on-demand (el resto de la metodologia se lee con Read bajo demanda).
 Uso:
     python3 assemble-startup.py <archivo-raiz>
     py assemble-startup.py <archivo-raiz>          (Windows)
+    python3 assemble-startup.py --check <archivo-raiz>
 
 Salida: el arranque ensamblado a stdout. Pure Python (stdlib).
 Guards: profundidad maxima de imports (4 hops, como Claude Code) y deteccion de ciclos.
-Defensivo: un archivo ilegible o un import faltante se reemplaza por un comentario,
-nunca aborta (el arranque debe emitirse siempre que sea posible).
+Defensivo (modo normal): un archivo ilegible o un import faltante se reemplaza por un
+comentario, nunca aborta (el arranque debe emitirse siempre que sea posible).
+Estricto (--check): recorre la cadena de imports y sale con exit 1 listando los
+imports faltantes/ilegibles — para el gate pre-push del maintainer, que NO debe
+publicar un kernel degradado aunque el runtime lo tolere.
 """
 import os
 import re
@@ -70,6 +74,28 @@ def assemble(path, depth, seen):
     return ''.join(out)
 
 
+def collect_errors(path, depth, seen, errors):
+    """Modo --check: recorre la cadena de imports acumulando faltantes/ilegibles."""
+    path = os.path.normpath(os.path.abspath(path))
+    if depth > MAX_DEPTH:
+        errors.append("profundidad maxima ({}) excedida en {}".format(MAX_DEPTH, path))
+        return
+    if path in seen:
+        return
+    seen.add(path)
+    try:
+        with open(path, encoding='utf-8') as fh:
+            lines = fh.readlines()
+    except OSError as exc:
+        errors.append("import faltante o ilegible: {} ({})".format(path, exc))
+        return
+    file_dir = os.path.dirname(path)
+    for line in lines:
+        m = IMPORT_RE.match(line.strip())
+        if m:
+            collect_errors(os.path.join(file_dir, m.group(1)), depth + 1, seen, errors)
+
+
 def main():
     # En Windows el stdout por defecto es cp1252 y el arranque tiene Unicode (≥, ─, etc.).
     # Forzar UTF-8 evita UnicodeEncodeError (relevante tambien cuando lo invoca el hook).
@@ -77,10 +103,21 @@ def main():
         sys.stdout.reconfigure(encoding='utf-8')
     except (AttributeError, ValueError):
         pass
-    if len(sys.argv) < 2:
-        sys.stderr.write("Uso: assemble-startup.py <archivo-raiz>\n")
+    args = [a for a in sys.argv[1:] if a != '--check']
+    check_mode = '--check' in sys.argv[1:]
+    if not args:
+        sys.stderr.write("Uso: assemble-startup.py [--check] <archivo-raiz>\n")
         sys.exit(1)
-    sys.stdout.write(assemble(sys.argv[1], 0, frozenset()))
+    if check_mode:
+        errors = []
+        collect_errors(args[0], 0, set(), errors)
+        if errors:
+            for e in errors:
+                sys.stderr.write("[assemble-startup --check] {}\n".format(e))
+            sys.exit(1)
+        sys.stdout.write("assemble-startup --check: cadena de imports integra\n")
+        return
+    sys.stdout.write(assemble(args[0], 0, frozenset()))
 
 
 if __name__ == '__main__':

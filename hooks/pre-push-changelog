@@ -1,32 +1,37 @@
 #!/usr/bin/env bash
 # managed-by: neb/hooks/pre-push-changelog
-# Hook pre-push: verifica que CHANGELOG.md esté sincronizado con changelog.d/
-# antes de publicar commits que tocan changelog.d/.
+# Hook pre-push del maintainer — único punto de enforcement BLOQUEANTE de neb.
+# Encadena 4 gates antes de publicar:
+#   1. Integridad del kernel: assemble-startup.py --check (ningún import del arranque roto).
+#   2. Términos vetados (PII/marcas): extension point del overlay — corre
+#      $NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh si existe (el script privado
+#      no se publica; el hook solo lo invoca).
+#   3. Fragment obligatorio: cambios normativos (fuera de changelog.d/, CHANGELOG.md,
+#      research/) exigen un fragment en el mismo push ("Cualquier cambio entra al CHANGELOG").
+#   4. Sincronía CHANGELOG.md ↔ changelog.d/ (assemble-changelog.py --check).
 #
-# Instalado automáticamente por bootstrap/install.sh.
+# Instalación (maintainer): cp hooks/pre-push-changelog .git/hooks/pre-push
 # Bypass (requiere autorización explícita del dev): git push --no-verify
 
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
 
-# Auto-detectar si neb vive como subtree (e.g. methodology) o en la raíz del repo
+# Auto-detectar si neb vive como subtree (layout histórico) o en la raíz del repo
 if [ -d "$ROOT/neb/changelog.d" ]; then
-  CHANGELOG_D="neb/changelog.d"
-  ASSEMBLER="$ROOT/neb/bootstrap/assemble-changelog.py"
+  NEB_ROOT="$ROOT/neb"
+  PREFIX="neb/"
 else
-  CHANGELOG_D="changelog.d"
-  ASSEMBLER="$ROOT/bootstrap/assemble-changelog.py"
+  NEB_ROOT="$ROOT"
+  PREFIX=""
 fi
 
-# Solo actúa si hay commits a pushear que tocan changelog.d/
 # @{push} requiere upstream configurado; si no hay, salir silencioso
 if ! git rev-parse --abbrev-ref "@{push}" >/dev/null 2>&1; then
   exit 0
 fi
-if ! git diff --name-only "@{push}..HEAD" 2>/dev/null | grep -q "^${CHANGELOG_D}/"; then
-  exit 0
-fi
+PUSHED="$(git diff --name-only "@{push}..HEAD" 2>/dev/null || true)"
+[ -z "$PUSHED" ] && exit 0
 
 # Detectar Python
 if command -v py >/dev/null 2>&1; then
@@ -39,19 +44,57 @@ else
   exit 1
 fi
 
-# Verificar sincronía
-if "$PY" "$ASSEMBLER" --check >/dev/null 2>&1; then
-  exit 0
+fail() {
+  echo >&2 ""
+  echo >&2 "[pre-push] $1"
+  echo >&2 ""
+  shift
+  for line in "$@"; do echo >&2 "  $line"; done
+  echo >&2 ""
+  echo >&2 "  Bypass (requiere autorización explícita del dev): git push --no-verify"
+  exit 1
+}
+
+# ── Gate 1: integridad de la cadena de imports del arranque ─────────────────
+if ! "$PY" "$NEB_ROOT/bootstrap/assemble-startup.py" --check "$NEB_ROOT/general/startup.md" >/dev/null 2>/tmp/neb_check_err; then
+  fail "Cadena de imports del arranque ROTA — no publicar un kernel degradado." \
+       "$(cat /tmp/neb_check_err 2>/dev/null | head -5)" \
+       "Repara el import (rename/move sin actualizar startup.md) y reintenta."
 fi
 
-echo >&2 ""
-echo >&2 "[pre-push] CHANGELOG.md desactualizado respecto a changelog.d/"
-echo >&2 ""
-echo >&2 "  Regenera y commitea antes de hacer push:"
-echo >&2 "    py bootstrap/assemble-changelog.py"
-echo >&2 "    git add CHANGELOG.md"
-echo >&2 "    git commit -m 'docs: regenerar CHANGELOG'"
-echo >&2 "    git push"
-echo >&2 ""
-echo >&2 "  Bypass (requiere autorización explícita del dev): git push --no-verify"
-exit 1
+# ── Gate 2: términos vetados (extension point del overlay privado) ──────────
+SCAN_RAN=0
+if [ -n "${NEB_WORKSPACE:-}" ]; then
+  for s in "$NEB_WORKSPACE"/*/scripts/scan-forbidden-terms.sh; do
+    [ -f "$s" ] || continue
+    SCAN_RAN=1
+    if ! bash "$s" "$NEB_ROOT" >/tmp/neb_scan_out 2>&1; then
+      fail "Términos vetados detectados en el set público (PII/marcas)." \
+           "$(tail -8 /tmp/neb_scan_out 2>/dev/null)" \
+           "Sanea los archivos señalados antes de publicar."
+    fi
+  done
+fi
+if [ "$SCAN_RAN" -eq 0 ]; then
+  echo >&2 "[pre-push] aviso: NEB_WORKSPACE sin scan de términos vetados — gate de PII omitido."
+fi
+
+# ── Gate 3: cambios normativos exigen fragment en el push ───────────────────
+NORMATIVE="$(printf '%s\n' "$PUSHED" | grep -vE "^${PREFIX}(changelog\.d/|CHANGELOG\.md$|research/)" || true)"
+HAS_FRAGMENT="$(printf '%s\n' "$PUSHED" | grep -E "^${PREFIX}changelog\.d/" || true)"
+if [ -n "$NORMATIVE" ] && [ -z "$HAS_FRAGMENT" ]; then
+  fail "Cambios normativos sin fragment de CHANGELOG en el push." \
+       "Archivos: $(printf '%s\n' "$NORMATIVE" | head -3 | tr '\n' ' ')..." \
+       "Crea changelog.d/<version>.md (bootstrap/bump-version.sh) y regenera el CHANGELOG."
+fi
+
+# ── Gate 4: sincronía CHANGELOG.md ↔ changelog.d/ ───────────────────────────
+if printf '%s\n' "$PUSHED" | grep -q "^${PREFIX}changelog\.d/"; then
+  if ! "$PY" "$NEB_ROOT/bootstrap/assemble-changelog.py" --check >/dev/null 2>&1; then
+    fail "CHANGELOG.md desactualizado respecto a changelog.d/." \
+         "Regenera y commitea antes del push:" \
+         "  py bootstrap/assemble-changelog.py && git add CHANGELOG.md && git commit -m 'docs: regenerar CHANGELOG'"
+  fi
+fi
+
+exit 0

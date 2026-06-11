@@ -107,7 +107,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 ### pre-push-changelog (git hook del repo, no Claude Code)
 
-`.git/hooks/pre-push` — git hook nativo del repo `methodology`, lo instala el **maintainer** del núcleo (el modelo clone con `install.sh` fue eliminado en 3.0.0). A diferencia de los anteriores, **no** se engancha vía `settings.json`. Corre `py bootstrap/assemble-changelog.py --check` antes de cada push que toca `changelog.d/`; si el `CHANGELOG.md` está desincronizado respecto a los fragments, aborta el push con mensaje claro. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
+`.git/hooks/pre-push` — git hook nativo del **clon del maintainer** (`cp hooks/pre-push-changelog .git/hooks/pre-push`). Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX). Encadena 4 gates: integridad de la cadena de imports del arranque (`assemble-startup.py --check`), términos vetados vía extension point del overlay (`$NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh` si existe), fragment obligatorio para cambios normativos, y sincronía `CHANGELOG.md` ↔ `changelog.d/`. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
 
 ## Activación en un proyecto
 
