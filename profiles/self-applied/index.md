@@ -50,7 +50,7 @@ Los lineamientos para redactar/editar la metodología están repartidos por capa
 
 | Documento | Cuándo aplica |
 |---|---|
-| [`methodology/principles.md`](../../methodology/principles.md) § "Lineamientos para editar MDs" | **Siempre** al editar cualquier `.md` del núcleo: qué eliminar, conservar, no tocar, y qué reportar sin fix silencioso. En el mismo archivo: capas y test de pertenencia (dónde va un archivo nuevo), coherencia global sobre cambio mínimo, anti-patrones |
+| [`methodology/principles.md`](../../methodology/principles.md) § "Lineamientos para editar MDs" | **Siempre** al editar cualquier `.md` del núcleo: qué eliminar, conservar, no tocar, qué declarar (cambios de fuerza normativa — nunca Patch) y qué reportar sin fix silencioso. En el mismo archivo: capas y test de pertenencia (dónde va un archivo nuevo), coherencia global sobre cambio mínimo, anti-patrones |
 | [`CLAUDE.md` del repo](../../CLAUDE.md) | Mecánica del repo: naming `kebab-case`, `index.md` por carpeta, imports relativos, cómo citar archivos (tabla de referencias), "No editar a mano" |
 | [`profiles/profile-authoring/conventions.md`](../profile-authoring/conventions.md) | Solo al redactar contenido de **profiles** (estructura, archivos mínimos, templates) |
 | [`methodology/change-control-policy.md`](../../methodology/change-control-policy.md) | Ownership: qué puede editar Claude solo vs qué requiere OK humano (bloques `<!-- human -->`) |

@@ -134,6 +134,10 @@ Editar la metodología es aplicarla (ver § "Características" — Reflexiva): e
 - Idioma según convención (español para conversación, inglés para identifiers/commits).
 - Enlaces que apunten a secciones eliminadas: redirigir al archivo o sección equivalente, no dejar enlace roto.
 
+### Declarar (nunca Patch)
+
+- Cambiar la fuerza o el alcance normativo de una regla no es redacción: relajar o endurecer un lineamiento del baseline (recomendación ↔ obligación), o promover un ejemplo, hipótesis o prosa explicativa a regla, se declara como tal en el plan y en el fragment del CHANGELOG, y clasifica como Minor o Major según el `CLAUDE.md` del repo § "Versionado SemVer" — nunca Patch.
+
 ### Detectar y reportar (no fix silencioso)
 
 - Inconsistencias entre archivos (mismo concepto con valores distintos: numeración de fases, comandos, paths).
