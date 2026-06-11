@@ -10,9 +10,9 @@ Trabajar con Claude Code es como pilotar una nave: tú defines el rumbo y tomas 
 
 ## El problema que resuelve
 
-Claude Code no ofrece una metodología incrustada. Sin ella, el agente improvisa, omite pasos de validación, pierde contexto entre sesiones y aplica criterios sin reglas explícitas. El resultado son cambios sin trazabilidad, decisiones sin registro y falta de contexto de cambios entre miembros del equipo.
+Claude Code no ofrece una metodología incrustada, sin ella, el agente improvisa, omite pasos de validación, pierde contexto entre sesiones y aplica criterios sin reglas explícitas. El resultado son cambios sin trazabilidad, decisiones sin registro y falta de contexto de cambios entre miembros del equipo.
 
-Neb resuelve este problema ajustando el comportamiento de Claude a un mismo flujo de trabajo y administrando sus artefactos de manera abstracta, delegándote la definición tus proyecto en *profiles*.
+Neb resuelve este problema ajustando el comportamiento de Claude a un mismo flujo de trabajo y administrando sus artefactos, delegándote la definición tus proyectos en *profiles*.
 
 En la práctica, defines un *profile* para cada tipo de proyecto: uno para el desarrollo de aplicaciones en web cierto lenguaje, otro para procesos de generación de documentos o un *profile* para el análisis y levantamiento de requerimientos en un dominio específico.
 
@@ -29,9 +29,17 @@ En Claude Code, agrega el marketplace e instala el plugin:
 /plugin install neb@neb
 ```
 
-Reinicia Claude Code (o `/reload-plugins`) para activar el hook de arranque. Luego `/wakeup` monta tu *workspace* (tu overlay + configuración personal) y lo conecta.
+Reinicia Claude Code o 
+```
+/reload-plugins
+```
+para activar el hook de arranque.
 
-> El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores.
+Luego,
+```
+/wakeup
+```
+para montar tu *workspace* (directorio donde extiendes la metodología, *overlay* + configuración personal).
 
 ---
 
