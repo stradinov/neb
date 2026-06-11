@@ -11,9 +11,21 @@ Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni 
 /plugin install neb@neb
 ```
 
-Luego escribí `/wakeup` — el tour monta tu overlay y tu config personal (vía `setup-workspace.sh`) y te guía por los pasos de abajo. Un hook `SessionStart` inyecta el arranque de la metodología en cada sesión; los skills, agents y commands del plugin se auto-descubren.
+Luego escribí `/wakeup` — el tour conecta o monta tu workspace (vía `setup-workspace.sh`) y te guía por los pasos de abajo. Un hook `SessionStart` inyecta el arranque de la metodología en cada sesión; los skills, agents y commands del plugin se auto-descubren.
 
-> El modelo de **clonar el repo + correr `bootstrap/install.sh`** quedó **deprecado** como vía de uso. Solo sigue vigente para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores)).
+> El modelo de **clonar el repo + correr `bootstrap/install.sh`** quedó **deprecado** como vía de uso. El clon solo es necesario para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores)).
+
+## Conectarse al workspace del equipo
+
+Si tu equipo ya tiene un **repo workspace** (overlay + `changes/` + `personal/` centralizados), no creás nada: lo conectás. Tres pasos:
+
+```
+/plugin marketplace add stradinov/neb      # + /plugin install neb@neb (una vez)
+git clone <repo-workspace-del-equipo> && cd <repo>
+/wakeup
+```
+
+`/wakeup` detecta que el clon ya es un workspace (markers estructurales: `*/overlays/detect-stack.local.sh` — el mismo criterio que usa el hook en runtime) y ofrece **conectarlo**: setea `NEB_WORKSPACE` en tu `settings.json` y crea tu `personal/<usuario>.md` si falta. El paso final real es **abrir una sesión nueva** de Claude Code: ahí el hook ya inyecta el arranque con el overlay de tu equipo.
 
 ## Montar tu overlay
 
@@ -81,29 +93,13 @@ Si querés versionarla (respaldo, portabilidad entre máquinas), quitá la regla
 
 ## Contribuir al núcleo (mantenedores)
 
-Lo anterior cubre **usar** Neb. **Contribuir al núcleo** —corregir o extender lo que vive en `neb/`, no tu overlay— es un rol de mantenedor y sí requiere una copia del repo, ya sea por fork o por subtree.
-
-**Con git subtree** (recomendado): un repo de gobernanza propio con `neb/` como subtree + tu overlay:
-
-```
-tu-repo/
-├── neb/        ← núcleo (subtree del repo público; no lo editás para meter lo tuyo)
-├── overlay/    ← tus stacks/agents/skills de dominio
-├── changes/    ← tus change MDs
-└── CLAUDE.md   ← importa tus stacks de dominio
-```
-
-Setup y mantenimiento:
+Lo anterior cubre **usar** Neb. **Contribuir al núcleo** —corregir o extender lo que vive en el repo neb, no tu overlay— es un rol de mantenedor y requiere un **clon normal del repo**, separado de tu workspace:
 
 ```bash
-git remote add neb <url-del-repo-neb>
-git subtree add  --prefix neb/ neb main --squash   # traer el núcleo
-git subtree pull --prefix neb/ neb main --squash   # actualizarlo
-git subtree push --prefix neb/ neb main            # contribuir al núcleo (solo viaja neb/)
+git clone https://github.com/stradinov/neb ~/neb   # o donde prefieras
+cp ~/neb/hooks/pre-push-changelog ~/neb/.git/hooks/pre-push   # gate del CHANGELOG
 ```
 
-El `--squash` mantiene tu historia limpia. Tu overlay y `neb/` quedan en árboles separados: el núcleo se actualiza sin tocar lo tuyo.
+Flujo: editás en el clon, fragment de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo (fork + PR si no tenés write). Para **dogfoodear** tus cambios antes de publicarlos, apuntá `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el cache del plugin) o corré `claude --plugin-dir <clon>`.
 
-**Camino simple**: forkeás `neb` y traés mejoras con `git pull` del upstream — sirve para empezar, pero mezcla tu historia con la del núcleo.
-
-El git hook `pre-push` del repo (corre el gate del CHANGELOG) lo instala el maintainer; el viejo `bootstrap/install.sh` quedó deprecado como vía de adopción.
+El clon del núcleo y tu workspace son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)

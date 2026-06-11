@@ -1,6 +1,6 @@
 ---
 name: wakeup
-description: Tour de bienvenida de Neb — monta tu overlay y define tu primer stack.
+description: Tour de bienvenida de Neb — conecta o monta tu workspace y define tu primer stack.
 ---
 
 # /wakeup — tour de bienvenida de Neb
@@ -8,7 +8,17 @@ description: Tour de bienvenida de Neb — monta tu overlay y define tu primer s
 El usuario invocó `/wakeup`. Ejecutá el **tour de bienvenida de Neb** siguiendo el flujo del skill `wakeup` (su definición completa vive en `skills/wakeup/SKILL.md` — no lo dupliques acá):
 
 1. **Presentá** Neb en 2-3 oraciones: qué garantiza (comportamiento explícito, customizable, expandible) y qué no es (no es un generador de código autónomo).
-2. **Detectá el estado** del entorno corriendo `bash "${NEB_HOME:-~/.claude/neb}/bootstrap/setup-workspace.sh" --dry-run` y consumí su salida — no re-detectes la estructura a mano (el script es la fuente de verdad).
-3. **Ofrecé las opciones** de adopción como lista numerada (montar/configurar workspace, definir primer stack, versionar config personal) y ejecutá la que elija el usuario.
+2. **Resolvé el script de setup** con este fallback (un miembro recién instalado no tiene `NEB_HOME`) y corré el dry-run:
 
-No dupliques los pasos de `docs/user-guide.md` en la conversación; ejecutalos refiriendo a la guía. Mantené el tour conversacional y opt-in: si el usuario quiere ir directo al trabajo, dejalo.
+   ```bash
+   NEB_SRC="${NEB_HOME:-${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/neb/neb/*/ 2>/dev/null | sort -V | tail -1)}}"
+   bash "$NEB_SRC/bootstrap/setup-workspace.sh" --dry-run
+   ```
+
+3. **Consumí la salida** (cascada de detección — no re-detectes a mano):
+   - `NEB_WORKSPACE` ya configurado y válido → confirmá "ya estás conectado a `<path>`" y pasá a las opciones del tour.
+   - **"Workspace existente detectado en `<dir>`"** (caso típico: el usuario clonó el repo workspace de su equipo) → ofrecé como opción primera **"Conectar este workspace"**; al aceptar, corré `bash "$NEB_SRC/bootstrap/setup-workspace.sh" --existing "<dir>"`.
+   - Sin workspace → preguntá si tiene uno en otra ruta (`--existing <ruta>`) o si creamos uno nuevo (default / `--base <dir>`).
+4. **Ofrecé las opciones** de adopción restantes como lista numerada (definir primer stack, versionar config personal) y ejecutá la que elija.
+
+No dupliques los pasos de `docs/user-guide.md` en la conversación; ejecutalos refiriendo a la guía. Mantené el tour conversacional y opt-in: si el usuario quiere ir directo al trabajo, dejalo. Cerrá indicando que abra una **sesión nueva** para que el hook tome el workspace conectado.

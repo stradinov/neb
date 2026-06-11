@@ -1,6 +1,6 @@
-@~/.claude/neb/stacks/self-applied/index.md
-@~/.claude/neb/general/startup.md
-@~/.claude/neb/workflow/index.md
+@stacks/self-applied/index.md
+@general/startup.md
+@workflow/index.md
 # CLAUDE.md (este repo)
 
 Meta-instrucciones para Claude cuando edita la metodología misma.
@@ -18,8 +18,8 @@ Meta-instrucciones para Claude cuando edita la metodología misma.
 
 - Archivos: `kebab-case.md`, sin prefijos numéricos.
 - Cada carpeta tiene su `index.md` con orden de lectura.
-- Imports internos: paths relativos (`../methodology/principles.md`).
-- Imports desde proyectos externos: ruta absoluta del clon. Convencionalmente `@~/.claude/neb/...`, ajustable.
+- Imports internos: paths relativos (`../methodology/principles.md`). Los del propio `CLAUDE.md` también son relativos — funcionan en cualquier ubicación del clon.
+- Proyectos externos **no importan el framework**: lo inyecta el plugin (hook `SessionStart`).
 
 ## Referencias en MDs de este repo
 

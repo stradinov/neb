@@ -22,22 +22,30 @@ Abrir con 2-3 oraciones:
 
 ### 2. Detectar el estado (vía script, no a mano)
 
-Corré `bash "${NEB_HOME:-~/.claude/neb}/bootstrap/setup-workspace.sh" --dry-run` desde la raíz del repo de gobernanza. El script reporta qué hay y qué falta (repo de gobernanza, overlay, `personal/`, `NEB_HOME`, `~/CLAUDE.md`) **sin escribir nada**. Consumí su salida — no re-detectes la estructura por tu cuenta (el script es la fuente de verdad).
+Resolvé el script con fallback (un miembro recién instalado no tiene `NEB_HOME`) y corré el dry-run:
 
-- Si el repo aún **no tiene `neb/`** (adoptante nuevo o dev legacy): guiá primero la instalación / `git subtree add` (user-guide § Instalar / Montar overlay), luego volvé a correr el `--dry-run`.
-- Si ya está todo montado: pasá a las opciones restantes (no re-configures).
+```bash
+NEB_SRC="${NEB_HOME:-${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/neb/neb/*/ 2>/dev/null | sort -V | tail -1)}}"
+bash "$NEB_SRC/bootstrap/setup-workspace.sh" --dry-run
+```
+
+El script aplica la **cascada de detección** y reporta **sin escribir nada**. Consumí su salida — no re-detectes la estructura por tu cuenta (el script es la fuente de verdad):
+
+- **Ya conectado** (`NEB_WORKSPACE` configurado y válido): confirmalo en una línea y pasá a las opciones restantes (no re-configures).
+- **"Workspace existente detectado en `<dir>`"** (caso típico: el usuario clonó el repo workspace de su equipo y corre `/wakeup` desde el clon): ofrecé **"Conectar este workspace"** como opción primera — corre `--existing "<dir>"`: setea `NEB_WORKSPACE` y crea su `personal/<usuario>.md` si falta, sin tocar la estructura existente.
+- **Sin workspace**: preguntá si tiene uno en otra ruta (`--existing <ruta>`) o creá uno nuevo (opción 1 de abajo).
 
 ### 3. Ofrecer las opciones (ejecutar, no describir)
 
 Presentar las acciones de adopción como opciones numeradas (formato de [`communication.md`](../../general/communication.md) § "Tono y forma"). Cada opción **ejecuta** los pasos de `user-guide.md` de forma interactiva, sin repetirlos en la conversación:
 
-1. **Montar / configurar tu entorno** — preguntá **dónde** crear el workspace: (default) `neb_workspace/` en el dir actual; `--base <dir>` para otra ubicación; o `--existing <dir>` para reconectar uno ya creado. Corré `bash "$NEB_HOME/bootstrap/setup-workspace.sh" [--base <dir> | --existing <dir>] [--overlay <nombre>]` (sin `--dry-run`): crea el scaffolding (overlay + `overlay/startup.md` + `personal/` + `changes/`), `personal/<username>.md` (username de tu `userConfig` del plugin), y **setea `NEB_HOME`/`NEB_WORKSPACE` en `~/.claude/settings.json` automáticamente** (merge no-destructivo, vía `set-neb-env.py`) + shell profile. Bajo plugin los hooks ya vienen registrados; no hay que tocar settings.json a mano. Es el paso mínimo (ver [user-guide § Montar tu overlay](../../docs/user-guide.md)).
+1. **Conectar / montar tu entorno** — si el paso 2 detectó un workspace existente, la acción es **conectarlo** (`--existing "<dir>"`). Si no, preguntá **dónde** crear el workspace: (default) `neb_workspace/` en el dir actual; `--base <dir>` para otra ubicación. Corré `bash "$NEB_SRC/bootstrap/setup-workspace.sh" [--base <dir> | --existing <dir>] [--overlay <nombre>]` (sin `--dry-run`): crea/conecta el scaffolding (overlay + `overlay/startup.md` + `personal/` + `changes/`), `personal/<username>.md` (username del SO) y **setea `NEB_WORKSPACE` en `~/.claude/settings.json` automáticamente** (merge no-destructivo, vía `set-neb-env.py`; `NEB_HOME` solo se persiste cuando no resuelve al cache del plugin). Bajo plugin los hooks ya vienen registrados; no hay que tocar settings.json a mano. Es el paso mínimo (ver [user-guide § Montar tu overlay](../../docs/user-guide.md)).
 2. **Definir tu primer stack** — preguntar el dominio ("¿Python/ML, PHP/backend, React, iOS…?"), proponer nombre en kebab-case, cambiar a stack `stack-authoring` y guiar `init-stack-subproject.sh` **en el overlay**. Puede incluir skill de apoyo (`skill-authoring`) y agentes revisores.
 3. **Versionar tu configuración personal** — seguir [user-guide § Versionar tu configuración personal](../../docs/user-guide.md).
 
 ### 4. Cierre
 
-Confirmar lo que quedó montado (overlay, primer stack) y señalar 2 referencias sin abrumar:
+Confirmar lo que quedó montado/conectado (workspace, overlay, primer stack), recordar abrir una **sesión nueva** para que el hook tome el workspace, y señalar 2 referencias sin abrumar:
 - [`general/index.md`](../../general/index.md) — mapa de Neb.
 - [`methodology/promises.md`](../../methodology/promises.md) — qué garantiza.
 

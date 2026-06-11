@@ -11,11 +11,18 @@ set -euo pipefail
 # Ubicacion del workspace (carpeta neb_workspace) — 3 modos:
 #   (default)          <cwd>/neb_workspace
 #   --base <dir>       <dir>/neb_workspace
-#   --existing <dir>   reconecta NEB_WORKSPACE a <dir> ya existente (no crea estructura)
+#   --existing <dir>   conecta NEB_WORKSPACE a <dir> ya existente (no crea estructura;
+#                      si crea personal/<usuario>.md si falta)
+#
+# Auto-deteccion: en modo default y --dry-run, si la raiz actual (git toplevel o cwd) ya es
+# un workspace (markers: */overlays/detect-stack.local.sh — el mismo glob que usa
+# neb-bootstrap-context.py en runtime — o <overlay>/startup.md), lo reporta y sugiere
+# --existing en vez de crear uno adentro.
 #
 # Opciones: --overlay <nombre> (default: overlay) · --dry-run (no escribe)
 #
 # NEB_HOME se determina: ${CLAUDE_PLUGIN_ROOT} (plugin) > $NEB_HOME (env) > el dir padre de este script.
+# NEB_HOME NO se persiste cuando resuelve al cache del plugin (path version-specific).
 
 MODE="create"
 BASE=""
@@ -58,11 +65,32 @@ NEB_HOME_VAL="$(cd "$NEB_HOME_VAL" 2>/dev/null && pwd || echo "$NEB_HOME_VAL")"
 bold "NEB_HOME (nucleo): $NEB_HOME_VAL"
 
 # 2. Resolver el workspace
+# _is_workspace: markers estructurales de un workspace de Neb (mismo criterio que el
+# discovery del overlay en neb-bootstrap-context.py — si el marker esta, el hook inyecta).
+_is_workspace() {
+  local d="$1"
+  compgen -G "$d/*/overlays/detect-stack.local.sh" > /dev/null 2>&1 && return 0
+  [ -f "$d/overlay/startup.md" ] && return 0
+  return 1
+}
+
 if [ "$MODE" = "existing" ]; then
   [ -d "$EXISTING" ] || { echo "El dir no existe: $EXISTING" >&2; exit 1; }
   WS="$(cd "$EXISTING" && pwd)"
-  bold "NEB_WORKSPACE (reconectar, sin crear estructura): $WS"
+  bold "NEB_WORKSPACE (conectar workspace existente): $WS"
+  _is_workspace "$WS" || warn "El dir no tiene markers de workspace (*/overlays/detect-stack.local.sh) — el hook no encontrara overlay que inyectar."
 else
+  # Auto-deteccion: no crear un workspace adentro de uno existente
+  DETECT_ROOT="${BASE:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
+  DETECT_ROOT="$(cd "$DETECT_ROOT" 2>/dev/null && pwd || echo "$DETECT_ROOT")"
+  if _is_workspace "$DETECT_ROOT"; then
+    bold "Workspace existente detectado en: $DETECT_ROOT"
+    info "marker: $(ls -d "$DETECT_ROOT"/*/overlays/detect-stack.local.sh 2>/dev/null | head -1 || echo "$DETECT_ROOT/overlay/startup.md")"
+    info "Conectalo:  bash $0 --existing \"$DETECT_ROOT\""
+    info "O crea en otra parte:  bash $0 --base <otro-dir>"
+    [ "$DRY_RUN" -eq 1 ] && info "(dry-run: no se escribio nada)"
+    exit 0
+  fi
   BASE_DIR="${BASE:-$(pwd)}"
   WS="$BASE_DIR/neb_workspace"
   bold "NEB_WORKSPACE (crear): $WS"
@@ -102,9 +130,12 @@ OV
   fi
 fi
 
-# 4. personal/<username>.md (username de userConfig del plugin, o del SO)
+# 4. personal/<username>.md (username del SO; mismo lookup que el hook SessionStart)
+#    Aplica en create Y en existing — un miembro que conecta el workspace del equipo
+#    necesita su personal/<usuario>.md aunque la estructura ya exista.
 USER_NAME="${CLAUDE_PLUGIN_OPTION_USERNAME:-${USER:-${USERNAME:-}}}"
-if [ -n "$USER_NAME" ] && [ "$MODE" = "create" ] && [ "$DRY_RUN" -eq 0 ]; then
+if [ -n "$USER_NAME" ] && [ "$DRY_RUN" -eq 0 ]; then
+  mkdir -p "$WS/personal"
   PERSONAL="$WS/personal/$USER_NAME.md"
   if [ ! -f "$PERSONAL" ]; then
     TPL="$NEB_HOME_VAL/templates/personal.md.template"
@@ -114,44 +145,47 @@ if [ -n "$USER_NAME" ] && [ "$MODE" = "create" ] && [ "$DRY_RUN" -eq 0 ]; then
       printf '# Personal — %s\n\n## Atajos personales\n\n## Preferencias de comunicacion\n\n## Notas privadas\n' "$USER_NAME" > "$PERSONAL"
     fi
     ok "personal/$USER_NAME.md"
+  else
+    info "personal/$USER_NAME.md ya existe"
   fi
-elif [ -z "$USER_NAME" ] && [ "$MODE" = "create" ]; then
-  warn "Sin username (userConfig/USER/USERNAME) — no creo personal/<username>.md. Re-corre con el username seteado."
+elif [ -z "$USER_NAME" ]; then
+  warn "Sin username (USER/USERNAME) — no creo personal/<username>.md. Re-corre con el username seteado."
 fi
 
-# 5. Conectar variables: settings.json (helper) + shell profile
-bold "Conectando NEB_HOME + NEB_WORKSPACE"
+# 5. Conectar variables en settings.json (helper).
+#    NEB_HOME NO se persiste cuando resuelve al cache del plugin y el usuario no lo tenia
+#    en env: el path del cache es version-specific y, por la precedencia D4
+#    (NEB_HOME > CLAUDE_PLUGIN_ROOT), quedaria sombreando al plugin tras un update.
+PERSIST_NEB_HOME=1
+if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${NEB_HOME:-}" ]; then
+  PERSIST_NEB_HOME=0
+fi
+
+bold "Conectando variables en ~/.claude/settings.json"
+ENV_ARGS=("NEB_WORKSPACE=$WS")
+[ "$PERSIST_NEB_HOME" -eq 1 ] && ENV_ARGS=("NEB_HOME=$NEB_HOME_VAL" "${ENV_ARGS[@]}")
 if [ "$DRY_RUN" -eq 1 ]; then
-  info "[dry-run] set-neb-env.py NEB_HOME=$NEB_HOME_VAL NEB_WORKSPACE=$WS"
+  info "[dry-run] set-neb-env.py ${ENV_ARGS[*]}"
+  [ "$PERSIST_NEB_HOME" -eq 0 ] && info "[dry-run] NEB_HOME no se persiste (resuelve al cache del plugin)"
 else
   PYBIN="$(neb_python || true)"
   if [ -n "$PYBIN" ]; then
-    "$PYBIN" "$NEB_HOME_VAL/bootstrap/set-neb-env.py" "NEB_HOME=$NEB_HOME_VAL" "NEB_WORKSPACE=$WS" \
+    "$PYBIN" "$NEB_HOME_VAL/bootstrap/set-neb-env.py" "${ENV_ARGS[@]}" \
       || warn "No se pudo actualizar settings.json (revisa $PYBIN). Setea NEB_WORKSPACE a mano en ~/.claude/settings.json."
   else
-    warn "No encontre Python (probe python3/python/py). Setea NEB_HOME/NEB_WORKSPACE a mano en ~/.claude/settings.json."
+    warn "No encontre Python (probe python3/python/py). Setea NEB_WORKSPACE a mano en ~/.claude/settings.json."
   fi
+  [ "$PERSIST_NEB_HOME" -eq 0 ] && info "NEB_HOME no se persiste (el plugin resuelve su propio path en cada sesion)"
 fi
 
-PROFILE=""
-for cand in "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.profile"; do
-  [ -f "$cand" ] && { PROFILE="$cand"; break; }
-done
-if [ -z "$PROFILE" ]; then
-  warn "Sin shell profile; agregá a mano: export NEB_HOME=\"$NEB_HOME_VAL\"; export NEB_WORKSPACE=\"$WS\""
-elif [ "$DRY_RUN" -eq 1 ]; then
-  info "[dry-run] actualizaria $PROFILE con NEB_HOME/NEB_WORKSPACE"
-elif grep -qF "export NEB_WORKSPACE=\"$WS\"" "$PROFILE" && grep -qF "export NEB_HOME=\"$NEB_HOME_VAL\"" "$PROFILE"; then
-  ok "shell profile ya correcto ($PROFILE)"
-else
-  cp "$PROFILE" "$PROFILE.bak"
-  grep -vE '^[[:space:]]*export[[:space:]]+(NEB_HOME|NEB_WORKSPACE)=' "$PROFILE" > "$PROFILE.tmp"
-  { printf 'export NEB_HOME="%s"\n' "$NEB_HOME_VAL"; printf 'export NEB_WORKSPACE="%s"\n' "$WS"; } >> "$PROFILE.tmp"
-  mv "$PROFILE.tmp" "$PROFILE"
-  ok "shell profile actualizado ($PROFILE, backup .bak)"
-fi
+# El shell profile ya no se edita (settings.json basta para las sesiones de Claude Code).
+# Para correr hooks/scripts de neb en shells sueltas, exporta a mano si lo necesitas:
+info "Exports opcionales para shells fuera de Claude Code:"
+[ "$PERSIST_NEB_HOME" -eq 1 ] && info "  export NEB_HOME=\"$NEB_HOME_VAL\""
+info "  export NEB_WORKSPACE=\"$WS\""
 
 bold "Listo"
 info "NEB_HOME=$NEB_HOME_VAL"
 info "NEB_WORKSPACE=$WS"
-[ "$DRY_RUN" -eq 1 ] && info "(dry-run: no se escribio nada)"
+info "Abri una sesion nueva de Claude Code para que el hook tome el workspace."
+if [ "$DRY_RUN" -eq 1 ]; then info "(dry-run: no se escribio nada)"; fi
