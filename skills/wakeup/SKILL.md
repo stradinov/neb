@@ -33,7 +33,8 @@ El script aplica la **cascada de detección** y reporta **sin escribir nada**. C
 
 - **Ya conectado** (`NEB_WORKSPACE` configurado y válido): confirmalo en una línea y pasá a las opciones restantes (no re-configures).
 - **"Workspace existente detectado en `<dir>`"** (caso típico: el usuario clonó el repo workspace de su equipo y corre `/wakeup` desde el clon): ofrecé **"Conectar este workspace"** como opción primera — corre `--existing "<dir>"`: setea `NEB_WORKSPACE` y crea su `personal/<usuario>.md` si falta, sin tocar la estructura existente.
-- **Sin workspace**: preguntá si tiene uno en otra ruta (`--existing <ruta>`) o creá uno nuevo (opción 1 de abajo).
+- **"Workspace(s) existente(s) encontrado(s) bajo `$HOME`"** (el cwd no era workspace; el script barrió `$HOME` con el mismo marker): con 1 resultado, ofrecé conectarlo; con varios, lista numerada para que el usuario elija — nadie teclea paths a mano.
+- **Sin workspace** (ni en cwd ni en el barrido): preguntá si tiene uno en otra ruta (`--existing <ruta>`) o creá uno nuevo (opción 1 de abajo).
 
 ### 3. Ofrecer las opciones (ejecutar, no describir)
 

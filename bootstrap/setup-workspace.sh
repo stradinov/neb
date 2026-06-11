@@ -18,6 +18,9 @@ set -euo pipefail
 # un workspace (markers: */overlays/detect-stack.local.sh — el mismo glob que usa
 # neb-bootstrap-context.py en runtime — o <overlay>/startup.md), lo reporta y sugiere
 # --existing en vez de crear uno adentro.
+# Si la raiz actual NO es workspace y no se paso --base, barre $HOME (una pasada de find,
+# podando ocultos/node_modules/AppData/*.bak) buscando el mismo marker y lista lo encontrado
+# en vez de crear a ciegas (nivel 2a de la cascada de /wakeup).
 #
 # Opciones: --overlay <nombre> (default: overlay) · --dry-run (no escribe)
 #
@@ -91,6 +94,31 @@ else
     [ "$DRY_RUN" -eq 1 ] && info "(dry-run: no se escribio nada)"
     exit 0
   fi
+
+  # Nivel 2a: barrido acotado bajo $HOME (solo modo default sin --base; --base = intencion
+  # explicita y salta el barrido). Una pasada de find hasta el marker (raiz del workspace a
+  # profundidad <=3 de $HOME), podando ocultos, node_modules, AppData y *.bak.
+  _scan_workspaces() {
+    find "$HOME" -maxdepth 5 \
+      \( -name '.*' -o -name node_modules -o -name AppData -o -name '*.bak' \) -prune -o \
+      -type f -path '*/overlays/detect-stack.local.sh' -print 2>/dev/null \
+    | while IFS= read -r f; do
+        dirname "$(dirname "$(dirname "$f")")"
+      done | sort -u
+  }
+  if [ -z "$BASE" ]; then
+    FOUND="$(_scan_workspaces || true)"
+    if [ -n "$FOUND" ]; then
+      N="$(printf '%s\n' "$FOUND" | wc -l | tr -d '[:space:]')"
+      bold "Workspace(s) existente(s) encontrado(s) bajo \$HOME ($N):"
+      printf '%s\n' "$FOUND" | while IFS= read -r w; do info "$w"; done
+      info "Conectalo:  bash $0 --existing \"<dir>\""
+      info "O crea uno nuevo en otra parte:  bash $0 --base <otro-dir>"
+      [ "$DRY_RUN" -eq 1 ] && info "(dry-run: no se escribio nada)"
+      exit 0
+    fi
+  fi
+
   BASE_DIR="${BASE:-$(pwd)}"
   WS="$BASE_DIR/neb_workspace"
   bold "NEB_WORKSPACE (crear): $WS"

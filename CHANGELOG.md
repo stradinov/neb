@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-10
+
+### Added
+
+- **Barrido de workspaces bajo `$HOME`** (nivel 2a de la cascada de `/wakeup`): cuando la raíz actual no es un workspace y no se pasó `--base`, `setup-workspace.sh` barre `$HOME` en una sola pasada de `find` (raíz del workspace a profundidad ≤3; poda ocultos, `node_modules`, `AppData` y `*.bak`) buscando el mismo marker estructural (`*/overlays/detect-stack.local.sh`) y lista lo encontrado en vez de crear a ciegas. El tour ofrece conectar el único resultado o elegir de una lista numerada — el usuario ya no teclea paths a mano. Medido: ~0.2s en Linux, ~4.5s en un home grande de Windows (corre una sola vez, en onboarding).
+
 ## [2.1.0] - 2026-06-10
 
 ### Added
