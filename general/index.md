@@ -6,14 +6,20 @@ Este archivo es el **índice/mapa** de la metodología: orden de lectura y flujo
 
 ## Orden de lectura
 
-Transversales (siempre):
+Transversales **inyectadas al arranque** (vía [`startup.md`](startup.md), garantizadas en toda sesión):
 
 - [Communication](communication.md) — tono, idioma, hilo de la metodología.
 - [Models](models.md) — selección de modelo según contexto.
 - [Profile detection](profile-detection.md) — detección del profile al iniciar y profile activo durante la sesión.
-- [Agents](agents.md) — tipos de subagente de Claude Code (Explore, Plan, general-purpose) y su mapeo a fases del workflow.
-- [Incidents](incidents.md) — protocolo reactivo para incidencias detectadas post-entrega a producción.
-- [Change control gate](../process/change-control-gate.md) — autorización del cambio (Fase 4); ownership de `.md` y punto de restauración en [methodology/change-control-policy.md](../methodology/change-control-policy.md).
+- [Phase transitions](../process/phase-transitions.md) — enrutamiento del workflow: trigger de formalización, anti-desviación, mapa de fases, gates de cola, conflictos normativos.
+- [Onboarding](onboarding.md) — oferta del tour `/wakeup`.
+- [Workflow index](../workflow/index.md) — mapa de artefactos + ENUM de estados.
+
+Transversales **on-demand** (su cláusula base viaja espejada en el arranque; el detalle se carga al disparador):
+
+- [Agents](agents.md) — al despachar subagentes (tipos y mapeo a fases).
+- [Incidents](incidents.md) — al detectar una incidencia post-entrega a producción.
+- [Change control gate](../process/change-control-gate.md) — al confirmar cambios (Fase 4); núcleo espejado en phase-transitions § "Gates de cola"; ownership de `.md` y punto de restauración en [methodology/change-control-policy.md](../methodology/change-control-policy.md).
 
 Fases (secuenciales por requerimiento):
 

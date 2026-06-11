@@ -1,6 +1,7 @@
 @profiles/self-applied/index.md
-@general/startup.md
-@workflow/index.md
+<!-- El arranque del framework (startup + workflow) lo inyecta el plugin neb (hook SessionStart)
+     — no se importa aquí para no cargarlo dos veces. Contribuidor sin plugin: instalalo
+     (/plugin marketplace add stradinov/neb + /plugin install neb@neb). -->
 # CLAUDE.md (este repo)
 
 Meta-instrucciones para Claude cuando edita la metodología misma.
