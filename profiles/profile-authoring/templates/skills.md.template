@@ -1,0 +1,17 @@
+# Skills (profile: {{PROFILE_NAME}})
+
+<!-- Opción A: sin skills propios -->
+Este profile no tiene skills propios actualmente. El conocimiento vive en los MDs del profile mismo.
+
+Ver inventario completo en [`skills/README.md`](../../skills/README.md).
+
+<!-- Opción B: con skills propios — reemplazar el bloque anterior por: -->
+<!--
+Skills aplicables a este profile:
+
+| Skill | Aplica en | Descripción |
+|---|---|---|
+| `<nombre>` | <!-- fases o contextos --> | <!-- qué aporta --> |
+
+Los skills se auto-descubren del plugin (basta crear `skills/<nombre>/SKILL.md`); registro en `skills/README.md`.
+-->

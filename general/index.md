@@ -1,6 +1,6 @@
 # Políticas generales
 
-Baseline del equipo. Aplican a cualquier proyecto y stack. Un override personal puede estrecharlas o agregar, no relajarlas (ver [methodology/personal-vs-team.md](../methodology/personal-vs-team.md)).
+Baseline del equipo. Aplican a cualquier proyecto y profile. Un override personal puede estrecharlas o agregar, no relajarlas (ver [methodology/personal-vs-team.md](../methodology/personal-vs-team.md)).
 
 Este archivo es el **índice/mapa** de la metodología: orden de lectura y flujo. Cada política vive en su propio archivo, que se carga según el disparador indicado abajo.
 
@@ -10,7 +10,7 @@ Transversales (siempre):
 
 - [Communication](communication.md) — tono, idioma, hilo de la metodología.
 - [Models](models.md) — selección de modelo según contexto.
-- [Stack detection](stack-detection.md) — detección del stack al iniciar y stack activo durante la sesión.
+- [Profile detection](profile-detection.md) — detección del profile al iniciar y profile activo durante la sesión.
 - [Agents](agents.md) — tipos de subagente de Claude Code (Explore, Plan, general-purpose) y su mapeo a fases del workflow.
 - [Incidents](incidents.md) — protocolo reactivo para incidencias detectadas post-entrega a producción.
 - [Change control gate](../process/change-control-gate.md) — autorización del cambio (Fase 4); ownership de `.md` y punto de restauración en [methodology/change-control-policy.md](../methodology/change-control-policy.md).
@@ -25,7 +25,7 @@ Fases (secuenciales por requerimiento):
 
 Referencia (on-demand):
 
-- [Vocabulary](../methodology/vocabulary.md) — vocabulario abstracto de la metodología; se consulta al concretizar el glosario de un stack o al usar un término del flujo.
+- [Vocabulary](../methodology/vocabulary.md) — vocabulario abstracto de la metodología; se consulta al concretizar el glosario de un profile o al usar un término del flujo.
 
 ## Capas del repo
 

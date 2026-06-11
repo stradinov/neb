@@ -6,8 +6,8 @@ Cubre clarificación, estimación, plan, plan de pruebas, propuesta.
 
 Antes de clarificar y planear, cargar el contexto relevante:
 
-- Consultar `skills/README.md` (inventario maestro) e identificar los skills cuya columna "Stack(s) aplicable(s)" incluye el stack activo. El plan debe declarar expresamente cuáles aplican al REQ y por qué. Si ninguno aplica, declararlo: "ningún skill del inventario cubre este REQ". Este paso cierra el loop si Claude no activó skills relevantes al iniciar la sesión. Un skill aplicable provee vocabulario, mapas y peculiaridades por proyecto que informan la estimación de impacto y la enumeración de dependientes.
-- Si stack activo = `self-applied` y el REQ propone **crear, mover o renombrar archivos** en el repo: consultar [`../methodology/principles.md`](../methodology/principles.md) antes de proponer ubicación. Declarar en el plan la clasificación del archivo afectado (Metodología / Proceso / Mixto) y derivar la ubicación de ella. Para Mixto, justificar la elección de carpeta y la sección que domina la decisión (ver `methodology/principles.md` § "Cuándo separar mixtos"). Aplica también a reorganizaciones de carpetas. No aplica a ediciones in-place ni a typos.
+- Consultar `skills/README.md` (inventario maestro) e identificar los skills cuya columna "Profile(s) aplicable(s)" incluye el profile activo. El plan debe declarar expresamente cuáles aplican al REQ y por qué. Si ninguno aplica, declararlo: "ningún skill del inventario cubre este REQ". Este paso cierra el loop si Claude no activó skills relevantes al iniciar la sesión. Un skill aplicable provee vocabulario, mapas y peculiaridades por proyecto que informan la estimación de impacto y la enumeración de dependientes.
+- Si profile activo = `self-applied` y el REQ propone **crear, mover o renombrar archivos** en el repo: consultar [`../methodology/principles.md`](../methodology/principles.md) antes de proponer ubicación. Declarar en el plan la clasificación del archivo afectado (Metodología / Proceso / Mixto) y derivar la ubicación de ella. Para Mixto, justificar la elección de carpeta y la sección que domina la decisión (ver `methodology/principles.md` § "Cuándo separar mixtos"). Aplica también a reorganizaciones de carpetas. No aplica a ediciones in-place ni a typos.
 
 ## Trigger de formalización
 
@@ -24,7 +24,7 @@ Gate de entrada al workflow. Contenido canónico en [`phase-transitions.md`](pha
 
 ## Sugerencia de research
 
-Si el REQ toca un tema especializado sin antecedente en skills ni en la memoria del proyecto, y la complejidad estimada es media o alta (ver tabla "Riesgo de regresión" abajo): proponer abrir un REQ de research antes de planear. El dev puede rechazar. Ver disparadores y modos en [`stacks/research/conventions.md`](../stacks/research/conventions.md).
+Si el REQ toca un tema especializado sin antecedente en skills ni en la memoria del proyecto, y la complejidad estimada es media o alta (ver tabla "Riesgo de regresión" abajo): proponer abrir un REQ de research antes de planear. El dev puede rechazar. Ver disparadores y modos en [`profiles/research/conventions.md`](../profiles/research/conventions.md).
 
 ## Sugerencia de plan mode
 
@@ -44,7 +44,7 @@ El **plan de pruebas es obligatorio** en cualquier nivel.
 | Media | 3–6 elementos, lógica nueva | Estimado + plan breve + plan de pruebas |
 | Alta  | 7+ elementos, cambio de arquitectura | Estimado + plan detallado + plan de pruebas |
 
-El plan de elaboración incluye: rango de tiempo, elementos del entregable con una línea cada uno, riesgos. El stack concretiza qué son "elementos" (archivos en un stack de software, secciones del documento en un stack de análisis).
+El plan de elaboración incluye: rango de tiempo, elementos del entregable con una línea cada uno, riesgos. El profile concretiza qué son "elementos" (archivos en un profile de software, secciones del documento en un profile de análisis).
 
 ## Riesgo de regresión
 

@@ -1,6 +1,6 @@
 # Versionado y entrega con git
 
-Concretización **git** del mecanismo de versionamiento: formato de commits, push, ramas, CHANGELOG. La política universal y agnóstica del mecanismo (ownership de `.md`, acciones destructivas, punto de restauración) vive en [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md); el gate de autorización en Fase 4 vive en [`../process/change-control-gate.md`](../process/change-control-gate.md) — este archivo concretiza ambos para git. Aplica a stacks que usan git; un stack con otro mecanismo lo concretiza en su `stacks/<stack>/deployment.md`.
+Concretización **git** del mecanismo de versionamiento: formato de commits, push, ramas, CHANGELOG. La política universal y agnóstica del mecanismo (ownership de `.md`, acciones destructivas, punto de restauración) vive en [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md); el gate de autorización en Fase 4 vive en [`../process/change-control-gate.md`](../process/change-control-gate.md) — este archivo concretiza ambos para git. Aplica a profiles que usan git; un profile con otro mecanismo lo concretiza en su `profiles/<profile>/deployment.md`.
 
 ## Commits
 
@@ -14,7 +14,7 @@ Exclusión propia del mecanismo git — el gate **no aplica** a los artefactos d
 
 ### Autonomía de Claude sobre archivos `.md` — operaciones git
 
-El principio (Claude es dueño operativo de los `.md`; las confirmaciones que tocan **exclusivamente** `.md` no requieren OK en ninguna fase ni stack) vive en [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Ownership de archivos `.md`". En git, ese principio cubre estas operaciones cuando el delta toca solo archivos `.md`:
+El principio (Claude es dueño operativo de los `.md`; las confirmaciones que tocan **exclusivamente** `.md` no requieren OK en ninguna fase ni profile) vive en [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Ownership de archivos `.md`". En git, ese principio cubre estas operaciones cuando el delta toca solo archivos `.md`:
 
 - **Cubre**: `git commit`, `git push`, creación de ramas, `git merge`, `git rebase` sobre rama propia, `git cherry-pick`, y operaciones destructivas (`reset --hard`, `branch -D`, `push --force` sobre ramas distintas a `main`/`master`) en cualquier path del repo (`changes/`, `research/`, `reqs/<algo>/`, `README.md`, `docs/`, `CHANGELOG.md`, `CLAUDE.md`, etc.). Creación y edición.
 - **No cubre** (requiere OK pese a tocar solo `.md`):
@@ -33,7 +33,7 @@ El principio (Claude es dueño operativo de los `.md`; las confirmaciones que to
 - Push solo cuando el usuario confirma y los cambios fueron validados.
 - **Excepción — push `.md`-only**: si los commits que arrastra el push tocan solo archivos `.md`, no requiere OK del dev (ver § Commits "Autonomía de Claude sobre archivos `.md`"). `push --force` a `main`/`master` mantiene su gate.
 - **Antes de validar**: solo recordar al usuario hacer commit; no solicitar push.
-  - **Validación diferida (stack `self-applied`)**: cuando la validación se difiere a uso real, Claude commitea localmente el trabajo del REQ una vez se cumplen: (a) plan aprobado, (b) Fase 4 cerrada. El push sigue diferido hasta cierre del REQ o autorización del dev. Cierra la ventana de exposición a otras sesiones que abran después. Ver `stacks/self-applied/deployment.md` § Validación diferida en uso.
+  - **Validación diferida (profile `self-applied`)**: cuando la validación se difiere a uso real, Claude commitea localmente el trabajo del REQ una vez se cumplen: (a) plan aprobado, (b) Fase 4 cerrada. El push sigue diferido hasta cierre del REQ o autorización del dev. Cierra la ventana de exposición a otras sesiones que abran después. Ver `profiles/self-applied/deployment.md` § Validación diferida en uso.
 - **Después de validar**: preguntar si hacer commit y push.
 - Entrega final y acciones que afectan a otros (PRs, force push): siempre confirmar.
 - **Push a entrega final sin validación**: Claude detecta y ofrece asistir con las pruebas. El dev acepta, valida por su cuenta, o confirma que ya fue validado fuera de sesión.
@@ -41,15 +41,15 @@ El principio (Claude es dueño operativo de los `.md`; las confirmaciones que to
 
 ## Comandos de entrega a servidores
 
-`pscp`, `ssh` y similares no son comandos locales — forman parte del proceso de entrega del stack (ver `stacks/<stack>/deployment.md`). Siguen el modelo del contexto activo, no Haiku.
+`pscp`, `ssh` y similares no son comandos locales — forman parte del proceso de entrega del profile (ver `profiles/<profile>/deployment.md`). Siguen el modelo del contexto activo, no Haiku.
 
-## Rama principal por stack
+## Rama principal por profile
 
 - `self-applied`: `main` o la rama principal del repo de metodología.
-- Un stack de software puede usar `master` u otra rama; lo declara en su `stacks/<stack>/deployment.md` (override por proyecto).
-- Otros stacks: declarar en `stacks/<stack>/deployment.md`.
+- Un profile de software puede usar `master` u otra rama; lo declara en su `profiles/<profile>/deployment.md` (override por proyecto).
+- Otros profiles: declarar en `profiles/<profile>/deployment.md`.
 
-## CHANGELOG fragmentado (stack `self-applied`)
+## CHANGELOG fragmentado (profile `self-applied`)
 
 Aplicable a repos que mantienen `CHANGELOG.md` y son trabajados por sesiones paralelas del mismo dev. Caso canónico: el propio repo `neb`.
 
@@ -76,7 +76,7 @@ Claude ejecuta estos pasos como parte de Fase 6/7, antes del push del REQ:
 
 ### Gate pre-push
 
-El git hook `.git/hooks/pre-push` del repo `neb` (lo instala el maintainer; `install.sh` deprecado) corre `assemble-changelog.py --check` antes de cada push que toca `changelog.d/`. Si retorna 1:
+El git hook `.git/hooks/pre-push` del repo `neb` (lo instala el maintainer: `cp hooks/pre-push-changelog .git/hooks/pre-push`) corre `assemble-changelog.py --check` antes de cada push que toca `changelog.d/`. Si retorna 1:
 
 - El push aborta con mensaje claro.
 - Claude (leyendo el mensaje del hook) regenera (`py bootstrap/assemble-changelog.py`), commitea `CHANGELOG.md` como commit final del REQ y reintenta push.

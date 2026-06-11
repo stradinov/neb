@@ -4,13 +4,13 @@ Single source of truth de los skills de Claude Code disponibles. Cualquier REQ q
 
 ## Skills disponibles
 
-| Skill | Versión | Stack(s) aplicable(s) | Último review | Última validación en uso | Estado |
+| Skill | Versión | Profile(s) aplicable(s) | Último review | Última validación en uso | Estado |
 |---|---|---|---|---|---|
 | [wakeup](wakeup/SKILL.md) | 1.1.0 (2026-06-03) | `self-applied` | 2026-06-03 | — | Experimental |
 
-## Candidatos (stubs en stacks, sin skill activo)
+## Candidatos (stubs en profiles, sin skill activo)
 
-| Stack | Candidato | Condición para crear |
+| Profile | Candidato | Condición para crear |
 |---|---|---|
 | `research` | `research-prompts` — catálogo de prompts efectivos por tipo de investigación | ≥3 research ejecutados con patrón emergente |
 
@@ -26,8 +26,8 @@ Single source of truth de los skills de Claude Code disponibles. Cualquier REQ q
 
 Los skills se **auto-descubren** del plugin de Neb instalado — no se copian a `~/.claude`. Basta con instalar/actualizar el plugin (ver [docs/user-guide.md](../docs/user-guide.md) § "Instalar"). Tras editar o agregar un skill, `/reload-plugins` (o `claude plugin update neb`) lo refresca sin reiniciar; en sesión nueva ya está disponible.
 
-> El modelo de copiar skills a `~/.claude` corriendo `install-skills.sh` / `install.sh` corresponde al modelo clone **deprecado**.
+> El modelo de copiar skills a `~/.claude` corresponde al modelo clone, **eliminado en 3.0.0** — los skills se auto-descubren del plugin.
 
 ## Cómo agregar un skill nuevo
 
-Ver `methodology/skills.md` (decision tree: ¿es un skill la opción correcta?) y `stacks/skill-authoring/index.md` (pasos concretos + fases).
+Ver `methodology/skills.md` (decision tree: ¿es un skill la opción correcta?) y `profiles/skill-authoring/index.md` (pasos concretos + fases).

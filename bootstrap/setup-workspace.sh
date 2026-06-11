@@ -15,7 +15,7 @@ set -euo pipefail
 #                      si crea personal/<usuario>.md si falta)
 #
 # Auto-deteccion: en modo default y --dry-run, si la raiz actual (git toplevel o cwd) ya es
-# un workspace (markers: */overlays/detect-stack.local.sh — el mismo glob que usa
+# un workspace (markers: */overlays/detect-profile.local.sh — el mismo glob que usa
 # neb-bootstrap-context.py en runtime — o <overlay>/startup.md), lo reporta y sugiere
 # --existing en vez de crear uno adentro.
 # Si la raiz actual NO es workspace y no se paso --base, barre $HOME (una pasada de find,
@@ -72,7 +72,7 @@ bold "NEB_HOME (nucleo): $NEB_HOME_VAL"
 # discovery del overlay en neb-bootstrap-context.py — si el marker esta, el hook inyecta).
 _is_workspace() {
   local d="$1"
-  compgen -G "$d/*/overlays/detect-stack.local.sh" > /dev/null 2>&1 && return 0
+  compgen -G "$d/*/overlays/detect-profile.local.sh" > /dev/null 2>&1 && return 0
   [ -f "$d/overlay/startup.md" ] && return 0
   return 1
 }
@@ -81,14 +81,14 @@ if [ "$MODE" = "existing" ]; then
   [ -d "$EXISTING" ] || { echo "El dir no existe: $EXISTING" >&2; exit 1; }
   WS="$(cd "$EXISTING" && pwd)"
   bold "NEB_WORKSPACE (conectar workspace existente): $WS"
-  _is_workspace "$WS" || warn "El dir no tiene markers de workspace (*/overlays/detect-stack.local.sh) — el hook no encontrara overlay que inyectar."
+  _is_workspace "$WS" || warn "El dir no tiene markers de workspace (*/overlays/detect-profile.local.sh) — el hook no encontrara overlay que inyectar."
 else
   # Auto-deteccion: no crear un workspace adentro de uno existente
   DETECT_ROOT="${BASE:-$(git rev-parse --show-toplevel 2>/dev/null || pwd)}"
   DETECT_ROOT="$(cd "$DETECT_ROOT" 2>/dev/null && pwd || echo "$DETECT_ROOT")"
   if _is_workspace "$DETECT_ROOT"; then
     bold "Workspace existente detectado en: $DETECT_ROOT"
-    info "marker: $(ls -d "$DETECT_ROOT"/*/overlays/detect-stack.local.sh 2>/dev/null | head -1 || echo "$DETECT_ROOT/overlay/startup.md")"
+    info "marker: $(ls -d "$DETECT_ROOT"/*/overlays/detect-profile.local.sh 2>/dev/null | head -1 || echo "$DETECT_ROOT/overlay/startup.md")"
     info "Conectalo:  bash $0 --existing \"$DETECT_ROOT\""
     info "O crea en otra parte:  bash $0 --base <otro-dir>"
     [ "$DRY_RUN" -eq 1 ] && info "(dry-run: no se escribio nada)"
@@ -101,7 +101,7 @@ else
   _scan_workspaces() {
     find "$HOME" -maxdepth 5 \
       \( -name '.*' -o -name node_modules -o -name AppData -o -name '*.bak' \) -prune -o \
-      -type f -path '*/overlays/detect-stack.local.sh' -print 2>/dev/null \
+      -type f -path '*/overlays/detect-profile.local.sh' -print 2>/dev/null \
     | while IFS= read -r f; do
         dirname "$(dirname "$(dirname "$f")")"
       done | sort -u
@@ -128,19 +128,19 @@ fi
 if [ "$MODE" = "create" ]; then
   bold "Scaffolding del workspace"
   if [ "$DRY_RUN" -eq 1 ]; then
-    info "[dry-run] crearia: $OVERLAY_NAME/overlays/detect-stack.local.sh, $OVERLAY_NAME/startup.md, personal/, changes/"
+    info "[dry-run] crearia: $OVERLAY_NAME/overlays/detect-profile.local.sh, $OVERLAY_NAME/startup.md, personal/, changes/"
   else
     mkdir -p "$WS/$OVERLAY_NAME/overlays" "$WS/personal" "$WS/changes"
     [ -f "$WS/changes/.gitkeep" ] || touch "$WS/changes/.gitkeep"
-    if [ ! -f "$WS/$OVERLAY_NAME/overlays/detect-stack.local.sh" ]; then
-      cat > "$WS/$OVERLAY_NAME/overlays/detect-stack.local.sh" <<'OV'
+    if [ ! -f "$WS/$OVERLAY_NAME/overlays/detect-profile.local.sh" ]; then
+      cat > "$WS/$OVERLAY_NAME/overlays/detect-profile.local.sh" <<'OV'
 #!/usr/bin/env bash
-# detect-stack.local.sh — overlay privado del adoptante. Sobreescribi estas funciones
-# para tus stacks de dominio (sourced por neb/bootstrap/link-into-project.sh).
-detect_stack_local()        { echo "unknown"; }   # devolve el nombre de tu stack segun $PROJECT
-get_private_stack_imports() { :; }                 # imprimi los @-imports de tu stack privado
+# detect-profile.local.sh — overlay privado del adoptante. Sobreescribi estas funciones
+# para tus profiles de dominio. El archivo es ademas el marker estructural del workspace
+detect_profile_local()        { echo "unknown"; }   # devolve el nombre de tu profile segun $PROJECT
+get_private_profile_imports() { :; }                 # imprimi los @-imports de tu profile privado
 OV
-      ok "$OVERLAY_NAME/overlays/detect-stack.local.sh (stub)"
+      ok "$OVERLAY_NAME/overlays/detect-profile.local.sh (stub)"
     fi
     # overlay/startup.md (D1): arranque del overlay, lo consume el hook SessionStart de neb
     if [ ! -f "$WS/$OVERLAY_NAME/startup.md" ]; then

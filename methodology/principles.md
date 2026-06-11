@@ -7,10 +7,10 @@ Qué características hacen útil a una metodología de trabajo con un agente de
 1. **Explícita** — vive en archivos versionados que el agente lee. No es conocimiento tácito.
 2. **Refinable** — tiene un loop de mejora declarado (ver [improvement](../process/improvement.md)).
 3. **Mensurable** — métricas concretas (turnos por fase, re-deployments, incidencias, complejidad estimada vs real).
-4. **Agnóstica del stack en su core** — `general/` no menciona paths, comandos ni servidores. Lo específico vive en `stacks/<stack>/`.
+4. **Agnóstica del profile en su core** — `general/` no menciona paths, comandos ni servidores. Lo específico vive en `profiles/<profile>/`.
 5. **Personalizable sin romper el equipo** — `personal/<usuario>.md` puede estrechar o agregar, no relajar (ver [personal-vs-team](personal-vs-team.md)).
 6. **Importable** — los proyectos referencian al repo vía `@imports` estables sobre los `index.md`.
-7. **Reflexiva** — la metodología se aplica a sí misma: editarla es un requerimiento que sigue sus propias fases y gates (stack `self-applied`), por lo que el repo es ejemplo vivo de su propio uso (dogfooding). `self-applied` no es un stack de dominio periférico sino parte integral del núcleo.
+7. **Reflexiva** — la metodología se aplica a sí misma: editarla es un requerimiento que sigue sus propias fases y gates (profile `self-applied`), por lo que el repo es ejemplo vivo de su propio uso (dogfooding). `self-applied` no es un profile de dominio periférico sino parte integral del núcleo.
 
 > Estas características son las **promesas** que Neb ofrece al adoptante. Su enunciado de cara al usuario y los criterios de aceptación verificables viven en [promises.md](promises.md).
 
@@ -67,7 +67,7 @@ Jerarquía: skills disponibles → research vigente → inferencia de Claude.
 Toda afirmación se respalda en evidencia del turno actual o se declara como suposición. Hay dos clases de suposición a vigilar:
 
 - **Estado concreto sin verificar** (brecha de contexto): afirmar sobre un archivo, dato, dependiente o configuración cuya fuente existe localmente pero no fue consultada en el turno actual. Acción: verificar (lectura, grep, LSP, consulta a memoria/skill vigente).
-- **Dominio sin antecedente** (dominio desconocido): inferir sobre un dominio sin cobertura en skills, memoria del proyecto o research vigente. Acción: aplicar "Contexto especializado antes de inferir" — proponer abrir REQ de research si el impacto es medio/alto (ver [`../stacks/research/conventions.md`](../stacks/research/conventions.md) "Modos de disparo").
+- **Dominio sin antecedente** (dominio desconocido): inferir sobre un dominio sin cobertura en skills, memoria del proyecto o research vigente. Acción: aplicar "Contexto especializado antes de inferir" — proponer abrir REQ de research si el impacto es medio/alto (ver [`../profiles/research/conventions.md`](../profiles/research/conventions.md) "Modos de disparo").
 
 Output esperado:
 
@@ -75,7 +75,7 @@ Output esperado:
 - Cierre de edit (Fase 4): Claude menciona qué fuentes consultó vs cuáles dio por entendidas por contexto previo.
 - Respuesta exploratoria (cualquier fase): si un hecho citado no se verificó en el turno actual, marcarlo `[asumido]`, `[memoria sin re-verificar]` o `[dominio sin research]`.
 
-Aplica a todos los stacks. Cubre dos huecos: (a) incluso con skill cargado y memoria vigente, una sesión puede asumir el estado concreto de un archivo sin haberlo abierto; (b) Claude puede confundir analogías superficiales del entrenamiento con conocimiento real del dominio.
+Aplica a todos los profiles. Cubre dos huecos: (a) incluso con skill cargado y memoria vigente, una sesión puede asumir el estado concreto de un archivo sin haberlo abierto; (b) Claude puede confundir analogías superficiales del entrenamiento con conocimiento real del dominio.
 
 Operacionalización: subagente `context-completeness-reviewer` (ver [`../agents/context-completeness-reviewer.md`](../agents/context-completeness-reviewer.md)) audita formalmente las suposiciones en plan-review (Fase 3), cierre de implementación (Fase 4) y pre-entrega final (Fase 7).
 
@@ -89,9 +89,9 @@ Operacionalización: subagente `context-completeness-reviewer` (ver [`../agents/
 
 ## Coherencia global sobre cambio mínimo
 
-El system prompt base de Claude prescribe cambio mínimo: no refactor, no cleanup adyacente, default no comments. Para código fuente es virtud. Para entregables del stack `self-applied` (metodología, proceso, artefactos auto-aplicados) es vicio: una edición localizada puede invalidar vocabulario canónico, referencias cruzadas o invariantes que solo se manifiestan cuando otra sesión aplica el lineamiento.
+El system prompt base de Claude prescribe cambio mínimo: no refactor, no cleanup adyacente, default no comments. Para código fuente es virtud. Para entregables del profile `self-applied` (metodología, proceso, artefactos auto-aplicados) es vicio: una edición localizada puede invalidar vocabulario canónico, referencias cruzadas o invariantes que solo se manifiestan cuando otra sesión aplica el lineamiento.
 
-**Override (solo stack `self-applied`)**: antes de cerrar una edición, Claude verifica los tres ejes:
+**Override (solo profile `self-applied`)**: antes de cerrar una edición, Claude verifica los tres ejes:
 
 1. **Vocabulario canónico** — ENUM de estados ([../workflow/index.md](../workflow/index.md)), glosario abstracto ([vocabulary.md](vocabulary.md)), distinción metodología/proceso (§ "Fases vs políticas" en este archivo). Términos introducidos o modificados se clasifican según el canónico, o se justifica el cambio del canónico mismo.
 2. **Dependientes cross-file** — `grep` del concepto, archivo o regla editada en todo el repo. Match afectado = otro archivo depende semánticamente del término (cita la regla, importa el archivo, replica el ENUM). Los matches afectados se incluyen en el plan o se justifica por qué no aplica.
@@ -99,13 +99,13 @@ El system prompt base de Claude prescribe cambio mínimo: no refactor, no cleanu
 
 **Exclusión** (alineada con [`../process/plan-review.md`](../process/plan-review.md) § "Cuándo aplica"): cosméticos puros — typos sin término canónico, reordenamientos dentro de una sección, fix de enlaces rotos. Para esos basta "Detectar y reportar (no fix silencioso)" más abajo.
 
-**Cobertura**: solo `self-applied`. El resto de stacks listados en [../stacks/index.md](../stacks/index.md) sigue el cambio mínimo del system prompt base; ampliaciones específicas se declaran en `stacks/<X>/conventions.md`.
+**Cobertura**: solo `self-applied`. El resto de profiles listados en [../profiles/index.md](../profiles/index.md) sigue el cambio mínimo del system prompt base; ampliaciones específicas se declaran en `profiles/<X>/conventions.md`.
 
-**Relación con otros gates**: este principio es turno-a-turno (Claude lo aplica antes de cerrar cada edit). El subagente `qa-process-engineer` audita formalmente los tres ejes en Fase 3 (plan-review) y Fase 4 (gate de cierre) — ver `stacks/self-applied/roles.md`. "Detectar y reportar (no fix silencioso)" más abajo es reactivo (qué hacer al encontrar inconsistencia mientras editas).
+**Relación con otros gates**: este principio es turno-a-turno (Claude lo aplica antes de cerrar cada edit). El subagente `qa-process-engineer` audita formalmente los tres ejes en Fase 3 (plan-review) y Fase 4 (gate de cierre) — ver `profiles/self-applied/roles.md`. "Detectar y reportar (no fix silencioso)" más abajo es reactivo (qué hacer al encontrar inconsistencia mientras editas).
 
 ## Lineamientos para editar MDs
 
-Editar la metodología es aplicarla (ver § "Características" — Reflexiva): estos lineamientos son núcleo, no periferia de un stack. **Criterio de corte**: si eliminar una frase no cambia el comportamiento esperado del LLM, no escribirla; si ya está, eliminarla.
+Editar la metodología es aplicarla (ver § "Características" — Reflexiva): estos lineamientos son núcleo, no periferia de un profile. **Criterio de corte**: si eliminar una frase no cambia el comportamiento esperado del LLM, no escribirla; si ya está, eliminarla.
 
 ### Eliminar
 

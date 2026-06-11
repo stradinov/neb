@@ -41,12 +41,12 @@ Captura: las 3 primeras dependen de señal explícita o ausencia de ella; las 3 
 
 **Patches retrospectivos** (cuando una versión posterior corrige un error u omisión de un REQ previo): cuentan como **error de implementación retroactivo** del REQ original, anotados en el patch nuevo (donde el error se evidencia y corrige), no en el REQ original ya cerrado.
 
-**Auditoría de métricas auto-reportadas**: "Errores de implementación de Claude" y "Faltas de contexto" se completan al cierre (Fase 8) por el rol revisor de calidad del stack, no por auto-reporte:
+**Auditoría de métricas auto-reportadas**: "Errores de implementación de Claude" y "Faltas de contexto" se completan al cierre (Fase 8) por el rol revisor de calidad del profile, no por auto-reporte:
 
-| Stack | Auditor |
+| Profile | Auditor |
 |---|---|
 | `self-applied` | QA Process Engineer |
-| Stacks de software (futuros) | Code Reviewer |
+| Profiles de software (futuros) | Code Reviewer |
 
 El auditor revisa la conversación del REQ y completa los conteos. Si el dev nota discrepancia al revisar el MD pre-cierre, ajusta los counts.
 
@@ -90,8 +90,8 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 
 | # | Criterio | Qué exige |
 |---|---|---|
-| 1 | **Comparable cross-REQ** | Misma unidad, normalizable entre proyectos y stacks |
-| 2 | **Atribuible a dimensiones** | Se puede cruzar con complejidad / fase / stack para extraer señal |
+| 1 | **Comparable cross-REQ** | Misma unidad, normalizable entre proyectos y profiles |
+| 2 | **Atribuible a dimensiones** | Se puede cruzar con complejidad / fase / profile para extraer señal |
 | 3 | **Loop pedagógico explícito** | El reporte sugiere qué aprender con ese dato |
 | 4 | **Bajo ruido** | No fluctúa por factores externos al REQ (velocidad de red, reinicio de sesión, herramientas lentas) |
 | 5 | **Alimenta revisión agregada** | Cross-REQs permite detectar patrones longitudinales (ej. evolución de costo por modelo) |
@@ -102,7 +102,7 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 |---|---|---|---|
 | **Tokens + costo + breakdown por modelo** | 5/5 | ✅ Dato informativo (con interpretación) | — |
 | Tiempo wall-clock | 2/5 | ❌ No admitida | Ruido por tools lentas; no atribuible a fases; varía con modelo |
-| Líneas de código netas | 2/5 | ❌ No admitida | No comparable cross-stack; no atribuible; refactors la distorsionan |
+| Líneas de código netas | 2/5 | ❌ No admitida | No comparable cross-profile; no atribuible; refactors la distorsionan |
 | Conteo de commits | 1/5 | ❌ No admitida | No correlaciona con calidad; no atribuible |
 | Pausas / SessionStart | 1/5 | ❌ No admitida | Mezcla señal con ruido de runtime; sin acción derivada clara |
 | Duración calendario | 3/5 | ❌ No admitida (descartada en sesión de diseño) | Útil pero cubre otro propósito (gestión de bloqueos); no es datos informativos |
@@ -111,7 +111,7 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 
 **Por qué pasa los 5 criterios:**
 
-1. Tokens y USD son unidades comparables entre cualquier REQ y stack.
+1. Tokens y USD son unidades comparables entre cualquier REQ y profile.
 2. Se cruza con complejidad estimada/real, fase, y modelo activo — permite detectar calibración rota.
 3. Interpreta directamente: si un REQ de complejidad "baja" costó como "media", el dev recalibra su criterio.
 4. Tokens son estables — no los afecta la velocidad del sistema, el modelo usado, ni los reinicios de sesión.

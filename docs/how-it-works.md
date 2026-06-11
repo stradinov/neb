@@ -37,23 +37,23 @@ documento de cambio del requerimiento.
 
 ---
 
-## Stacks
+## Profiles
 
-Un *stack* encapsula lo que no es universal en un proyecto: comandos de
+Un *profile* encapsula lo que no es universal en un proyecto: comandos de
 build, convenciones de commit, proceso de deploy y revisores aplicables.
-El núcleo de Neb es agnóstico; los stacks lo concretan para un
+El núcleo de Neb es agnóstico; los profiles lo concretan para un
 tipo de proyecto específico.
 
 ### Detección automática
 
-Al iniciar trabajo en un directorio, el agente detecta el stack activo
-mediante heurísticas de path y estructura del proyecto. El stack permanece
+Al iniciar trabajo en un directorio, el agente detecta el profile activo
+mediante heurísticas de path y estructura del proyecto. El profile permanece
 fijo durante la sesión y cambia únicamente cuando el contexto lo requiere.
 
-### Stacks incluidos en el núcleo
+### Profiles incluidos en el núcleo
 
 - `self-applied` — la propia Neb (el repo se gobierna con sus propias reglas)
-- `stack-authoring` — creación de un stack nuevo
+- `profile-authoring` — creación de un profile nuevo
 - `skill-authoring` — creación de un skill nuevo
 - `research` — investigación multi-fuente con verificación adversarial
 
@@ -67,10 +67,10 @@ Preferencias de comunicación, atajos y reglas individuales del desarrollador.
 Contrato: un override puede *estrechar o agregar* sobre el baseline, pero
 **nunca relajarlo**.
 
-### Overrides de equipo (dentro del stack)
+### Overrides de equipo (dentro del profile)
 
 Convenciones de commit, estándares de código, definición de done y reglas
-de deploy. Aplican a todos los integrantes que utilicen el stack.
+de deploy. Aplican a todos los integrantes que utilicen el profile.
 
 ---
 
@@ -79,13 +79,13 @@ de deploy. Aplican a todos los integrantes que utilicen el stack.
 Neb se instala como **plugin de Claude Code**. Al iniciar cada sesión, un hook
 `SessionStart` del plugin inyecta el arranque con **peso vinculante** (Claude lo
 respeta como un `CLAUDE.md` de proyecto): las reglas *always-on* —políticas de
-comunicación, detección de stack, onboarding— ensambladas desde
+comunicación, detección de profile, onboarding— ensambladas desde
 `general/startup.md`, más el overlay y la configuración personal del adoptante.
 El resto del contenido se carga on-demand según lo que el contexto requiera.
 
 Los proyectos cliente **no** necesitan ninguna línea de `@import` en su
 `CLAUDE.md`: el hook inyecta el arranque en toda sesión, de modo que un
-`CLAUDE.md` de proyecto conserva solo sus imports de stack y su contenido
+`CLAUDE.md` de proyecto conserva solo sus imports de profile y su contenido
 propio. El marcador `<!-- neb: skip -->` en el `CLAUDE.md` de un proyecto
 desactiva la inyección para ese repo.
 
@@ -122,5 +122,5 @@ del repo registra cómo se tomó cada decisión de diseño.
 
 - [`methodology/promises.md`](../methodology/promises.md) — las promesas de Neb con criterios verificables
 - [`process/`](../process/) — detalle de cada fase y sus gates
-- [`stacks/index.md`](../stacks/index.md) — catálogo de stacks y heurística de detección
+- [`profiles/index.md`](../profiles/index.md) — catálogo de profiles y heurística de detección
 - [`workflow/index.md`](../workflow/index.md) — ubicación y nomenclatura de los artefactos

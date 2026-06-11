@@ -1,12 +1,12 @@
 ---
 name: Proyecto <NOMBRE>
-description: <una línea — qué tipo de proyecto, qué stack, qué cliente>
+description: <una línea — qué tipo de proyecto, qué profile, qué cliente>
 type: project
 ---
 
 # Proyecto <NOMBRE>
 
-## Stack y arquitectura
+## Profile y arquitectura
 
 <!-- una línea sobre framework, BD, tipo. Solo lo no evidente del CLAUDE.md del repo. -->
 

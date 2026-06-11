@@ -1,10 +1,10 @@
 # Vocabulario abstracto
 
-La metodología usa vocabulario neutro para cubrir entregables de distinta naturaleza (código, documento, proceso). Cada stack concretiza los términos en su `stacks/<stack>/index.md` sección "Glosario del stack".
+La metodología usa vocabulario neutro para cubrir entregables de distinta naturaleza (código, documento, proceso). Cada profile concretiza los términos en su `profiles/<profile>/index.md` sección "Glosario del profile".
 
-| Término abstracto | Significado | Ejemplos por tipo de stack |
+| Término abstracto | Significado | Ejemplos por tipo de profile |
 |---|---|---|
-| Entregable / elaboración | Lo que produce el requerimiento | Código (stack de software) · Documento (stack de análisis) · Lineamiento (self-applied) |
+| Entregable / elaboración | Lo que produce el requerimiento | Código (profile de software) · Documento (profile de análisis) · Lineamiento (self-applied) |
 | Elaboración asistida | Humano-en-loop durante la elaboración | Un autor redacta con el dev iterando |
 | Elaboración autónoma | Claude conduce la elaboración en un único turno (prompt → planeación → output) sin humano en el loop | Borrador auto-generado en un turno |
 | Confirmación del cambio | Hacer permanente y recuperable un cambio del entregable | `git commit` (software, self-applied) · commit del documento versionado (análisis) |
@@ -38,10 +38,10 @@ ENUM canónico. Cualquier archivo que registre estado usa este vocabulario. El m
 Clasificación según la naturaleza del entregable. Los pasos de ejecución de Fase 5 viven en [`../process/delivery.md`](../process/delivery.md) § Validación.
 
 - **Con ambiente de revisión** (e-commerce, etc.): el usuario valida el flujo principal en el ambiente de revisión antes de la entrega final.
-- **Con ciclo de revisión cliente** (stacks de análisis): el cliente valida el entregable iterativamente; cada vuelta produce una nueva versión hasta la aprobación final.
+- **Con ciclo de revisión cliente** (profiles de análisis): el cliente valida el entregable iterativamente; cada vuelta produce una nueva versión hasta la aprobación final.
 - **Sin ambiente pero con artefactos** (scripts, migraciones, CLI): validación directa — ejecución local, dry-run, o revisión.
 - **Sin artefactos** (docs sin proceso, comentarios, typos): validación implícita — el usuario revisa en contexto y confirma.
-- **Diferida en uso** (stack `self-applied`): los walkthroughs mentales aterrizan el diseño, pero el cierre formal requiere uso real (criterio: ≥ 10 sesiones sin reporte negativo — ver [`../stacks/self-applied/deployment.md`](../stacks/self-applied/deployment.md)).
+- **Diferida en uso** (profile `self-applied`): los walkthroughs mentales aterrizan el diseño, pero el cierre formal requiere uso real (criterio: ≥ 10 sesiones sin reporte negativo — ver [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md)).
 
 ## Niveles de riesgo de regresión
 

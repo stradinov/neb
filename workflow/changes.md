@@ -44,6 +44,6 @@ Variante del change MD para incidentes detectados post-entrega final. Comparte c
 
 - **Path**: `<proyecto>/changes/<YYYY-MM-DD>-incident-<slug>.md`, desde [`templates/incident.md.template`](../templates/incident.md.template).
 - **Apertura**: el dev lo crea y lo notifica explícitamente a Claude.
-- **Cierre**: marcar `Estado: Cerrado` cuando (1) la mitigación está verificada en producción y (2) hubo 7 días sin recurrencia del síntoma; confirmar el cambio según el mecanismo del stack.
+- **Cierre**: marcar `Estado: Cerrado` cuando (1) la mitigación está verificada en producción y (2) hubo 7 días sin recurrencia del síntoma; confirmar el cambio según el mecanismo del profile.
 - **Cross-link al requerimiento que lo originó**: si el incidente es atribuible a un deploy identificable, anotar en el INCIDENT MD `**Originado por:** changes/<fecha>-<req>.md (confirmación <ref>)` y la referencia inversa en el change MD original (§ "Resultado post-entrega"). Alimenta la métrica de re-entregas y los análisis de Fase 9. Modelo completo: [traceability.md](traceability.md).
 

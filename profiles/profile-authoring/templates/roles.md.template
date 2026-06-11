@@ -1,0 +1,23 @@
+# Roles (profile: {{PROFILE_NAME}})
+
+## Rol principal — <!-- Nombre del rol --> — `persona`
+
+<!-- Mandato del rol principal -->
+
+## Revisores
+
+<!-- Opción A: hereda de self-applied (para overlays sobre self-applied) -->
+<!-- Hereda revisores de profiles/self-applied/roles.md: qa-process-engineer + process-improvement-analyst. Ver ese archivo para mandato completo. -->
+
+<!-- Opción B: define revisores propios -->
+<!-- Ver process/roles-invocation.md para criterio de cuándo crear subagente propio vs reutilizar existente. -->
+
+## Subagentes por fase
+
+| Fase | Subagente | Momento de activación |
+|---|---|---|
+| 3 Plan-review | <!-- subagente --> | Tras generar el plan inicial |
+| 4 Cierre (gate) | <!-- subagente --> | Tras completar implementación |
+| 7 Pre-ejecución (gate) | <!-- subagente --> | Antes de la entrega final |
+| 9 Improvement | `process-improvement-analyst` | Al detectar defecto no cazado |
+| Incidentes P1/P2 | `process-improvement-analyst` | En análisis raíz |

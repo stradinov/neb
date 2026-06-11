@@ -1,6 +1,6 @@
 ---
 name: wakeup
-description: Tour de bienvenida de Neb — conecta o monta tu workspace y define tu primer stack.
+description: Tour de bienvenida de Neb — conecta o monta tu workspace y define tu primer profile.
 ---
 
 # /wakeup — tour de bienvenida de Neb
@@ -20,6 +20,6 @@ El usuario invocó `/wakeup`. Ejecutá el **tour de bienvenida de Neb** siguiend
    - **"Workspace existente detectado en `<dir>`"** (caso típico: el usuario clonó el repo workspace de su equipo) → ofrecé como opción primera **"Conectar este workspace"**; al aceptar, corré `bash "$NEB_SRC/bootstrap/setup-workspace.sh" --existing "<dir>"`.
    - **"Workspace(s) existente(s) encontrado(s) bajo `$HOME`"** (el cwd no era workspace; el script barrió `$HOME`): 1 resultado → ofrecé conectarlo; varios → lista numerada para que elija cuál conectar.
    - Sin workspace (ni en cwd ni en el barrido) → preguntá si tiene uno en otra ruta (`--existing <ruta>`) o si creamos uno nuevo (default / `--base <dir>`).
-4. **Ofrecé las opciones** de adopción restantes como lista numerada (definir primer stack, versionar config personal) y ejecutá la que elija.
+4. **Ofrecé las opciones** de adopción restantes como lista numerada (definir primer profile, versionar config personal) y ejecutá la que elija.
 
 No dupliques los pasos de `docs/user-guide.md` en la conversación; ejecutalos refiriendo a la guía. Mantené el tour conversacional y opt-in: si el usuario quiere ir directo al trabajo, dejalo. Cerrá indicando que abra una **sesión nueva** para que el hook tome el workspace conectado.

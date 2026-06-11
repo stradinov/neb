@@ -1,10 +1,10 @@
 # Catálogo de roles
 
-Catálogo de roles universales, dimensiones del plan, implementación persona/subagente y evolución. La invocación de roles (default por stack, algoritmo de detección, modo de anuncio, cobertura por fase) vive en [`../process/roles-invocation.md`](../process/roles-invocation.md).
+Catálogo de roles universales, dimensiones del plan, implementación persona/subagente y evolución. La invocación de roles (default por profile, algoritmo de detección, modo de anuncio, cobertura por fase) vive en [`../process/roles-invocation.md`](../process/roles-invocation.md).
 
 ## Dimensiones del plan
 
-Catálogo canónico. Indicadores genéricos universales; cada stack puede extender con indicadores específicos en su `stacks/<stack>/roles.md`.
+Catálogo canónico. Indicadores genéricos universales; cada profile puede extender con indicadores específicos en su `profiles/<profile>/roles.md`.
 
 | Dimensión | Indicadores genéricos | Revisor asociado |
 |---|---|---|
@@ -17,19 +17,19 @@ Catálogo canónico. Indicadores genéricos universales; cada stack puede extend
 | **Routing crítico** | `index.php`, `.htaccess`, `routes.*`, `App.tsx`, redirects | SysAdmin / SRE + Code Reviewer |
 | **Performance crítica** | Hot paths declarados en CLAUDE.md, queries con cardinalidad alta, loops sobre tablas grandes | Performance Reviewer |
 
-## Roles universales (stacks de software)
+## Roles universales (profiles de software)
 
 ### Software Engineer
 
-Rol principal en stacks de software. Diseña y ejecuta el código siguiendo patrones del stack y convenciones del proyecto. Genera el plan inicial en Fase 3.
+Rol principal en profiles de software. Diseña y ejecuta el código siguiendo patrones del profile y convenciones del proyecto. Genera el plan inicial en Fase 3.
 
 ### Code Reviewer
 
-Foco: calidad del código, idiomaticidad del stack, ausencia de regresiones, cumplimiento de convenciones específicas del stack (sanitización, naming, estructura).
+Foco: calidad del código, idiomaticidad del profile, ausencia de regresiones, cumplimiento de convenciones específicas del profile (sanitización, naming, estructura).
 
 ### Security Reviewer
 
-Foco: auth, sanitización de input, manejo de secrets, exposición de datos sensibles, autorización por capa, vulnerabilidades comunes del stack (SQLi, XSS, CSRF según aplique).
+Foco: auth, sanitización de input, manejo de secrets, exposición de datos sensibles, autorización por capa, vulnerabilidades comunes del profile (SQLi, XSS, CSRF según aplique).
 
 ### Database Engineer
 
@@ -72,10 +72,10 @@ Si un REQ requiere un revisor no listado (ej. Accessibility Reviewer, Domain Ana
 
 Tracking del valor real de cada rol/sub-foco. Score se ajusta en Fase 9 (ver [`../process/improvement.md`](../process/improvement.md)) según el comportamiento del rol en plan-review.
 
-| Rol | Tipo | Impl. | Stack | Utilidad | Última act. |
+| Rol | Tipo | Impl. | Profile | Utilidad | Última act. |
 |---|---|---|---|---|---|
 | Process Architect | principal | persona | self-applied | 1.0 | 2026-05-03 |
-| Stack Author | principal | persona | stack-authoring | 1.0 | 2026-05-15 |
+| Profile Author | principal | persona | profile-authoring | 1.0 | 2026-05-15 |
 | QA Process Engineer | revisor | **subagente** (`qa-process-engineer`) | self-applied | 0.0 | 2026-05-17 |
 | Process Improvement Analyst | revisor | **subagente** (`process-improvement-analyst`) | self-applied | 0.9 | 2026-05-17 |
 | Software Engineer | principal | persona | software (futuro) | 1.0 | 2026-05-03 |
@@ -84,13 +84,13 @@ Tracking del valor real de cada rol/sub-foco. Score se ajusta en Fase 9 (ver [`.
 | Database Engineer | revisor | persona | software (futuro) | 1.0 | 2026-05-14 |
 | Skill QA Engineer | revisor | **subagente** (`skill-qa-engineer`) | skill-authoring | 1.0 | 2026-05-14 |
 | Fact-Check Reviewer | revisor | **subagente** (`fact-check-reviewer`) | research | 1.0 | 2026-05-17 |
-| Context Completeness Reviewer | revisor | **subagente** (`context-completeness-reviewer`) | transversal (todos los stacks) | 0.0 | 2026-05-21 |
+| Context Completeness Reviewer | revisor | **subagente** (`context-completeness-reviewer`) | transversal (todos los profiles) | 0.0 | 2026-05-21 |
 | SysAdmin / SRE | revisor | persona | software (futuro) | 1.0 | 2026-05-03 |
 | Frontend Reviewer | revisor por dimensión | persona | software (futuro) | 1.0 | 2026-05-03 |
 | Observability Reviewer | revisor por dimensión | persona | software (futuro) | 1.0 | 2026-05-03 |
 | Performance Reviewer | revisor por dimensión | persona | software (futuro) | 1.0 | 2026-05-03 |
 
-> En la columna **Stack**, `software (futuro)` denota stacks de software por agregar. Ver § "Roles universales (stacks de software)".
+> En la columna **Profile**, `software (futuro)` denota profiles de software por agregar. Ver § "Roles universales (profiles de software)".
 
 ## Evolución de roles
 
@@ -105,7 +105,7 @@ Criterios de atribución por tipo de defecto:
 | Tipo de defecto | Atribución |
 |---|---|
 | Inconsistencia entre archivos / contradicción con política | QA Process Engineer / Code Reviewer |
-| Sesgo de stack en vocabulario canónico | QA Process Engineer (sub-foco existente) |
+| Sesgo de profile en vocabulario canónico | QA Process Engineer (sub-foco existente) |
 | Ceremonia innecesaria / valor cuestionable | Process Improvement Analyst |
 | Vulnerabilidad de seguridad | Security Reviewer |
 | Performance issue / query lenta | Performance Reviewer / Database Engineer |
@@ -116,7 +116,7 @@ Criterios de atribución por tipo de defecto:
 
 | Atribución | Acción | Ejemplo histórico |
 |---|---|---|
-| Cae dentro del mandato de un rol existente, foco no lo enunciaba explícitamente | **Ajustar foco** del rol con sub-foco/bullet nuevo. REQ tipo `docs:` (patch) | sub-foco agnóstico-stack agregado a QA tras un defecto de sesgo de stack |
+| Cae dentro del mandato de un rol existente, foco no lo enunciaba explícitamente | **Ajustar foco** del rol con sub-foco/bullet nuevo. REQ tipo `docs:` (patch) | sub-foco agnóstico-profile agregado a QA tras un defecto de sesgo de profile |
 | Tipo de defecto no cubierto por ningún rol del catálogo | **Crear rol nuevo** solo si: (a) el foco no encaja conceptualmente como sub-foco; (b) se anticipa reuso (≥2 casos previsibles). REQ minor | (Hipotético) Accessibility Reviewer tras issues recurrentes de a11y |
 | Defecto cae en dimensión nueva (no de rol) | **Ajustar catálogo de dimensiones** (`Dimensiones del plan` arriba) | (Hipotético) dimensión "i18n" agregada |
 

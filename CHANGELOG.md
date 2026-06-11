@@ -4,6 +4,31 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-06-11
+
+Cambio mayor: el concepto central **stack** pasa a llamarse **profile** en todo el framework (prosa, paths, identifiers, markers). Razón: "stack" colisionaba con el "tech stack" genérico — las propias heurísticas de detección hablan del stack tecnológico — y el concepto cubre más que tecnología (proceso, roles, deploy, convenciones): es un *perfil de trabajo*. Corte limpio: 3.0.0 solo reconoce los nombres nuevos.
+
+### Changed (BREAKING)
+
+- **Renombres de estructura**: `stacks/` → `profiles/` (con `stack-authoring` → `profile-authoring`); `general/stack-detection.md` → `general/profile-detection.md`; `methodology/stacks.md` → `methodology/profiles.md`; `bootstrap/init-stack-subproject.sh` → `bootstrap/init-profile-subproject.sh`.
+- **Marker de workspace**: el overlay del adoptante ahora se descubre por `*/overlays/detect-profile.local.sh` (antes `detect-stack.local.sh`). Consumidores actualizados: `neb-bootstrap-context.py` (discovery del hook), `setup-workspace.sh` (detección, barrido y scaffold).
+- **Marcador de opt-out**: `<!-- neb-profile: none -->` (antes `neb-stack: none`). `<!-- neb: skip -->` **no cambia**.
+- **Identifiers**: `detect_profile_local`, `get_private_profile_imports`, `PROFILE_NAME`, `PROFILE_DIR`, placeholder de template `{{PROFILE_BASE}}`.
+- **Prosa e interfaces**: "profile activo", anuncios `[profile: <X> → <Y>]`, columna "Profile(s) aplicable(s)" en `skills/README.md`, tour de `/wakeup` ("Definir tu primer profile"). Los CHANGELOG/fragments < 3.0.0 conservan el término viejo (la historia no se reescribe).
+
+### Removed (BREAKING)
+
+- **Scripts del modelo clone eliminados** (deprecados desde 2.0.0): `bootstrap/install.sh`, `bootstrap/link-into-project.sh`, `bootstrap/install-skills.sh`, `bootstrap/install-agents.sh`. El plugin auto-descubre skills/agents/commands; el workspace se monta/conecta con `setup-workspace.sh` (vía `/wakeup`).
+
+### Migración 2.x → 3.0
+
+| Qué | Acción |
+|---|---|
+| Workspace existente | Renombrar `<overlay>/overlays/detect-stack.local.sh` → `detect-profile.local.sh` y dentro: `detect_stack_local` → `detect_profile_local`, `get_private_stack_imports` → `get_private_profile_imports` |
+| Imports de profiles propios en CLAUDE.md de proyectos | Si tu overlay renombró su dir (`stacks/` → `profiles/`), actualizar los `@import` |
+| Marcador de opt-out | `<!-- neb-stack: none -->` → `<!-- neb-profile: none -->` |
+| Plugin | `claude plugin update neb@neb` + sesión nueva |
+
 ## [2.2.0] - 2026-06-10
 
 ### Added

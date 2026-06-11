@@ -2,7 +2,7 @@
 
 Formato y tipos del mensaje de commit. Son invariantes del estilo de commit del equipo; las **operaciones** git (push, gate de confirmación en Fase 4, autonomía sobre `.md`, CHANGELOG fragmentado) viven en [`../process/version-control.md`](../process/version-control.md).
 
-> **Punto de customización**: el formato del mensaje de commit es lo que un adoptante adapta con más frecuencia a su contexto (p. ej. [Conventional Commits](https://www.conventionalcommits.org/) en inglés, scopes obligatorios, gitmoji). Reemplazá esta convención en `personal/<usuario>.md` o `stacks/<stack>/deployment.md` sin tocar las operaciones git del proceso.
+> **Punto de customización**: el formato del mensaje de commit es lo que un adoptante adapta con más frecuencia a su contexto (p. ej. [Conventional Commits](https://www.conventionalcommits.org/) en inglés, scopes obligatorios, gitmoji). Reemplazá esta convención en `personal/<usuario>.md` o `profiles/<profile>/deployment.md` sin tocar las operaciones git del proceso.
 
 ## Formato
 

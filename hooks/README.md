@@ -107,17 +107,17 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 ### pre-push-changelog (git hook del repo, no Claude Code)
 
-`.git/hooks/pre-push` — git hook nativo del repo `methodology`, lo instala el **maintainer** del núcleo (el viejo `bootstrap/install.sh` quedó deprecado). A diferencia de los anteriores, **no** se engancha vía `settings.json`. Corre `py bootstrap/assemble-changelog.py --check` antes de cada push que toca `changelog.d/`; si el `CHANGELOG.md` está desincronizado respecto a los fragments, aborta el push con mensaje claro. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
+`.git/hooks/pre-push` — git hook nativo del repo `methodology`, lo instala el **maintainer** del núcleo (el modelo clone con `install.sh` fue eliminado en 3.0.0). A diferencia de los anteriores, **no** se engancha vía `settings.json`. Corre `py bootstrap/assemble-changelog.py --check` antes de cada push que toca `changelog.d/`; si el `CHANGELOG.md` está desincronizado respecto a los fragments, aborta el push con mensaje claro. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
 
 ## Activación en un proyecto
 
 Bajo el plugin de Neb, el `SessionStart` se auto-registra (ver §"Bajo el plugin de Neb" abajo). Los demás hooks son **opt-in por proyecto**: agregalos al `<proyecto>/.claude/settings.json` tomando [`templates/claude-settings.json.template`](../templates/claude-settings.json.template) (o `settings.template.json`) como base.
 
-> El comando `bash $NEB_HOME/bootstrap/link-into-project.sh <ruta>` que generaba ese `settings.json` automáticamente corresponde al modelo clone **deprecado**.
+> El script `link-into-project.sh` que generaba ese `settings.json` (modelo clone) fue eliminado en 3.0.0; partí de `templates/` para configurarlo.
 
 ## Bajo el plugin de Neb
 
-Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` auto-registra **solo el `SessionStart`** (`bootstrap/neb-bootstrap-context.py` — inyecta el arranque ensamblado; no consume stdin; cross-OS: `python` con fallback a `python3` — `python` corre en Windows, `python3` en Linux/Mac modernos). Los demás hooks de este README (`save-approved-plan`, `usage-tracker`, `notify-*`, `preprocess-prompt`) **NO** se auto-registran por el plugin: son **opt-in por proyecto** vía `settings.json` (`link-into-project.sh` / `settings.template.json`) o config manual del dev. Razones (plan-review REQ-2): (a) varios **no están off por defecto** (`preprocess` corre en `full`, `notify` suena) y auto-registrarlos sería intrusivo para todo adoptante; (b) los que **consumen stdin** (`preprocess`, `usage-tracker`, `save-approved-plan`) requieren `"shell": "powershell"` en Windows (ver §Filosofía) — no aptos para auto-registro cross-OS sin esa variante.
+Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` auto-registra **solo el `SessionStart`** (`bootstrap/neb-bootstrap-context.py` — inyecta el arranque ensamblado; no consume stdin; cross-OS: `python` con fallback a `python3` — `python` corre en Windows, `python3` en Linux/Mac modernos). Los demás hooks de este README (`save-approved-plan`, `usage-tracker`, `notify-*`, `preprocess-prompt`) **NO** se auto-registran por el plugin: son **opt-in por proyecto** vía `settings.json` (`settings.template.json`) o config manual del dev. Razones (plan-review REQ-2): (a) varios **no están off por defecto** (`preprocess` corre en `full`, `notify` suena) y auto-registrarlos sería intrusivo para todo adoptante; (b) los que **consumen stdin** (`preprocess`, `usage-tracker`, `save-approved-plan`) requieren `"shell": "powershell"` en Windows (ver §Filosofía) — no aptos para auto-registro cross-OS sin esa variante.
 
 ## Agregar un hook nuevo
 

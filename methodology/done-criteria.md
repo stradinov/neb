@@ -2,7 +2,7 @@
 
 Criterios que determinan cuándo un requerimiento está terminado. Son **condiciones** (qué debe cumplirse), no pasos — el gate que las verifica vive en [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento".
 
-> **Punto de customización**: un adoptante puede estrechar o ampliar estos criterios para su contexto (p. ej. exigir cobertura de tests, aprobación de QA, o checklist de accesibilidad) declarándolo en su `stacks/<stack>/` o `personal/<usuario>.md`. No puede relajar los obligatorios del baseline.
+> **Punto de customización**: un adoptante puede estrechar o ampliar estos criterios para su contexto (p. ej. exigir cobertura de tests, aprobación de QA, o checklist de accesibilidad) declarándolo en su `profiles/<profile>/` o `personal/<usuario>.md`. No puede relajar los obligatorios del baseline.
 
 ## Obligatorios (bloquean el cierre)
 
@@ -11,7 +11,7 @@ Criterios que determinan cuándo un requerimiento está terminado. Son **condici
   - **Baja**: checklist `- [x]` del Plan de pruebas suficiente.
   - **Validación implícita** (sin artefactos, ver [`../process/delivery.md`](../process/delivery.md) § Validación): se omite la tabla; cierre por confirmación inline del dev.
 - [ ] **Flujos críticos** — si el riesgo de regresión es `medio`/`alto` (ver [vocabulary.md](vocabulary.md) "Riesgo de regresión"): la tabla incluye ≥1 fila con prefijo `[crítico]` y todas las filas `[crítico]` están en ✅. Cualquier `[crítico]` con ❌ bloquea cierre.
-- [ ] **Validación superada** — usuario o Claude confirmó (o cliente aprobó, según stack). Claude registra fecha.
+- [ ] **Validación superada** — usuario o Claude confirmó (o cliente aprobó, según profile). Claude registra fecha.
 - [ ] **Sin tareas abiertas** — todas en `completed`, ninguna `in_progress`.
 
 ## Checkpoint (no bloquea)

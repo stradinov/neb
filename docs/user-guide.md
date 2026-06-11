@@ -1,6 +1,6 @@
 # Guía del usuario — adoptar y extender Neb
 
-Cómo poner Neb a trabajar en tu equipo: instalarlo, montar tu capa propia y definir tu primer stack — todo **sin tocar el núcleo**. Para entender *cómo funciona Neb* por dentro, ver [how-it-works.md](how-it-works.md).
+Cómo poner Neb a trabajar en tu equipo: instalarlo, montar tu capa propia y definir tu primer profile — todo **sin tocar el núcleo**. Para entender *cómo funciona Neb* por dentro, ver [how-it-works.md](how-it-works.md).
 
 ## Instalar
 
@@ -13,7 +13,7 @@ Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni 
 
 Luego escribí `/wakeup` — el tour conecta o monta tu workspace (vía `setup-workspace.sh`) y te guía por los pasos de abajo. Un hook `SessionStart` inyecta el arranque de la metodología en cada sesión; los skills, agents y commands del plugin se auto-descubren.
 
-> El modelo de **clonar el repo + correr `bootstrap/install.sh`** quedó **deprecado** como vía de uso. El clon solo es necesario para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores)).
+> El modelo de **clonar el repo + correr `bootstrap/install.sh`** fue **eliminado en 3.0.0** (deprecado desde 2.0.0) como vía de uso. El clon solo es necesario para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores)).
 
 ## Conectarse al workspace del equipo
 
@@ -25,20 +25,20 @@ git clone <repo-workspace-del-equipo> && cd <repo>
 /wakeup
 ```
 
-`/wakeup` detecta que el clon ya es un workspace (markers estructurales: `*/overlays/detect-stack.local.sh` — el mismo criterio que usa el hook en runtime) y ofrece **conectarlo**: setea `NEB_WORKSPACE` en tu `settings.json` y crea tu `personal/<usuario>.md` si falta. El paso final real es **abrir una sesión nueva** de Claude Code: ahí el hook ya inyecta el arranque con el overlay de tu equipo.
+`/wakeup` detecta que el clon ya es un workspace (markers estructurales: `*/overlays/detect-profile.local.sh` — el mismo criterio que usa el hook en runtime) y ofrece **conectarlo**: setea `NEB_WORKSPACE` en tu `settings.json` y crea tu `personal/<usuario>.md` si falta. El paso final real es **abrir una sesión nueva** de Claude Code: ahí el hook ya inyecta el arranque con el overlay de tu equipo.
 
 ## Montar tu overlay
 
-`neb` es el núcleo y lo consumís vía el plugin instalado. Lo tuyo —stacks de dominio, agents/skills propios, preferencias— vive en una capa aparte (*overlay*), **nunca dentro de `neb/`**, para poder actualizar el núcleo (el plugin) sin conflictos. Montar el overlay es el **paso mínimo para usar Neb**: sin él no tenés dónde definir tu primer stack.
+`neb` es el núcleo y lo consumís vía el plugin instalado. Lo tuyo —profiles de dominio, agents/skills propios, preferencias— vive en una capa aparte (*overlay*), **nunca dentro de `neb/`**, para poder actualizar el núcleo (el plugin) sin conflictos. Montar el overlay es el **paso mínimo para usar Neb**: sin él no tenés dónde definir tu primer profile.
 
 El overlay es un directorio propio (`overlay/`, `personal/`, `changes/`) en tu repo de gobernanza o en tu workspace; no necesita ser un subtree de `neb/` para usar Neb. El tour `/wakeup` lo monta por vos vía `setup-workspace.sh`.
 
 ```
 tu-workspace/
-├── overlay/    ← tus stacks/agents/skills de dominio
+├── overlay/    ← tus profiles/agents/skills de dominio
 ├── personal/   ← tu config personal (gitignored por defecto)
 ├── changes/    ← tus change MDs
-└── CLAUDE.md   ← importa tus stacks de dominio (el arranque del núcleo lo inyecta el plugin)
+└── CLAUDE.md   ← importa tus profiles de dominio (el arranque del núcleo lo inyecta el plugin)
 ```
 
 > El layout con `neb/` como **subtree** del repo y el flujo `git subtree add/pull/push` corresponden al modelo de **contribución al núcleo**, no de uso — ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores).
@@ -54,31 +54,31 @@ El tour `/wakeup` corre el script de setup por vos (idempotente — seguro de re
 
 Reiniciá tu shell para que tomen efecto. El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (default `overlay`).
 
-## Definir tu primer stack
+## Definir tu primer profile
 
-Un *stack* concreta Neb para un tipo de proyecto (comandos de build, convenciones de commit, proceso de deploy, revisores aplicables) — es lo que hace a Neb útil para tu dominio. Materializalo en **tu overlay**, no en `neb/`.
+Un *profile* concreta Neb para un tipo de proyecto (comandos de build, convenciones de commit, proceso de deploy, revisores aplicables) — es lo que hace a Neb útil para tu dominio. Materializalo en **tu overlay**, no en `neb/`.
 
 ```bash
-bash bootstrap/init-stack-subproject.sh <nombre>
+bash bootstrap/init-profile-subproject.sh <nombre>
 ```
 
-Genera el scaffold con los archivos mínimos. Referencia completa: [`methodology/stacks.md`](../methodology/stacks.md).
+Genera el scaffold con los archivos mínimos. Referencia completa: [`methodology/profiles.md`](../methodology/profiles.md).
 
-Definir un stack **puede implicar** crear capacidades de apoyo:
+Definir un profile **puede implicar** crear capacidades de apoyo:
 
-### Skill de apoyo al stack
+### Skill de apoyo al profile
 
 Un skill carga conocimiento de dominio cuando Claude lo necesita (mapas de código, convenciones específicas, troubleshooting).
 
 1. Crear `skills/<nombre>/SKILL.md` con los campos `name` y `description`.
 2. Agregar archivos de contenido y scripts si aplica.
-3. Registrar en `skills/README.md` y en el stack correspondiente.
+3. Registrar en `skills/README.md` y en el profile correspondiente.
 
 El agente los descubre automáticamente.
 
-### Agentes revisores del stack
+### Agentes revisores del profile
 
-Un stack puede definir revisores adversariales propios (por dimensión: seguridad, datos, convenciones) que actúan en el plan-review.
+Un profile puede definir revisores adversariales propios (por dimensión: seguridad, datos, convenciones) que actúan en el plan-review.
 
 1. Crear `agents/<nombre>.md` con los campos `name`, `description` y `tools`.
 2. El cuerpo constituye el system prompt del rol.

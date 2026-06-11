@@ -6,7 +6,7 @@ Términos abstractos usados aquí ("Confirmación del cambio", "Punto de restaur
 
 ## Ownership de archivos `.md`
 
-Claude es **dueño operativo** de los archivos `.md` en todos los repos del equipo; el dev los consulta para diagnóstico, no los redacta. En consecuencia, las confirmaciones que tocan **exclusivamente** `.md` no requieren OK del dev en ninguna fase (1–9) ni stack.
+Claude es **dueño operativo** de los archivos `.md` en todos los repos del equipo; el dev los consulta para diagnóstico, no los redacta. En consecuencia, las confirmaciones que tocan **exclusivamente** `.md` no requieren OK del dev en ninguna fase (1–9) ni profile.
 
 - **No aplica a**:
   - Confirmaciones **mixtas** `.md` + entregable no-documental — piden OK por la parte más restrictiva; la autonomía sobre `.md` no contagia al resto.
@@ -26,8 +26,8 @@ Antes de la entrega final debe existir un **punto de restauración** — un esta
 
 Concretización por naturaleza del entregable: confirmación previa (entregables con control de versiones) · versión anterior etiquetada (documentos) · backup explícito (datos).
 
-## Mecanismo de versionamiento por stack
+## Mecanismo de versionamiento por profile
 
-Cada stack declara su mecanismo en `stacks/<stack>/deployment.md`. Sea cual sea, debe proveer **confirmación del cambio** (hacer permanente y recuperable) y **punto de restauración** (rollback).
+Cada profile declara su mecanismo en `profiles/<profile>/deployment.md`. Sea cual sea, debe proveer **confirmación del cambio** (hacer permanente y recuperable) y **punto de restauración** (rollback).
 
-Hoy todos los stacks usan **git** (los versionados con git se enumeran en [`../workflow/traceability.md`](../workflow/traceability.md); un stack de análisis de requerimientos versiona en el git del proyecto al que sirve); su concretización vive en [`../process/version-control.md`](../process/version-control.md). Un stack futuro sin git instancia el mismo contrato con otro medio —versiones etiquetadas, snapshot/backup, o entrega directa con backup previo como punto de restauración— declarándolo en su `deployment.md` sin necesitar git.
+Hoy todos los profiles usan **git** (los versionados con git se enumeran en [`../workflow/traceability.md`](../workflow/traceability.md); un profile de análisis de requerimientos versiona en el git del proyecto al que sirve); su concretización vive en [`../process/version-control.md`](../process/version-control.md). Un profile futuro sin git instancia el mismo contrato con otro medio —versiones etiquetadas, snapshot/backup, o entrega directa con backup previo como punto de restauración— declarándolo en su `deployment.md` sin necesitar git.

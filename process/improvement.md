@@ -109,7 +109,7 @@ Si Claude identifica un ajuste:
 
 1. Lo propone en una línea: *"Sugiero actualizar la metodología: [cambio concreto]. ¿Lo aplico?"*
 2. Con confirmación, edita el archivo correspondiente del repo `methodology`.
-3. Confirma y entrega el cambio según el mecanismo del stack (en `self-applied`/git, commit + push):
+3. Confirma y entrega el cambio según el mecanismo del profile (en `self-applied`/git, commit + push):
    ```
    docs: actualizar metodología — <descripción breve>
    ```

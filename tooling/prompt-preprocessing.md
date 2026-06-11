@@ -120,7 +120,7 @@ El hook **no llama a Haiku** en los siguientes casos (pasa raw a Claude principa
 - Match de regex multilingüe de saludos/afirmaciones cortas: `hola|hi|hello|si|sí|yes|no|ok|okay|gracias|thanks|listo|continúa|continua|continue|sigue|dale|va|oui|salut`.
 - Capa A — payload puro:
   - Prompt envuelto entre fences ` ``` ` y ` ``` ` sin prosa.
-  - Todas las líneas no-vacías matchean stack-trace.
+  - Todas las líneas no-vacías matchean profile-trace.
   - `len(prose_lines) == 0` **y** `code_lines / total_lines > 0.80`.
 
 Umbral conservador a propósito: ante duda, pasa a Capa B (Haiku decide).

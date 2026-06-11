@@ -4,14 +4,14 @@
 
 @~/.claude/neb/general/index.md
 @~/.claude/neb/workflow/index.md
-@~/.claude/neb/stacks/<STACK>/index.md
-@~/.claude/neb/stacks/<STACK>/servers.md
+@~/.claude/neb/profiles/<PROFILE>/index.md
+@~/.claude/neb/profiles/<PROFILE>/servers.md
 
 <!-- Personal override del proyecto, si existe (gitignored): -->
 <!-- @./.claude/personal.md -->
 
-<!-- Opt-out de Neb (opcional; ver neb/general/stack-detection.md "Opt-out de stack / Neb"):
-     neb-stack: none   → este proyecto usa Neb pero sin stack (Claude no sugiere stack)
+<!-- Opt-out de Neb (opcional; ver neb/general/profile-detection.md "Opt-out de profile / Neb"):
+     neb-profile: none   → este proyecto usa Neb pero sin profile (Claude no sugiere profile)
      neb: skip         → este proyecto no usa Neb (reservado; sin efecto hasta que exista el hook del plugin) -->
 
 ---
@@ -20,7 +20,7 @@
 
 > Lo específico de ESTE proyecto: arquitectura, módulos, BD, crons, decisiones particulares. NO duplica metodología (vive en methodology).
 
-### Stack
+### Profile
 
 <!-- versión de PHP, BD, framework si conviene aclararlo -->
 
@@ -34,6 +34,6 @@
 
 ### Comandos comunes
 
-<!-- build, test, deploy específicos del proyecto si difieren del stack -->
+<!-- build, test, deploy específicos del proyecto si difieren del profile -->
 
 ### Notas

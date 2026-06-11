@@ -4,7 +4,7 @@ Punto de entrada de la metodología. Carga, vía `@import` (garantizado y determ
 
 @communication.md
 @models.md
-@stack-detection.md
+@profile-detection.md
 @../process/phase-transitions.md
 @onboarding.md
 @../workflow/index.md

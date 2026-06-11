@@ -40,7 +40,7 @@ Por eso la **cadena mínima trazable es `Change MD → commits`**: el Change MD 
 
 ## Eslabón Change MD ↔ confirmación del cambio
 
-El último eslabón es la confirmación del cambio (ver [`../process/change-control-gate.md`](../process/change-control-gate.md)). En **stacks versionados con git** (cualquier stack de software/datos y `self-applied`) es el commit, y es bidireccional:
+El último eslabón es la confirmación del cambio (ver [`../process/change-control-gate.md`](../process/change-control-gate.md)). En **profiles versionados con git** (cualquier profile de software/datos y `self-applied`) es el commit, y es bidireccional:
 
 - **REQ → commit**: al cierre (Fase 8), el campo `**Commits:**` del Change MD se completa con el/los hash(es) — un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos.
 - **commit → REQ**: el mensaje del commit nombra el tipo y el tema del REQ (`tipo: descripción`, ver [`../process/version-control.md`](../process/version-control.md) "Commits"). Permite ir de un hash suelto al REQ sin partir del Change MD.
@@ -64,9 +64,9 @@ Así, `commit → REQ` desde cualquier proyecto se resuelve por el mensaje del c
 
 > La regla operativa de "dónde abrir el Change MD cross-repo" vive en el `CLAUDE.md` del repo central. Este documento es el modelo de trazabilidad que esa regla concreta.
 
-## Trazabilidad por stack
+## Trazabilidad por profile
 
-La cadena hasta el commit aplica a stacks versionados con git. Para stacks cuyo entregable no es código (ej. `self-applied`, donde el entregable son archivos markdown de la metodología), el eslabón final no es un commit sino la **Entrega final** del stack en su vocabulario concreto (ver el glosario de [`../methodology/vocabulary.md`](../methodology/vocabulary.md) y `stacks/<stack>/index.md`). El Change MD sigue siendo el eje; cambia solo qué representa el último eslabón.
+La cadena hasta el commit aplica a profiles versionados con git. Para profiles cuyo entregable no es código (ej. `self-applied`, donde el entregable son archivos markdown de la metodología), el eslabón final no es un commit sino la **Entrega final** del profile en su vocabulario concreto (ver el glosario de [`../methodology/vocabulary.md`](../methodology/vocabulary.md) y `profiles/<profile>/index.md`). El Change MD sigue siendo el eje; cambia solo qué representa el último eslabón.
 
 ## Casos especiales
 

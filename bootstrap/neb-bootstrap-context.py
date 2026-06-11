@@ -87,11 +87,11 @@ def main():
     ws = os.environ.get('NEB_WORKSPACE')
     if ws and os.path.isdir(ws):
         # Overlay del adoptante (D1): <workspace>/overlay/startup.md, o el primer dir con
-        # overlays/detect-stack.local.sh (mismo patron de descubrimiento que setup-workspace.sh).
+        # overlays/detect-profile.local.sh (mismo patron de descubrimiento que setup-workspace.sh).
         candidates = [os.path.join(ws, 'overlay', 'startup.md')]
         try:
             for entry in sorted(os.listdir(ws)):
-                marker = os.path.join(ws, entry, 'overlays', 'detect-stack.local.sh')
+                marker = os.path.join(ws, entry, 'overlays', 'detect-profile.local.sh')
                 if os.path.isfile(marker):
                     candidates.append(os.path.join(ws, entry, 'startup.md'))
         except OSError:

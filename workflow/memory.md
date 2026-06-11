@@ -16,7 +16,7 @@ Estructura: ver [`templates/project-memory.md.template`](../templates/project-me
 
 ## Sección "Pendiente de entrega"
 
-Handoff entre sesiones cuando el requerimiento está en validación esperando entrega final. Lista artefactos a entregar y pasos exactos según el stack (p. ej. deploy vía SSH/SCP para un stack de software, commit etiquetado + notificación para un stack de análisis). Si requiere downtime o ventana, anotarlo.
+Handoff entre sesiones cuando el requerimiento está en validación esperando entrega final. Lista artefactos a entregar y pasos exactos según el profile (p. ej. deploy vía SSH/SCP para un profile de software, commit etiquetado + notificación para un profile de análisis). Si requiere downtime o ventana, anotarlo.
 
 **Se elimina al confirmar que la entrega final fue aprobada.** Mantenerla viva es una falla de cierre.
 

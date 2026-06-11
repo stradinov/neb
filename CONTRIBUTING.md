@@ -2,11 +2,11 @@
 
 > Stub inicial (MVP). Se ampliará a medida que el proyecto reciba contribuciones externas.
 
-Gracias por tu interés en mejorar **Neb**. Neb se gobierna con sus propias reglas (stack `self-applied`): cada cambio a la metodología es un requerimiento que sigue sus propias fases y gates.
+Gracias por tu interés en mejorar **Neb**. Neb se gobierna con sus propias reglas (profile `self-applied`): cada cambio a la metodología es un requerimiento que sigue sus propias fases y gates.
 
 ## Antes de empezar
 
-- Leé el [README](README.md) para entender el modelo (fases, stacks, artefactos).
+- Leé el [README](README.md) para entender el modelo (fases, profiles, artefactos).
 - Revisá [`CLAUDE.md`](CLAUDE.md) — las meta-instrucciones para editar Neb, incluidas las convenciones de versionado SemVer y el flujo de CHANGELOG.
 
 ## Flujo de una contribución
@@ -21,13 +21,13 @@ Gracias por tu interés en mejorar **Neb**. Neb se gobierna con sus propias regl
 5. **Registrá el cambio en el CHANGELOG** — agregá un fragment en `changelog.d/<X.Y.Z>.md` (formato [keep a changelog](https://keepachangelog.com/)) y corré `python bootstrap/assemble-changelog.py`.
 6. **Bump SemVer** según el tipo de cambio (ver `CLAUDE.md`):
    - Patch: redacción, typos, aclaraciones.
-   - Minor: nuevos lineamientos, stacks, skills, hooks.
+   - Minor: nuevos lineamientos, profiles, skills, hooks.
    - Major: rupturas de imports o cambios incompatibles.
 7. **Abrí un Pull Request** referenciando el issue. Describí qué cambió y por qué.
 
 ## Estilo de commits
 
-Mensajes en inglés, formato `tipo: descripción` (`docs:`, `feat:`, `fix:`, `stacks(<nombre>):`, …).
+Mensajes en inglés, formato `tipo: descripción` (`docs:`, `feat:`, `fix:`, `profiles(<nombre>):`, …).
 
 ## Código de conducta
 

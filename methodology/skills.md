@@ -1,6 +1,6 @@
 # Skills
 
-Lineamiento meta-organizacional: cuándo crear un skill, qué nivel de detalle poner y cómo mantenerlo a lo largo del ciclo de vida de la metodología. Para el "cómo" concreto (estructura, frontmatter, distribución), ver `stacks/skill-authoring/`.
+Lineamiento meta-organizacional: cuándo crear un skill, qué nivel de detalle poner y cómo mantenerlo a lo largo del ciclo de vida de la metodología. Para el "cómo" concreto (estructura, frontmatter, distribución), ver `profiles/skill-authoring/`.
 
 ## ¿Qué es un skill?
 
@@ -13,7 +13,7 @@ Antes de crear un skill, descartar alternativas más simples:
 | ¿El conocimiento es...? | Va en |
 |---|---|
 | Específico de un proyecto, estable | `CLAUDE.md` del proyecto |
-| Convención del stack, aplica a todos sus proyectos | `stacks/<stack>/conventions.md` |
+| Convención del profile, aplica a todos sus proyectos | `profiles/<profile>/conventions.md` |
 | Decisión de un REQ puntual, histórica | Change MD del REQ |
 | Override del dev, no del equipo | `personal/<usuario>.md` |
 | Mapa/índice cross-proyecto, demasiado voluminoso para CLAUDE.md, estable | **Skill** |
@@ -31,16 +31,16 @@ Sí incluir: vocabulario, desambiguación, puntos de entrada (nombre de clase/m�
 
    Regla práctica: si una línea del skill tiene un número de línea, una signatura completa o un bloque SQL, probablemente sobra.
 
-Ver detalle de convenciones en `stacks/skill-authoring/conventions.md`.
+Ver detalle de convenciones en `profiles/skill-authoring/conventions.md`.
 
-## Asociación con stacks e inventario
+## Asociación con profiles e inventario
 
 Cada skill se registra en dos lugares:
 
 1. `skills/README.md` — inventario maestro (single source of truth del catálogo del equipo).
-2. `stacks/<stack>/skills.md` del stack donde aplica.
+2. `profiles/<profile>/skills.md` del profile donde aplica.
 
-Un skill puede asociarse a múltiples stacks.
+Un skill puede asociarse a múltiples profiles.
 
 ## Validación en uso y procesamiento de gaps
 
@@ -79,4 +79,4 @@ El skill no se actualiza automáticamente. Tres triggers:
 2. **Regla en metodología**: si el REQ agrega un proyecto al common o cambia `projects.json`, regenerar el skill en Fase 8.
 3. **Revisión mensual**: el Skill Maintainer (asignado en `personal/<usuario>.md`) regenera, revisa diff, commitea baselines.
 
-Ver procedimiento completo en `stacks/skill-authoring/deployment.md`.
+Ver procedimiento completo en `profiles/skill-authoring/deployment.md`.

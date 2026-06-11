@@ -1,0 +1,13 @@
+# Convenciones (profile: {{PROFILE_NAME}})
+
+## <!-- Sección principal de convenciones -->
+
+<!-- Describir estructura de archivos, naming, patrones específicos del profile -->
+
+## Imports
+
+<!-- Política de imports dentro del profile y desde proyectos cliente -->
+
+## Separación core vs profile
+
+<!-- Qué vive en general/meta/ vs qué vive en este profile -->

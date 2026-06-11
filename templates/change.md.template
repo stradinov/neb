@@ -27,7 +27,7 @@
 ## Plan de pruebas
 
 <!-- Flujos a validar, datos de entrada, criterios de éxito, orden.
-     En stack `self-applied` (cambios a la metodología): walkthroughs mentales aquí + validación diferida en uso (ver Trazabilidad/pendings tag <slug>-validacion-uso). -->
+     En profile `self-applied` (cambios a la metodología): walkthroughs mentales aquí + validación diferida en uso (ver Trazabilidad/pendings tag <slug>-validacion-uso). -->
 
 - [ ] ...
 - [ ] ...
@@ -50,7 +50,7 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 
 ## Plan de elaboración
 
-<!-- Una línea por elemento. Riesgos identificados. El stack determina qué son "elementos" (archivos, secciones del documento, etc.). -->
+<!-- Una línea por elemento. Riesgos identificados. El profile determina qué son "elementos" (archivos, secciones del documento, etc.). -->
 
 | Elemento | Cambio |
 |---|---|

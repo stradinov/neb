@@ -1,7 +1,7 @@
 {
   "name": "neb",
-  "version": "2.2.0",
-  "description": "Neb — framework de metodología agnóstica para trabajar con agentes de IA en Claude Code (fases, gates, artefactos trazables, stacks por dominio).",
+  "version": "3.0.0",
+  "description": "Neb — framework de metodología agnóstica para trabajar con agentes de IA en Claude Code (fases, gates, artefactos trazables, profiles por dominio).",
   "author": {
     "name": "stradinov"
   },
