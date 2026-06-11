@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [3.0.1] - 2026-06-11
+
+### Added
+
+- **Mapa de redacción en el profile `self-applied`** (`profiles/self-applied/index.md`): índice de los 4 documentos que norman la redacción/edición de los MDs de Neb (`methodology/principles.md` § "Lineamientos para editar MDs", `CLAUDE.md` del repo, `profiles/profile-authoring/conventions.md`, `methodology/change-control-policy.md`) con cuándo aplica cada uno. Los lineamientos estaban correctamente aislados por capa pero sin descubribilidad — nada decía que eran cuatro lugares. Como `CLAUDE.md` importa el index de `self-applied`, el mapa se carga automáticamente en toda sesión dentro del repo.
+
 ## [3.0.0] - 2026-06-11
 
 Cambio mayor: el concepto central **stack** pasa a llamarse **profile** en todo el framework (prosa, paths, identifiers, markers). Razón: "stack" colisionaba con el "tech stack" genérico — las propias heurísticas de detección hablan del stack tecnológico — y el concepto cubre más que tecnología (proceso, roles, deploy, convenciones): es un *perfil de trabajo*. Corte limpio: 3.0.0 solo reconoce los nombres nuevos.

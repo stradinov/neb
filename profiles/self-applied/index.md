@@ -44,4 +44,15 @@ Concretización del [vocabulario abstracto](../../methodology/vocabulary.md) de 
 1. [Deployment](deployment.md) — cómo se "deploya" un cambio + tipo de validación "diferida en uso" + criterio de cierre.
 2. [Roles](roles.md) — Process Architect + QA Process Engineer + Process Improvement Analyst (roles fijos sin detección por dimensiones).
 
-> Los lineamientos para editar los `.md` de la metodología viven en [`../../methodology/principles.md`](../../methodology/principles.md) § "Lineamientos para editar MDs" — son núcleo (editar la metodología es aplicarla), no contenido de profile.
+## Redacción de los MDs de Neb — mapa
+
+Los lineamientos para redactar/editar la metodología están repartidos por capa (test de pertenencia); este mapa los reúne:
+
+| Documento | Cuándo aplica |
+|---|---|
+| [`methodology/principles.md`](../../methodology/principles.md) § "Lineamientos para editar MDs" | **Siempre** al editar cualquier `.md` del núcleo: qué eliminar, conservar, no tocar, y qué reportar sin fix silencioso. En el mismo archivo: capas y test de pertenencia (dónde va un archivo nuevo), coherencia global sobre cambio mínimo, anti-patrones |
+| [`CLAUDE.md` del repo](../../CLAUDE.md) | Mecánica del repo: naming `kebab-case`, `index.md` por carpeta, imports relativos, cómo citar archivos (tabla de referencias), "No editar a mano" |
+| [`profiles/profile-authoring/conventions.md`](../profile-authoring/conventions.md) | Solo al redactar contenido de **profiles** (estructura, archivos mínimos, templates) |
+| [`methodology/change-control-policy.md`](../../methodology/change-control-policy.md) | Ownership: qué puede editar Claude solo vs qué requiere OK humano (bloques `<!-- human -->`) |
+
+> Los lineamientos de edición son núcleo (editar la metodología es aplicarla), no contenido de profile — este mapa solo los indexa.
