@@ -41,6 +41,8 @@ Luego,
 ```
 para montar tu *workspace* (directorio donde extiendes la metodología, *overlay* + configuración personal).
 
+> El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores.
+
 ---
 
 ## Qué te da

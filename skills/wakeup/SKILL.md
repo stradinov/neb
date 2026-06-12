@@ -25,7 +25,7 @@ Abrir con 2-3 oraciones:
 Resolvé el script con fallback (un miembro recién instalado no tiene `NEB_HOME`) y corré el dry-run:
 
 ```bash
-NEB_SRC="${NEB_HOME:-${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/neb/neb/*/ 2>/dev/null | sort -V | tail -1)}}"
+NEB_SRC="${NEB_HOME:-${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/*/neb/*/ 2>/dev/null | sort -V | tail -1)}}"
 bash "$NEB_SRC/bootstrap/setup-workspace.sh" --dry-run
 ```
 

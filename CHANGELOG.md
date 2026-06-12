@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+# 3.3.1
+
+## Corregido
+
+- **Fallback de `NEB_SRC` marketplace-agnóstico** (`commands/wakeup.md`, `skills/wakeup/SKILL.md`): el glob del cache del plugin asumía instalación desde el marketplace `neb` (`cache/neb/neb/*/`). Generalizado a `cache/*/neb/*/` — el primer segmento es el nombre del marketplace de instalación, que puede ser cualquiera (p. ej. un marketplace interno de equipo que liste este plugin).
+
 ## [3.3.0] - 2026-06-11
 
 ### Added
