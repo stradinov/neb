@@ -70,6 +70,15 @@ Cuando el dev anuncia que pausará para continuar después en otra sesión, la s
 - `claude --resume` — picker interactivo (todas las sesiones del proyecto; `Ctrl+A` para todos los proyectos).
 - `claude -n <nombre>` — nombrar al iniciar una sesión nueva (si el dev quiere prefijar antes del primer turno).
 
+### Relevo cross-dev (bitácora de relevo)
+
+Para retomar trabajo **en otra máquina o por otro dev** (lo que `--resume` no permite cross-machine), Neb usa la **bitácora de relevo**. El artefacto y su modelo de ownership viven en [`../workflow/logbook.md`](../workflow/logbook.md); la mecánica (backend, hook, config) en [`../tooling/logbook.md`](../tooling/logbook.md). El protocolo:
+
+- **Publicar (automático).** El hook publica/actualiza la entrada del `work` en cada `Stop`/`SessionEnd`/`PreCompact`. Al pausar deliberadamente, Claude redacta en el estado semántico el bloque **"Trabajo en vuelo"**: cómo **relanzar** agentes/scripts que quedaron a medias — es prosa que Claude escribe (los procesos no se serializan; el hook no los introspecta), junto a "próximos pasos".
+- **Retomar.** En la otra máquina/cuenta: `/logbook` lista los `work` relevables; el dev **toma el mando** (`tomar`) y abre una **sesión nueva** (no `--resume` cross-machine) alimentada con el transcript como contexto + el índice semántico; relanza el trabajo en vuelo desde lo materializado.
+- **Relevar.** El owner **libera** al pausar; otro dev **solicita el mando** si está `owned`; **`liberar --forzado`** (con confirmación) cubre el caso de owner ausente (corte sin liberar). Estados y reglas: [`../workflow/logbook.md`](../workflow/logbook.md) §"Modelo de ownership".
+- **Modo exploratorio** (sin REQ formal): la sesión se registra para localización pero se reanuda con **`--resume` local** del mismo dev; al formalizarse en REQ entra al relevo cross-dev (ver [`../workflow/logbook.md`](../workflow/logbook.md) §"Dos modos").
+
 ## Incidencias durante el trabajo
 
 (Para incidentes detectados post-entrega final, ver [incidents.md](../general/incidents.md).)

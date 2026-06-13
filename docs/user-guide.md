@@ -91,6 +91,18 @@ Los agents se auto-descubren del plugin: basta con crear el `agents/<nombre>.md`
 
 Si querés versionarla (respaldo, portabilidad entre máquinas), quitá la regla `personal/` de **tu** `.gitignore` (no del de `neb/`) y commiteala en tu repo privado. Excluí binarios (`*.wav` y similares). Sus cambios se trazan con el commit normal; no llevan change MD.
 
+## Retomar y relevar trabajo (bitácora de relevo)
+
+Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque otro dev sigue— la **bitácora de relevo** te deja retomarla. Es **opt-in**: agregá el hook `logbook-sync` a tu `<proyecto>/.claude/settings.json` (base en `hooks/settings.template.json`; en Windows usá la variante `"shell": "powershell"`). El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb-logbook.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
+
+Con el comando `/logbook`:
+
+- **`/logbook`** — lista tus trabajos a medias (con-REQ y sesiones exploratorias) con su contexto.
+- **`/logbook retomar <id>`** — reconstruye el contexto: para un REQ, toma el mando y abre una sesión nueva con el transcript; para una exploración, te entrega el `claude --resume`.
+- **`/logbook tomar | liberar | solicitar <id>`** — opera el "mando" del trabajo (un solo dueño a la vez).
+
+Por defecto la bitácora es **local** (tu máquina). El **relevo entre devs o entre máquinas** —que otro dev tome tu trabajo y lo devuelva— requiere el **backend central** del equipo (servidor opcional; llega en una versión posterior). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
+
 ## Contribuir al núcleo (mantenedores)
 
 Lo anterior cubre **usar** Neb. **Contribuir al núcleo** —corregir o extender lo que vive en el repo neb, no tu overlay— es un rol de mantenedor y requiere un **clon normal del repo**, separado de tu workspace:

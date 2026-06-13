@@ -42,6 +42,8 @@ Asignar al nuevo ítem el **siguiente entero libre** (típicamente `máx + 1`, p
 
 Heading dedicado en `pendings.md` para sesiones Claude nombradas con `/rename` cuando el dev anuncia pausa/continuación posterior. Permite recuperar el comando de reanudación sin que el dev recuerde el nombre.
 
+Esto cubre **reanudar la propia sesión local** (mismo dev, misma máquina). Para **relevo cross-dev / cross-máquina** (otro dev continúa, u otra máquina) ver la [bitácora de relevo](logbook.md), que además registra sesiones automáticamente sin depender del anuncio de pausa.
+
 Formato:
 
 ```markdown

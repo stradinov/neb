@@ -19,6 +19,67 @@
             "command": "bash \"${NEB_HOME:-$HOME/.claude/neb}/hooks/usage-tracker.sh\""
           }
         ]
+      },
+      {
+        "_os_note": "logbook-sync — WINDOWS (PowerShell). Combina stdin + env vars → requiere shell:powershell. Para Linux/Mac usar el bloque bash siguiente (eliminar este).",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "powershell -NoProfile -File \"$env:NEB_HOME\\hooks\\logbook-sync.ps1\""
+          }
+        ]
+      },
+      {
+        "_os_note": "logbook-sync — LINUX/MAC (bash). Requiere jq. Eliminar el bloque Windows de arriba al usar este.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${NEB_HOME:-$HOME/.claude/neb}/hooks/logbook-sync.sh\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "_os_note": "logbook-sync — WINDOWS (PowerShell). Para Linux/Mac usar el bloque bash siguiente (eliminar este).",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "powershell -NoProfile -File \"$env:NEB_HOME\\hooks\\logbook-sync.ps1\""
+          }
+        ]
+      },
+      {
+        "_os_note": "logbook-sync — LINUX/MAC (bash). Eliminar el bloque Windows de arriba al usar este.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${NEB_HOME:-$HOME/.claude/neb}/hooks/logbook-sync.sh\""
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "_os_note": "logbook-sync — WINDOWS (PowerShell). Para Linux/Mac usar el bloque bash siguiente (eliminar este).",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "powershell -NoProfile -File \"$env:NEB_HOME\\hooks\\logbook-sync.ps1\""
+          }
+        ]
+      },
+      {
+        "_os_note": "logbook-sync — LINUX/MAC (bash). Eliminar el bloque Windows de arriba al usar este.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"${NEB_HOME:-$HOME/.claude/neb}/hooks/logbook-sync.sh\""
+          }
+        ]
       }
     ]
   }

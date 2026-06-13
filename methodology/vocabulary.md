@@ -33,6 +33,8 @@ ENUM canónico. Cualquier archivo que registre estado usa este vocabulario. El m
 - El draft del change MD existe desde `Plan aprobado` (ver [`../workflow/changes.md`](../workflow/changes.md)); por convención arranca en `En progreso`. No hay estado "Propuesto".
 - Los changes históricos pueden contener vocabulario previo (`Propuesto`, `COMPLETADO`, `Listo para producción`); no se migran. `Listo para producción` es el término anterior de `Listo para aprobación` (renombrado en una versión anterior).
 
+**ENUM de lock de la bitácora de relevo** (`owned` / `released` / `takeover_requested`, definido en [`../workflow/logbook.md`](../workflow/logbook.md) §"Modelo de ownership") es **ortogonal** a este ENUM: gobierna quién tiene el mando de un `work` para relevo entre devs, no el avance del requerimiento. Un `work` archivado al cerrar no altera el estado canónico del REQ.
+
 ## Tipos de validación
 
 Clasificación según la naturaleza del entregable. Los pasos de ejecución de Fase 5 viven en [`../process/delivery.md`](../process/delivery.md) § Validación.

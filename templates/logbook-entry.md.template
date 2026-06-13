@@ -1,0 +1,25 @@
+<!-- Plantilla de una entrada de la bitácora de relevo: representación legible de un `work`.
+     El almacenamiento real es la DB (esquema en hooks/logbook-schema.sql); esto documenta la forma
+     y lo que /logbook muestra al retomar. NO es un archivo que el dev edite a mano. -->
+
+# Relevo: <project> / <req_slug>   (<mode: req | exploratory>)
+
+- **Owner:** <owner (username)> · **Máquina origen:** <origin_machine>
+- **Lock:** <owned | released | takeover_requested>
+- **Estado del REQ:** <ENUM de estados del requerimiento>  <!-- ortogonal al lock -->
+- **Branch / HEAD:** <branch> / <head_commit>
+- **Change MD:** <ruta del change MD>
+- **Sesión Claude:** <claude_session_id>  <!-- válido solo en la máquina origen -->
+
+## Estado semántico (payload)
+
+- **Plan resumido:** …
+- **Archivos:** …
+- **Próximos pasos:** …
+- **Pendiente de entrega:** …
+- **Trabajo en vuelo (cómo relanzar agentes/scripts):** …  <!-- prosa que el agente redacta al pausar -->
+
+## Cómo retomar
+
+- **req:** `/logbook retomar <id>` → toma el mando, `checkout` del branch, sesión nueva con el transcript como contexto.
+- **exploratory:** `claude --resume <claude_session_id>` (local, mismo dev).

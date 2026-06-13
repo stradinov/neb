@@ -64,6 +64,18 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 **Lógica completa**: `hooks/lib/usage-tracker.py`.
 
+### logbook-sync.{sh,ps1}
+
+`Stop` + `SessionEnd` + `PreCompact` — publica/actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo** (SQLite local). Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
+
+- **Tipo**: `command`. Dos scripts hermanos: `.sh` (Linux/Mac, requiere `jq`) + `.ps1` (Windows).
+- **Requiere**: Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib); `NEB_HOME`.
+- **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
+- **Windows**: declarar `"shell": "powershell"` con `logbook-sync.ps1` — combina stdin + variables de entorno (ver §Filosofía).
+- **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea.
+- **Opt-in por proyecto** (no auto-registrado por el plugin), como `usage-tracker`.
+- **Lógica completa**: `hooks/lib/logbook.py` (modo hook de captura + CLI del comando `/logbook`).
+
 ### notify-on-permission.{ps1,sh}
 
 `Notification` — reproduce un WAV cuando Claude pide permiso para una herramienta o el prompt input lleva idle > 60s. **Opt-in personal**: lineamiento completo en [`tooling/notify-on-permission.md`](../tooling/notify-on-permission.md).
@@ -117,7 +129,7 @@ Bajo el plugin de Neb, el `SessionStart` se auto-registra (ver §"Bajo el plugin
 
 ## Bajo el plugin de Neb
 
-Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` auto-registra **solo el `SessionStart`** (`bootstrap/neb-bootstrap-context.py` — inyecta el arranque ensamblado; no consume stdin; cross-OS: `python` con fallback a `python3` — `python` corre en Windows, `python3` en Linux/Mac modernos). Los demás hooks de este README (`save-approved-plan`, `usage-tracker`, `notify-*`, `preprocess-prompt`) **NO** se auto-registran por el plugin: son **opt-in por proyecto** vía `settings.json` (`settings.template.json`) o config manual del dev. Razones (plan-review REQ-2): (a) varios **no están off por defecto** (`preprocess` corre en `full`, `notify` suena) y auto-registrarlos sería intrusivo para todo adoptante; (b) los que **consumen stdin** (`preprocess`, `usage-tracker`, `save-approved-plan`) requieren `"shell": "powershell"` en Windows (ver §Filosofía) — no aptos para auto-registro cross-OS sin esa variante.
+Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` auto-registra **solo el `SessionStart`** (`bootstrap/neb-bootstrap-context.py` — inyecta el arranque ensamblado; no consume stdin; cross-OS: `python` con fallback a `python3` — `python` corre en Windows, `python3` en Linux/Mac modernos). Los demás hooks de este README (`save-approved-plan`, `usage-tracker`, `logbook-sync`, `notify-*`, `preprocess-prompt`) **NO** se auto-registran por el plugin: son **opt-in por proyecto** vía `settings.json` (`settings.template.json`) o config manual del dev. Razones (plan-review REQ-2): (a) varios **no están off por defecto** (`preprocess` corre en `full`, `notify` suena) y auto-registrarlos sería intrusivo para todo adoptante; (b) los que **consumen stdin** (`preprocess`, `usage-tracker`, `save-approved-plan`) requieren `"shell": "powershell"` en Windows (ver §Filosofía) — no aptos para auto-registro cross-OS sin esa variante.
 
 ## Agregar un hook nuevo
 

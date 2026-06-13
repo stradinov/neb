@@ -134,4 +134,4 @@ La revisión agregada (`improvement.md §Revisión agregada`) incluye como sub-a
 
 ## Handoff entre sesiones
 
-El procedimiento de handoff (retomar un requerimiento interrumpido, pausar/reanudar una sesión por nombre, comandos `claude --resume`) es gestión de sesión, no métrica — vive en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)".
+El procedimiento de handoff (retomar un requerimiento interrumpido, pausar/reanudar la propia sesión por nombre con `claude --resume`, y el **relevo cross-dev** vía la [bitácora de relevo](logbook.md)) es gestión de sesión, no métrica — vive en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)".
