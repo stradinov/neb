@@ -26,11 +26,11 @@ El MD se crea como draft al aprobar el plan y se completa durante la implementac
 
 | Momento | Acción |
 |---|---|
-| Plan aprobado | Crear `changes/YYYY-MM-DD-<req>.md` con estado `En progreso`, contexto, alcance y plan resumido |
+| Plan aprobado | Crear `changes/YYYY-MM-DD-<req>.md` con estado `En progreso`, contexto, alcance y plan resumido. Desde aquí el registro es **entregable de forma temprana y autónoma** (ver abajo) |
 | Fase mayor completada | Actualizar archivos modificados e incidencias |
-| Cierre | Completar métricas, marcar `Cerrado` (ver [`workflow/index.md`](index.md) "Estados del requerimiento"), confirmar el cambio (en git: commit `docs: change.md ...`) |
+| Cierre | Completar métricas, marcar `Cerrado` (ver [`workflow/index.md`](index.md) "Estados del requerimiento"), confirmar el cambio (en git: commit `docs: change.md ...`) si no se confirmó/entregó antes |
 
-El draft **no se confirma** hasta el cierre (en git: no se commitea).
+**Entrega temprana del registro.** El **registro del requerimiento** (su change MD — ver [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Registro del requerimiento") es un artefacto `.md`, por lo que confirmarlo y entregarlo es **autónomo** desde su creación (Fase 4) bajo el ownership de `.md` — no requiere OK del dev cuando el delta es solo `.md` (ver [`change-control-policy.md`](../methodology/change-control-policy.md) § "Ownership de archivos `.md`" y [`version-control.md`](../process/version-control.md) § Push). La entrega temprana (confirmar + publicar el registro **desacoplada** de la entrega del entregable) aplica **cuando el entorno de validación es compartido** — lo determina Claude por juicio; la señal determinista es que el `work` se publique a una bitácora compartida (backend central): publicar el `work` para relevo cross-dev exige que su registro esté **entregado** para que el puntero resuelva en la máquina que releva (ver [`logbook.md`](logbook.md)). Si el entorno **no** es compartido (sesión solo del dev, sin bitácora compartida), el registro se confirma/entrega al cierre. Esto cubre solo el **registro**: la validación diferida del entregable (los `.md` de la metodología misma) mantiene su gate de validación/cierre intacto.
 
 ### Plan resumido vs plan literal
 

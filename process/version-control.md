@@ -32,12 +32,13 @@ El principio (Claude es dueño operativo de los `.md`; las confirmaciones que to
 - Verificar la rama principal del proyecto (varía: `master`, `main`, etc.).
 - Push solo cuando el usuario confirma y los cambios fueron validados.
 - **Excepción — push `.md`-only**: si los commits que arrastra el push tocan solo archivos `.md`, no requiere OK del dev (ver § Commits "Autonomía de Claude sobre archivos `.md`"). `push --force` a `main`/`master` mantiene su gate.
-- **Antes de validar**: solo recordar al usuario hacer commit; no solicitar push.
+- **Antes de validar** (entregable): solo recordar al usuario hacer commit; no solicitar push. Aplica al **entregable**, no al **registro del requerimiento** (change MD — ver [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Registro del requerimiento"): la entrega temprana del registro (bullet abajo) es independiente del gate de validación del entregable.
   - **Validación diferida (profile `self-applied`)**: cuando la validación se difiere a uso real, Claude commitea localmente el trabajo del REQ una vez se cumplen: (a) plan aprobado, (b) Fase 4 cerrada. El push sigue diferido hasta cierre del REQ o autorización del dev. Cierra la ventana de exposición a otras sesiones que abran después. Ver `profiles/self-applied/deployment.md` § Validación diferida en uso.
+- **Entrega temprana del registro del requerimiento**: el registro (change MD — ver [`../workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft") puede **confirmarse y entregarse (push) de forma autónoma desde que existe el draft** (al aprobar el plan / entrada a Fase 4), **desacoplado** de la entrega del entregable. Es `.md`-only ⇒ autónomo por la § Commits "Autonomía de Claude sobre archivos `.md`"; no requiere OK del dev. **Condición — entorno de validación compartido**: aplica cuando Claude juzga que el entorno/instrucciones de validación son del equipo (no una sesión solo del dev). **Señal determinista**: si el `work` se publica a una bitácora **compartida** (backend central — ver [`../workflow/logbook.md`](../workflow/logbook.md)), el entorno es compartido y el registro debe quedar **entregado (pusheado)** para que el puntero de la entrada resuelva en la máquina que releva. Si **no** es compartido, el registro se confirma/entrega en el cierre del REQ. No relaja el gate del **entregable**, que sigue su validación/cierre. `push --force` a `main`/`master` mantiene su gate.
 - **Después de validar**: preguntar si hacer commit y push.
 - Entrega final y acciones que afectan a otros (PRs, force push): siempre confirmar.
 - **Push a entrega final sin validación**: Claude detecta y ofrece asistir con las pruebas. El dev acepta, valida por su cuenta, o confirma que ya fue validado fuera de sesión.
-- **Si el dev pide push en cualquier momento**: Claude sugiere primero actualizar el MD del requerimiento.
+- **Si el dev pide push en cualquier momento**: Claude sugiere primero actualizar el registro del requerimiento (change MD); el push `.md`-only de ese registro es autónomo (ver "Entrega temprana del registro del requerimiento" arriba).
 
 ## Comandos de entrega a servidores
 

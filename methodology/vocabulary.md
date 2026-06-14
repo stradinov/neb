@@ -52,7 +52,7 @@ A cada REQ **le corresponde** un único **registro** (su change MD): proyección
 | Cross-repo: un solo change MD (repo central) | [`../workflow/traceability.md`](../workflow/traceability.md) §"Multi-proyecto" |
 | Trazabilidad unidireccional plan→change MD; plan opcional, pruebas obligatorio | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) |
 | Eslabón change MD↔commit (bidireccional) | [`../workflow/traceability.md`](../workflow/traceability.md) §"Eslabón Change MD ↔ confirmación" |
-| Definición de done + cierre atómico (push `.md`-only del change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) §"Cierre del requerimiento" |
+| Definición de done + entrega del registro (temprana si entorno compartido, o atómica al cierre — push `.md`-only del change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) §"Cierre del requerimiento" |
 | Validación diferida en uso (self-applied, ≥10 sesiones) | [§ Tipos de validación](#tipos-de-validación), [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) |
 
 ### Formas especiales

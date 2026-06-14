@@ -16,6 +16,8 @@ Claude es **dueño operativo** de los archivos `.md` en todos los repos del equi
 
 La materialización en operaciones del VCS (qué cubre, límites sobre historia compartida y tags publicados) vive en [`../process/version-control.md`](../process/version-control.md) § "Autonomía de Claude sobre archivos `.md`".
 
+Uso canónico de esta autonomía — **entrega temprana del registro del requerimiento**: el registro (change MD — ver [`vocabulary.md`](vocabulary.md) § "Registro del requerimiento") es `.md`, así que confirmarlo y entregarlo (en git: commit + push) cae bajo esta autonomía sin OK del dev cuando el delta es solo-`.md`, desacoplado de la entrega del entregable. Aplica cuando el entorno de validación es compartido (señal determinista: el `work` se publica a una bitácora compartida); fuera de ese caso el registro se confirma/entrega en el cierre. No redefine el ownership: solo lo aplica al registro. La **validación diferida del entregable** (cuando el entregable es `.md`, p. ej. la metodología misma) sigue su propio gate — son `.md` distintos. Condición y momento: [`../workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft"; operaciones git: [`../process/version-control.md`](../process/version-control.md) § Push.
+
 ## Acciones destructivas
 
 Ninguna acción que **reescriba historia o destruya estado recuperable** del entregable se ejecuta sin OK explícito del dev. La autorización contextual (ej. restaurar un archivo durante el rollback de un incidente) no la viola. Los comandos concretos que caen en esta categoría dependen del mecanismo y se enumeran en [`../process/version-control.md`](../process/version-control.md).

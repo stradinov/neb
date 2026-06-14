@@ -27,7 +27,17 @@ Cuarto tipo de validación, complementa los 3 de [`process/delivery.md`](../../p
 
 Los walkthroughs mentales en Fase 5 detectan ambigüedad del diseño, no fricción real. La fricción aparece cuando el lineamiento se aplica en una sesión de trabajo en otro profile (cualquier profile de software o documentación). Solo el uso revela si el cambio ayuda, estorba o requiere ajuste.
 
-El periodo entre cierre de Fase 4 y push abre una ventana de exposición a otras sesiones. Ver `process/version-control.md` § Push, bullet "Validación diferida" — Claude commitea localmente al cerrar Fase 4 aunque el push se difiera.
+El periodo entre cierre de Fase 4 y push abre una ventana de exposición a otras sesiones. Ver `process/version-control.md` § Push, bullet "Validación diferida" — Claude commitea localmente al cerrar Fase 4 aunque el push del **entregable** (el lineamiento) se difiera hasta el cierre.
+
+La diferición aplica al **entregable**, no al **registro del requerimiento** (change MD — ver [`../../methodology/vocabulary.md`](../../methodology/vocabulary.md) § "Registro del requerimiento"); cuando el entorno de validación es compartido, el registro puede **entregarse temprano** (ver § "Entrega temprana del registro").
+
+### Entrega temprana del registro
+
+El **registro del requerimiento** (change MD — ver [`../../methodology/vocabulary.md`](../../methodology/vocabulary.md) § "Registro del requerimiento") puede confirmarse y **entregarse** (`git push`) tempranamente, desde que existe el draft (plan aprobado / entrada a Fase 4), **desacoplado** de la Entrega del entregable. Es autónomo: el delta es solo `.md` y aplica el ownership de `.md` (ver [`../../methodology/change-control-policy.md`](../../methodology/change-control-policy.md) § "Ownership de archivos `.md`"); no requiere OK del dev.
+
+**Condición**: aplica cuando el **entorno de validación es compartido**, lo determina Claude. Señal determinista: el `work` se publica a una bitácora compartida (backend central — ver [`../../workflow/logbook.md`](../../workflow/logbook.md)) ⇒ entorno compartido; si la entrada de bitácora apunta al change MD para relevo cross-dev, el registro debe estar **entregado** para que el puntero resuelva en la máquina que releva. Si el entorno **no** es compartido (sesión solo del dev, sin bitácora compartida), el registro se confirma/entrega en el cierre (ver [`../../process/delivery.md`](../../process/delivery.md) § "Cierre del requerimiento").
+
+La **validación diferida del entregable** se mantiene intacta: son `.md` distintos — el registro documenta *sobre* el REQ, el entregable es el lineamiento producido. El push del entregable sigue su gate de validación/cierre.
 
 ### Criterio de cierre
 
@@ -45,7 +55,7 @@ Al cerrar el cambio en estado `Listo para aprobación`, agregar a `~/.claude/pen
 [ ] [<slug>-validacion-uso] <req> — validación diferida en uso (push <fecha>). Cierre tras ≥ 10 sesiones de trabajo en otros profiles sin reporte negativo. Change MD: <path>.
 ```
 
-Se elimina cuando se cumple el criterio de cierre (≥ 10 sesiones sin reporte negativo). Al eliminarse, el estado del change MD pasa a `Cerrado` y se ejecuta el cierre atómico (commit + push del change MD — ver [`process/delivery.md`](../../process/delivery.md) § "Cierre del requerimiento").
+Se elimina cuando se cumple el criterio de cierre (≥ 10 sesiones sin reporte negativo). Al eliminarse, el estado del change MD pasa a `Cerrado` y se ejecuta el cierre atómico (commit + push del change MD — ver [`process/delivery.md`](../../process/delivery.md) § "Cierre del requerimiento"). En entorno compartido el push del registro pudo realizarse antes (entrega temprana, ver § "Entrega temprana del registro"); en ese caso, al cierre solo se confirma/entrega el delta restante.
 
 ### Cuando el dev pausa esperando otra sesión paralela
 
@@ -72,6 +82,6 @@ El dev reporta inline en sesión ("este lineamiento estorba en X" / "no quedó c
 
 ## Lo que NO hace Claude
 
-- Push al remote **antes** del cierre del REQ (la validación diferida difiere el push; al cierre, el push `.md`-only es autónomo — ver [`process/delivery.md`](../../process/delivery.md) § "Cierre del requerimiento" y `process/version-control.md` § Push).
+- Push al remote del **entregable** (el lineamiento) **antes** del cierre del REQ (la validación diferida difiere ese push; al cierre, el push `.md`-only es autónomo — ver [`process/delivery.md`](../../process/delivery.md) § "Cierre del requerimiento" y `process/version-control.md` § Push). **Excepción — el registro del requerimiento (change MD)**: puede entregarse temprano si el entorno de validación es compartido (ver § "Entrega temprana del registro"); su push `.md`-only es autónomo y no arrastra el del entregable.
 - Asumir que un proyecto cliente "ya tiró pull" — el dev confirma el deploy real.
 - Cerrar el REQ antes del criterio de cierre (≥ 10 sesiones sin reporte negativo).

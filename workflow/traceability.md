@@ -42,7 +42,7 @@ Por eso la **cadena mínima trazable es `Change MD → commits`**: el Change MD 
 
 El último eslabón es la confirmación del cambio (ver [`../process/change-control-gate.md`](../process/change-control-gate.md)). En **profiles versionados con git** (cualquier profile de software/datos y `self-applied`) es el commit, y es bidireccional:
 
-- **REQ → commit**: al cierre (Fase 8), el campo `**Commits:**` del Change MD se completa con el/los hash(es) — un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos.
+- **REQ → commit**: al cierre (Fase 8), el campo `**Commits:**` del Change MD se completa con el/los hash(es) — un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos. (Con entrega temprana del registro, el change MD pudo entregarse antes con `**Commits:**` aún vacío — ver [`changes.md`](changes.md) § "Ciclo de vida del draft"; el campo se completa igualmente al cierre.)
 - **commit → REQ**: el mensaje del commit nombra el tipo y el tema del REQ (`tipo: descripción`, ver [`../process/version-control.md`](../process/version-control.md) "Commits"). Permite ir de un hash suelto al REQ sin partir del Change MD.
 
 El draft del Change MD nace sin hashes (estado `En progreso`); el campo `**Commits:**` se llena cuando los commits ya existen. Mientras tanto, el cross-link inverso `Draft changes MD:` en la memoria del proyecto mantiene la trazabilidad de la sesión en curso.
