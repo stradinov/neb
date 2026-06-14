@@ -33,10 +33,12 @@ Corré `LB show <id>` y actuá según `mode`:
 - `liberar <id>` → `LB release <id>`.
 - `liberar-forzado <id>` → **pedí confirmación humana explícita** (le quita el mando a otro dev), y con el OK: `LB forced-release <id>`. Queda auditado (`event forced_release`).
 - `solicitar <id>` → `LB request <id>`.
+- `renombrar <id> <nuevo-slug> [nuevo-project]` → `LB rename <id> <nuevo-slug>` (rename gobernado: migra la fila preservando `event`/`transcript`; sin esto, un slug nuevo bifurca en otro work).
+- `archivar <id>` → `LB archive <id>` (cierre del REQ: marca el work archivado; se preserva para auditoría, la purga es manual via `server/purge.py`).
 
 ### Buscar — `search <texto>`
-`LB search <texto>`.
+`LB search <texto>` (FULLTEXT sobre el transcript del corpus; requiere central).
 
 ## Notas
-- En backend **local-only** el lock es informativo (un dev, una DB) y `solicitar`/`search` requieren el **backend central** (REQ B) — el CLI lo informa.
+- Con `NEB_LOGBOOK_ENDPOINT` configurado el CLI opera contra el **backend central** (autoridad: lock atómico, `solicitar`/`search`/`renombrar` funcionales; los ids son los **remotos** que devuelve `list`/`search`). En **local-only** el lock es informativo (un dev, una DB) y `solicitar`/`search` no aplican — el CLI lo informa.
 - No edites la DB a mano: usá los subcomandos (preservan idempotencia y eventos auditados).

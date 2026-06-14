@@ -66,10 +66,11 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 ### logbook-sync.{sh,ps1}
 
-`Stop` + `SessionEnd` + `PreCompact` — publica/actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo** (SQLite local). Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
+`Stop` + `SessionEnd` + `PreCompact` — publica/actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo** (SQLite local). Si el entorno es compartido (`NEB_LOGBOOK_ENDPOINT` y sin opt-out por proyecto), tras la captura lanza un **sync detached** que drena el outbox + sube el transcript al backend central. Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
 
 - **Tipo**: `command`. Dos scripts hermanos: `.sh` (Linux/Mac, requiere `jq`) + `.ps1` (Windows).
 - **Requiere**: Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib); `NEB_HOME`.
+- **Central (opcional)**: con `NEB_LOGBOOK_ENDPOINT` + `NEB_LOGBOOK_TOKEN` en el entorno, la captura lanza `logbook.py sync` **detached** (`subprocess.Popen`, cross-OS) que publica al central — los wrappers `.sh`/`.ps1` no cambian. El cliente usa solo stdlib (`urllib`); **PyMySQL es solo del servidor** (`server/`). Ver [`../server/INSTALL.md`](../server/INSTALL.md).
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
 - **Windows**: declarar `"shell": "powershell"` con `logbook-sync.ps1` — combina stdin + variables de entorno (ver §Filosofía).
 - **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea.

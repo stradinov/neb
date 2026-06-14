@@ -100,8 +100,10 @@ Con el comando `/logbook`:
 - **`/logbook`** — lista tus trabajos a medias (con-REQ y sesiones exploratorias) con su contexto.
 - **`/logbook retomar <id>`** — reconstruye el contexto: para un REQ, toma el mando y abre una sesión nueva con el transcript; para una exploración, te entrega el `claude --resume`.
 - **`/logbook tomar | liberar | solicitar <id>`** — opera el "mando" del trabajo (un solo dueño a la vez).
+- **`/logbook search <texto>`** — busca en el corpus de transcripts (requiere central).
+- **`/logbook renombrar <id> <nuevo-slug>`** — rename gobernado del REQ (requiere central).
 
-Por defecto la bitácora es **local** (tu máquina). El **relevo entre devs o entre máquinas** —que otro dev tome tu trabajo y lo devuelva— requiere el **backend central** del equipo (servidor opcional; llega en una versión posterior). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
+Por defecto la bitácora es **local** (tu máquina) — si trabajás solo, no necesitás nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva, con búsqueda full-text del corpus— lo habilita el **backend central** del equipo (servidor opcional; montaje en [`../server/INSTALL.md`](../server/INSTALL.md)). **Privacidad**: al montar el central, tu trabajo se publica por default al catálogo compartido —works **y sesiones exploratorias** (su transcript, sin los outputs de herramientas)—; para mantener un proyecto privado, agregá `<!-- neb-logbook: local -->` a su `CLAUDE.md` (opt-out por proyecto). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
 
 ## Contribuir al núcleo (mantenedores)
 

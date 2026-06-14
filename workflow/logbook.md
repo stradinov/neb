@@ -7,7 +7,7 @@ La **mecánica** (backend pluggable, hook de captura, config, modos de fallo) vi
 ## Unidad y backend
 
 - **Unidad = `work`** (un trabajo relevable), identificado por `project + req_slug` (estable cross-máquina; **no** la sesión Claude, que es local y efímera).
-- **Backend pluggable**: SQLite local por defecto (universal, sin infra) + central opcional para relevo cross-dev real (servidor de referencia, ver [`../tooling/logbook.md`](../tooling/logbook.md) y REQ central). El SQLite local es además **outbox** que sincroniza al central cuando está configurado.
+- **Backend pluggable**: SQLite local por defecto (universal, sin infra) + central opcional para relevo cross-dev real (servidor de referencia en `server/`, ver [`../tooling/logbook.md`](../tooling/logbook.md) y [`../server/INSTALL.md`](../server/INSTALL.md)). El SQLite local es además **outbox** que sincroniza al central cuando el **entorno es compartido** (ver "Entorno compartido" abajo).
 - **Identidad del owner**: username del SO + `origin_machine` + nombre del trabajo (contexto desambiguador legible). No usa `git email` (decisión del equipo). *Limitación*: no distingue dos personas con el mismo username ni une al mismo dev con usernames distintos entre máquinas — el caso "continuar lo propio" se cubre con `--resume` local (ver "Dos modos").
 
 ## Modelo de ownership
@@ -35,10 +35,14 @@ Este ENUM de lock es **ortogonal** al ENUM de estados del requerimiento ([`../me
 
 | Modo | Cuándo | Identidad | Reanudación |
 |---|---|---|---|
-| **Con-REQ** | hay `## Requerimiento activo` en memoria | `project + req_slug` | **relevo cross-dev** (lock); el transcript se publica al central |
-| **Exploratorio** | sin REQ formal (exploración previa) | `session_id` (entrada liviana, sin lock, sin subir al central) | **`--resume` local** del mismo dev (no bloqueado; el veto cross-machine es solo para `--resume` en otra máquina) |
+| **Con-REQ** | hay `## Requerimiento activo` en memoria | `project + req_slug` | **relevo cross-dev** (lock atómico); estado + transcript al central |
+| **Exploratorio** | sin REQ formal (exploración previa) | `session_id` (entrada liviana, sin lock) | **`--resume` local** del mismo dev. Con entorno compartido también se publica al catálogo (visibilidad/búsqueda); **no** relevable cross-dev (`claude_session_id` solo vale en su máquina origen) |
 
-El modo exploratorio registra automáticamente la sesión (aunque el dev no anuncie pausa) con un resumen y el `transcript_path` local, para que `/logbook` la localice entre muchas y entregue el comando `--resume`. Al **formalizarse en REQ**, la sesión exploratoria se vincula al `work` y entra al relevo cross-dev. Que **otro** dev retome exige formalizar el REQ antes.
+El modo exploratorio registra automáticamente la sesión (aunque el dev no anuncie pausa) con un resumen y el `transcript_path` local, para que `/logbook` la localice entre muchas y entregue el comando `--resume`. **Con el entorno compartido** la sesión exploratoria también se publica al catálogo —para visibilidad y búsqueda del corpus—, pero **no es relevable cross-dev**: que **otro** dev la retome exige formalizarla en REQ antes. Al **formalizarse en REQ**, se vincula a un `work` `req` y entra al relevo cross-dev con lock.
+
+## Entorno compartido (disparador) y opt-out
+
+El **disparador** de "entorno compartido" es **determinista**: el trabajo se publica al catálogo central cuando hay `NEB_LOGBOOK_ENDPOINT` configurado **y** el proyecto no declaró opt-out. **Opt-out por proyecto**: marcador `<!-- neb-logbook: local -->` en el `CLAUDE.md` del proyecto (el hook lo lee antes de publicar; análogo a `<!-- neb-profile: none -->`). Sin endpoint o con marcador → la bitácora queda **local-only**. *(Opt-out por perfil: requerimiento futuro.)* Publicar el `work` a un entorno compartido **habilita la Entrega temprana del registro** (ver "Relación con otros artefactos" abajo).
 
 ## Entrada de la bitácora
 
@@ -56,7 +60,7 @@ El esquema concreto (SQLite local / central) vive en [`../hooks/logbook-schema.s
 |---|---|
 | Sesión en curso | El hook publica/actualiza la entrada en cada `Stop`/`SessionEnd`/`PreCompact` (ver [`../tooling/logbook.md`](../tooling/logbook.md)) |
 | Relevo | Otro dev `tomar`/`solicitar` el mando; retoma en sesión nueva (ver protocolo en `execution.md`) |
-| Cierre del REQ | El `work` se marca `archived` — **se preserva, no se borra** (corpus de auditoría futuro). El borrado real es purga intencional |
+| Cierre del REQ | El `work` se marca `archived` (`/logbook archivar <id>`) — **se preserva, no se borra** (corpus de auditoría). El borrado real es purga intencional (`server/purge.py`) |
 
 ## Relación con otros artefactos (frontera, no duplicar)
 

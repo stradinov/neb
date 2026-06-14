@@ -34,6 +34,7 @@ Un proyecto puede declarar, mediante un **marcador en su `CLAUDE.md`**, que no q
 |---|---|---|
 | `<!-- neb-profile: none -->` | El proyecto **usa Neb** pero no tiene profile: trabajo genérico. Claude no vuelve a sugerir detectar/crear profile en ese dir. | Esta detección (pasos 2 y 4). |
 | `<!-- neb: skip -->` | El proyecto **no usa Neb**: el hook `SessionStart` detecta el marcador en el `CLAUDE.md` del proyecto activo y **no inyecta el arranque**. Para proyectos ajenos a Neb donde la metodología no debe actuar. | El hook `SessionStart` (`bootstrap/neb-bootstrap-context.py`, vía `CLAUDE_PROJECT_DIR`) — activo desde v2.0.0 |
+| `<!-- neb-logbook: local -->` | El proyecto usa Neb y la bitácora, pero **no publica al catálogo central** (queda local-only) aunque haya `NEB_LOGBOOK_ENDPOINT` — opt-out de compartición **por proyecto**. *(Opt-out por perfil: futuro.)* | El hook `logbook-sync` (`hooks/lib/logbook.py`); ver [`../workflow/logbook.md`](../workflow/logbook.md) §"Entorno compartido" |
 
 Reglas del marcador:
 

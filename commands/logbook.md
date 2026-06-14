@@ -7,7 +7,7 @@ description: Bitácora de relevo — listar, retomar o relevar trabajos a medias
 
 El usuario invocó `/logbook` (opcionalmente con un subcomando). Operá la bitácora de relevo siguiendo el skill `logbook` (definición completa en `skills/logbook/SKILL.md` — no la dupliques acá).
 
-Subcomandos: sin args o `list` (listar trabajos a medias) · `retomar <id>` · `tomar <id>` · `liberar <id>` · `liberar-forzado <id>` · `solicitar <id>` · `search <texto>`.
+Subcomandos: sin args o `list` (listar trabajos a medias) · `retomar <id>` · `tomar <id>` · `liberar <id>` · `liberar-forzado <id>` · `solicitar <id>` · `renombrar <id> <nuevo-slug>` · `archivar <id>` · `search <texto>`.
 
 Resolvé el módulo y operá vía (fallback para miembros sin `NEB_HOME`):
 

@@ -38,7 +38,8 @@ CREATE TABLE IF NOT EXISTS work (
   -- outbox hacia el central (solo local; el central es la autoridad y no los lleva)
   dirty           INTEGER NOT NULL DEFAULT 1,         -- pendiente de push
   synced_at       TEXT,
-  remote_id       INTEGER
+  remote_id       INTEGER,
+  conflict        INTEGER NOT NULL DEFAULT 0          -- 1 = publish rechazado por el central (409); reconciliar (claim/forzar) antes de re-publicar. Corta el reintento ciego del outbox
 );
 
 -- Identidad por modo: índices únicos parciales (un solo work por REQ / por sesión exploratoria).
@@ -55,7 +56,7 @@ CREATE TABLE IF NOT EXISTS event (
   work_id   INTEGER NOT NULL REFERENCES work(id) ON DELETE CASCADE,
   ts        TEXT NOT NULL,
   dev       TEXT NOT NULL,
-  action    TEXT NOT NULL,                            -- REQ A: publish|claim|release|forced_release · REQ B/futuro: request_takeover|resume|close|archive
+  action    TEXT NOT NULL,                            -- publish|claim|release|forced_release|request_takeover|rename|archive (REQ A solo emite publish|claim|release|forced_release en local)
   prev_owner TEXT,                                    -- en forced_release: a quién se le quitó el mando
   machine   TEXT,
   note      TEXT,

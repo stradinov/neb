@@ -4,6 +4,26 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-06-14
+
+### Added
+
+- **Backend central de referencia de la bitácora de relevo (REQ B).** Servidor `server/logbook_server.py` (stdlib `http.server` + PyMySQL) + DDL MariaDB `server/schema.sql` (`work`/`event`/`transcript`; unicidad por modo vía columna generada `identity_key`; `FULLTEXT(text_plain)`; `ROW_FORMAT=COMPRESSED`) + `server/INSTALL.md` + retención manual `server/purge.py` + `server/.env.example` + `server/requirements.txt`. Contrato HTTP con auth `Bearer NEB_LOGBOOK_TOKEN`: `publish`/`claim`/`release`/`request-takeover`/`forced-release`/`rename`/`archive`/`transcript`/`search`/`work`. Habilita el **relevo cross-dev real** (lock atómico cross-máquina + transcript buscable). El despliegue concreto en la infra del adoptante queda fuera del núcleo.
+- **Cliente remoto** en `hooks/lib/logbook.py`: modo `sync` (drena el outbox de works `dirty` —`req` y `exploratory`— + sube el transcript incremental, con parser `text_plain` que excluye `tool_result` y líneas estructurales) disparado detached por el hook; `_project_id` derivado del git remote (`host/owner/repo`); `cli_search`/`cli_request`/`cli_rename` reales contra el central; columna `conflict` (migración idempotente) para reportar el 409 sin loop.
+
+### Changed
+
+> Cambios de **fuerza normativa** declarados (ver `methodology/principles.md` § "Declarar (nunca Patch)"). Minor: no rompen imports.
+
+- **Lock de la bitácora: de informativo a enforcement atómico cross-dev.** Con backend central, el lock se arbitra atómicamente (`UPDATE … WHERE lock_state IN(...)`, veredicto por `rowcount`; nunca read-then-write); `solicitar el mando` y `search` quedan operativos. En local-only el lock sigue informativo (sin cambio).
+- **Modo exploratorio: de local-only a compartido por default.** Con central configurado y sin opt-out, las sesiones exploratorias también se publican al catálogo (visibilidad + búsqueda del corpus; **no** relevables cross-dev — `claude_session_id` solo vale en su máquina origen). Antes el exploratorio no subía al central (`workflow/logbook.md` § Dos modos).
+- **Disparador del "entorno compartido": de juicio de Claude a determinista.** Con `NEB_LOGBOOK_ENDPOINT` configurado y sin **opt-out por proyecto** (marcador `<!-- neb-logbook: local -->` en el `CLAUDE.md`), el trabajo se publica al central por default. Reemplaza el disparador por juicio de Claude que 3.6.0 dejó como temporal.
+
+### Notes
+
+- **Acota la promesa de 3.6.0**: el disparador determinista per-profile/proyecto que 3.6.0 dejó asignado a REQ B se entrega aquí **por presencia de endpoint + opt-out por proyecto**; el **opt-out por perfil** queda diferido a un REQ posterior (el hook no conoce el perfil de forma trivial).
+- **Privacidad**: montar el central comparte todo el trabajo por default (incl. exploratorias); el opt-out por proyecto es el escape. Un dev que trabaja solo no necesita el central. Ver `server/INSTALL.md`.
+
 ## [3.6.1] - 2026-06-14
 
 ### Changed
