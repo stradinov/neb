@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# usage-tracker.sh — Stop hook: acumula tokens/costo del turno al draft del REQ activo.
+# usage-tracker.sh — Stop hook: acumula tokens/costo del turno al draft del change MD (registro) del REQ activo.
 # Ver hooks/lib/usage-tracker.py para la lógica completa.
 # Filosofía: defensivo — exit 0 siempre; errores a stderr.
 set -euo pipefail

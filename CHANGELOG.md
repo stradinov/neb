@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [3.6.1] - 2026-06-14
+
+### Changed
+
+- Homologación de redacción (residuos del modelo proyección-no-identidad): `workflow/memory.md` ("draft del changes MD" → "draft del change MD (el registro del requerimiento)") y el comentario de `hooks/usage-tracker.sh` ("draft del REQ activo" → "draft del change MD (registro) del REQ activo"). Sin cambio de fuerza normativa.
+
 ## [3.6.0] - 2026-06-14
 
 ### Changed

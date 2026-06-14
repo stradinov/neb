@@ -22,7 +22,7 @@ Handoff entre sesiones cuando el requerimiento está en validación esperando en
 
 ## Sección "Requerimiento activo"
 
-Obligatoria mientras hay un requerimiento en curso. Es la fuente de verdad para el hook PreCompact que actualiza el draft del changes MD.
+Obligatoria mientras hay un requerimiento en curso. Es la fuente de verdad para el hook PreCompact que actualiza el draft del change MD (el registro del requerimiento).
 
 ```markdown
 ## Requerimiento activo
