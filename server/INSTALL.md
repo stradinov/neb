@@ -8,12 +8,12 @@ El servidor es **agnóstico al despliegue**: escucha HTTP en `host:puerto` y asu
 que termina TLS. Estos pasos son el contrato mínimo; el despliegue concreto (vhost, systemd de tu
 infra) lo ajusta cada adoptante.
 
-> **Privacidad — leer antes de montar.** Con el central configurado en una máquina, **todo trabajo
-> se publica por default** al catálogo compartido del equipo: works con-REQ **y sesiones
-> exploratorias** (su transcript, sin `tool_result`, queda buscable por el equipo). El escape es el
-> **opt-out por proyecto**: un marcador `<!-- neb-logbook: local -->` en el `CLAUDE.md` del proyecto
-> evita que ese proyecto se publique. (El opt-out por perfil es un follow-up.) Un dev que trabaja
-> solo **no necesita montar el central**.
+> **Privacidad — leer antes de montar.** El central es **opt-in por proyecto**: con `NEB_LOGBOOK_ENDPOINT`
+> configurado, un proyecto publica su trabajo al catálogo compartido del equipo **solo si** su `CLAUDE.md`
+> trae el marcador `<!-- neb-logbook: central -->` (works con-REQ **y sesiones exploratorias**: su
+> transcript, sin `tool_result`, queda buscable por el equipo). Sin el marcador la bitácora queda
+> **local-only** (el default; la bitácora local ya cubre el relevo del propio dev). (El opt-in por perfil
+> es un follow-up.) Un dev que trabaja solo **no necesita montar el central**.
 
 ## Requisitos
 

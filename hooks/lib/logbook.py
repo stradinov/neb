@@ -4,8 +4,9 @@ logbook.py — cliente de la bitácora de relevo (Neb).
 
 Tres modos (dispatch en __main__):
   • captura (sin args reconocidos)  — lo dispara el hook `logbook-sync` en Stop/SessionEnd/PreCompact:
-      registra estado + transcript_path del work activo en SQLite local; si el entorno es
-      compartido (NEB_LOGBOOK_ENDPOINT y sin opt-out por proyecto), lanza el modo `sync` detached.
+      registra estado + transcript_path del work activo en SQLite local; si el proyecto activa el
+      central (NEB_LOGBOOK_ENDPOINT y opt-in por proyecto vía marcador `<!-- neb-logbook: central -->`),
+      lanza el modo `sync` detached.
   • sync <guide_dir> <home_dir>     — drena el outbox (works dirty) al central + sube el transcript
       incremental. Best-effort, defensivo (REQ B).
   • CLI (list/show/claim/...)       — lo invoca el comando/skill `/logbook`. Con NEB_LOGBOOK_ENDPOINT
@@ -324,19 +325,22 @@ def _central():
 
 
 def _is_shared(cwd):
-    """Disparador determinista: compartido sii hay endpoint Y sin opt-out por proyecto.
-    Opt-out: marcador `<!-- neb-logbook: local -->` en el CLAUDE.md del cwd. (Opt-out por perfil: follow-up.)"""
+    """Disparador determinista: el central (compartido) es OPT-IN por proyecto.
+    Compartido sii hay endpoint Y el CLAUDE.md del cwd trae el marcador `<!-- neb-logbook: central -->`.
+    Sin endpoint o sin marcador → local-only (la bitácora local de REQ A es el default).
+    El default es local porque la bitácora local ya cubre el relevo del propio dev; el central
+    se reserva a los proyectos que deliberadamente lo comparten con el equipo."""
     if not os.environ.get("NEB_LOGBOOK_ENDPOINT"):
         return False
     claude_md = os.path.join(cwd, "CLAUDE.md")
     try:
         if os.path.isfile(claude_md):
             txt = open(claude_md, encoding="utf-8", errors="replace").read()
-            if re.search(r"<!--\s*neb-logbook:\s*local\s*-->", txt):
-                return False
+            if re.search(r"<!--\s*neb-logbook:\s*central\s*-->", txt):
+                return True
     except OSError:
         pass
-    return True
+    return False
 
 
 def _maybe_spawn_sync(cwd, guide_dir, home_dir):

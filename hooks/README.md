@@ -66,7 +66,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 ### logbook-sync.{sh,ps1}
 
-`Stop` + `SessionEnd` + `PreCompact` — publica/actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo** (SQLite local). Si el entorno es compartido (`NEB_LOGBOOK_ENDPOINT` y sin opt-out por proyecto), tras la captura lanza un **sync detached** que drena el outbox + sube el transcript al backend central. Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
+`Stop` + `SessionEnd` + `PreCompact` — publica/actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo** (SQLite local). Si el proyecto activa el central (`NEB_LOGBOOK_ENDPOINT` y el marcador opt-in `<!-- neb-logbook: central -->` en su `CLAUDE.md`), tras la captura lanza un **sync detached** que drena el outbox + sube el transcript al backend central. Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
 
 - **Tipo**: `command`. Dos scripts hermanos: `.sh` (Linux/Mac, requiere `jq`) + `.ps1` (Windows).
 - **Requiere**: Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib); `NEB_HOME`.
