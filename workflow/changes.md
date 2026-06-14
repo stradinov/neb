@@ -1,8 +1,8 @@
-# Changes (requerimientos por proyecto)
+# Changes (registros de requerimientos por proyecto)
 
-Cada proyecto mantiene `changes/` (versionado cuando el proyecto usa control de versiones). Trazabilidad histórica de los requerimientos.
+Cada proyecto mantiene `changes/` (versionado cuando el proyecto usa control de versiones): la carpeta guarda los registros de sus requerimientos (un change MD por REQ). Trazabilidad histórica de los requerimientos a través de sus registros.
 
-El modelo completo de trazabilidad (plan → change MD → commits, y el caso cross-repo) vive en [traceability.md](traceability.md); este archivo cubre el ciclo de vida del change MD.
+El modelo completo de trazabilidad (plan → change MD → commits, y el caso cross-repo) vive en [traceability.md](traceability.md); este archivo cubre el ciclo de vida del change MD como registro del REQ.
 
 ## Path
 
@@ -10,8 +10,8 @@ El modelo completo de trazabilidad (plan → change MD → commits, y el caso cr
 <proyecto>/changes/<YYYY-MM-DD>-<nombre>.md
 ```
 
-- Una carpeta `changes/` por proyecto, en la raíz.
-- Un MD por requerimiento.
+- Una carpeta `changes/` por proyecto, en la raíz: contiene los registros de sus requerimientos.
+- Un MD por requerimiento (cardinalidad 1↔1: cada REQ se registra en un único change MD; incluso cross-repo, un solo MD en el repo central — ver [traceability.md](traceability.md)).
 - Prefijo `YYYY-MM-DD` para orden cronológico sin renombrados.
 - `<nombre>` en kebab-case descriptivo.
 - Se confirma con el entregable (en git: commit al repo).
@@ -40,7 +40,7 @@ Con `autoCompactEnabled: true`, un hook PreCompact actualiza el draft antes de c
 
 ## Incident MD
 
-Variante del change MD para incidentes detectados post-entrega final. Comparte carpeta y naturaleza (artefacto versionado en `changes/`). El protocolo reactivo (severidad P1/P2, respuesta, postmortem) vive en [`../general/incidents.md`](../general/incidents.md); aquí el ciclo de vida del artefacto.
+Variante del change MD para incidentes detectados post-entrega final: registro reactivo del REQ correctivo, con su propia cardinalidad 1↔1. Comparte carpeta y naturaleza (artefacto versionado en `changes/`). El protocolo reactivo (severidad P1/P2, respuesta, postmortem) vive en [`../general/incidents.md`](../general/incidents.md); aquí el ciclo de vida del artefacto.
 
 - **Path**: `<proyecto>/changes/<YYYY-MM-DD>-incident-<slug>.md`, desde [`templates/incident.md.template`](../templates/incident.md.template).
 - **Apertura**: el dev lo crea y lo notifica explícitamente a Claude.

@@ -4,14 +4,14 @@ Cómo se enlazan los artefactos del workflow para rastrear un requerimiento de e
 
 ## Grafo de artefactos
 
-La cadena nominal de un requerimiento:
+El **requerimiento (REQ)** es la unidad de trabajo: un cambio lógico coherente con un objetivo, no un documento. El **Change MD** es su **registro** — la proyección documental versionada del REQ, en relación 1↔1. La cadena nominal de artefactos que registran un REQ:
 
 ```
 Plan aprobado  →  Change MD  →  Confirmación / Entrega
-   (opcional)      (eje)          (entregable; en git: commits)
+   (opcional)   (registro; eje doc.)   (entregable; en git: commits)
 ```
 
-El **Change MD** es el eje: todo enlace pasa por él. Cada artefacto se une al siguiente por un campo concreto:
+El **Change MD** es el **eje documental**: registra al REQ y todo enlace entre artefactos pasa por él. El REQ es la unidad; el Change MD es lo que la registra. Cada artefacto se une al siguiente por un campo concreto:
 
 | Desde | Campo de enlace | Hacia | Doc canónico |
 |---|---|---|---|
@@ -34,7 +34,7 @@ La estructura de la sección Trazabilidad del Change MD es canónica en [`../tem
 **Direccionalidad.** La trazabilidad plan↔Change MD es **unidireccional por diseño**:
 
 - `Change MD → plan` **soportado**: campo `**Plan aprobado:**` (lo deja el hook en plan mode, o Claude en la vía conversacional).
-- `plan → Change MD` **no soportado por diseño**: el artefacto del plan no apunta de vuelta. El Change MD es el **eje** (todo enlace pasa por él): se parte del Change MD para llegar al plan, no al revés. No es deuda — el hook persiste el plan antes de que el Change MD exista, así que no podría inyectar el enlace inverso, y el slug del plan y el `<nombre>` del Change MD pueden diferir (no se adoptó naming coordinado).
+- `plan → Change MD` **no soportado por diseño**: el artefacto del plan no apunta de vuelta. El Change MD es el **eje documental** (todo enlace pasa por él): se parte del Change MD para llegar al plan, no al revés. No es deuda — el hook persiste el plan antes de que el Change MD exista, así que no podría inyectar el enlace inverso, y el slug del plan y el `<nombre>` del Change MD pueden diferir (no se adoptó naming coordinado).
 
 Por eso la **cadena mínima trazable es `Change MD → commits`**: el Change MD es el único eslabón (casi) siempre presente. "Plan aprobado" como *momento* (cuando nace el draft del Change MD, al entrar a Fase 4) es distinto del *artefacto* plan aprobado: el momento siempre ocurre; el artefacto existe en media/alta y se navega desde el Change MD.
 
@@ -53,20 +53,20 @@ Un Change MD en `<proyecto>/changes/<YYYY-MM-DD>-<nombre>.md`; el campo `**Commi
 
 ## Multi-proyecto (cross-repo)
 
-Cuando un requerimiento toca un repo central y/o varios proyectos sincronizados, **el Change MD es único y vive en el repo central** — no se duplica en cada proyecto. Su sección Trazabilidad lista los hashes **por repo**, porque cada proyecto recibe su propio commit (la réplica es un cherry-pick rehecho → hash distinto por repo, no el mismo).
+Cuando un requerimiento toca un repo central y/o varios proyectos sincronizados, sigue siendo **un solo REQ con un único Change MD que lo registra, en el repo central** — el registro no se duplica en cada proyecto. Su sección Trazabilidad lista los hashes **por repo**, porque cada proyecto recibe su propio commit (la réplica es un cherry-pick rehecho → hash distinto por repo, no el mismo).
 
 ```
 - **Commits:**
   - proyecto-a `79c6e417c` · proyecto-b `09ef92bd` · proyecto-c `315fa000` · …
 ```
 
-Así, `commit → REQ` desde cualquier proyecto se resuelve por el mensaje del commit (que nombra el REQ) y converge al único Change MD del repo central. No se crea un MD por proyecto: un requerimiento es un Change MD.
+Así, `commit → REQ` desde cualquier proyecto se resuelve por el mensaje del commit (que nombra el REQ) y converge al único Change MD del repo central. No se crea un MD por proyecto: a cada requerimiento le corresponde un único Change MD que lo registra (1↔1), también cross-repo.
 
 > La regla operativa de "dónde abrir el Change MD cross-repo" vive en el `CLAUDE.md` del repo central. Este documento es el modelo de trazabilidad que esa regla concreta.
 
 ## Trazabilidad por profile
 
-La cadena hasta el commit aplica a profiles versionados con git. Para profiles cuyo entregable no es código (ej. `self-applied`, donde el entregable son archivos markdown de la metodología), el eslabón final no es un commit sino la **Entrega final** del profile en su vocabulario concreto (ver el glosario de [`../methodology/vocabulary.md`](../methodology/vocabulary.md) y `profiles/<profile>/index.md`). El Change MD sigue siendo el eje; cambia solo qué representa el último eslabón.
+La cadena hasta el commit aplica a profiles versionados con git. Para profiles cuyo entregable no es código (ej. `self-applied`, donde el entregable son archivos markdown de la metodología), el eslabón final no es un commit sino la **Entrega final** del profile en su vocabulario concreto (ver el glosario de [`../methodology/vocabulary.md`](../methodology/vocabulary.md) y `profiles/<profile>/index.md`). El Change MD sigue siendo el eje documental; cambia solo qué representa el último eslabón.
 
 ## Casos especiales
 

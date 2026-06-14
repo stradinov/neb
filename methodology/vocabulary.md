@@ -17,9 +17,86 @@ La metodología usa vocabulario neutro para cubrir entregables de distinta natur
 | Dependientes | Referencias al dato, función o concepto afectado (escritura y lectura/display) | Callers de un método (software) · Secciones que citan un supuesto (análisis) |
 | Flujos críticos | Flujos con riesgo de regresión medio/alto que se deben re-validar | Tests de auth/pagos (software) · Casos de uso `[crítico]` del documento (análisis) |
 
+## Requerimiento (REQ)
+
+El **requerimiento (REQ)** es la **unidad abstracta de trabajo** de la metodología: un cambio lógico coherente con un objetivo. No es ningún documento. El estado, la fase y la complejidad son **propiedades del REQ**; el change MD las **registra/refleja**, no las define (modelo proyección-no-identidad, ya en uso en [`../workflow/logbook.md`](../workflow/logbook.md) §"Entrada de la bitácora" y en [`../docs/how-it-works.md`](../docs/how-it-works.md) §"Ciclo de estados").
+
+### Qué lo distingue de un no-REQ
+
+Un prompt escala a REQ solo al cruzar el **trigger de formalización** (`/plan`, "abre requerimiento"/"formaliza esto", o instrucción concreta de implementación o entrega). Sin trigger, una observación, pregunta de diseño o propuesta exploratoria **no es un REQ**: Claude responde en prosa. Canónico en [`../process/phase-transitions.md`](../process/phase-transitions.md) §"Trigger de formalización".
+
+### Identidad y nombre
+
+Identidad estable cross-máquina: `project + req_slug` (ver [`../workflow/logbook.md`](../workflow/logbook.md) §"Unidad y backend"). En **Fase 1 no hay nombre formal** — solo un tema conversacional; el nombre nace **al aprobar el plan**, cuando se crea el registro. Tres formas del nombre **pueden diferir** (no se adoptó naming coordinado — ver [`../workflow/traceability.md`](../workflow/traceability.md) §"persistencia y direccionalidad"):
+
+| Forma | Dónde | Notas |
+|---|---|---|
+| `<slug>` del plan aprobado | `~/.claude/approved-plans/<ts>-<proyecto>-<slug>.md` | existe en media/alta |
+| `<nombre>` del change MD | `<proyecto>/changes/<YYYY-MM-DD>-<nombre>.md` | siempre presente |
+| `req_slug` de la bitácora / `[nombre-req]` en pendings | bitácora + `pendings.md` | identidad de relevo / seguimiento |
+
+### Relación 1↔1 con su registro
+
+A cada REQ **le corresponde** un único **registro** (su change MD): proyección documental versionada, eje **documental** de la trazabilidad (todo enlace entre artefactos pasa por él — ver [`../workflow/traceability.md`](../workflow/traceability.md)). El change MD **registra** el REQ; no **es** el REQ. La **cardinalidad 1↔1 se preserva incluso cross-repo**: un único change MD en el repo central, con commits listados por repo ([`../workflow/traceability.md`](../workflow/traceability.md) §"Multi-proyecto"). **Excepción**: `changes_old/` documenta retrospectivamente cambios lógicos reconstruidos del historial git, fuera del flujo normal (no es excepción a la 1↔1, es trazabilidad hacia atrás — ver [`../workflow/changes.md`](../workflow/changes.md) y [`../workflow/traceability.md`](../workflow/traceability.md) §"Casos especiales").
+
+### Propiedades del REQ (punteros canónicos)
+
+| Propiedad | Canónico |
+|---|---|
+| Estados (`En progreso`…`Cerrado`) + sufijo `Bloqueado` | [§ Estados del requerimiento](#estados-del-requerimiento) (abajo) |
+| Fases 1–9 (mapa y flujo) | [`../general/index.md`](../general/index.md) |
+| Trigger de formalización (gate de entrada) | [`../process/phase-transitions.md`](../process/phase-transitions.md) |
+| Complejidad estimada / real | [`../process/planning.md`](../process/planning.md) §"Estimación" |
+| Riesgo de regresión (eje ortogonal) | [§ Niveles de riesgo de regresión](#niveles-de-riesgo-de-regresión) (abajo) |
+| Dos ejes: momento nace-MD vs artefacto persiste-plan | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) §"persistencia y direccionalidad" |
+| Cross-repo: un solo change MD (repo central) | [`../workflow/traceability.md`](../workflow/traceability.md) §"Multi-proyecto" |
+| Trazabilidad unidireccional plan→change MD; plan opcional, pruebas obligatorio | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) |
+| Eslabón change MD↔commit (bidireccional) | [`../workflow/traceability.md`](../workflow/traceability.md) §"Eslabón Change MD ↔ confirmación" |
+| Definición de done + cierre atómico (push `.md`-only del change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) §"Cierre del requerimiento" |
+| Validación diferida en uso (self-applied, ≥10 sesiones) | [§ Tipos de validación](#tipos-de-validación), [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) |
+
+### Formas especiales
+
+| Forma | Canónico |
+|---|---|
+| REQ de research (antes de planear) | [`../process/planning.md`](../process/planning.md) §"Sugerencia de research" |
+| REQ derivado (corrige un defecto Fase 9) | [`../process/improvement.md`](../process/improvement.md) |
+| Incidencia-durante-el-trabajo vs sub-requerimiento | [`../process/execution.md`](../process/execution.md) §"Incidencias" |
+| Incident MD (variante reactiva post-entrega) | [`../workflow/changes.md`](../workflow/changes.md) §"Incident MD" |
+
+### Proyecciones / representaciones del REQ
+
+El REQ se proyecta (no se duplica) en varios artefactos; cada uno **deriva** del registro o de la memoria, sin ser una segunda fuente:
+
+| Proyección | Qué refleja | Canónico |
+|---|---|---|
+| Memoria del proyecto `## Requerimiento activo` | estado vivo de la sesión (fuente de verdad local) | [`../workflow/memory.md`](../workflow/memory.md) |
+| Bitácora de relevo (`work` + lock ortogonal + `archived`) | relevo cross-dev; deriva de la memoria | [`../workflow/logbook.md`](../workflow/logbook.md) |
+| `pendings.md` (`[nombre-req]` tag) | seguimiento no bloqueante cross-sesión | [`../workflow/pendings.md`](../workflow/pendings.md) |
+| Métricas del REQ | retroalimentación de la metodología | [`../workflow/metrics.md`](../workflow/metrics.md) |
+| Diagnóstico de defectos | origen del defecto + REQ derivado | [`../process/improvement.md`](../process/improvement.md) §"Diagnóstico de origen" |
+
+## Registro del requerimiento
+
+**Registro del requerimiento** es el término agnóstico para la **subclase documental de [artefacto](#vocabulario-abstracto)** cuyo rol es **documentar *sobre* un REQ** (su proyección versionada). No es el REQ (ver [§ Requerimiento (REQ)](#requerimiento-req)) ni el entregable.
+
+| Forma | Naturaleza | Cardinalidad | Canónico |
+|---|---|---|---|
+| **Change MD** | canónica | 1↔1 con el REQ (incluso cross-repo) | [`../workflow/changes.md`](../workflow/changes.md) |
+| **Incident MD** | variante reactiva (defecto post-entrega final) | propia 1↔1 con su incidente | [`../workflow/changes.md`](../workflow/changes.md) §"Incident MD", [`../general/incidents.md`](../general/incidents.md) |
+
+### Discriminador registro vs entregable: el rol, no la extensión
+
+Lo que separa un registro de un **entregable** (lo producido — ver la fila "Entregable / elaboración" arriba) es el **rol**:
+
+- **Registro**: documenta *sobre* el REQ (contexto, alcance, plan resumido, resultado, métricas, trazabilidad).
+- **Entregable**: es lo que el REQ produce (código, documento, lineamiento).
+
+`.md` **no es rasgo definitorio** del registro — es implementación incidental. En el profile `self-applied` el **entregable también es `.md`** (archivos de la metodología), y aun así se distingue del change MD por su rol. La autonomía de Claude sobre archivos `.md` y el caso de confirmaciones mixtas viven en [`change-control-policy.md`](change-control-policy.md) §"Ownership de archivos `.md`".
+
 ## Estados del requerimiento
 
-ENUM canónico. Cualquier archivo que registre estado usa este vocabulario. El mapa de artefactos por estado y las transiciones especiales (qué fases se saltan) viven en [`../workflow/index.md`](../workflow/index.md) y [`../process/delivery.md`](../process/delivery.md) respectivamente.
+Estado y fase son propiedades del REQ (la unidad abstracta de trabajo); ningún artefacto las define, solo las **registra**. ENUM canónico: cualquier artefacto que registre el estado del REQ usa este vocabulario. El mapa de artefactos por estado y las transiciones especiales (qué fases se saltan) viven en [`../workflow/index.md`](../workflow/index.md) y [`../process/delivery.md`](../process/delivery.md) respectivamente.
 
 | Estado | Significado | Fase |
 |---|---|---|
@@ -30,7 +107,7 @@ ENUM canónico. Cualquier archivo que registre estado usa este vocabulario. El m
 
 **Bloqueado** se anota como sufijo del estado activo: `En progreso (bloqueado por X)`. No es estado paralelo — no inventa transiciones nuevas.
 
-- El draft del change MD existe desde `Plan aprobado` (ver [`../workflow/changes.md`](../workflow/changes.md)); por convención arranca en `En progreso`. No hay estado "Propuesto".
+- El change MD (registro canónico del REQ, relación 1↔1 incluso cross-repo) existe desde `Plan aprobado` (ver [`../workflow/changes.md`](../workflow/changes.md)); por convención registra `En progreso` como estado inicial. No hay estado "Propuesto".
 - Los changes históricos pueden contener vocabulario previo (`Propuesto`, `COMPLETADO`, `Listo para producción`); no se migran. `Listo para producción` es el término anterior de `Listo para aprobación` (renombrado en una versión anterior).
 
 **ENUM de lock de la bitácora de relevo** (`owned` / `released` / `takeover_requested`, definido en [`../workflow/logbook.md`](../workflow/logbook.md) §"Modelo de ownership") es **ortogonal** a este ENUM: gobierna quién tiene el mando de un `work` para relevo entre devs, no el avance del requerimiento. Un `work` archivado al cerrar no altera el estado canónico del REQ.

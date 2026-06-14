@@ -4,6 +4,23 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-06-14
+
+### Added
+
+- **`methodology/vocabulary.md` — secciones "Requerimiento (REQ)" y "Registro del requerimiento"**: definen el REQ como **unidad abstracta de trabajo** (no un documento) y el change MD como su **registro** (proyección documental versionada, relación 1↔1 incluso cross-repo). Modelo **proyección-no-identidad**, consolidando por referencia ~20 propiedades del REQ (estados, complejidad, riesgo, cross-repo, definición de done, validación diferida, formas especiales, proyecciones en memoria/bitácora/pendings, métricas). "Registro del requerimiento" = término agnóstico para la subclase documental (change MD canónico + incident MD variante), discriminada del entregable por el **rol, no la extensión `.md`**.
+
+### Changed
+
+- **Reconciliación identidad→proyección en el core** — resuelve la inconsistencia interna (`traceability.md` afirmaba "un requerimiento es un Change MD" mientras `logbook.md`/`how-it-works.md` ya usaban proyección-no-identidad). Cardinalidad 1↔1 preservada en todos los casos:
+  - `workflow/traceability.md`: "un requerimiento es un Change MD" → "a un requerimiento le corresponde un único Change MD que lo registra (1↔1)"; "el eje" → "eje documental"; grafo nominal y caso cross-repo en lenguaje de registro.
+  - `workflow/changes.md`: título → "registros de requerimientos por proyecto"; "un MD por requerimiento" reexpresado como cardinalidad de registro; incident MD = variante con su propia 1↔1.
+  - `workflow/index.md`: fila "Requerimiento" → "Change MD (registro del requerimiento)".
+  - `process/phase-transitions.md`: la fase es propiedad del REQ; el change MD la **registra**, no la define.
+  - `methodology/done-criteria.md`: las condiciones se verifican sobre el registro (change MD) del REQ.
+  - `methodology/vocabulary.md` §Estados: estado y fase son propiedades del REQ que el artefacto registra.
+  - `general/communication.md`: "draft del requerimiento" → "draft del change MD (registro del requerimiento)".
+
 ## [3.4.0] - 2026-06-13
 
 ### Added

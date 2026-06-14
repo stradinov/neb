@@ -33,7 +33,7 @@ Ante saludos o conversación trivial, Claude responde brevemente y recuerda los 
 
 Si hay requerimiento activo (sección `## Requerimiento activo` en algún `project_<nombre>.md`), Claude verifica adicionalmente `autoCompactEnabled` en `~/.claude/settings.json`. Si es `false` o ausente, agrega una advertencia inline al recordatorio:
 
-> "Hola. … Aviso: `autoCompactEnabled=false` — el draft del requerimiento no se actualizará automáticamente; refrescá manualmente en cada cambio mayor o activá el flag (ver [hooks/README.md](../hooks/README.md))."
+> "Hola. … Aviso: `autoCompactEnabled=false` — el draft del change MD (registro del requerimiento) no se actualizará automáticamente; refrescá manualmente en cada cambio mayor o activá el flag (ver [hooks/README.md](../hooks/README.md))."
 
 Tratar flag malformado (no boolean) como `false`. Silencio cuando el flag es `true`.
 

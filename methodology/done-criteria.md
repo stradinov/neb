@@ -1,12 +1,12 @@
 # Definición de done
 
-Criterios que determinan cuándo un requerimiento está terminado. Son **condiciones** (qué debe cumplirse), no pasos — el gate que las verifica vive en [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento".
+Criterios que determinan cuándo un **requerimiento** está terminado. Lo que se termina es el requerimiento (la unidad de trabajo); las condiciones se verifican sobre su **registro** —el change MD que lo registra (relación 1↔1, también cross-repo: un único MD en el repo central; ver [`../workflow/traceability.md`](../workflow/traceability.md))—. Son **condiciones** (qué debe cumplirse), no pasos — el gate que las verifica vive en [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento".
 
 > **Punto de customización**: un adoptante puede estrechar o ampliar estos criterios para su contexto (p. ej. exigir cobertura de tests, aprobación de QA, o checklist de accesibilidad) declarándolo en su `profiles/<profile>/` o `personal/<usuario>.md`. No puede relajar los obligatorios del baseline.
 
 ## Obligatorios (bloquean el cierre)
 
-- [ ] **Plan de pruebas completado** — según complejidad:
+- [ ] **Plan de pruebas completado** — según complejidad, verificado en el registro del requerimiento (change MD):
   - **Media/alta**: tabla `### Resultado` del [`change.md.template`](../templates/change.md.template) sin ❌. Cualquier ❌ requiere fix + revalidar.
   - **Baja**: checklist `- [x]` del Plan de pruebas suficiente.
   - **Validación implícita** (sin artefactos, ver [`../process/delivery.md`](../process/delivery.md) § Validación): se omite la tabla; cierre por confirmación inline del dev.

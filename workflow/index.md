@@ -5,7 +5,7 @@ Lineamientos concretos: qué archivos genera la metodología, dónde viven, cóm
 ## Documentos
 
 1. [Approved plans](approved-plans.md) — MD por plan aprobado (`~/.claude/approved-plans/`, no versionado).
-2. [Changes](changes.md) — MD por requerimiento (`<proyecto>/changes/`, versionado cuando el proyecto usa control de versiones).
+2. [Changes](changes.md) — un change MD por requerimiento, su registro versionado (`<proyecto>/changes/`, versionado cuando el proyecto usa control de versiones).
 3. [Memory](memory.md) — `project_<nombre>.md` en memoria de Claude.
 4. [Metrics](metrics.md) — métricas por requerimiento + handoff.
 5. [Pendings](pendings.md) — `pendings.md` global del dev.
@@ -14,10 +14,10 @@ Lineamientos concretos: qué archivos genera la metodología, dónde viven, cóm
 
 ## Mapa rápido
 
-| Artefacto | Path | Versionado | Vida |
+| Artefacto (registro u otro) | Path | Versionado | Vida |
 |---|---|---|---|
 | Plan aprobado | `~/.claude/approved-plans/<ts>-<proyecto>-<slug>.md` | No | Histórico, cross-proyecto |
-| Requerimiento | `<proyecto>/changes/<YYYY-MM-DD>-<nombre>.md` | Sí | Trazabilidad del proyecto |
+| Change MD (registro del requerimiento) | `<proyecto>/changes/<YYYY-MM-DD>-<nombre>.md` | Sí | Trazabilidad del proyecto |
 | Memoria del proyecto | `~/.claude/projects/.../memory/project_<nombre>.md` | No | Contexto activo (incluye "Pendiente de entrega") |
 | MEMORY.md (índice) | `~/.claude/projects/.../memory/MEMORY.md` | No | Index de memorias |
 | Pendings del dev | `~/.claude/pendings.md` | No | Seguimiento cross-sesión |

@@ -21,7 +21,7 @@ Con un trigger formal de implementación o entrega, Claude entra a **Propuesta**
 Fases del requerimiento: **1** Clarificación · **2** Estimación · **3** Propuesta · **4** Implementación · **5** Validación · **6** Control de cambios · **7** Producción · **8** Documentación · **9** Retroalimentación.
 
 - Los archivos de fase (`process/planning|execution|delivery|documentation|improvement.md`) se leen **al entrar a la fase** — este arranque trae el enrutamiento, no el detalle de cada fase.
-- La fase actual se determina del **Estado del change MD** del REQ activo y del último gate cruzado; ante duda, preguntar antes de asumir fase.
+- La fase es propiedad del **REQ activo**: se lee del **Estado registrado en su change MD** (que la refleja, no la define) y del último gate cruzado; ante duda, preguntar antes de asumir fase.
 
 ## Gates de cola (always-on)
 
