@@ -27,21 +27,13 @@ import subprocess
 import sys
 from datetime import datetime, timezone
 
-
-def posix_to_win(path):
-    """Ruta POSIX de Git Bash (/c/Users/foo) a Windows. No-op si ya es Windows o en Linux/Mac."""
-    if sys.platform == "win32" and path and re.match(r"^/[a-zA-Z]/", path):
-        return f"{path[1].upper()}:\\{path[2:].replace('/', '\\')}"
-    return path
-
-
-def encode_cwd(cwd):
-    """CWD → formato de directorio de proyecto Claude: ':' → '-', luego '/' y '\\' → '-'."""
-    return cwd.replace(":", "-").replace("/", "-").replace("\\", "-")
-
-
-def now_iso():
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+# Infra compartida de la DB (resolver dual-mode + conexión net-new + helpers puros movidos).
+# El resolver dual-mode vive SOLO en _db_shared; las 3 sedes de db_path de este módulo lo importan.
+from _db_shared import (
+    resolve_db_path, _connect, _migrate, begin_immediate, with_write_tx,
+    now_iso, posix_to_win, encode_cwd,
+    _whoami, _hostname, _git, _git_info, _project_id, _normalize_remote, _basename,
+)
 
 
 # =========================================================================== captura
@@ -65,7 +57,8 @@ def main():
     jsonl_path   = transcript_arg or os.path.join(projects_dir, f"{session_id}.jsonl")
     memory_dir   = os.path.join(projects_dir, "memory")
     schema_path  = os.path.join(guide_dir, "hooks", "logbook-schema.sql")
-    db_path      = os.path.join(home_dir, ".claude", "neb-logbook.db")
+#    db_path      = os.path.join(home_dir, ".claude", "neb-logbook.db")
+    db_path      = resolve_db_path(home_dir)
 
     owner   = _whoami()
     machine = _hostname()
@@ -101,31 +94,8 @@ def main():
 
 
 # --------------------------------------------------------------------------- DB
-
-def _connect(db_path, schema_path):
-    try:
-        con = sqlite3.connect(db_path)
-    except sqlite3.Error as e:
-        print(f"[logbook] ERROR abriendo {db_path}: {e}", file=sys.stderr)
-        return None
-    try:
-        if os.path.isfile(schema_path):
-            con.executescript(open(schema_path, encoding="utf-8").read())
-        _migrate(con)
-    except (OSError, sqlite3.Error) as e:
-        print(f"[logbook] ERROR aplicando schema: {e}", file=sys.stderr)
-        con.close()
-        return None
-    return con
-
-
-def _migrate(con):
-    """Migraciones idempotentes para DBs de REQ A ya existentes (CREATE TABLE IF NOT EXISTS no altera)."""
-    cols = [r[1] for r in con.execute("PRAGMA table_info(work)").fetchall()]
-    if cols and "conflict" not in cols:
-        con.execute("ALTER TABLE work ADD COLUMN conflict INTEGER NOT NULL DEFAULT 0")
-        con.commit()
-
+# _connect / _migrate se movieron a _db_shared.py (importados arriba); aquí solo viven
+# los upserts/eventos específicos del logbook que usan esa conexión.
 
 def _upsert_req(con, project, req_slug, owner, machine, state, branch, head,
                 repo_path, change_md, payload, session_id, transcript_path):
@@ -252,66 +222,8 @@ def _first_user_prompt(jsonl_path, limit=120):
 
 
 # -------------------------------------------------------------------------- util
-
-def _whoami():
-    return os.environ.get("USER") or os.environ.get("USERNAME") or "unknown"
-
-
-def _basename(path):
-    return os.path.basename(path.rstrip("/\\")) if path else ""
-
-
-def _hostname():
-    try:
-        import socket
-        return socket.gethostname()
-    except Exception:
-        return os.environ.get("COMPUTERNAME") or os.environ.get("HOSTNAME") or "unknown"
-
-
-def _git(cwd, *args):
-    try:
-        out = subprocess.run(["git", "-C", cwd, *args], capture_output=True, text=True, timeout=2)
-        return out.stdout.strip() if out.returncode == 0 else None
-    except (OSError, subprocess.SubprocessError):
-        return None
-
-
-def _git_info(cwd):
-    """(branch, short_head) del repo en cwd; (None, None) si no es repo o git falla."""
-    return _git(cwd, "rev-parse", "--abbrev-ref", "HEAD"), _git(cwd, "rev-parse", "--short", "HEAD")
-
-
-def _project_id(path):
-    """Identidad estable del proyecto cross-máquina: host/owner/repo del git remote (REQ B).
-    Prefiere `origin`; si no, el primer remote. Sin remote → basename(path)
-    (NO estable cross-máquina → ese work no es relevable cross-dev de forma fiable)."""
-    if not path:
-        return ""
-    url = _git(path, "remote", "get-url", "origin")
-    if not url:
-        remotes = _git(path, "remote")
-        if remotes:
-            first = remotes.splitlines()[0].strip()
-            if first:
-                url = _git(path, "remote", "get-url", first)
-    if not url:
-        return _basename(path)
-    return _normalize_remote(url)
-
-
-def _normalize_remote(url):
-    """git@host:owner/repo(.git) | proto://[user@]host/owner/repo(.git) → host/owner/repo."""
-    u = url.strip()
-    if u.endswith(".git"):
-        u = u[:-4]
-    m = re.match(r"^[^@/]+@([^:/]+):(.+)$", u)          # scp-like ssh
-    if m:
-        return f"{m.group(1)}/{m.group(2)}"
-    m = re.match(r"^[a-zA-Z][a-zA-Z0-9+.\-]*://(?:[^@/]+@)?([^/]+)/(.+)$", u)  # url scheme
-    if m:
-        return f"{m.group(1)}/{m.group(2)}"
-    return u
+# _whoami / _basename / _hostname / _git / _git_info / _project_id / _normalize_remote
+# se movieron a _db_shared.py (importados arriba). Aquí no se redefinen.
 
 
 # =========================================================================== sync (REQ B)
@@ -387,7 +299,8 @@ def sync_main(args):
     endpoint, token = _central()
     if not endpoint or not token:
         return
-    db_path     = os.path.join(home, ".claude", "neb-logbook.db")
+#    db_path     = os.path.join(home, ".claude", "neb-logbook.db")
+    db_path     = resolve_db_path(home)
     schema_path = os.path.join(guide, "hooks", "logbook-schema.sql") if guide else ""
     con = _connect(db_path, schema_path)
     if con is None:
@@ -501,7 +414,8 @@ CLI_CMDS = {"list", "show", "claim", "release", "forced-release", "request", "re
 def _db_for_cli():
     home  = os.path.expanduser("~")
     guide = posix_to_win(os.environ.get("NEB_HOME", "")) or os.path.join(home, ".claude", "neb")
-    return _connect(os.path.join(home, ".claude", "neb-logbook.db"),
+    return _connect(resolve_db_path(home),
+#                    os.path.join(home, ".claude", "neb-logbook.db"),
                     os.path.join(guide, "hooks", "logbook-schema.sql"))
 
 
@@ -570,16 +484,22 @@ def cli_lock(action, args):
         print(f"work {wid} no encontrado"); con.close(); return
     prev_owner = r[0]
     ts = now_iso()
-    if action == "claim":
-        con.execute("UPDATE work SET owner=?, lock_state='owned', locked_at=?, dirty=1 WHERE id=?", (me, ts, wid))
-        _event(con, wid, me, machine, "claim", prev_owner=prev_owner)
-    elif action == "release":
-        con.execute("UPDATE work SET lock_state='released', locked_at=?, dirty=1 WHERE id=?", (ts, wid))
-        _event(con, wid, me, machine, "release")
-    elif action == "forced-release":
-        con.execute("UPDATE work SET owner=?, lock_state='released', takeover_by=NULL, locked_at=?, dirty=1 WHERE id=?", (me, ts, wid))
-        _event(con, wid, me, machine, "forced_release", prev_owner=prev_owner)
-    con.commit(); con.close()
+
+    # Simetría transaccional con pendings: BEGIN IMMEDIATE + COMMIT/ROLLBACK con retry ante
+    # SQLITE_BUSY (antes era DEFERRED + commit ciego, que ante un escritor concurrente fallaba
+    # sin reintento). El SELECT del owner ya ocurrió arriba (lectura); las escrituras van dentro.
+    def _do(c):
+        if action == "claim":
+            c.execute("UPDATE work SET owner=?, lock_state='owned', locked_at=?, dirty=1 WHERE id=?", (me, ts, wid))
+            _event(c, wid, me, machine, "claim", prev_owner=prev_owner)
+        elif action == "release":
+            c.execute("UPDATE work SET lock_state='released', locked_at=?, dirty=1 WHERE id=?", (ts, wid))
+            _event(c, wid, me, machine, "release")
+        elif action == "forced-release":
+            c.execute("UPDATE work SET owner=?, lock_state='released', takeover_by=NULL, locked_at=?, dirty=1 WHERE id=?", (me, ts, wid))
+            _event(c, wid, me, machine, "forced_release", prev_owner=prev_owner)
+
+    with_write_tx(con, _do); con.close()
     print(f"{action} OK (work {wid}). Nota: en backend local el lock es informativo; "
           f"el relevo cross-dev real requiere el backend central (NEB_LOGBOOK_ENDPOINT).")
 
@@ -610,10 +530,14 @@ def cli_rename(args):
     con = _db_for_cli()
     if con is None:
         return
-    con.execute("UPDATE work SET req_slug=?, updated_at=?, dirty=1 WHERE id=? AND mode='req'",
-                (args[1], now_iso(), args[0]))
-    _event(con, args[0], _whoami(), _hostname(), "rename", note=f"-> {args[1]}")
-    con.commit(); con.close()
+
+    # Simetría transaccional con pendings: BEGIN IMMEDIATE + COMMIT/ROLLBACK con retry ante BUSY.
+    def _do(c):
+        c.execute("UPDATE work SET req_slug=?, updated_at=?, dirty=1 WHERE id=? AND mode='req'",
+                  (args[1], now_iso(), args[0]))
+        _event(c, args[0], _whoami(), _hostname(), "rename", note=f"-> {args[1]}")
+
+    with_write_tx(con, _do); con.close()
     print(f"rename OK local (work {args[0]} → {args[1]}).")
 
 
@@ -630,9 +554,25 @@ def cli_archive(args):
     con = _db_for_cli()
     if con is None:
         return
-    con.execute("UPDATE work SET archived_at=?, dirty=1 WHERE id=? AND archived_at IS NULL", (now_iso(), wid))
-    _event(con, wid, me, machine, "archive")
-    con.commit(); con.close()
+
+    # Simetría transaccional con pendings: BEGIN IMMEDIATE + COMMIT/ROLLBACK con retry ante BUSY,
+    # emitido ANTES del primer write (y del SAVEPOINT del gancho). El gancho on_work_archived
+    # usa un SAVEPOINT que EXIGE estar dentro de una transacción; con DEFERRED dependía del
+    # BEGIN implícito del primer UPDATE — ahora el BEGIN IMMEDIATE lo garantiza explícitamente.
+    def _do(c):
+        c.execute("UPDATE work SET archived_at=?, dirty=1 WHERE id=? AND archived_at IS NULL", (now_iso(), wid))
+        _event(c, wid, me, machine, "archive")
+        # --- gancho aditivo: disparador de obsolescencia "al cerrar el work ligado" ---
+        # Best-effort: si pendings no importa o falla, el archive del work NO se rompe (patrón
+        # _maybe_spawn_sync). on_work_archived hace ROLLBACK TO SAVEPOINT propio ante error y
+        # re-lanza; lo tragamos aquí para que el COMMIT del work siga su curso.
+        try:
+            import pendings
+            pendings.on_work_archived(c, wid, me, machine)
+        except Exception as e:
+            print(f"[logbook] aviso: on_work_archived omitido: {e}", file=sys.stderr)
+
+    with_write_tx(con, _do); con.close()
     print(f"archive OK local (work {wid}).")
 
 

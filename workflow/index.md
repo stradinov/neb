@@ -22,7 +22,7 @@ Lineamientos concretos: qué archivos genera la metodología, dónde viven, cóm
 | MEMORY.md (índice) | `~/.claude/projects/.../memory/MEMORY.md` | No | Index de memorias |
 | Pendings del dev | `~/.claude/pendings.md` | No | Seguimiento cross-sesión |
 | Incidente en prod | `<proyecto>/changes/<YYYY-MM-DD>-incident-<slug>.md` | Sí | Trazabilidad del incidente (ver [`general/incidents.md`](../general/incidents.md)) |
-| Bitácora de relevo | `~/.claude/neb-logbook.db` (local) + central opcional | No | Relevo cross-dev de sesiones a medias (ver [logbook.md](logbook.md)) |
+| Bitácora de relevo | `~/.claude/neb.db` (local) + central opcional | No | Relevo cross-dev de sesiones a medias (ver [logbook.md](logbook.md)) |
 
 ## Estados del requerimiento
 

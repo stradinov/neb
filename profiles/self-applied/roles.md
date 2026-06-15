@@ -45,3 +45,7 @@ Revisor transversal (no exclusivo de `self-applied` — aplica a todos los profi
 | 7 Pre-ejecución (gate) | `qa-process-engineer` + `context-completeness-reviewer` | Antes de `git push` — verifica CHANGELOG, versión bumped, imports no rotos, y suposiciones residuales |
 | 9 Improvement | `process-improvement-analyst` | Al detectar defecto no cazado por ningún rol (patch retrospectivo, reporte en uso) |
 | Incidentes P1/P2 | `process-improvement-analyst` | En análisis raíz del proceso tras incidente en producción |
+
+## Agentes funcionales (no revisores de fase)
+
+- **Pendings Recommender** — `subagente` (`agents/pendings-recommender.md`). Invocado por el skill `pendings-review` para el fan-out de soluciones profundas (top-K). No es revisor de fase ni entra en la cobertura por fase; ver `process/roles-invocation.md` § "Agentes funcionales".

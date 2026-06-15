@@ -11,7 +11,7 @@ La 4ª categoría de naming "Profiles auto-aplicados / reflexivos" está documen
 ## Características
 
 - **Entregable**: archivos markdown que describen políticas, fases, artefactos, plantillas.
-- **Sin código ejecutable** que requiera build, tests unitarios o servidor.
+- **Predominantemente sin código ejecutable** que requiera build o servidor. Excepción: la infraestructura propia de Neb (hooks/módulos de `neb.db`, p.ej. `hooks/lib/`) sí es código y se valida con tests unitarios (`py -m unittest`); para esos cambios, además de la revisión de roles + coherencia, el gate de cierre exige la suite verde. El supuesto general (entregable = markdown, validación = roles + coherencia) sigue aplicando al resto del profile.
 - **Ambiente único: prueba = producción** — no existe QA separado; las sesiones donde se aplica el lineamiento son simultáneamente ambiente de pruebas y de producción (ver [deployment.md](deployment.md) "Ambiente único").
 - **Deploy**: `git push` al remote → `git pull` en proyectos cliente que importen vía `@~/.claude/neb/...`.
 - **Validación**: revisión de roles + coherencia estática + dogfooding en la misma sesión (ver [deployment.md](deployment.md)); cierre inmediato. La fricción que aparece al aplicar el lineamiento en otra sesión es retroalimentación de Fase 9, no un gate de cierre.

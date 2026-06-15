@@ -75,3 +75,82 @@ CREATE TABLE IF NOT EXISTS transcript_cursor (
   updated_at  TEXT NOT NULL,
   PRIMARY KEY (session_id, work_id)
 );
+
+-- ===========================================================================
+-- Pendings (REQ neb-pendings-sqlite, nucleo). Reusa la infra del logbook.
+-- Enums en INGLES (la capa de presentacion traduce al mostrar).
+-- ===========================================================================
+
+-- Un pendiente del dev. type='task' = algo por hacer; type='session' = sesion pausada
+-- (referencia un work exploratory por session_ref → contexto via su transcript local).
+CREATE TABLE IF NOT EXISTS pending (
+  id               INTEGER PRIMARY KEY,                 -- autoincrement (reemplaza grep max+1)
+  type             TEXT NOT NULL DEFAULT 'task',        -- 'task' | 'session'
+  context_origin   TEXT NOT NULL,                       -- snapshot INMUTABLE (legible en frio); la evolucion va a pending_note
+  status           TEXT NOT NULL DEFAULT 'open',        -- 'open' | 'obsolete'
+  obsolete_cause   TEXT,                                -- 'no-longer-applies' | 'resolved-otherwise'; NULL si status='open'
+  work_ref         INTEGER REFERENCES work(id) ON DELETE SET NULL,   -- vinculo pending↔work (logbook); NULL = sin work
+  session_ref      INTEGER REFERENCES work(id) ON DELETE SET NULL,   -- type='session' → work exploratory
+  created_at       TEXT NOT NULL,
+  last_reviewed_at TEXT,                                -- ultima vez que el recomendador lo evaluo (delta en B/C)
+  archived_at      TEXT                                 -- NULL = activo; se setea al pasar a obsolete (no se borra)
+);
+-- Vista activa rapida (status='open' AND archived_at IS NULL): indice parcial.
+CREATE INDEX IF NOT EXISTS idx_pending_active   ON pending(status) WHERE archived_at IS NULL;
+-- FKs con indice (evita scans en on_work_archived / cierre del work ligado).
+-- Parciales (WHERE ... IS NOT NULL): el grueso de pendings no liga work/session, asi que el
+-- indice solo cubre las filas relevantes (mas chico, y on_work_archived solo busca work_ref no-NULL).
+CREATE INDEX IF NOT EXISTS idx_pending_work     ON pending(work_ref)    WHERE work_ref IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_pending_session  ON pending(session_ref) WHERE session_ref IS NOT NULL;
+
+-- Bitacora append-only de la evolucion del pending (no reescribe context_origin).
+CREATE TABLE IF NOT EXISTS pending_note (
+  id          INTEGER PRIMARY KEY,
+  pending_id  INTEGER NOT NULL REFERENCES pending(id) ON DELETE CASCADE,
+  note        TEXT NOT NULL,
+  ts          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_pending_note_pending ON pending_note(pending_id, ts);
+
+-- Grafo pending↔pending (agrupar relacionados; el disparador "bloqueo" usa relation='blocks').
+CREATE TABLE IF NOT EXISTS pending_link (
+  a         INTEGER NOT NULL REFERENCES pending(id) ON DELETE CASCADE,
+  b         INTEGER NOT NULL REFERENCES pending(id) ON DELETE CASCADE,
+  relation  TEXT NOT NULL,                              -- 'related' | 'depends' | 'blocks'
+  PRIMARY KEY (a, b, relation)
+);
+CREATE INDEX IF NOT EXISTS idx_pending_link_b ON pending_link(b);
+
+-- Catalogo de temas (formaliza las secciones por proyecto del pendings.md).
+-- topic NO lleva peso de prioridad: el peso vive en compas.md (Sub-entrega C).
+CREATE TABLE IF NOT EXISTS topic (
+  id           INTEGER PRIMARY KEY,
+  slug         TEXT NOT NULL,                           -- estable, kebab-case
+  name         TEXT NOT NULL,
+  description  TEXT,
+  keywords     TEXT,                                    -- CSV; alimenta el matching automatico (B)
+  status       TEXT NOT NULL DEFAULT 'active',          -- 'active' | 'archived'
+  parent_id    INTEGER REFERENCES topic(id) ON DELETE SET NULL  -- jerarquia
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_topic_slug   ON topic(slug);
+CREATE INDEX IF NOT EXISTS idx_topic_parent       ON topic(parent_id);
+
+-- Grafo explicito curado entre temas (ademas de la jerarquia parent_id y de los keywords compartidos).
+CREATE TABLE IF NOT EXISTS topic_link (
+  topic_a   INTEGER NOT NULL REFERENCES topic(id) ON DELETE CASCADE,
+  topic_b   INTEGER NOT NULL REFERENCES topic(id) ON DELETE CASCADE,
+  relation  TEXT NOT NULL,                              -- 'related' | 'depends'
+  PRIMARY KEY (topic_a, topic_b, relation)
+);
+CREATE INDEX IF NOT EXISTS idx_topic_link_b ON topic_link(topic_b);
+
+-- Puente N:M pending↔topic. La PRIORIDAD vive AQUI (prioridad POR TEMA, persistida).
+CREATE TABLE IF NOT EXISTS pending_topic (
+  pending_id      INTEGER NOT NULL REFERENCES pending(id) ON DELETE CASCADE,
+  topic_id        INTEGER NOT NULL REFERENCES topic(id)   ON DELETE CASCADE,
+  priority_band   TEXT,                                  -- 'high' | 'medium' | 'low' (recomendado; NULL = sin clasificar aun)
+  priority_score  REAL,                                  -- score fino opcional (criterio externo/roadmap)
+  is_primary      INTEGER NOT NULL DEFAULT 0,            -- 1 = tema principal del pending
+  PRIMARY KEY (pending_id, topic_id)
+);
+CREATE INDEX IF NOT EXISTS idx_pending_topic_topic ON pending_topic(topic_id);

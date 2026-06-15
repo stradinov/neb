@@ -7,7 +7,7 @@ La **mecánica** (backend pluggable, hook de captura, config, modos de fallo) vi
 ## Unidad y backend
 
 - **Unidad = `work`** (un trabajo relevable), identificado por `project + req_slug` (estable cross-máquina; **no** la sesión Claude, que es local y efímera).
-- **Backend pluggable**: SQLite local por defecto (universal, sin infra) + central opcional para relevo cross-dev real (servidor de referencia en `server/`, ver [`../tooling/logbook.md`](../tooling/logbook.md) y [`../server/INSTALL.md`](../server/INSTALL.md)). El SQLite local es además **outbox** que sincroniza al central cuando el **entorno es compartido** (ver "Entorno compartido" abajo).
+- **Backend pluggable**: SQLite local por defecto (universal, sin infra) + central opcional para relevo cross-dev real (servidor de referencia en `server/`, ver [`../tooling/logbook.md`](../tooling/logbook.md) y [`../server/INSTALL.md`](../server/INSTALL.md)). El SQLite local es además **outbox** que sincroniza al central cuando el **entorno es compartido** (ver "Entorno compartido" abajo). El archivo local es `~/.claude/neb.db`, con **resolver dual-mode permanente** que cae al nombre legado `~/.claude/neb-logbook.db` en máquinas sin migrar (mecánica en [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend pluggable").
 - **Identidad del owner**: username del SO + `origin_machine` + nombre del trabajo (contexto desambiguador legible). No usa `git email` (decisión del equipo). *Limitación*: no distingue dos personas con el mismo username ni une al mismo dev con usernames distintos entre máquinas — el caso "continuar lo propio" se cubre con `--resume` local (ver "Dos modos").
 
 ## Modelo de ownership

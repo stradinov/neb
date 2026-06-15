@@ -7,6 +7,7 @@ Single source of truth de los skills de Claude Code disponibles. Cualquier REQ q
 | Skill | Versión | Profile(s) aplicable(s) | Último review | Última validación en uso | Estado |
 |---|---|---|---|---|---|
 | [wakeup](wakeup/SKILL.md) | 1.1.0 (2026-06-03) | `self-applied` | 2026-06-03 | — | Experimental |
+| [pendings-review](pendings-review/SKILL.md) | 4.3.0 (2026-06-14) | `self-applied` | 2026-06-14 | — | Experimental |
 
 ## Candidatos (stubs en profiles, sin skill activo)
 

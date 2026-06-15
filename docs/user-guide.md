@@ -93,7 +93,7 @@ Si querés versionarla (respaldo, portabilidad entre máquinas), quitá la regla
 
 ## Retomar y relevar trabajo (bitácora de relevo)
 
-Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque otro dev sigue— la **bitácora de relevo** te deja retomarla. Es **opt-in**: agregá el hook `logbook-sync` a tu `<proyecto>/.claude/settings.json` (base en `hooks/settings.template.json`; en Windows usá la variante `"shell": "powershell"`). El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb-logbook.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
+Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque otro dev sigue— la **bitácora de relevo** te deja retomarla. Es **opt-in**: agregá el hook `logbook-sync` a tu `<proyecto>/.claude/settings.json` (base en `hooks/settings.template.json`; en Windows usá la variante `"shell": "powershell"`). El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
 
 Con el comando `/logbook`:
 
