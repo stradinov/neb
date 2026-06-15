@@ -6,7 +6,9 @@ Términos abstractos usados aquí ("Confirmación del cambio", "Punto de restaur
 
 ## Ownership de archivos `.md`
 
-Claude es **dueño operativo** de los archivos `.md` en todos los repos del equipo; el dev los consulta para diagnóstico, no los redacta. En consecuencia, las confirmaciones que tocan **exclusivamente** `.md` no requieren OK del dev en ninguna fase (1–9) ni profile.
+Claude es **dueño operativo** de los **artefactos que Neb genera y administra** —[registros del requerimiento](vocabulary.md#registro-del-requerimiento) (change/incident MD), `pendings`, planes aprobados, métricas— por su **rol** (metadata del proceso que Neb produce, no entregable del proyecto); el dev los consulta para diagnóstico, no los redacta. De forma **derivada**, la autonomía cubre **cualquier archivo `.md`** del repo: su naturaleza documental los hace de bajo riesgo y revisables en diff. En consecuencia, las confirmaciones que tocan **exclusivamente** esos artefactos —o, en general, solo `.md`— no requieren OK del dev en ninguna fase (1–9) ni profile.
+
+> Criterio: el discriminador primario es el **rol/función** (lo que Neb genera), no la extensión — `.md` es el rasgo **derivado**, no el definitorio (ver [vocabulary.md](vocabulary.md) § "Discriminador registro vs entregable: el rol, no la extensión"). La frontera de lo autónomo coincide con el criterio `.md`-only previo (todo artefacto que Neb genera es hoy `.md`); el encuadre por rol nombra *por qué* esos artefactos son de Claude y resiste casos futuros donde un artefacto de proceso no sea `.md`.
 
 - **No aplica a**:
   - Confirmaciones **mixtas** `.md` + entregable no-documental — piden OK por la parte más restrictiva; la autonomía sobre `.md` no contagia al resto.

@@ -14,7 +14,7 @@ Exclusión propia del mecanismo git — el gate **no aplica** a los artefactos d
 
 ### Autonomía de Claude sobre archivos `.md` — operaciones git
 
-El principio (Claude es dueño operativo de los `.md`; las confirmaciones que tocan **exclusivamente** `.md` no requieren OK en ninguna fase ni profile) vive en [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Ownership de archivos `.md`". En git, ese principio cubre estas operaciones cuando el delta toca solo archivos `.md`:
+El principio (Claude es dueño operativo de los **artefactos que Neb genera** y, derivadamente, de cualquier `.md`; las confirmaciones que tocan **exclusivamente** esos artefactos —o solo `.md`— no requieren OK en ninguna fase ni profile) vive en [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Ownership de archivos `.md`". En git, ese principio cubre estas operaciones cuando el delta toca solo archivos `.md`:
 
 - **Cubre**: `git commit`, `git push`, creación de ramas, `git merge`, `git rebase` sobre rama propia, `git cherry-pick`, y operaciones destructivas (`reset --hard`, `branch -D`, `push --force` sobre ramas distintas a `main`/`master`) en cualquier path del repo (`changes/`, `research/`, `reqs/<algo>/`, `README.md`, `docs/`, `CHANGELOG.md`, `CLAUDE.md`, etc.). Creación y edición.
 - **No cubre** (requiere OK pese a tocar solo `.md`):

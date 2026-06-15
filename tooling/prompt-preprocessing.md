@@ -23,7 +23,7 @@ Ejemplo (el dev, español MX): `agreaga una funcion que valide el correo en el f
 |---|---|---|
 | 1. Corrección ortográfica/sintaxis | Hook (Python + `claude -p --model claude-haiku-4-5`) | Devuelve la versión corregida como `additionalContext` |
 | 2. Eco en el idioma del prompt | Claude principal en la sesión | Instruido por preámbulo que el hook inyecta |
-| 3. Confirmación previa | Claude principal en la sesión | Instruido por preámbulo (espera "sí"/"ok"/"continúa" antes de tomar acciones de escritura) |
+| 3. Confirmación previa | Claude principal en la sesión | Instruido por preámbulo: aplica el gate de autorización de la metodología (no pide OK donde el gate ya exime — artefactos que Neb genera, `.md`-only, autonomías declaradas por proyecto) |
 
 El prompt original se ve tal cual en el transcript; la versión corregida vive en system reminder.
 
@@ -43,7 +43,7 @@ dev tipea prompt → UserPromptSubmit hook
 
 | Modo | Corrección | Eco | Confirmación | Cuándo usar |
 |---|---|---|---|---|
-| `full` (default) | Sí | Sí | Sí | Trabajo normal; máxima protección contra mala lectura |
+| `full` (default) | Sí | Sí | Según gate | Trabajo normal; máxima protección contra mala lectura |
 | `fast` | Sí | Sí | No | Conversación fluida donde la confirmación constante estorba |
 | `off` | No | No | No | Sesión exploratoria, dictado correcto, prompt pegado puro |
 
