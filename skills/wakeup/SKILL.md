@@ -33,12 +33,12 @@ El script aplica la **cascada de detección** y reporta **sin escribir nada**. C
 
 - **Ya conectado** (`NEB_WORKSPACE` configurado y válido): confirmalo en una línea y pasá a las opciones restantes (no re-configures).
 - **"Workspace existente detectado en `<dir>`"** (caso típico: el usuario clonó el repo workspace de su equipo y corre `/wakeup` desde el clon): ofrecé **"Conectar este workspace"** como opción primera — corre `--existing "<dir>"`: setea `NEB_WORKSPACE` y crea su `personal/<usuario>.md` si falta, sin tocar la estructura existente.
-- **"Workspace(s) existente(s) encontrado(s) bajo `$HOME`"** (el cwd no era workspace; el script barrió `$HOME` con el mismo marker): con 1 resultado, ofrecé conectarlo; con varios, lista numerada para que el usuario elija — nadie teclea paths a mano.
+- **"Workspace(s) existente(s) encontrado(s) bajo `$HOME`"** (el cwd no era workspace; el script barrió `$HOME` con el mismo marker): con 1 resultado, ofrecé conectarlo; con varios, menú de selección para que el usuario elija — nadie teclea paths a mano.
 - **Sin workspace** (ni en cwd ni en el barrido): preguntá si tiene uno en otra ruta (`--existing <ruta>`) o creá uno nuevo (opción 1 de abajo).
 
 ### 3. Ofrecer las opciones (ejecutar, no describir)
 
-Presentar las acciones de adopción como opciones numeradas (formato de [`communication.md`](../../general/communication.md) § "Tono y forma"). Cada opción **ejecuta** los pasos de `user-guide.md` de forma interactiva, sin repetirlos en la conversación:
+Presentar las acciones de adopción como **menú de selección** (formato de [`communication.md`](../../general/communication.md) § "Tono y forma"). Cada opción **ejecuta** los pasos de `user-guide.md` de forma interactiva, sin repetirlos en la conversación:
 
 1. **Conectar / montar tu entorno** — si el paso 2 detectó un workspace existente, la acción es **conectarlo** (`--existing "<dir>"`). Si no, preguntá **dónde** crear el workspace: (default) `neb_workspace/` en el dir actual; `--base <dir>` para otra ubicación. Corré `bash "$NEB_SRC/bootstrap/setup-workspace.sh" [--base <dir> | --existing <dir>] [--overlay <nombre>]` (sin `--dry-run`): crea/conecta el scaffolding (overlay + `overlay/startup.md` + `personal/` + `changes/`), `personal/<username>.md` (username del SO) y **setea `NEB_WORKSPACE` en `~/.claude/settings.json` automáticamente** (merge no-destructivo, vía `set-neb-env.py`; `NEB_HOME` solo se persiste cuando no resuelve al cache del plugin). Bajo plugin los hooks ya vienen registrados; no hay que tocar settings.json a mano. Es el paso mínimo (ver [user-guide § Montar tu overlay](../../docs/user-guide.md)).
 2. **Definir tu primer profile** — preguntar el dominio ("¿Python/ML, PHP/backend, React, iOS…?"), proponer nombre en kebab-case, cambiar a profile `profile-authoring` y guiar `init-profile-subproject.sh` **en el overlay**. Puede incluir skill de apoyo (`skill-authoring`) y agentes revisores.
@@ -55,6 +55,6 @@ Confirmar lo que quedó montado/conectado (workspace, overlay, primer profile), 
 - No leer ni mostrar archivos extensos durante el tour — solo nombrar paths y seguir user-guide.
 - **No duplicar** los pasos de `user-guide.md` en la conversación — ejecutarlos refiriendo a la guía (la guía es la fuente única).
 - **Delegá en `setup-workspace.sh`** para detectar y configurar el entorno: corré el script y leé su salida; no re-implementes su lógica de detección en la conversación.
-- Mantener el tour conversacional — usar el formato de opciones numeradas de `communication.md`.
+- Mantener el tour conversacional — usar el formato de menú de selección de `communication.md`.
 - No generar plan estructurado (tabla de archivos, SemVer, change MD) salvo que el usuario pida crear un profile/skill — ahí sí, seguir el flujo de `profile-authoring` o `skill-authoring`.
 - Si el usuario quiere saltarse el tour e ir directo al trabajo, dejarlo — el tour es opt-in.

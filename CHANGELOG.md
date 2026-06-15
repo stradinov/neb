@@ -4,6 +4,22 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [3.10.0] - 2026-06-14
+
+### Changed
+
+> Cambio de **fuerza normativa** declarado (ver `methodology/principles.md` § "Declarar (nunca Patch)"). Minor: no rompe imports. Evoluciona el lineamiento de comunicación de decisiones a partir de su **validación en uso**.
+
+- **Comunicación de decisiones: gate de altitud + menú de selección, retirando el "¿OK?" en prosa.** `general/communication.md` § "Tono y forma": se reemplazan los bullets "Default + binaria" y "Numeración" por tres reglas planas. (a) **Altitud anclada a gate observable**: Claude ejecuta-y-reporta toda decisión que no requiera input que solo el dev tenga ni dispare un gate de autorización (entrega que toca el entregable del destino) — el criterio deja de ser el juicio introspectivo "reversible/bajo riesgo" (anti-patrón `principles.md` § "prescribir el razonamiento interno"). (b) **Menú de selección** para cualquier elección enumerable (en Claude Code, `AskUserQuestion`), con **degradación a lista numerada en prosa** cuando no hay UI interactiva (headless, cron, remoto); la recomendada primero, la inacción como opción explícita, y en un gate la selección de aprobación constituye el OK explícito. (c) El **"¿OK?" en prosa queda retirado**: todo punto de decisión es ejecuto-y-reporto o menú. Origen: el bullet previo producía confirmaciones ambiguas ("ok"/"ve con eso") y comprimía bifurcaciones ocultando opciones — defecto detectado por la validación-en-uso del propio lineamiento (subsume `pendings.md` ítem 114).
+
+### Notes
+
+- Afecta `general/communication.md`, `general/onboarding.md`, `skills/wakeup/SKILL.md` (las dos últimas alinean "opciones numeradas" → "menú de selección"; la numeración sobrevive como fallback, así que sus referencias no quedan huérfanas).
+- **Término neutro** "menú de selección" en el cuerpo normativo (con `AskUserQuestion` nombrado una sola vez como implementación en Claude Code) para no acoplar el lineamiento baseline a un tool del harness — `communication.md` es punto de customización para adoptantes externos.
+- **Vocabulario agnóstico de profile**: el gate se ancla a "entrega que toca el entregable del destino" (commit, deploy, migración, config), no a "commit/deploy", para cubrir profiles sin deploy (`self-applied`, `research`).
+- **Fuera de scope** (decisión del dev): § "Hilo de la metodología" — las transiciones de fase ("¿Procedo a Fase X?") **no cambian**; persiste la asimetría aceptada conscientemente. Consistente con el follow-up (b) diferido en 3.9.0.
+- Validación diferida en uso (profile `self-applied`): tag `[neb-decisiones-menu-y-altitud-validacion-uso]` en `pendings.md`.
+
 ## [3.9.0] - 2026-06-14
 
 ### Changed

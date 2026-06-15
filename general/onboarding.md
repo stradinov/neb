@@ -16,7 +16,7 @@ Sin preámbulo, sin interrumpir el trabajo. El tour es opt-in.
 
 ## Opciones del tour
 
-El tour **no describe los pasos** —esos viven en [`../docs/user-guide.md`](../docs/user-guide.md)— sino que ofrece ejecutarlos. Tras presentar Neb y detectar el estado de la instalación, Claude ofrece las acciones de adopción como opciones numeradas (formato de [`communication.md`](communication.md) § "Tono y forma"):
+El tour **no describe los pasos** —esos viven en [`../docs/user-guide.md`](../docs/user-guide.md)— sino que ofrece ejecutarlos. Tras presentar Neb y detectar el estado de la instalación, Claude ofrece las acciones de adopción como **menú de selección** (formato de [`communication.md`](communication.md) § "Tono y forma"):
 
 1. **Montar tu overlay** — la capa propia donde vive lo del adoptante; paso mínimo para usar Neb (ver [user-guide § Montar tu overlay](../docs/user-guide.md)).
 2. **Definir tu primer profile** — concreta Neb para el dominio; puede incluir skill de apoyo y agentes revisores (ver [user-guide § Definir tu primer profile](../docs/user-guide.md)).

@@ -9,8 +9,8 @@ Política transversal: aplica siempre, no es una fase.
 - Sin clichés tipo "Perfecto, voy a...". Indica la acción y procede.
 - Una oración por update mientras trabajas.
 - Cierre de turno: 1–2 oraciones — qué cambió y qué sigue.
-- **Default + binaria** cuando hay contexto para proponer una acción: formular "Voy con X. ¿OK?" (razón breve solo si no es evidente del contexto). En Fases ≥ 4, no formular como "¿A o B?" sin haber elegido X antes del signo `?`.
-- **Numeración** cuando hay 2+ opciones legítimas sin default claro: lista numerada con tradeoff por línea ("1) X — `<tradeoff>` / 2) Y — `<tradeoff>`. Responde con número o 'otro'").
+- **Ejecuta y reporta** ("Voy con X." y procedes) toda decisión que no requiera input que solo el dev tenga ni dispare un gate de autorización (entrega que toca el entregable del proyecto destino: commit, deploy, migración, config). El "¿OK?" en prosa queda retirado.
+- **Menú de selección** para cualquier elección entre opciones enumerables — en Claude Code, `AskUserQuestion`; sin UI interactiva (headless, cron, remoto), degrada a lista numerada en prosa con las mismas opciones. Una opción por alternativa con su tradeoff; la recomendada primero, "(Recomendado)"; la inacción, si es alternativa, va como opción explícita. En un gate de entrega, elegir la opción de aprobación constituye el OK explícito del gate.
 - **Pregunta abierta** solo en Fases 1–3 cuando se extrae input no enumerable (clarificación, exploración de diseño).
 
 ## Idioma
