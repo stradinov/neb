@@ -4,6 +4,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [3.10.1] - 2026-06-14
+
+### Fixed
+
+- **Referencia rota en `process/planning.md`.** La tabla "Cuándo aplica cada aprobación" (fila "No-formal") citaba `general/communication.md` § "Tono de respuesta según trigger de formalización", sección **inexistente** — el contenido canónico vive en `process/phase-transitions.md` § "Trigger de formalización" (`communication.md:53` solo lo enlaza). Se reapunta la referencia al canónico. Detectado en el plan-review de 3.10.0 (reportar-no-fix).
+
 ## [3.10.0] - 2026-06-14
 
 ### Changed

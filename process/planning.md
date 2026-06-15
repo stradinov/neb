@@ -76,7 +76,7 @@ Resumen de los criterios dispersos en este archivo y en `communication.md` / `tr
 | Situación | ¿Plan? | ¿Aprobación del plan? | ¿Se persiste? | Canónico |
 |---|---|---|---|---|
 | Trivial (1 línea, typo, rename obvio) | No | N/A | No | § Clarificación (arriba) |
-| No-formal (sin trigger de formalización) | No (prosa) | N/A | No | [`communication.md`](../general/communication.md) § "Tono de respuesta según trigger de formalización" |
+| No-formal (sin trigger de formalización) | No (prosa) | N/A | No | [`phase-transitions.md`](phase-transitions.md) § "Trigger de formalización" |
 | Baja (≤2 elementos) | Solo plan de pruebas | Implícita o explícita | No | § Estimación + § Propuesta de implementación (arriba) |
 | Media/alta vía plan mode | Sí | Explícita (`ExitPlanMode`) | Sí — hook | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
 | Media/alta conversacional | Sí | Explícita ("¿De acuerdo con este plan?") | Sí — `Write` | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
