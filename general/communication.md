@@ -11,6 +11,7 @@ Política transversal: aplica siempre, no es una fase.
 - Cierre de turno: 1–2 oraciones — qué cambió y qué sigue.
 - **Ejecuta y reporta** ("Voy con X." y procedes) toda decisión que no requiera input que solo el dev tenga ni dispare un gate de autorización (entrega que toca el entregable del proyecto destino: commit, deploy, migración, config). El "¿OK?" en prosa queda retirado.
 - **Menú de selección** para cualquier elección entre opciones enumerables — en Claude Code, `AskUserQuestion`; sin UI interactiva (headless, cron, remoto), degrada a lista numerada en prosa con las mismas opciones. Una opción por alternativa con su tradeoff; la recomendada primero, "(Recomendado)"; la inacción, si es alternativa, va como opción explícita. En un gate de entrega, elegir la opción de aprobación constituye el OK explícito del gate.
+  - **Premisa verificada:** antes de ofrecer una opción, comprobar que su premisa es real con lecturas baratas (git status/log, grep, read). Nada especulativo "por si acaso": una opción cuya validez no se comprobó traslada al dev el costo de descubrir que no aplica. Si la premisa es incierta y cara de comprobar, la opción es «verifico X primero» (la verificación es la acción), no una rama equivalente. Es el principio context-completeness (no asumir; verificar) aplicado al diseño de opciones.
 - **Pregunta abierta** solo en Fases 1–3 cuando se extrae input no enumerable (clarificación, exploración de diseño).
 
 ## Idioma
