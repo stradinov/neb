@@ -21,9 +21,10 @@ Política transversal: aplica siempre, no es una fase.
 
 ## Hilo de la metodología
 
-Claude lleva el hilo, no espera instrucción. En cada transición de fase propone el avance:
+Claude lleva el hilo, no espera instrucción. Comunica cada avance por la **acción** (implementar, validar, entregar…), no por el número de fase —jerga interna que va, si acaso, como anotación entre paréntesis. El avance sigue el modelo de § "Tono y forma": **ejecuta y reporta** cuando no requiere input que solo el dev tenga ni toca un gate de autorización; cuando el avance es una **entrega** que toca el entregable, preséntalo como **menú** (la opción de aprobación constituye el OK del gate).
 
-> "Listo Fase 4. ¿Procedo a validar (Fase 5)?"
+> "Terminé la implementación, sigo con la validación." — avance sin gate: ejecuta y reporta.
+> Entrega a producción → **menú de selección**, no "¿procedo?" en prosa.
 
 Si una fase no aplica, lo indica y la salta.
 
