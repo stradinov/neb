@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # managed-by: neb/hooks/pre-push-changelog
 # Hook pre-push del maintainer — único punto de enforcement BLOQUEANTE de neb.
-# Encadena 4 gates antes de publicar:
+# Encadena 5 gates antes de publicar:
 #   1. Integridad del kernel: assemble-startup.py --check (ningún import del arranque roto).
 #   2. Términos vetados (PII/marcas): extension point del overlay — corre
 #      $NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh si existe (el script privado
@@ -9,6 +9,8 @@
 #   3. Fragment obligatorio: cambios normativos (fuera de changelog.d/, CHANGELOG.md,
 #      research/) exigen un fragment en el mismo push ("Cualquier cambio entra al CHANGELOG").
 #   4. Sincronía CHANGELOG.md ↔ changelog.d/ (assemble-changelog.py --check).
+#   5. Sincronía plugin.json.version ↔ VERSION (el manager compara semver; un campo
+#      congelado bloquea 'claude plugin update' en silencio para todos los marketplace).
 #
 # Instalación (maintainer): cp hooks/pre-push-changelog .git/hooks/pre-push
 # Bypass (requiere autorización explícita del dev): git push --no-verify
@@ -94,6 +96,22 @@ if printf '%s\n' "$PUSHED" | grep -q "^${PREFIX}changelog\.d/"; then
     fail "CHANGELOG.md desactualizado respecto a changelog.d/." \
          "Regenera y commitea antes del push:" \
          "  py bootstrap/assemble-changelog.py && git add CHANGELOG.md && git commit -m 'docs: regenerar CHANGELOG'"
+  fi
+fi
+
+# ── Gate 5: plugin.json.version sincronizado con VERSION ─────────────────────
+# El manager compara el semver de plugin.json.version; si no coincide con VERSION
+# (fuente de verdad del release), 'claude plugin update' reporta "already at latest"
+# y ningún marketplace entrega el contenido nuevo. No publicar desincronizado.
+PLUGIN_JSON="$NEB_ROOT/.claude-plugin/plugin.json"
+if [ -f "$NEB_ROOT/VERSION" ] && [ -f "$PLUGIN_JSON" ]; then
+  VER_SRC="$(tr -d '[:space:]' < "$NEB_ROOT/VERSION")"
+  PJ_VER="$("$PY" -c "import json,io,sys;print(json.load(io.open(sys.argv[1],encoding='utf-8')).get('version',''))" "$PLUGIN_JSON" 2>/dev/null || echo '')"
+  if [ "$VER_SRC" != "$PJ_VER" ]; then
+    fail "plugin.json.version ('$PJ_VER') != VERSION ('$VER_SRC') — el plugin se publicaría desincronizado." \
+         "'claude plugin update' compara plugin.json.version; si no coincide con la versión publicada" \
+         "reporta 'already at latest' y ningún marketplace entrega el contenido nuevo." \
+         "Sincroniza con: bootstrap/bump-version.sh   (o edita .claude-plugin/plugin.json.version a $VER_SRC)"
   fi
 fi
 

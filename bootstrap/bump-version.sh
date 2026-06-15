@@ -43,6 +43,17 @@ neb_python() {
 }
 PYTHON="$(neb_python || true)"
 
+# Sin Python no se puede sincronizar plugin.json.version. Abortar ruidoso y temprano
+# —antes de escribir VERSION o crear el fragment— en vez de degradar a un aviso
+# "hacelo a mano" que se ignora (causa raíz de la deriva de versión histórica). El
+# gate 5 del pre-push es el backstop; aquí se previene la desincronía en origen.
+if [ -f "$PLUGIN_JSON" ] && [ -z "$PYTHON" ]; then
+  echo "ERROR: no se encontró Python ejecutable (python3/python/py) y existe $PLUGIN_JSON." >&2
+  echo "       Sin Python no se puede sincronizar plugin.json.version; el plugin quedaria" >&2
+  echo "       desincronizado y 'claude plugin update' lo bloquearia. Instala Python y reintenta." >&2
+  exit 1
+fi
+
 [ -f "$VERSION_FILE" ] || { echo "No existe $VERSION_FILE" >&2; exit 1; }
 CUR="$(tr -d '[:space:]' < "$VERSION_FILE")"
 if ! echo "$CUR" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$'; then
@@ -91,7 +102,8 @@ else
   info "changelog.d/$NEW.md ya existe"
 fi
 
-if [ -f "$PLUGIN_JSON" ] && [ -n "$PYTHON" ]; then
+if [ -f "$PLUGIN_JSON" ]; then
+  # PYTHON garantizado por el check de arranque cuando plugin.json existe.
   "$PYTHON" - "$PLUGIN_JSON" "$NEW" <<'PY'
 import json, sys
 path, new = sys.argv[1], sys.argv[2]
@@ -103,8 +115,6 @@ with open(path, 'w', encoding='utf-8') as f:
     f.write('\n')
 PY
   ok "plugin.json.version → $NEW"
-elif [ -f "$PLUGIN_JSON" ]; then
-  info "AVISO: sin Python (python3/python/py) — plugin.json.version NO sincronizado a $NEW. Hacelo a mano."
 fi
 
 bold "Listo"
