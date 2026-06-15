@@ -6,7 +6,7 @@ Metodologías específicas por tipo de proyecto. Abstrae lo que NO es universal:
 
 - [profile-authoring](profile-authoring/index.md) — Autoría, mantenimiento y distribución de profiles de la metodología. Overlay sobre `self-applied`.
 - [skill-authoring](skill-authoring/index.md) — Autoría, mantenimiento y distribución de skills de Claude Code. Overlay sobre `self-applied`.
-- [self-applied](self-applied/index.md) — Proyectos auto-aplicados — la metodología que se edita es la que se aplica (caso canónico: el propio repo `neb`). Validación **diferida en uso**.
+- [self-applied](self-applied/index.md) — Proyectos auto-aplicados — la metodología que se edita es la que se aplica (caso canónico: el propio repo `neb`). Validación por **revisión de roles + coherencia**.
 - [research](research/index.md) — Investigación multi-LLM: consultar fuentes independientes, sintetizar resultados y producir documentos citables desde cualquier profile o requerimiento. Overlay sobre `self-applied`.
 
 ## Pendientes

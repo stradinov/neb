@@ -53,7 +53,7 @@ A cada REQ **le corresponde** un único **registro** (su change MD): proyección
 | Trazabilidad unidireccional plan→change MD; plan opcional, pruebas obligatorio | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) |
 | Eslabón change MD↔commit (bidireccional) | [`../workflow/traceability.md`](../workflow/traceability.md) §"Eslabón Change MD ↔ confirmación" |
 | Definición de done + entrega del registro (temprana si entorno compartido, o atómica al cierre — push `.md`-only del change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) §"Cierre del requerimiento" |
-| Validación diferida en uso (self-applied, ≥10 sesiones) | [§ Tipos de validación](#tipos-de-validación), [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) |
+| Validación + cierre por mecanismo verificable del profile (sin gate diferido; señal-en-uso → Fase 9) | [§ Tipos de validación](#tipos-de-validación), [`../process/improvement.md`](../process/improvement.md) |
 
 ### Formas especiales
 
@@ -120,7 +120,8 @@ Clasificación según la naturaleza del entregable. Los pasos de ejecución de F
 - **Con ciclo de revisión cliente** (profiles de análisis): el cliente valida el entregable iterativamente; cada vuelta produce una nueva versión hasta la aprobación final.
 - **Sin ambiente pero con artefactos** (scripts, migraciones, CLI): validación directa — ejecución local, dry-run, o revisión.
 - **Sin artefactos** (docs sin proceso, comentarios, typos): validación implícita — el usuario revisa en contexto y confirma.
-- **Diferida en uso** (profile `self-applied`): los walkthroughs mentales aterrizan el diseño, pero el cierre formal requiere uso real (criterio: ≥ 10 sesiones sin reporte negativo — ver [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md)).
+
+> Los **profiles de proceso** (`self-applied` y sus overlays `research`/`skill-authoring`/`profile-authoring`) no usan un tipo aparte: validan con el mecanismo **verificable** de su entregable —revisión de roles + coherencia para lineamientos, `fact-check-reviewer` para research, smoke load + `validation-prompts` para skills— y **cierran de inmediato**. La observación en uso posterior (utilidad, triggering, fricción) es **retroalimentación de Fase 9** (ver [`../process/improvement.md`](../process/improvement.md)), no un gate de cierre.
 
 ## Niveles de riesgo de regresión
 

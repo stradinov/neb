@@ -42,14 +42,11 @@ Cada skill se registra en dos lugares:
 
 Un skill puede asociarse a múltiples profiles.
 
-## Validación en uso y procesamiento de gaps
+## Validación al entregar y gaps en uso
 
-Un skill no se cierra al entregarlo. La metodología distingue dos validaciones:
+El skill se valida **al entregar** (Fase 5): smoke load + `validation-prompts.md` — cubre los casos previstos al escribirlo. Con eso el REQ **cierra**.
 
-- **Validación al entregar** (Fase 5): smoke load + `validation-prompts.md`. Cubre los casos previstos al escribirlo.
-- **Validación en uso** (diferida): cada sesión real donde el skill carga puede revelar gaps no previstos. El skill solo se considera "probado en producción" tras una primera ronda de uso real exitosa.
-
-Pendiente en `pendings.md`: al cerrar el REQ que crea/actualiza un skill, abrir item `[<skill>-validacion-uso]`. Se cierra cuando el dev confirma uso exitoso.
+Los gaps que aparecen en sesiones reales posteriores (no previstos al escribir) son **retroalimentación de Fase 9**, no un gate que difiera el cierre: cada uno entra como REQ de patch (ver § siguiente). No se mantiene un pendiente de "validación en uso" abierto indefinidamente.
 
 ### Procesamiento de un gap detectado en uso
 

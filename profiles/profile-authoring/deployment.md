@@ -1,6 +1,6 @@
 # Deployment (profile: profile-authoring)
 
-Hereda de [`profiles/self-applied/deployment.md`](../self-applied/deployment.md): deploy = `git push`, ambiente único (prueba = producción), validación diferida en uso.
+Hereda de [`profiles/self-applied/deployment.md`](../self-applied/deployment.md): deploy = `git push`, ambiente único (prueba = producción), validación por revisión de roles + coherencia (cierre inmediato).
 
 ## Deploy
 

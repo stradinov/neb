@@ -20,7 +20,7 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 | **Profile raíz** | Profile que cubre un repo autónomo con `.git` propio; heurística por indicadores estructurales |
 | **Overlay** | Profile que cubre un subdirectorio/tipo de trabajo dentro de un repo detectado por otro profile |
 | **Heurística de detección** | Regla en `profiles/index.md` que activa el profile al detectar el cwd del proyecto; Claude la lee en runtime (ver `general/profile-detection.md`) |
-| **Validación en uso** | El profile se valida en sesiones reales, no solo al entregarlo |
+| **Validación en uso** | El profile se valida al entregar (smoke de detección + regresión de profiles existentes); los gaps en sesiones posteriores son señal de Fase 9, no un gate de cierre |
 
 > Overlay sobre `self-applied`: la concretización del [vocabulario abstracto](../../methodology/vocabulary.md) (Entregable, Entrega final, etc.) se hereda de [`self-applied`](../self-applied/index.md). La tabla anterior lista solo los términos propios de profile-authoring.
 

@@ -29,7 +29,7 @@ Si la desviación tiene causa documentada (ej. complejidad real más alta por in
 
 ## Diagnóstico de origen del defecto
 
-El **Process Improvement Analyst** diagnostica el origen del defecto cuando se detecta (vía métrica, patch retrospectivo o reporte en validación diferida en uso). El output va en la sección "Diagnóstico de defectos" del change MD, según el formato de la tabla siguiente.
+El **Process Improvement Analyst** diagnostica el origen del defecto cuando se detecta (vía métrica, patch retrospectivo o reporte de uso post-cierre). El output va en la sección "Diagnóstico de defectos" del change MD, según el formato de la tabla siguiente.
 
 ### Tabla de orígenes y mejoras derivadas
 
@@ -38,7 +38,7 @@ El **Process Improvement Analyst** diagnostica el origen del defecto cuando se d
 | **Plan defectuoso** | Fase 3 | Plan no enumeró dependientes críticos; alcance vago; dimensión faltante; criterios ambiguos | Ajuste a Process Architect / criterios de [`planning.md`](planning.md) / template |
 | **Ejecución defectuosa** | Fase 4 | Claude se desvió del plan claro; introdujo regresión; violación de convención | Ajuste a lineamiento aplicado o sub-foco del rol revisor que debió cazar |
 | **Validación insuficiente** | Fase 5 | Plan de pruebas no cubrió flujo crítico que falló post-deploy | Ajuste a riesgo de regresión / matriz de Resultado del template |
-| **Comportamiento inesperado post-entrega** | Fase 7 | Comportamiento en uso real no previsto en validación; paridad de ambientes incompleta o criterios de aceptación vagues | Ajuste a paridad / validación diferida en uso |
+| **Comportamiento inesperado post-entrega** | Fase 7 | Comportamiento en uso real no previsto en validación; paridad de ambientes incompleta o criterios de aceptación vagos | Ajuste a paridad / criterios de validación |
 | **Documentación faltante** | Fase 8 | Cambio no reflejado en CLAUDE.md / memoria del proyecto / metodología | Ajuste a [`documentation.md`](documentation.md) / memoria |
 | **Loop tardío** | Fase 9 | Patrón persistente no detectado por revisión agregada o disparadores | Ajuste a este archivo / disparadores cuantitativos |
 | **Transversal** | — | Faltas de contexto recurrentes; ambigüedad en múltiples fases; defecto sin etapa clara | Revisión agregada extraordinaria |
@@ -47,7 +47,7 @@ El **Process Improvement Analyst** diagnostica el origen del defecto cuando se d
 
 Si el defecto cruza dos etapas (ej. plan vago + ejecución que tomó la dirección incorrecta), atribuir al **primer eslabón causal** — el plan vago. La ejecución es síntoma, no causa raíz.
 
-Si el defecto se detecta meses después (validación diferida en uso): la **etapa de origen es donde se introdujo**, no donde se detectó. Ej: plan vago en REQ-X cerrado hace 2 meses → origen Fase 3 de REQ-X.
+Si el defecto se detecta tiempo después, en uso post-cierre: la **etapa de origen es donde se introdujo**, no donde se detectó. Ej: plan vago en REQ-X cerrado hace 2 meses → origen Fase 3 de REQ-X.
 
 ### Salida
 

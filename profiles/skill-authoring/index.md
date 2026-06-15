@@ -19,7 +19,7 @@ Si el REQ también toca la metodología general (lineamientos, profiles, etc.), 
 | **Skill Author** | Dev que diseña y escribe el skill en esta iteración |
 | **Skill Maintainer** | Dev responsable del mantenimiento periódico (regen autogen, baselines, distribución) |
 | **autogen** | Contenido entre marcadores `<!-- autogen-start --> ... <!-- autogen-end -->` generado por scripts, no editado a mano |
-| **Validación en uso** | Prueba diferida: el skill se valida cada vez que se usa en una sesión real, no solo al entregarlo |
+| **Validación en uso** | El skill se valida al entregar (smoke load + `validation-prompts`); los gaps que aparecen en sesiones reales posteriores son señal de Fase 9, no un gate de cierre |
 | **Undertriggering** | El skill estaba disponible pero Claude no lo cargó/usó cuando habría sido relevante |
 | **Sub-especificación** | El skill cargó pero no tenía el vocabulario/orientación necesario para resolver el prompt |
 

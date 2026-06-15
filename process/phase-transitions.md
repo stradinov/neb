@@ -29,7 +29,7 @@ Espejo de las reglas canónicas de [`change-control-gate.md`](change-control-gat
 
 - **Confirmación**: toda confirmación que toque el entregable del proyecto destino (commit, deploy, migración, config) espera **OK explícito del dev** durante la implementación.
 - **Validación antes de entregar**: no se entrega a producción sin Fase 5 ejecutada — o saltada con OK explícito (transiciones especiales en `delivery.md`).
-- **Cierre**: un REQ no pasa a `Cerrado` sin validación del dev (o el criterio de validación diferida del profile).
+- **Cierre**: un REQ no pasa a `Cerrado` sin validación del dev (o el criterio de validación que defina su profile).
 
 ## Conflictos y vacíos normativos (always-on)
 

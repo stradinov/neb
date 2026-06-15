@@ -14,7 +14,7 @@ La 4ª categoría de naming "Profiles auto-aplicados / reflexivos" está documen
 - **Sin código ejecutable** que requiera build, tests unitarios o servidor.
 - **Ambiente único: prueba = producción** — no existe QA separado; las sesiones donde se aplica el lineamiento son simultáneamente ambiente de pruebas y de producción (ver [deployment.md](deployment.md) "Ambiente único").
 - **Deploy**: `git push` al remote → `git pull` en proyectos cliente que importen vía `@~/.claude/neb/...`.
-- **Validación**: diferida en uso (ver [deployment.md](deployment.md)). Los walkthroughs mentales en Fase 5 detectan ambigüedad del diseño; la fricción real aparece cuando el lineamiento se aplica en sesión de otro profile.
+- **Validación**: revisión de roles + coherencia estática + dogfooding en la misma sesión (ver [deployment.md](deployment.md)); cierre inmediato. La fricción que aparece al aplicar el lineamiento en otra sesión es retroalimentación de Fase 9, no un gate de cierre.
 - **Reflexividad**: el repo importa su propio `CLAUDE.md`, lo que hace que Claude trabaje sobre la metodología que aplica.
 
 ## Antes de proponer ubicación de archivos
@@ -34,14 +34,14 @@ Concretización del [vocabulario abstracto](../../methodology/vocabulary.md) de 
 | Entregable / elaboración | Archivos markdown de políticas, fases, artefactos, plantillas |
 | Entrega para revisión | Walkthrough mental + revisión de roles antes de commit |
 | Entrega final / aprobación final | `git push` al remote; propagación vía `git pull` en proyectos cliente |
-| Ambiente de revisión | Uso real en sesiones de otro profile (validación diferida en uso) |
-| Estado aprobado | Lineamiento en uso, ≥10 sesiones sin reporte negativo |
+| Ambiente de revisión | Revisión de roles + coherencia en la sesión que edita (dogfooding) |
+| Estado aprobado | Lineamiento entregado tras revisión de roles + coherencia (cierre inmediato) |
 | Dependientes | Otras secciones o lineamientos que referencian la regla o archivo afectado |
 | Flujos críticos | Lineamientos que, si se rompen, generan errores sistemáticos en todos los proyectos |
 
 ## Documentos
 
-1. [Deployment](deployment.md) — cómo se "deploya" un cambio + tipo de validación "diferida en uso" + criterio de cierre.
+1. [Deployment](deployment.md) — cómo se "deploya" un cambio + validación (roles + coherencia) + criterio de cierre.
 2. [Roles](roles.md) — Process Architect + QA Process Engineer + Process Improvement Analyst (roles fijos sin detección por dimensiones).
 
 ## Redacción de los MDs de Neb — mapa

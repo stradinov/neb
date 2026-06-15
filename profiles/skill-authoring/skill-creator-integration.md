@@ -25,7 +25,7 @@ Aspectos donde la metodología difiere de `skill-creator`:
 | **Distribución** | Los skills se auto-descubren del plugin `neb`. No es instalación individual por dev — el Skill Maintainer commitea y el equipo hace `claude plugin update` (`/reload-plugins` para tomar cambios sin reiniciar) |
 | **Asociación a profiles** | Cada skill se registra en `profiles/<profile>/skills.md` y en el inventario `skills/README.md` |
 | **Inventario maestro** | `skills/README.md` como single source of truth del catálogo del equipo |
-| **Validación en uso** | Patrón de pendiente `[<skill>-validacion-uso]` para tracking diferido; procesamiento de gaps como REQ de patch |
+| **Validación en uso** | El skill se valida al entregar (smoke load + `validation-prompts`); los gaps en uso posterior entran como REQ de patch (Fase 9), sin pendiente de tracking diferido |
 | **Restricción de contenido** | La metodología prohíbe signaturas, SQL, números de línea — el código se lee del repo. `skill-creator` no tiene esta restricción explícita |
 | **Baselines autogeneradas** | Marcadores `<!-- autogen-start/end -->` gestionados por scripts Python. Solo el Skill Maintainer commitea |
 

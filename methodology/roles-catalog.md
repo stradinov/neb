@@ -98,7 +98,7 @@ Mecanismo de auto-mejora del catálogo: defectos no cazados disparan ajustes de 
 
 ### Atribución del defecto
 
-Cuando se detecta un defecto en la implementación (vía métricas `Errores de implementación`, patches retrospectivos, o reportes en validación diferida en uso), Claude pregunta en Fase 9: *"¿Hubo defecto que ningún rol cazó? ¿Era responsabilidad de un rol existente o requiere uno nuevo?"*
+Cuando se detecta un defecto en la implementación (vía métricas `Errores de implementación`, patches retrospectivos, o reportes de uso post-cierre), Claude pregunta en Fase 9: *"¿Hubo defecto que ningún rol cazó? ¿Era responsabilidad de un rol existente o requiere uno nuevo?"*
 
 Criterios de atribución por tipo de defecto:
 

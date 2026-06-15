@@ -17,10 +17,10 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 | Término | Significado |
 |---|---|
 | **Entregable** | Documento markdown de investigación: síntesis destilada + frontmatter YAML (ver [conventions.md](conventions.md) §Trazabilidad) |
-| **Entrega para revisión** | Síntesis destilada presentada al dev en la sesión (sin gate formal de utilidad — hereda la validación diferida de `self-applied`) |
+| **Entrega para revisión** | Síntesis destilada presentada al dev en la sesión; la calidad ya pasó el gate F4 (`fact-check-reviewer`) |
 | **Entrega final** | Commit del documento en su ubicación según scope + cita en el change que lo originó |
-| **Ambiente de revisión** | Uso del research en REQs/decisiones posteriores (validación diferida en uso) |
-| **Estado aprobado** | Research `vigente` sin reporte negativo tras ≥2 usos en otros REQs |
+| **Ambiente de revisión** | Gate F4 (`fact-check-reviewer`) + presentación al dev; la utilidad posterior es señal de Fase 9 |
+| **Estado aprobado** | Research entregado tras gate F4 (calidad verificada) — `vigente` |
 | **Dependientes** | Documentos o archivos que citan este research (ver §Trazabilidad en conventions.md) |
 | **Flujos críticos** | Sub-preguntas marcadas `[crítico]` cuando el propósito es una decisión — foco del gate F4 (su divergencia no resuelta lo dispara) |
 | **Síntesis** | Output destilado por el Process Architect — nunca recitar respuestas crudas de las fuentes |
@@ -36,8 +36,8 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 | **Fase 2 — Estimación** | Baja: ≤2 fuentes, búsqueda directa · Media: multi-fuente con cruce · Alta: multi-fuente + verificación adversarial (voz externa Gemini si `exploratorio`) |
 | **Fase 3 — Propuesta** | Plan = fuentes/motor a consultar + prompts + dimensiones + criterio de éxito. Plan de pruebas = dimensiones esperadas (criterio de éxito) + flujos `[crítico]` si `propósito = decisión`. Plan-review obligatorio cuando `propósito = decisión` |
 | **Fase 4 — Ejecución** | Ejecutar el motor de investigación (`WebSearch`/`WebFetch` de piso; `deep-research` opcional; Gemini inline si `exploratorio`), capturar síntesis destilada. Gate: `fact-check-reviewer` si `propósito = decisión` o divergencia no resuelta en dimensión `[crítico]` |
-| **Fase 5 — Validación** | **Validación diferida en uso** (hereda de `self-applied`): no hay gate síncrono ni matriz formal. La síntesis se presenta al dev; su utilidad se valida al usarse en REQs posteriores. La calidad de claims ya pasó por el gate F4 |
-| **Fase 6 — Control de cambios** | Estado `Listo para aprobación`: dev autoriza el commit/entrega del research (no valida utilidad — diferida en uso) |
+| **Fase 5 — Validación** | La calidad de claims se validó en el gate F4 (`fact-check-reviewer`); no hay matriz formal adicional. La síntesis se presenta al dev. La utilidad del research en decisiones posteriores es retroalimentación de Fase 9, no un gate de cierre |
+| **Fase 6 — Control de cambios** | Estado `Listo para aprobación`: dev autoriza el commit/entrega del research (la utilidad no es gate — es señal de Fase 9) |
 | **Fase 7 — Entrega final** | Commit en ubicación según scope + cita desde el change originador. Gate: `fact-check-reviewer` pre-commit |
 | **Fase 8 — Documentación** | Change MD del REQ + actualizar memoria del proyecto (decisión derivada, no el research entero). Bump SemVer solo si el research modifica la metodología directamente |
 | **Fase 9 — Mejora** | Δ score de fuentes/motor por utilidad real; patrón de preguntas que no se beneficiaron de la voz externa (candidato a restringir Gemini para esos casos) |

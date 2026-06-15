@@ -2,7 +2,7 @@
 
 ## Rol principal — Process Architect — `persona`
 
-Diseña la pregunta de investigación, selecciona las fuentes y el motor de investigación, conduce las consultas, sintetiza outputs destilados, presenta la síntesis al dev (la utilidad se valida diferida en uso, no en un gate síncrono) y decide el formato final del documento.
+Diseña la pregunta de investigación, selecciona las fuentes y el motor de investigación, conduce las consultas, sintetiza outputs destilados, presenta la síntesis al dev (la calidad se validó en el gate F4; la utilidad posterior es señal de Fase 9, no un gate) y decide el formato final del documento.
 
 Hereda de `profiles/self-applied/roles.md`. El nombre Process Architect aplica sin cambio al dominio de investigación.
 

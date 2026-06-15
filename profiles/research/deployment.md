@@ -26,9 +26,9 @@ El change MD del REQ originador (si aplica) cita el research con el formato can�
 
 ## Validación (Fase 5)
 
-**Diferida en uso** (hereda de `self-applied`): no hay matriz formal ni gate síncrono con el dev. La síntesis se presenta en la sesión; la utilidad real del research se valida al consumirse en REQs/decisiones posteriores. No hay ambiente de QA separado. La calidad de claims ya se verificó en el gate F4 (`fact-check-reviewer`, si `propósito = decisión` o divergencia no resuelta en `[crítico]`).
+La calidad de claims se valida en el gate **F4** (`fact-check-reviewer`, si `propósito = decisión` o divergencia no resuelta en `[crítico]`). En F5 la síntesis se presenta al dev; no hay matriz formal adicional ni ambiente de QA separado.
 
-Criterio de cierre diferido (análogo a `self-applied`, modo diferido): research `vigente` sin reporte negativo tras **≥2 usos** en otros REQs — no ≥10 sesiones como `self-applied`: un research se consume en pocos REQs, no en cada sesión de trabajo. Transición del ENUM: `En progreso` → `En validación` (F5) → `Listo para aprobación` (F6) → `Cerrado` (diferido); ver [`workflow/index.md`](../../workflow/index.md) "Estados del requerimiento".
+Criterio de cierre: research `vigente` una vez verificada la calidad (gate F4) y presentada la síntesis — **cierre inmediato**, sin esperar usos posteriores. La **utilidad** del research al consumirse en decisiones es retroalimentación de Fase 9 (un research que no sirvió alimenta la mejora, no bloquea el cierre). Transición del ENUM: `En progreso` → `En validación` (F5) → `Listo para aprobación` (F6) → `Cerrado`; ver [`workflow/index.md`](../../workflow/index.md) "Estados del requerimiento".
 
 ## Distribución al equipo
 
