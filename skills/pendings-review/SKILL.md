@@ -29,7 +29,7 @@ PD() { py "$NEB_SRC/hooks/lib/pendings.py" "$@" 2>/dev/null || python "$NEB_SRC/
 
 ### Pase unificado (default, `/pendings-review`)
 1. `PD triage` → JSON de pendings activos con su tema, banda recomendada y grupos (pre-filtro SQL/FTS de B; agrupación por tema compartido, NO O(N²)).
-2. **Triage inline** (sin subagente): por cada pending, mostrá id · tema(s) · banda · origen del peso (prompt/compas/intrínseco/sin-clasificar) · una línea de rationale. **Traducí los enums**: `open`→"abierto", `obsolete`→"obsoleto", `no-longer-applies`→"ya no aplica", `resolved-otherwise`→"resuelto de otra forma"; `related`→"relacionado", `depends`→"depende", `blocks`→"bloquea".
+2. **Triage inline** (sin subagente): por cada pending, mostrá su cita canónica **`[slug]` (`PD-<id>`)** · tema(s) · banda · origen del peso (prompt/compas/intrínseco/sin-clasificar) · una línea de rationale. Citá por `[slug]` y, si mostrás número, el `id` de `neb.db` como `PD-<id>` — nunca `#NNN` (ver [`../../tooling/pendings.md`](../../tooling/pendings.md) § "Cómo citar un pendiente"). **Traducí los enums**: `open`→"abierto", `obsolete`→"obsoleto", `no-longer-applies`→"ya no aplica", `resolved-otherwise`→"resuelto de otra forma"; `related`→"relacionado", `depends`→"depende", `blocks`→"bloquea".
 3. **Obsolescencia**:
    - señal dura (work ligado cerrado) → ya viene auto-archivado con causa por el gancho de A (`on_work_archived`); solo informalo.
    - "al recuperarlo" / juicio → **SUGERENCIA CON CONFIRMACIÓN**: proponé marcar obsoleto + causa; pedí OK antes de `PD archive <id> <causa>` (el verbo CLI es `archive`, que setea `status='obsolete'` con la causa). Nunca auto-archives por juicio en el MVP.

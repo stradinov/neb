@@ -972,22 +972,63 @@ def cli_revive(args):
     print(f"revive {'OK' if n else 'no-op'} (pending {pid}).")
 
 
+_ID_RE = re.compile(r"^(?:pd-|#)?(\d+)$", re.IGNORECASE)  # acepta 183 | #183 | PD-183
+
+
+def resolve_pending_ref(con, ref):
+    """Resuelve una cita de pendiente a fila(s) de la DB.
+
+    `ref` numérico (`183`, `#183`, `PD-183`) → resuelve por id (rowid) — cita canónica.
+    `ref` no numérico → trata como SLUG/substring del `context_origin`:
+    primero el tag exacto `[slug]`, si no hay match degrada a substring libre.
+    Devuelve (kind, rows) donde kind ∈ {'id','slug-exact','slug-loose'} y rows es
+    lista de sqlite3.Row. La cita por slug es la robusta: el id markdown histórico
+    NO es clave (colisiona y se reasignó en la migración a neb.db)."""
+    m = _ID_RE.match(str(ref).strip())
+    if m:
+        rows = con.execute("SELECT * FROM pending WHERE id=?", (int(m.group(1)),)).fetchall()
+        return ("id", rows)
+    slug = str(ref).strip().lstrip("[").rstrip("]")
+    rows = con.execute("SELECT * FROM pending WHERE context_origin LIKE ? ORDER BY id",
+                       ("%[" + slug + "]%",)).fetchall()
+    if rows:
+        return ("slug-exact", rows)
+    rows = con.execute("SELECT * FROM pending WHERE context_origin LIKE ? ORDER BY id",
+                       ("%" + slug + "%",)).fetchall()
+    return ("slug-loose", rows)
+
+
 def cli_show(args):
     if not args:
-        print("uso: show <id>"); return
+        print("uso: show <id|#id|PD-id|[slug]|slug>"); return
     con = _db_for_cli()
     if con is None:
         return
-    cur = con.execute("SELECT * FROM pending WHERE id=?", (args[0],))
-    r = cur.fetchone()
-    cols = [c[0] for c in cur.description] if r else []
+    con.row_factory = sqlite3.Row
+    kind, rows = resolve_pending_ref(con, args[0])
+    if not rows:
+        con.close()
+        print(f"pending {args[0]} no encontrado "
+              f"(cita por id de neb.db o por [slug]; el #NNN del markdown histórico no resuelve)")
+        return
+    if len(rows) > 1:
+        # ambigüedad por slug/substring: lista candidatos para desambiguar por id
+        cand = [{"id": r["id"], "status": r["status"],
+                 "context_origin": (r["context_origin"] or "")[:120]} for r in rows]
+        con.close()
+        print(json.dumps({"ambiguous": True, "matched_by": kind,
+                          "count": len(cand), "candidates": cand,
+                          "hint": "varios match; reintenta con `show <id>`"},
+                         ensure_ascii=False, indent=2))
+        return
+    r = rows[0]
+    cols = r.keys()
     notes = [dict(zip(("note", "ts"), n))
              for n in con.execute("SELECT note, ts FROM pending_note WHERE pending_id=? ORDER BY id",
-                                  (args[0],))]
+                                  (r["id"],))]
     con.close()
-    if not r:
-        print(f"pending {args[0]} no encontrado"); return
-    print(json.dumps({**dict(zip(cols, r)), "notes": notes}, ensure_ascii=False, indent=2, default=str))
+    print(json.dumps({**dict(zip(cols, r)), "matched_by": kind, "notes": notes},
+                     ensure_ascii=False, indent=2, default=str))
 
 
 def cli_list(_args):

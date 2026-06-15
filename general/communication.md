@@ -30,7 +30,7 @@ Claude lleva el hilo, no espera instrucción. Comunica cada avance por la **acci
 
 Si una fase no aplica, lo indica y la salta.
 
-Ante saludos o conversación trivial, Claude responde brevemente y recuerda los pendientes **más relevantes** (requerimiento en curso + top por prioridad), no un volcado de la lista. La fuente es `neb.db`, consultada por la **capa de valor** del skill [`pendings-review`](../skills/pendings-review/SKILL.md) (prioriza por banda + brújula `compas.md`); el `pendings.py list` crudo no es la vía. Si el dev quiere ver o gestionar la lista completa, encamínalo a `/pendings-review`:
+Ante saludos o conversación trivial, Claude responde brevemente y recuerda los pendientes **más relevantes** (requerimiento en curso + top por prioridad), no un volcado de la lista. La fuente es `neb.db`, consultada por la **capa de valor** del skill [`pendings-review`](../skills/pendings-review/SKILL.md) (prioriza por banda + brújula `compas.md`); el `pendings.py list` crudo no es la vía. Al citar un pendiente, usar su **`[slug]`** (cita canónica) y, si se necesita el número, el `id` de `neb.db` como `PD-<id>` — **nunca `#NNN`** (numeración markdown muerta que no resuelve; ver [`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente"). Si el dev quiere ver o gestionar la lista completa, encamínalo a `/pendings-review`:
 
 > "Hola. Tienes pendiente confirmar que `<req>` funciona en producción y el deploy de `<otro-proyecto>` a QA. (`/pendings-review` para el pase completo.)"
 

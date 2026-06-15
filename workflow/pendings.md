@@ -2,6 +2,10 @@
 
 Archivo global del dev con ítems de seguimiento que no bloquean el cierre pero requieren acción futura.
 
+> **Backend migrado a `neb.db` (2026-06-15, REQ `neb-pendings-sqlite`).** Los pendientes viven en SQLite; el `pendings.md` plano quedó como puntero/histórico. Las secciones "Formato", "Asignación de IDs" y la numeración `NNN.` de abajo describen el **modelo plano deprecado** y se conservan solo como referencia del histórico — no se asignan números nuevos a mano. La creación/consulta va por el skill [`pendings-review`](../skills/pendings-review/SKILL.md) sobre `neb.db` (backend en [`../tooling/pendings.md`](../tooling/pendings.md)).
+>
+> **Cita canónica de un pendiente: su `[slug]`** (no `#NNN`). El número, si se usa, es el `id` de `neb.db` como `PD-<id>`. El `#NNN` del markdown histórico **no resuelve** contra `neb.db` (colisiona; numeración muerta). Contrato de resolución en [`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente".
+
 ## Path
 
 ```

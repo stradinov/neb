@@ -4,6 +4,17 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [4.9.0] - 2026-06-15
+
+### Added
+
+- **Notación canónica de cita de pendientes** (`tooling/pendings.md` § "Cómo citar un pendiente"): la cita canónica es el **`[slug]`**; el número, si se usa, es el `id` de `neb.db` como `PD-<id>`. El `#NNN` del `pendings.md` histórico queda **retirado** — la migración a SQLite asignó `id` autoincrement y descartó el número del markdown, que colisiona y no resuelve contra `neb.db`. Reflejado en `general/communication.md` (recordatorio de pendientes), `skills/pendings-review/SKILL.md` (triage) y `workflow/pendings.md` (nota de deprecación del modelo plano).
+- **`pendings.py show` resuelve por id o por slug**: nueva `resolve_pending_ref()` acepta `<id|#id|PD-id|[slug]|slug>` (tag exacto → substring), reporta ambigüedad con candidatos y aclara en "no encontrado" que el `#NNN` markdown no resuelve. Tests `TestResolvePendingRef` (suite 77/77).
+
+### Fixed
+
+- **Defecto de comunicación raíz**: las ~100 referencias `#NNN` a pendientes en `MEMORY.md` y memorias `project_*.md` usaban la numeración markdown muerta (0 de 23 en `MEMORY.md` resolvían bien). Reescritas a `[slug]` y notación canónica establecida para que no recurra.
+
 ## [4.8.0] - 2026-06-15
 
 ### Changed

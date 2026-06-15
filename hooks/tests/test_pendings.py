@@ -154,5 +154,60 @@ class TestPendingsCrud(unittest.TestCase):
         c2.close()
 
 
+class TestResolvePendingRef(unittest.TestCase):
+    """resolve_pending_ref: cita canónica por id (rowid) vs cita robusta por [slug].
+    El #NNN del markdown histórico NO es clave (colisiona / reasignado en la migración)."""
+
+    def _seed(self):
+        con = _fresh_con()
+        con.row_factory = __import__("sqlite3").Row
+        # context_origin con prefijo "NN." histórico + tag [slug], como tras la migración
+        pendings.create(con, "task", "153. [uma-pem-ppk-desfasados] regenerar pem desde ppk")
+        pendings.create(con, "task", "30. [site-monitor] rotar keys PEM a forced-command")
+        pendings.create(con, "task", "31. [site-monitor] drop tablas diagnostics_bak")
+        con.commit()
+        return con
+
+    def test_resolve_by_id_plain_and_prefixed(self):
+        con = self._seed()
+        for ref in ("1", "#1", "PD-1", "pd-1"):
+            kind, rows = pendings.resolve_pending_ref(con, ref)
+            self.assertEqual(kind, "id")
+            self.assertEqual([r["id"] for r in rows], [1])
+        con.close()
+
+    def test_resolve_by_exact_slug(self):
+        con = self._seed()
+        kind, rows = pendings.resolve_pending_ref(con, "uma-pem-ppk-desfasados")
+        self.assertEqual(kind, "slug-exact")
+        self.assertEqual([r["id"] for r in rows], [1])
+        # también acepta el slug con corchetes
+        kind2, rows2 = pendings.resolve_pending_ref(con, "[uma-pem-ppk-desfasados]")
+        self.assertEqual([r["id"] for r in rows2], [1])
+        con.close()
+
+    def test_resolve_ambiguous_slug_returns_all(self):
+        con = self._seed()
+        kind, rows = pendings.resolve_pending_ref(con, "site-monitor")
+        self.assertEqual(kind, "slug-exact")
+        self.assertEqual(sorted(r["id"] for r in rows), [2, 3])
+        con.close()
+
+    def test_resolve_not_found(self):
+        con = self._seed()
+        kind, rows = pendings.resolve_pending_ref(con, "no-existe-xyz")
+        self.assertEqual(rows, [])
+        kind2, rows2 = pendings.resolve_pending_ref(con, "9999")
+        self.assertEqual((kind2, rows2), ("id", []))
+        con.close()
+
+    def test_old_markdown_number_does_not_resolve_to_item(self):
+        # el "153." vive solo como texto en context_origin; show 153 (id) no devuelve ese item
+        con = self._seed()
+        _, rows = pendings.resolve_pending_ref(con, "153")
+        self.assertEqual(rows, [])  # no hay rowid 153
+        con.close()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -39,6 +39,18 @@ Toda consulta del dev sobre sus pendientes —desde "cuáles son mis pendientes"
 
 Los verbos `list` y `show` de `pendings.py` son **acceso de bajo nivel / debug** (volcado JSON sin priorización ni brújula). NO son una vía de consulta equivalente ofrecida al dev: usarlos para responder "cuáles son mis pendientes" **salta la capa de valor** y oculta el nudge de `compas.md`. Reservalos para inspección puntual, scripting o diagnóstico.
 
+## Cómo citar un pendiente (notación canónica)
+
+La **cita canónica de un pendiente es su `[slug]`** (el tag `[nombre-req]` que vive en `context_origin`): es estable y único en intención. Cuando se muestra un número, es **siempre el `id` de `neb.db`**, escrito `PD-<id>` (p.ej. `PD-170`). `pendings.py show` resuelve cualquiera de las dos vías:
+
+```bash
+PD show 170            # por id de neb.db (rowid)
+PD show PD-170         # idem (acepta prefijo PD- o #)
+PD show uma-pem-ppk-desfasados   # por [slug]: tag exacto → substring; lista candidatos si es ambiguo
+```
+
+**El `#NNN` del `pendings.md` histórico queda RETIRADO como cita de pendiente.** Esa numeración del markdown plano **no es clave en `neb.db`**: la migración asignó `id` autoincrement y descartó el número del `.md` (sobrevive solo como texto en el prefijo `NN.` de `context_origin`). Por eso `#NNN` colisiona (un mismo número apunta a varios items) y `show NNN` resolvería al item equivocado. Al citar un pendiente —en chat, memorias, change MDs— usar `[slug]` (y `PD-<id>` si se necesita el número). Nunca `#NNN`.
+
 ## Jerarquía de fuentes de priorización
 
 De mayor a menor:
