@@ -1092,6 +1092,13 @@ def cli_remember_session(args):
 
 
 def cli_main(argv):
+    # Windows: la consola cp1252 no puede imprimir Unicode (→, ↔, acentos) del context_origin;
+    # reconfigurar stdout/stderr a UTF-8 (errors='replace') evita UnicodeEncodeError en list/show/triage.
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     cmd, rest = argv[0], argv[1:]
     if cmd == "create":
         cli_create(rest)
