@@ -61,6 +61,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
   - Modelo sin entrada en `pricing.yml` → tokens se acumulan, costo se marca `—`; warning a stderr.
   - Python no encontrado → warning a stderr, `exit 0`.
   - Cualquier error → `exit 0` (no bloquea al dev).
+- **Subsesión interna del corrector**: si `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), `exit 0` antes de leer stdin — no cuenta los tokens del subproceso `claude -p` contra el REQ activo. Ver `hooks/lib/subsession.py`.
 
 **Lógica completa**: `hooks/lib/usage-tracker.py`.
 
@@ -75,6 +76,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Windows**: declarar `"shell": "powershell"` con `logbook-sync.ps1` — combina stdin + variables de entorno (ver §Filosofía).
 - **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea.
 - **Opt-in por proyecto** (no auto-registrado por el plugin), como `usage-tracker`.
+- **Subsesión interna del corrector**: si `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), `exit 0` — no escribe la subsesión Haiku a la bitácora. Ver `hooks/lib/subsession.py`.
 - **Lógica completa**: `hooks/lib/logbook.py` (modo hook de captura + CLI del comando `/logbook`).
 
 ### notify-on-permission.{ps1,sh}
@@ -89,7 +91,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Output**: ninguno (reproduce audio async en background process).
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, player ausente), `exit 0` silencioso.
 - **Configurable** en `~/.claude/notify-on-permission.json`: `enabled`, `wav`. Defaults: 1 chime fijo. Sin scaling ni `min_seconds` (el evento no tiene duración medible).
-- **Recursion guard**: chequea `CLAUDE_PREPROCESS_RECURSION=1` (igual que `notify-on-stop`).
+- **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), igual que `notify-on-stop`.
 - **Coexiste con `Stop`** (`notify-on-stop`): eventos semánticamente distintos; pueden disparar chimes en secuencia. Ver `tooling/notify-on-permission.md` § 5.
 
 ### notify-on-stop.{ps1,sh}
@@ -104,7 +106,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Output**: ninguno (reproduce audio async en background process).
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0` silencioso.
 - **Configurable** en `~/.claude/notify-on-stop.json`: `enabled`, `wav`, `min_seconds`, `max_chimes`, `scaling` (`per-minute` o `fixed`). Defaults: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
-- **Recursion guard**: chequea `CLAUDE_PREPROCESS_RECURSION=1` y abandona — evita el "chime fantasma" del subproceso `claude -p` invocado por [`preprocess-prompt.py`](#preprocess-promptpy). Cross-link en `tooling/notify-on-stop.md` § Recursion guard.
+- **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) y abandona — evita el "chime fantasma" del subproceso `claude -p` invocado por [`preprocess-prompt.py`](#preprocess-promptpy). Cross-link en `tooling/notify-on-stop.md` § Guard de subsesión interna.
 
 ### preprocess-prompt.py
 
@@ -116,7 +118,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Output**: JSON con `hookSpecificOutput.additionalContext` (preámbulo para Claude principal). Sin output si el hook decide skipear (slash command, trivial, payload puro, error).
 - **Defensivo**: ante cualquier falla (red, API, timeout, CLI ausente), `exit 0` silencioso y el prompt pasa raw — nunca bloquea la sesión.
 - **Configurable** en sesión vía `/preprocess full|fast|off`, prefijo `$$` por prompt o env var `CLAUDE_PREPROCESS_MODE`.
-- **Excepción a la filosofía "< 100ms"**: documentada explícitamente — la llamada inevitable a `claude -p` con Haiku justifica 13–25 s (medido localmente; el plan estimaba 2–4 s, la realidad fue mayor). Mitigaciones: timeout 30 s, filtros agresivos de skip, modo `off`, opt-in personal, recursion guard via env var `CLAUDE_PREPROCESS_RECURSION`.
+- **Excepción a la filosofía "< 100ms"**: documentada explícitamente — la llamada inevitable a `claude -p` con Haiku justifica 13–25 s (medido localmente; el plan estimaba 2–4 s, la realidad fue mayor). Mitigaciones: timeout 30 s, filtros agresivos de skip, modo `off`, opt-in personal, guard de subsesión interna via env var `NEB_INTERNAL_SUBSESSION` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) que setea en el subproceso — consumida por todos los hooks de sesión vía `hooks/lib/subsession.py`.
 
 ### pre-push-changelog (git hook del repo, no Claude Code)
 

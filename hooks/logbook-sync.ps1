@@ -4,6 +4,10 @@
 # Ver hooks/lib/logbook.py para la lógica. Defensivo: exit 0 siempre.
 $ErrorActionPreference = "SilentlyContinue"
 
+# Subsesión interna del corrector (preprocess-prompt.py): hook inerte — no escribir
+# la subsesión Haiku a la bitácora. Ver hooks/lib/subsession.py.
+if ($env:NEB_INTERNAL_SUBSESSION -eq '1' -or $env:CLAUDE_PREPROCESS_RECURSION -eq '1') { exit 0 }
+
 $raw = [Console]::In.ReadToEnd()
 try { $j = $raw | ConvertFrom-Json } catch { exit 0 }
 

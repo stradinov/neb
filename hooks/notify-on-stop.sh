@@ -5,15 +5,16 @@
 # Defaults: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
 # Configurable en ~/.claude/notify-on-stop.json (enabled, wav, min_seconds, max_chimes, scaling).
 #
-# Recursion guard: si CLAUDE_PREPROCESS_RECURSION=1 (subproceso `claude -p`
-# del preprocess-prompt.py), abandona sin sonar — evita chime fantasma.
+# Guard de subsesión interna del corrector (preprocess-prompt.py): si
+# NEB_INTERNAL_SUBSESSION=1 (o el alias legacy CLAUDE_PREPROCESS_RECURSION=1),
+# abandona sin sonar — evita chime fantasma. Ver hooks/lib/subsession.py.
 #
 # Requisitos: bash, jq, un player (afplay/paplay/aplay/play). Sin alguno
 # de estos, exit 0 silencioso. Defensivo: cualquier falla → exit 0.
 
 set +e
 
-[ "$CLAUDE_PREPROCESS_RECURSION" = "1" ] && exit 0
+if [ "${NEB_INTERNAL_SUBSESSION:-}" = "1" ] || [ "${CLAUDE_PREPROCESS_RECURSION:-}" = "1" ]; then exit 0; fi
 
 log() { printf '[notify-on-stop] %s\n' "$*" >&2; }
 

@@ -19,6 +19,18 @@ import re
 import sys
 import importlib.util
 
+# Helper de subsesión interna del corrector (hooks/lib/subsession.py). Fallback
+# inline — el hook de arranque nunca debe romperse por esto.
+sys.path.insert(0, os.path.join(
+    os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "hooks", "lib"))
+try:
+    from subsession import is_internal_subsession
+except ImportError:
+    def is_internal_subsession(env=None):
+        env = os.environ if env is None else env
+        return (env.get("NEB_INTERNAL_SUBSESSION") == "1"
+                or env.get("CLAUDE_PREPROCESS_RECURSION") == "1")
+
 
 def _utf8_stdout():
     # En Windows el stdout por defecto es cp1252; el arranque tiene Unicode.
@@ -54,6 +66,12 @@ def _project_opts_out():
 
 
 def main():
+    # Subsesión interna del corrector (preprocess-prompt.py): no inyectar el
+    # arranque — evita que el Haiku corrector reciba instrucciones de asistente +
+    # pendientes y responda la pregunta en vez de corregir ortografía.
+    if is_internal_subsession():
+        return
+
     _utf8_stdout()
 
     # neb: skip — si el proyecto activo lo declara en su CLAUDE.md, no inyectar nada (D2).

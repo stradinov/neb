@@ -5,12 +5,13 @@
 # Defaults: 1 chime fijo. Sin scaling, sin walk-back de transcript.
 # Configurable en ~/.claude/notify-on-permission.json (enabled, wav).
 #
-# Recursion guard: si CLAUDE_PREPROCESS_RECURSION=1 (subproceso `claude -p` del
-# preprocess-prompt.py), abandona sin sonar — evita chime fantasma.
+# Guard de subsesión interna del corrector (preprocess-prompt.py): si
+# NEB_INTERNAL_SUBSESSION=1 (o el alias legacy CLAUDE_PREPROCESS_RECURSION=1),
+# abandona sin sonar — evita chime fantasma. Ver hooks/lib/subsession.py.
 
 $ErrorActionPreference = 'SilentlyContinue'
 
-if ($env:CLAUDE_PREPROCESS_RECURSION -eq '1') { exit 0 }
+if ($env:NEB_INTERNAL_SUBSESSION -eq '1' -or $env:CLAUDE_PREPROCESS_RECURSION -eq '1') { exit 0 }
 
 # --- Defaults ---------------------------------------------------------------
 

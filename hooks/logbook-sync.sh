@@ -4,6 +4,10 @@
 # En Windows usar logbook-sync.ps1 ("shell": "powershell" — consume stdin; ver hooks/README.md §Filosofía).
 set -euo pipefail
 
+# Subsesión interna del corrector (preprocess-prompt.py): hook inerte — no escribir
+# la subsesión Haiku a la bitácora. Ver hooks/lib/subsession.py.
+if [ "${NEB_INTERNAL_SUBSESSION:-}" = "1" ] || [ "${CLAUDE_PREPROCESS_RECURSION:-}" = "1" ]; then exit 0; fi
+
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""')
 CWD=$(echo "$INPUT"        | jq -r '.cwd // ""')

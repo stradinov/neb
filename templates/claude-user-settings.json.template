@@ -73,7 +73,7 @@
     "Stop": [
       {
         "_doc": "notify-on-stop — hook opt-in personal que reproduce un chime al cierre de cada turno de Claude. Ver tooling/notify-on-stop.md. Defaults: 1 chime + 1 por minuto del turno, max 5, skip si < 10s. Configurable en ~/.claude/notify-on-stop.json. Elegir bloque OS apropiado y eliminar el otro.",
-        "_os_note": "WINDOWS — usa `shell: \"powershell\"` con `$env:VAR`. Requiere NEB_HOME seteado. Defensivo: ante cualquier falla, exit 0 silencioso. Incluye recursion guard via CLAUDE_PREPROCESS_RECURSION para evitar chime fantasma cuando preprocess-prompt.py invoca claude -p como subproceso.",
+        "_os_note": "WINDOWS — usa `shell: \"powershell\"` con `$env:VAR`. Requiere NEB_HOME seteado. Defensivo: ante cualquier falla, exit 0 silencioso. Incluye guard de subsesión interna via NEB_INTERNAL_SUBSESSION (alias legacy CLAUDE_PREPROCESS_RECURSION) para evitar chime fantasma cuando preprocess-prompt.py invoca claude -p como subproceso.",
         "hooks": [
           {
             "type": "command",
@@ -97,7 +97,7 @@
     "Notification": [
       {
         "_doc": "notify-on-permission — hook opt-in personal que reproduce 1 chime cuando Claude pide permiso para una herramienta o el prompt input lleva idle > 60s. Ver tooling/notify-on-permission.md. Configurable en ~/.claude/notify-on-permission.json (enabled, wav). Coexiste con el bloque Stop (notify-on-stop): eventos semánticamente distintos. Elegir bloque OS apropiado y eliminar el otro.",
-        "_os_note": "WINDOWS — usa `shell: \"powershell\"` con `$env:VAR`. Requiere NEB_HOME seteado. Defensivo: ante cualquier falla, exit 0 silencioso. Incluye recursion guard via CLAUDE_PREPROCESS_RECURSION.",
+        "_os_note": "WINDOWS — usa `shell: \"powershell\"` con `$env:VAR`. Requiere NEB_HOME seteado. Defensivo: ante cualquier falla, exit 0 silencioso. Incluye guard de subsesión interna via NEB_INTERNAL_SUBSESSION (alias legacy CLAUDE_PREPROCESS_RECURSION).",
         "hooks": [
           {
             "type": "command",

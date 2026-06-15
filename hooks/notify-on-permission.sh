@@ -6,15 +6,16 @@
 # Defaults: 1 chime fijo. Sin scaling, sin walk-back de transcript.
 # Configurable en ~/.claude/notify-on-permission.json (enabled, wav).
 #
-# Recursion guard: si CLAUDE_PREPROCESS_RECURSION=1 (subproceso `claude -p`
-# del preprocess-prompt.py), abandona sin sonar — evita chime fantasma.
+# Guard de subsesión interna del corrector (preprocess-prompt.py): si
+# NEB_INTERNAL_SUBSESSION=1 (o el alias legacy CLAUDE_PREPROCESS_RECURSION=1),
+# abandona sin sonar — evita chime fantasma. Ver hooks/lib/subsession.py.
 #
 # Requisitos: bash, jq (blando), un player (afplay/paplay/aplay/play). Sin
 # player en PATH → exit 0 silencioso. Defensivo: cualquier falla → exit 0.
 
 set +e
 
-[ "$CLAUDE_PREPROCESS_RECURSION" = "1" ] && exit 0
+if [ "${NEB_INTERNAL_SUBSESSION:-}" = "1" ] || [ "${CLAUDE_PREPROCESS_RECURSION:-}" = "1" ]; then exit 0; fi
 
 log() { printf '[notify-on-permission] %s\n' "$*" >&2; }
 

@@ -19,7 +19,7 @@ Opt-in personal porque no todos los devs lo quieren (entorno de oficina comparti
 | Paso | Quién | Cómo |
 |---|---|---|
 | 1. Detectar fin de turno | Claude Code | Dispara `Stop` hook con `transcript_path` en stdin |
-| 2. Recursion guard | Hook (script) | Si `CLAUDE_PREPROCESS_RECURSION=1`, `exit 0` |
+| 2. Guard de subsesión interna | Hook (script) | Si `NEB_INTERNAL_SUBSESSION=1` (o alias legacy), `exit 0` |
 | 3. Cargar config personal | Hook (script) | Lee `~/.claude/notify-on-stop.json`; campos ausentes caen a defaults |
 | 4. Calcular duración del turno | Hook (script) | Walk-back del transcript al último user message no-`toolUseResult` |
 | 5. Reproducir N chimes | Hook (script) | Player nativo en background process; el hook retorna inmediato |
@@ -28,7 +28,7 @@ Opt-in personal porque no todos los devs lo quieren (entorno de oficina comparti
 
 ```
 Claude termina turno → Stop hook
-                      ├─ Recursion guard (CLAUDE_PREPROCESS_RECURSION=1 → exit 0)
+                      ├─ Guard de subsesión interna (NEB_INTERNAL_SUBSESSION=1 → exit 0)
                       ├─ Cargar ~/.claude/notify-on-stop.json (defaults si ausente)
                       ├─ Si enabled=false → exit 0
                       ├─ Resolver WAV (cfg.wav || $NEB_HOME/personal/chimes-loud.wav)
@@ -109,25 +109,25 @@ El dev tenía una versión personal de este hook en `~/.claude/hooks/notify-on-s
 3. Opcional: crear `~/.claude/notify-on-stop.json` con valores explícitos; si está ausente, los defaults producen exactamente el comportamiento previo (1 chime + 1/minuto, max 5, skip < 10s).
 4. Reiniciar sesión `claude`.
 
-## 7. Recursion guard
+## 7. Guard de subsesión interna
 
 El hook [`preprocess-prompt.py`](../hooks/preprocess-prompt.py) invoca `claude -p --model claude-haiku-4-5` como subproceso para corregir el prompt del dev. Ese subproceso hereda `~/.claude/settings.json`, incluido el bloque `Stop`. Cuando termina su turno interno, dispara su **propio** `Stop` → el hook se ejecutaría con la sesión Haiku como contexto → chime suena en un "turno fantasma" que no corresponde al dev.
 
-Mecanismo: `preprocess-prompt.py` setea la env var `CLAUDE_PREPROCESS_RECURSION=1` en el ambiente del subproceso. El primer paso del script `notify-on-stop` chequea esa bandera y abandona silenciosamente:
+Mecanismo: `preprocess-prompt.py` marca el entorno del subproceso con `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION=1`). El primer paso del script `notify-on-stop` chequea ambas y abandona silenciosamente:
 
-- PowerShell: `if ($env:CLAUDE_PREPROCESS_RECURSION -eq '1') { exit 0 }`
-- Bash: `[ "$CLAUDE_PREPROCESS_RECURSION" = "1" ] && exit 0`
+- PowerShell: `if ($env:NEB_INTERNAL_SUBSESSION -eq '1' -or $env:CLAUDE_PREPROCESS_RECURSION -eq '1') { exit 0 }`
+- Bash: `if [ "${NEB_INTERNAL_SUBSESSION:-}" = "1" ] || [ "${CLAUDE_PREPROCESS_RECURSION:-}" = "1" ]; then exit 0; fi`
 
 Sin este guard, cada prompt no trivial del dev produce 2 chimes: uno del subproceso Haiku (fantasma) y otro del turno real al final.
 
-Cross-link inverso: [`tooling/prompt-preprocessing.md`](prompt-preprocessing.md) §9 "Restricciones técnicas" → bullet recursion guard.
+Es **un caso del contrato general** "hooks inertes en subsesión interna del corrector" — definido en [`prompt-preprocessing.md`](prompt-preprocessing.md) § 9 y compartido vía [`hooks/lib/subsession.py`](../hooks/lib/subsession.py).
 
 ## 8. Heurística de skip
 
 El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 
 - `enabled: false` en el config.
-- `$env:CLAUDE_PREPROCESS_RECURSION = '1'` (recursion guard).
+- `$env:NEB_INTERNAL_SUBSESSION = '1'` (o el alias legacy `CLAUDE_PREPROCESS_RECURSION`) — guard de subsesión interna.
 - Duración del turno < `min_seconds` (default 10).
 - `transcript_path` ausente o ilegible — fallback a `play_n 1` (1 chime de cortesía, no skip total).
 - WAV inexistente y default inexistente.
@@ -183,7 +183,7 @@ Escenarios a probar tras activar:
 | 7 | Config `wav` apuntando a archivo inexistente | Fallback al default + warning stderr; chime suena. |
 | 8 | Config JSON malformado | Todos defaults aplicados; warning stderr. |
 | 9 | Sin config (archivo ausente) | Defaults; chime suena igual que escenarios 2-4. |
-| 10 | **Prompt no trivial con `preprocess-prompt.py` activo** (escenario clave) | Solo 1 chime al final del turno real. **Sin chime fantasma** del subproceso `claude -p` (recursion guard). |
+| 10 | **Prompt no trivial con `preprocess-prompt.py` activo** (escenario clave) | Solo 1 chime al final del turno real. **Sin chime fantasma** del subproceso `claude -p` (guard de subsesión interna). |
 | 11 | Transcript inaccesible (path inválido en payload) | 1 chime de cortesía + `exit 0`. |
 | 12 | Linux/Mac sin player instalado | `exit 0` silencioso. |
 | 13 | Windows con WAV en path con espacios | Suena correctamente. |
@@ -195,6 +195,6 @@ Escenarios 1–4, 6, 9, 10, 13–15 corren en máquina Windows. Escenarios 12 (L
 ## 12. Referencias
 
 - [`hooks/README.md`](../hooks/README.md) — catálogo de los hooks.
-- [`tooling/notify-on-permission.md`](notify-on-permission.md) — hook hermano (`Notification`) para permission prompts e idle > 60 s. Comparte recursion guard y arquitectura defensiva.
-- [`tooling/prompt-preprocessing.md`](prompt-preprocessing.md) — hook recíproco que origina la necesidad del recursion guard.
+- [`tooling/notify-on-permission.md`](notify-on-permission.md) — hook hermano (`Notification`) para permission prompts e idle > 60 s. Comparte el guard de subsesión interna y arquitectura defensiva.
+- [`tooling/prompt-preprocessing.md`](prompt-preprocessing.md) — hook recíproco que origina la necesidad del guard de subsesión interna.
 - Documentación oficial de `Stop`: [Anthropic Claude Code hooks](https://docs.claude.com/en/docs/claude-code/hooks).

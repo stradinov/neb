@@ -151,7 +151,14 @@ Umbral conservador a propósito: ante duda, pasa a Capa B (Haiku decide).
 - **Slash commands**: skipeados; el hook detecta `^/` y deja pasar.
 - **Plan mode**: SÍ aplica (decisión consciente — corrige antes de planear evita planes erróneos).
 - **Múltiples hooks UserPromptSubmit**: Claude Code no soporta matcher en este event; si el equipo agrega otro hook UserPromptSubmit, todos los `additionalContext` se concatenan.
-- **Recursion guard**: el hook setea la variable de entorno `CLAUDE_PREPROCESS_RECURSION=1` antes de invocar `claude -p` y abandona temprano si la detecta — evita que el hook se llame a sí mismo cuando la sesión interna de Haiku dispara `UserPromptSubmit` por la misma config del dev. Sin este guard, cada llamada cae en cascada de timeouts hasta que cada nivel abandona. La misma bandera la consume el hook `Stop` [`notify-on-stop`](notify-on-stop.md) para evitar el "chime fantasma" cuando el subproceso `claude -p` termina su turno interno.
+- **Guard de subsesión interna** (contrato canónico): el hook marca el entorno del subproceso `claude -p` con `NEB_INTERNAL_SUBSESSION=1` (vía `mark_internal_subsession` de [`hooks/lib/subsession.py`](../hooks/lib/subsession.py)) y abandona temprano si la detecta. La subsesión de Haiku hereda el `settings.json` del dev, así que dispararía **todos** los hooks de Neb; cada uno debe ser **inerte** dentro de ella. Consumidores que respetan la bandera (vía `is_internal_subsession` o el snippet shell canónico):
+  - `preprocess-prompt.py` (`UserPromptSubmit`) — evita la auto-recursión (cascada de timeouts); fue el motivo original de la bandera.
+  - `neb-bootstrap-context.py` (`SessionStart`) — **no inyecta el arranque**; sin esto el Haiku corrector recibe instrucciones de asistente + pendientes y **responde** la pregunta en vez de corregirla.
+  - `usage-tracker.sh` (`Stop`) — no cuenta los tokens de la subsesión contra el REQ activo.
+  - `logbook-sync.{sh,ps1}` (`Stop`/`SessionEnd`/`PreCompact`) — no escribe la subsesión a la bitácora.
+  - `notify-on-stop` / `notify-on-permission` — evitan el "chime fantasma".
+
+  **Alias legacy** `CLAUDE_PREPROCESS_RECURSION` (deprecado, retiro diferido a un major): `mark_internal_subsession` setea **ambas** y todos los consumidores chequean **ambas**, para tolerar la convivencia de plugins de distinta versión en el equipo durante la transición.
 
 ## 10. Cuándo desactivarlo
 

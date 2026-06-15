@@ -4,7 +4,7 @@
 >
 > Artefactos del hook: [`hooks/notify-on-permission.ps1`](../hooks/notify-on-permission.ps1), [`hooks/notify-on-permission.sh`](../hooks/notify-on-permission.sh), [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
 >
-> Hermano de [`tooling/notify-on-stop.md`](notify-on-stop.md). Detalles compartidos (recursion guard, filosofía hooks, cross-OS Windows, restricciones técnicas) viven allí — este documento referencia sin duplicar.
+> Hermano de [`tooling/notify-on-stop.md`](notify-on-stop.md). Detalles compartidos (guard de subsesión interna, filosofía hooks, cross-OS Windows, restricciones técnicas) viven allí — este documento referencia sin duplicar.
 
 ---
 
@@ -20,7 +20,7 @@ Opt-in personal por las mismas razones que `notify-on-stop` (oficina compartida,
 
 ```
 Claude pide permiso o idle > 60s → Notification hook
-                                  ├─ Recursion guard (CLAUDE_PREPROCESS_RECURSION=1 → exit 0)
+                                  ├─ Guard de subsesión interna (NEB_INTERNAL_SUBSESSION=1 → exit 0)
                                   ├─ Cargar ~/.claude/notify-on-permission.json (defaults si ausente)
                                   ├─ Si enabled=false → exit 0
                                   ├─ Resolver WAV (cfg.wav || $NEB_HOME/personal/chimes-loud.wav)
@@ -100,7 +100,7 @@ Escenarios a probar tras activar:
 | 5 | Config `wav` apuntando a archivo inexistente | Fallback al default + warning stderr; chime suena. |
 | 6 | Config JSON malformado | Defaults aplicados; warning stderr. |
 | 7 | Sin config (archivo ausente) | Defaults; chime suena. |
-| 8 | **Prompt no trivial con `preprocess-prompt.py` activo** (escenario clave) | Sin chime fantasma del subproceso `claude -p` (recursion guard via `CLAUDE_PREPROCESS_RECURSION`). |
+| 8 | **Prompt no trivial con `preprocess-prompt.py` activo** (escenario clave) | Sin chime fantasma del subproceso `claude -p` (guard de subsesión interna via `NEB_INTERNAL_SUBSESSION`). |
 | 9 | Windows con WAV en path con espacios | Suena correctamente. |
 | 10 | Coexistencia con otros hooks `Notification` futuros | Todos ejecutan secuencialmente; ninguno bloquea al otro (filosofía de `hooks/README.md`). |
 | 11 | Linux/Mac sin player instalado | `exit 0` silencioso. |
@@ -110,7 +110,7 @@ Escenarios 1–7, 9–10, 12 corren en máquina Windows. Escenario 11 (Linux/Mac
 
 ## Referencias
 
-- [`tooling/notify-on-stop.md`](notify-on-stop.md) — hook hermano (`Stop`). Detalles compartidos: recursion guard (§ 7), heurística de skip (§ 8), limitaciones y restricciones técnicas (§ 9), cuándo desactivar (§ 10).
-- [`tooling/prompt-preprocessing.md`](prompt-preprocessing.md) — hook que origina la necesidad del recursion guard via `CLAUDE_PREPROCESS_RECURSION`.
+- [`tooling/notify-on-stop.md`](notify-on-stop.md) — hook hermano (`Stop`). Detalles compartidos: guard de subsesión interna (§ 7), heurística de skip (§ 8), limitaciones y restricciones técnicas (§ 9), cuándo desactivar (§ 10).
+- [`tooling/prompt-preprocessing.md`](prompt-preprocessing.md) — hook que origina la necesidad del guard de subsesión interna via `NEB_INTERNAL_SUBSESSION` (alias legacy `CLAUDE_PREPROCESS_RECURSION`).
 - [`hooks/README.md`](../hooks/README.md) — catálogo de los hooks + filosofía (idempotencia, < 100 ms, defensivos, sin secretos, cross-OS).
 - Documentación oficial de `Notification`: [Anthropic Claude Code hooks](https://docs.claude.com/en/docs/claude-code/hooks).

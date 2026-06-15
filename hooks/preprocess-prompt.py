@@ -16,6 +16,22 @@ import shutil
 import subprocess
 import sys
 
+# Helper de subsesión interna (hooks/lib/subsession.py). Fallback inline si el
+# import falla — el hook nunca debe romperse por esto.
+sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), "lib"))
+try:
+    from subsession import is_internal_subsession, mark_internal_subsession
+except ImportError:
+    def is_internal_subsession(env=None):
+        env = os.environ if env is None else env
+        return (env.get("NEB_INTERNAL_SUBSESSION") == "1"
+                or env.get("CLAUDE_PREPROCESS_RECURSION") == "1")
+
+    def mark_internal_subsession(env):
+        env["NEB_INTERNAL_SUBSESSION"] = "1"
+        env["CLAUDE_PREPROCESS_RECURSION"] = "1"
+        return env
+
 # ---------------------------------------------------------------------------
 # Defaults
 # ---------------------------------------------------------------------------
@@ -44,7 +60,6 @@ STACK_TRACE = re.compile(
     r"(at\s+\S+\s+\([^)]+:\d+\)|File\s+\"[^\"]+\",\s+line\s+\d+)"
 )
 SUBPROCESS_TIMEOUT = 30
-RECURSION_ENV = "CLAUDE_PREPROCESS_RECURSION"
 
 
 def log(msg):
@@ -194,8 +209,7 @@ def correct_with_haiku(prompt, model):
     if not cli:
         log("claude CLI no encontrado en PATH")
         return None
-    env = os.environ.copy()
-    env[RECURSION_ENV] = "1"
+    env = mark_internal_subsession(os.environ.copy())
     try:
         proc = subprocess.run(
             [cli, "-p", "--model", model, "--system-prompt", SYSTEM_PROMPT, prompt],
@@ -262,7 +276,7 @@ def emit(additional_context):
 
 
 def main():
-    if os.environ.get(RECURSION_ENV) == "1":
+    if is_internal_subsession():
         return
 
     try:

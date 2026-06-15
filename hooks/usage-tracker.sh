@@ -4,6 +4,10 @@
 # Filosofía: defensivo — exit 0 siempre; errores a stderr.
 set -euo pipefail
 
+# Subsesión interna del corrector (preprocess-prompt.py): hook inerte — no contar
+# los tokens de la subsesión Haiku contra el REQ activo. Ver hooks/lib/subsession.py.
+if [ "${NEB_INTERNAL_SUBSESSION:-}" = "1" ] || [ "${CLAUDE_PREPROCESS_RECURSION:-}" = "1" ]; then exit 0; fi
+
 INPUT=$(cat)
 SESSION_ID=$(echo "$INPUT" | jq -r '.session_id // ""')
 CWD=$(echo "$INPUT"       | jq -r '.cwd // ""')
