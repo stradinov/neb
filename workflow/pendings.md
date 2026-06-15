@@ -36,7 +36,7 @@ Asignar al nuevo ítem el **siguiente entero libre** (típicamente `máx + 1`, p
 ## Cuándo Claude lo escribe / lee
 
 - **Escribe**: al cerrar sin confirmación de prod (ver [delivery.md](../process/delivery.md)) o ítems sin urgencia identificados durante el requerimiento.
-- **Lee**: al saludar (ver [communication.md](../general/communication.md)) o cuando el dev pide pendientes.
+- **Lee**: cuando el dev pide pendientes o al saludar (ver [communication.md](../general/communication.md)) — la consulta se sirve por el skill [`pendings-review`](../skills/pendings-review/SKILL.md) sobre `neb.db` (capa de valor: prioriza por banda + brújula `compas.md`), no leyendo el `.md` plano.
 
 ## Sección "Sesiones pausadas"
 

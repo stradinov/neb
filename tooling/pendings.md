@@ -33,6 +33,12 @@ owner: <usuario>
 
 El parser **tolera la ausencia** de `compas.md` (degrada a señales intrínsecas). `compas.md` NO se versiona ni se incluye en el repo; este documento es solo su formato y contrato. La plantilla literal la materializa `write_compas()` solo tras OK del dev.
 
+## Vía de consulta del dev: el skill, no el CLI crudo
+
+Toda consulta del dev sobre sus pendientes —desde "cuáles son mis pendientes" hasta priorizar o pasar lista— se atiende por el skill [`pendings-review`](../skills/pendings-review/SKILL.md), que aplica la **capa de valor**: prioriza por banda, consulta la brújula `compas.md` y, si falta o la cobertura es baja, dispara `infer_objectives` para aprenderla (ver jerarquía abajo).
+
+Los verbos `list` y `show` de `pendings.py` son **acceso de bajo nivel / debug** (volcado JSON sin priorización ni brújula). NO son una vía de consulta equivalente ofrecida al dev: usarlos para responder "cuáles son mis pendientes" **salta la capa de valor** y oculta el nudge de `compas.md`. Reservalos para inspección puntual, scripting o diagnóstico.
+
 ## Jerarquía de fuentes de priorización
 
 De mayor a menor:

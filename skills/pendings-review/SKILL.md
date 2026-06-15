@@ -1,11 +1,14 @@
 ---
 name: pendings-review
 description: >
-  Cargar cuando el dev invoca /pendings-review o pide revisar, priorizar o "pasar lista" a sus
-  pendientes: marcar obsoletos, recomendar prioridad por tema, agrupar relacionados (candidatos a
-  REQ conjunto) y sugerir soluciones. También cuando pide "deja esta sesión en mis pendientes" o
-  "rankéame los pendientes según <criterio/roadmap>". NO cargar para implementación normal ni para
-  el pendings.md plano (este skill opera la DB neb.db, no el .md).
+  Cargar SIEMPRE que el dev consulte, revise, priorice o "pase lista" a sus pendientes —
+  incluyendo preguntas de lectura simple como "cuáles son mis pendientes", "qué tengo pendiente",
+  "mis pendientes activos". También: marcar obsoletos, recomendar prioridad por tema, agrupar
+  relacionados (candidatos a REQ conjunto), sugerir soluciones, "deja esta sesión en mis
+  pendientes" o "rankéame los pendientes según <criterio/roadmap>". Es la ÚNICA vía de consulta
+  del dev: opera neb.db y aplica la capa de valor (prioriza por banda + brújula compas.md), no el
+  volcado plano. El CLI pendings.py list/show es acceso de bajo nivel/debug y NO sustituye al
+  skill. NO cargar solo para implementación normal ajena a los pendientes.
 ---
 
 # Skill: pendings-review (revisión y priorización de pendientes)

@@ -28,9 +28,9 @@ Claude lleva el hilo, no espera instrucción. Comunica cada avance por la **acci
 
 Si una fase no aplica, lo indica y la salta.
 
-Ante saludos o conversación trivial, Claude responde brevemente y recuerda los pendientes activos (requerimiento en curso, ítems de `pendings.md`):
+Ante saludos o conversación trivial, Claude responde brevemente y recuerda los pendientes **más relevantes** (requerimiento en curso + top por prioridad), no un volcado de la lista. La fuente es `neb.db`, consultada por la **capa de valor** del skill [`pendings-review`](../skills/pendings-review/SKILL.md) (prioriza por banda + brújula `compas.md`); el `pendings.py list` crudo no es la vía. Si el dev quiere ver o gestionar la lista completa, encamínalo a `/pendings-review`:
 
-> "Hola. Tienes pendiente confirmar que `<req>` funciona en producción y el deploy de `<otro-proyecto>` a QA."
+> "Hola. Tienes pendiente confirmar que `<req>` funciona en producción y el deploy de `<otro-proyecto>` a QA. (`/pendings-review` para el pase completo.)"
 
 Si hay requerimiento activo (sección `## Requerimiento activo` en algún `project_<nombre>.md`), Claude verifica adicionalmente `autoCompactEnabled` en `~/.claude/settings.json`. Si es `false` o ausente, agrega una advertencia inline al recordatorio:
 
