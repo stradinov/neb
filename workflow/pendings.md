@@ -58,7 +58,7 @@ Formato:
 
 No numerado (los ítems numerados son pendientes accionables; estos son recuperables). Procedimiento completo en [`workflow/metrics.md`](metrics.md) §"Pausar y reanudar la misma sesión Claude".
 
-**Cuándo Claude escribe**: al detectar el anuncio de pausa (ver [`general/communication.md`](../general/communication.md) §"Hilo de la metodología").
+**Cuándo Claude escribe**: al detectar el anuncio de pausa (ver [`general/communication.md`](../general/communication.md) §"Handoff de sesión").
 
 **Cuándo Claude elimina**: al reanudar la sesión vía `--resume <nombre>` (paso 5 de §"Retomar una sesión interrumpida"), o si el dev anuncia descarte explícito.
 

@@ -62,7 +62,7 @@ Resumir el estado en una línea al inicio:
 
 ### Pausar y reanudar la misma sesión Claude
 
-Cuando el dev anuncia que pausará para continuar después en otra sesión, la sesión actual debe quedar recuperable por nombre — `claude --continue` solo recupera la última, y si el dev abre una sesión intermedia se pierde el hilo. La **acción de Claude** al detectar el anuncio de pausa (nombrar la sesión, registrar en `pendings.md`, confirmar) vive en [`../general/communication.md`](../general/communication.md) §"Hilo de la metodología".
+Cuando el dev anuncia que pausará para continuar después en otra sesión, la sesión actual debe quedar recuperable por nombre — `claude --continue` solo recupera la última, y si el dev abre una sesión intermedia se pierde el hilo. La **acción de Claude** al detectar el anuncio de pausa (nombrar la sesión, registrar en `pendings.md`, confirmar) vive en [`../general/communication.md`](../general/communication.md) §"Handoff de sesión".
 
 **Comandos disponibles para el dev**:
 

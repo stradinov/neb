@@ -21,7 +21,7 @@ Dos hooks en `~/.claude/settings.json` (config **personal del dev**) que preserv
 
 Se configuran una vez en `~/.claude/settings.json` del dev — no requieren activación por proyecto. Variantes en [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
 
-> **Failsafe del flag**: si `autoCompactEnabled` es `false` o ausente, el hook `auto` no dispara y el draft envejece silenciosamente. La verificación al inicio de sesión vive en [`general/communication.md`](../general/communication.md) "Hilo de la metodología" — Claude advierte al saludar si hay requerimiento activo. No hay SessionStart hook ejecutable (Claude lo verifica al leer settings.json).
+> **Failsafe del flag**: si `autoCompactEnabled` es `false` o ausente, el hook `auto` no dispara y el draft envejece silenciosamente. La verificación al inicio de sesión vive en [`general/communication.md`](../general/communication.md) § "Pendientes en saludos y conversación trivial" — Claude advierte al saludar si hay requerimiento activo. No hay SessionStart hook ejecutable (Claude lo verifica al leer settings.json).
 
 #### `matcher: "auto"` — agente silencioso
 

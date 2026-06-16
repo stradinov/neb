@@ -8,7 +8,7 @@ Este archivo es el **índice/mapa** de la metodología: orden de lectura y flujo
 
 Transversales **inyectadas al arranque** (vía [`startup.md`](startup.md), garantizadas en toda sesión):
 
-- [Communication](communication.md) — tono, idioma, hilo de la metodología.
+- [Communication](communication.md) — BLUF, idioma, hilo conductor, handoff.
 - [Models](models.md) — selección de modelo según contexto.
 - [Profile detection](profile-detection.md) — detección del profile al iniciar y profile activo durante la sesión.
 - [Phase transitions](../process/phase-transitions.md) — enrutamiento del workflow: trigger de formalización, anti-desviación, mapa de fases, gates de cola, conflictos normativos.
