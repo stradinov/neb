@@ -4,6 +4,15 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [4.10.1] - 2026-06-17
+
+> **Patch**: corrige dos defectos que dejaban el CLI/skill `/logbook` inoperante en servidores con Python < 3.12 (p.ej. Amazon Linux 2023: `python3` 3.9, `python3.11` vía uv, sin 3.12). Sin cambio de fuerza normativa ni de imports. De paso sincroniza `plugin.json` con `VERSION` (venía en 4.9.0 desde 4.10.0).
+
+### Fixed
+
+- **`SyntaxError` por backslash en expresión de f-string (PEP 701) — bloqueaba el import del módulo.** En `hooks/lib/_db_shared.py`, `posix_to_win` usaba `f"{path[1].upper()}:\\{path[2:].replace('/', '\\')}"`; el backslash dentro de `{…}` solo es válido en Python ≥ 3.12. En 3.9/3.11 lanza `SyntaxError: f-string expression part cannot include a backslash`, y al ser error de parseo el módulo entero no carga (ni en Linux, aunque `posix_to_win` solo actúe en Windows) — tumbando el CLI y, por importación, `logbook.py`/`pendings.py`/`usage-tracker.py`. Se precomputan `drive` y `rest` en variables y el f-string queda sin backslash en sus expresiones. Comportamiento idéntico en Windows; no-op en Linux/Mac. Validado con `py_compile` en 3.9 y 3.11 (exit 0).
+- **Wrapper `LB()` del skill `/logbook` sin fallback a `python3`.** `LB() { py … || python …; }` daba exit 127 (`python: command not found`) en cajas que solo tienen `python3` (Amazon Linux 2023 no provee `py` ni `python`), impidiendo que el skill ejecutara el CLI aun con la sintaxis corregida. Se agrega `|| python3 …` como último fallback (Windows sigue usando `py` primero; Linux/Mac caen a `python3`).
+
 ## [4.10.0] - 2026-06-15
 
 > Refactor de `general/communication.md` hacia una política orientada a decisiones (BLUF como principio rector, gates por **propiedad de la acción**, captura de tangentes por impacto). Adopta el rediseño del borrador, validado por análisis multi-lente adversarial + revisión de roles (`qa-process-engineer`, `process-improvement-analyst`). **Minor**: cambia la fuerza normativa de varias reglas y agrega lineamientos; no rompe imports (solo anclas de sección intra-archivo de path estable).

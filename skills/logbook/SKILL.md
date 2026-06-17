@@ -15,7 +15,7 @@ Opera la bitácora de relevo. El artefacto y su modelo de ownership viven en [`.
 
 ```bash
 NEB_SRC="${NEB_HOME:-${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/*/neb/*/ 2>/dev/null | sort -V | tail -1)}}"
-LB() { py "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python "$NEB_SRC/hooks/lib/logbook.py" "$@"; }
+LB() { py "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python3 "$NEB_SRC/hooks/lib/logbook.py" "$@"; }
 ```
 
 ## Operaciones

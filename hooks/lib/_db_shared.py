@@ -32,7 +32,9 @@ LEGACY_DB_NAME = "neb-logbook.db"    # nombre legado (máquinas del equipo sin m
 def posix_to_win(path):
     """Ruta POSIX de Git Bash (/c/Users/foo) a Windows. No-op si ya es Windows o en Linux/Mac."""
     if sys.platform == "win32" and path and re.match(r"^/[a-zA-Z]/", path):
-        return f"{path[1].upper()}:\\{path[2:].replace('/', '\\')}"
+        drive = path[1].upper()
+        rest = path[2:].replace('/', '\\')
+        return f"{drive}:\\{rest}"
     return path
 
 
