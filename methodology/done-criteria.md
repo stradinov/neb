@@ -16,7 +16,7 @@ Criterios que determinan cuándo un **requerimiento** está terminado. Lo que se
 
 ## Checkpoint (no bloquea)
 
-**"Pendiente de entrega"** — la sección del `project_<nombre>.md` (ver [`../workflow/memory.md`](../workflow/memory.md)). Si tiene ítems, el cierre los notifica y espera decisión: resolver antes de cerrar, o cerrar igual.
+**"Pendiente de entrega"** — la sección del `active_<proyecto>_<slug>.md` del REQ (ver [`../workflow/memory.md`](../workflow/memory.md)). Si tiene ítems, el cierre los notifica y espera decisión: resolver antes de cerrar, o cerrar igual.
 
 ## Confirmación post-entrega (no bloquea, salvo complejidad alta)
 

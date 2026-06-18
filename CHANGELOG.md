@@ -4,6 +4,28 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.0.0] - 2026-06-17
+
+> **Major**: la memoria de un requerimiento pasa de una sección `## Requerimiento activo` dentro de `project_<nombre>.md` a un **archivo por REQ** (`active_<proyecto>_<slug>.md`), habilitando **varios REQ activos del mismo proyecto en paralelo** en la bitácora de relevo. Además, los hooks ahora **respetan `autoMemoryDirectory`** (setting nativo de Claude Code) para una memoria única independiente del cwd. **Compatible hacia atrás**: los hooks siguen leyendo la sección legacy durante la transición. El major es por el cambio de vocabulario/estructura canónica de la memoria; no hay ruptura de imports.
+
+### Added
+
+- **`active_<proyecto>_<slug>.md` — un archivo por REQ activo.** La bitácora (`work`) ahora captura **N REQ activos por proyecto** (el esquema ya lo soportaba vía `(project, req_slug)`; faltaba el capturador, que asumía un único REQ por cwd). Plantilla nueva: `templates/active-req.md.template`.
+- **`_db_shared.find_active_reqs(memory_dir)`** (plural) — escanea `active_*.md` + compat legacy (`project_*.md` con `## Requerimiento activo`), dedup por `(project_path, name)` prefiriendo `active_*`, ordena por mtime. Fuente única compartida por `logbook.py` y `usage-tracker.py` (antes había 2 copias divergentes de `find_active_req`).
+- **`_db_shared.resolve_memory_dir(home, cwd, encoded)`** — respeta `autoMemoryDirectory` de `settings.json` (precedencia Local > Project > User; fallback al path derivado del workspace). Memoria única independiente del cwd de arranque; opt-in personal, no se impone. Scopes `managed`/`--settings` fuera de alcance del hook (limitación documentada).
+- **Cobertura**: `hooks/tests/test_active_reqs.py` (N REQ, compat legacy, dedup, parser robusto, `resolve_memory_dir` por scope + fallback + expansión `~`).
+
+### Changed
+
+- **`logbook.py`**: `main()` itera todos los REQ activos y hace upsert por cada uno; `memory_dir` vía `resolve_memory_dir`.
+- **`usage-tracker.py`**: `memory_dir` vía `resolve_memory_dir` (user scope); con varios REQ activos atribuye el costo del turno al de mtime más reciente. Los archivos de sesión (`.jsonl`/`offset`/`state`) **siguen** ubicándose por cwd (no se mueven con `autoMemoryDirectory`; el `.jsonl` no vive en el dir de memoria custom).
+- **"Pendiente de entrega"** se mueve de `project_<nombre>.md` al `active_*.md` del REQ (es por-REQ); `project_<nombre>.md` queda con contexto duradero.
+- **Vocabulario y docs** (sección → archivo, singular → plural): `workflow/memory.md` (canónico), `hooks/README.md`, `general/communication.md`, `workflow/{changes,metrics,logbook,index,traceability}.md`, `methodology/{vocabulary,done-criteria}.md`, `process/{execution,documentation}.md`, `templates/project-memory.md.template`.
+
+### Fixed
+
+- **`usage-tracker` no atribuía costos con el formato real de la memoria.** Su `_extract_field` solo matcheaba `Field: value` plano, no `- **Field:** value` (el formato del template) → en la práctica nunca encontraba el REQ activo. Al unificar en `find_active_reqs` (regex `_field` robusto a viñeta/negrita), queda corregido.
+
 ## [4.10.1] - 2026-06-17
 
 > **Patch**: corrige dos defectos que dejaban el CLI/skill `/logbook` inoperante en servidores con Python < 3.12 (p.ej. Amazon Linux 2023: `python3` 3.9, `python3.11` vía uv, sin 3.12). Sin cambio de fuerza normativa ni de imports. De paso sincroniza `plugin.json` con `VERSION` (venía en 4.9.0 desde 4.10.0).

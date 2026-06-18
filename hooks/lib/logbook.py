@@ -31,7 +31,7 @@ from datetime import datetime, timezone
 # El resolver dual-mode vive SOLO en _db_shared; las 3 sedes de db_path de este módulo lo importan.
 from _db_shared import (
     resolve_db_path, _connect, _migrate, begin_immediate, with_write_tx,
-    now_iso, posix_to_win, encode_cwd,
+    now_iso, posix_to_win, encode_cwd, find_active_reqs, resolve_memory_dir,
     _whoami, _hostname, _git, _git_info, _project_id, _normalize_remote, _basename,
 )
 
@@ -55,7 +55,7 @@ def main():
     encoded      = encode_cwd(cwd)
     projects_dir = os.path.join(home_dir, ".claude", "projects", encoded)
     jsonl_path   = transcript_arg or os.path.join(projects_dir, f"{session_id}.jsonl")
-    memory_dir   = os.path.join(projects_dir, "memory")
+    memory_dir   = resolve_memory_dir(home_dir, cwd, encoded)   # respeta autoMemoryDirectory; fallback al default
     schema_path  = os.path.join(guide_dir, "hooks", "logbook-schema.sql")
 #    db_path      = os.path.join(home_dir, ".claude", "neb-logbook.db")
     db_path      = resolve_db_path(home_dir)
@@ -64,24 +64,25 @@ def main():
     machine = _hostname()
     branch, head = _git_info(cwd)
 
-    active = find_active_req(memory_dir) if os.path.isdir(memory_dir) else None
+    active_reqs = find_active_reqs(memory_dir) if os.path.isdir(memory_dir) else []
 
     con = _connect(db_path, schema_path)
     if con is None:
         return
     try:
-        if active:
-            project  = _project_id(active.get("project_path") or cwd)
-            req_slug = active.get("name") or "sin-nombre"
-            payload  = json.dumps({
-                "plan": active.get("plan", ""),
-                "next_steps": active.get("next_steps", ""),
-                "files": active.get("files", ""),
-                "pending_delivery": active.get("pending_delivery", ""),
-            }, ensure_ascii=False)
-            _upsert_req(con, project, req_slug, owner, machine, active.get("state", ""),
-                        branch, head, active.get("project_path", ""), active.get("draft", ""),
-                        payload, session_id, jsonl_path)
+        if active_reqs:
+            for active in active_reqs:                # N REQ activos (incluye varios del mismo proyecto)
+                project  = _project_id(active.get("project_path") or cwd)
+                req_slug = active.get("name") or "sin-nombre"
+                payload  = json.dumps({
+                    "plan": active.get("plan", ""),
+                    "next_steps": active.get("next_steps", ""),
+                    "files": active.get("files", ""),
+                    "pending_delivery": active.get("pending_delivery", ""),
+                }, ensure_ascii=False)
+                _upsert_req(con, project, req_slug, owner, machine, active.get("state", ""),
+                            branch, head, active.get("project_path", ""), active.get("draft", ""),
+                            payload, session_id, jsonl_path)
         else:
             summary = _first_user_prompt(jsonl_path)
             _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd, jsonl_path)
@@ -147,47 +148,8 @@ def _event(con, work_id, dev, machine, action, prev_owner=None, note=None):
 
 
 # ----------------------------------------------------------------------- memoria
-
-def find_active_req(memory_dir):
-    """project_*.md con §Requerimiento activo: el más reciente y bien-formado → dict (o None)."""
-    try:
-        files = [f for f in os.listdir(memory_dir) if f.startswith("project_") and f.endswith(".md")]
-    except OSError:
-        return None
-    candidates = []
-    for fname in files:
-        fpath = os.path.join(memory_dir, fname)
-        try:
-            content = open(fpath, encoding="utf-8").read()
-            mtime = os.path.getmtime(fpath)
-        except OSError:
-            continue
-        if "## Requerimiento activo" not in content:
-            continue
-        block = content.split("## Requerimiento activo", 1)[1]
-        d = {
-            "name":         _field(block, "Nombre"),
-            "project_path": _field(block, "Path del proyecto"),
-            "draft":        _field(block, "Draft changes MD"),
-            "state":        _field(block, "Estado"),
-            "plan":         _field(block, "Plan resumido"),
-            "files":        _field(block, "Archivos modificados hasta ahora"),
-            "next_steps":   _field(block, "Próximos pasos"),
-            "pending_delivery": _field(block, "Pendiente de entrega"),
-        }
-        well_formed = bool(d["name"] and d["project_path"])
-        candidates.append((well_formed, mtime, d))
-    if not candidates:
-        return None
-    candidates.sort(key=lambda c: (c[0], c[1]), reverse=True)
-    return candidates[0][2]
-
-
-def _field(text, label):
-    """Valor de una línea tipo '- **Label:** value' o 'Label: value'."""
-    pat = re.compile(r"^[\s\-*]*" + re.escape(label) + r"\s*:\s*\**\s*(.+?)\s*$", re.MULTILINE)
-    m = pat.search(text)
-    return m.group(1).strip() if m else ""
+# find_active_reqs (plural, soporta N REQ activos) y el parser _field viven ahora en
+# _db_shared.py — fuente única compartida con usage-tracker.py (antes había 2 copias).
 
 
 def _first_user_prompt(jsonl_path, limit=120):

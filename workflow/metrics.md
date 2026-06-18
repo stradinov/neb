@@ -117,7 +117,7 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 4. Tokens son estables — no los afecta la velocidad del sistema, el modelo usado, ni los reinicios de sesión.
 5. Cross-REQs permite separar dos señales: evolución de Claude (mismo modelo, metodología mejoró → costo baja) y evolución del modelo (mismo tipo de REQ → ¿Opus 4.7 es más eficiente que 4.6?).
 
-**Captura:** hook `Stop` (`hooks/usage-tracker.sh`) actualiza automáticamente la sección "Reporte de cierre" del draft del change MD al cierre de cada turno. Requiere `## Requerimiento activo` en el `project_<nombre>.md` correspondiente.
+**Captura:** hook `Stop` (`hooks/usage-tracker.sh`) actualiza automáticamente la sección "Reporte de cierre" del draft del change MD al cierre de cada turno. Requiere al menos un `active_<proyecto>_<slug>.md` (o sección legacy `## Requerimiento activo`); con varios REQ activos, atribuye el costo del turno al de modificación más reciente.
 
 **Breakdown por modelo:** el JSONL de la sesión registra el campo `model` en cada entry de tipo `assistant`. El hook agrupa tokens y costo por modelo en la misma invocación — soporta cambio de modelo mid-sesión (`/model`).
 

@@ -35,7 +35,7 @@ Este ENUM de lock es **ortogonal** al ENUM de estados del requerimiento ([`../me
 
 | Modo | Cuándo | Identidad | Reanudación |
 |---|---|---|---|
-| **Con-REQ** | hay `## Requerimiento activo` en memoria | `project + req_slug` | **relevo cross-dev** (lock atómico); estado + transcript al central |
+| **Con-REQ** | hay ≥1 `active_<proyecto>_<slug>.md` en memoria (o sección legacy) | `project + req_slug` | **relevo cross-dev** (lock atómico); estado + transcript al central |
 | **Exploratorio** | sin REQ formal (exploración previa) | `session_id` (entrada liviana, sin lock) | **`--resume` local** del mismo dev. Si el proyecto activa el central (opt-in), también se publica al catálogo (visibilidad/búsqueda); **no** relevable cross-dev (`claude_session_id` solo vale en su máquina origen) |
 
 El modo exploratorio registra automáticamente la sesión (aunque el dev no anuncie pausa) con un resumen y el `transcript_path` local, para que `/logbook` la localice entre muchas y entregue el comando `--resume`. **Si el proyecto activa el central (opt-in)**, la sesión exploratoria también se publica al catálogo —para visibilidad y búsqueda del corpus—, pero **no es relevable cross-dev**: que **otro** dev la retome exige formalizarla en REQ antes. Al **formalizarse en REQ**, se vincula a un `work` `req` y entra al relevo cross-dev con lock.
@@ -46,7 +46,7 @@ El **disparador** de "entorno compartido" es **determinista** y **opt-in por pro
 
 ## Entrada de la bitácora
 
-Se **deriva** de la memoria del proyecto (`## Requerimiento activo` / `## Pendiente de entrega` — fuente de verdad); la bitácora es su **proyección publicada al equipo**, no una segunda fuente. Contiene:
+Se **deriva** de la memoria del proyecto (los `active_<proyecto>_<slug>.md` — uno por REQ — y su "Pendiente de entrega"; fuente de verdad); la bitácora es su **proyección publicada al equipo**, no una segunda fuente. Contiene:
 
 - Metadatos: `project`, `req_slug`, `owner`, `lock_state`, estado del REQ, `branch`, `head_commit`, `origin_machine`, `claude_session_id` (válido solo en su máquina origen).
 - Estado semántico (`payload_json`): plan resumido, archivos, próximos pasos, "Pendiente de entrega", y **Trabajo en vuelo** — prosa que el agente redacta al pausar sobre **cómo relanzar** agentes/scripts (no se introspecta el proceso: ver [`../process/execution.md`](../process/execution.md) §handoff).
@@ -65,5 +65,5 @@ El esquema concreto (SQLite local / central) vive en [`../hooks/logbook-schema.s
 ## Relación con otros artefactos (frontera, no duplicar)
 
 - [`pendings.md`](pendings.md) §"Sesiones pausadas" + `--resume`: reanudar **la propia sesión local** (mismo dev, misma máquina). La bitácora **no lo reemplaza** — lo complementa con el **relevo cross-dev** y, en modo exploratorio, automatiza el registro para `--resume`.
-- [`memory.md`](memory.md) ("Requerimiento activo" / "Pendiente de entrega"): **fuente de verdad** local del estado del REQ. La bitácora la deriva.
+- [`memory.md`](memory.md) (`active_<proyecto>_<slug>.md` — uno por REQ — y su "Pendiente de entrega"): **fuente de verdad** local del estado del REQ. La bitácora la deriva.
 - [`changes.md`](changes.md): el change MD (registro del requerimiento — ver [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Registro del requerimiento") da la trazabilidad del REQ; la entrada de bitácora **apunta** a él, no lo duplica. Si el `work` se publica a una bitácora **compartida** (backend central, relevo cross-dev), su registro debe estar **entregado** (en git: pusheado) para que el puntero resuelva en la máquina que releva — publicar el `work` a un entorno compartido **habilita la Entrega temprana del registro** (ver [`changes.md`](changes.md) § "Ciclo de vida del draft"). En backend local-only el registro sigue el ciclo por defecto.

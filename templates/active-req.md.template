@@ -1,0 +1,36 @@
+---
+name: REQ activo — <PROYECTO>/<SLUG>
+description: <una línea — requerimiento en curso; este archivo se elimina al cerrar>
+type: project
+---
+
+# Requerimiento activo — <SLUG>
+
+> **Un archivo por REQ activo**: `active_<proyecto>_<slug>.md` en el mismo dir de memoria.
+> Soporta **varios REQ del mismo proyecto en paralelo** (cada uno su archivo). El contexto
+> duradero del proyecto (Profile, Convenciones, Bugs resueltos) vive en `project_<nombre>.md`.
+> **Se elimina al cerrar el requerimiento.** Es la fuente de verdad local del estado del REQ
+> (la bitácora `work` y el hook PreCompact lo leen).
+
+- **Nombre:** <slug del requerimiento>
+- **Path del proyecto:** <path absoluto local>
+- **Draft changes MD:** changes/YYYY-MM-DD-<req>.md
+- **Estado:** En progreso | En validación | Listo para aprobación | Cerrado (ver [`workflow/index.md`](../workflow/index.md) "Estados del requerimiento")
+- **Plan resumido:** <3-5 líneas del plan aprobado>
+- **Archivos modificados hasta ahora:** lista
+- **Próximos pasos:** lista
+
+## Pendiente de entrega
+
+> Handoff entre sesiones cuando el REQ está en validación esperando entrega final.
+> **Se elimina al confirmar que la entrega final fue aprobada** (mantenerla viva es una falla
+> de cierre). Si está vacía, omitir la sección.
+
+Artefactos listos para entrega:
+- <archivo> (commit <hash>)
+
+Pasos exactos:
+1. <comando de deploy: scp/ssh/migración de BD/...>
+2. ...
+
+Crons o configuración a verificar.

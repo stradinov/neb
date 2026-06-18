@@ -16,6 +16,8 @@ import os
 import re
 import sys
 
+from _db_shared import find_active_reqs, resolve_memory_dir
+
 # ---------------------------------------------------------------------------
 # Helpers de path
 # ---------------------------------------------------------------------------
@@ -48,7 +50,11 @@ def main():
     offset_path  = os.path.join(projects_dir, f"{session_id}.usage-offset")
     state_path   = os.path.join(projects_dir, f"{session_id}.usage-state.json")
     pricing_path = os.path.join(guide_dir, "hooks", "pricing.yml")
-    memory_dir   = os.path.join(projects_dir, "memory")
+    # memory_dir respeta autoMemoryDirectory (user scope); jsonl/offset/state NO se mueven
+    # con ese setting — son archivos de sesión, viven bajo projects/<encoded_cwd> (por cwd).
+    # usage-tracker solo recibe encoded_cwd (no el cwd crudo) → resuelve user scope; los
+    # scopes project/local de autoMemoryDirectory los respeta logbook.py (caso raro).
+    memory_dir   = resolve_memory_dir(home_dir, "", encoded_cwd)
 
     # -----------------------------------------------------------------------
     # 1. Verificar JSONL y memoria
@@ -59,9 +65,15 @@ def main():
         return
 
     # -----------------------------------------------------------------------
-    # 2. Encontrar REQ activo
+    # 2. Encontrar REQ activo — con N REQ activos, atribuir el costo del turno al de
+    #    mtime más reciente (el tocado en esta sesión); atribución única, no duplica.
     # -----------------------------------------------------------------------
-    project_path, draft_rel = find_active_req(memory_dir)
+    reqs = find_active_reqs(memory_dir)
+    if not reqs:
+        return
+    active = max(reqs, key=lambda d: d.get("mtime", 0))
+    project_path = active.get("project_path", "")
+    draft_rel    = active.get("draft", "")
     if not project_path or not draft_rel:
         return
 
@@ -196,37 +208,6 @@ def main():
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-def find_active_req(memory_dir):
-    """Retorna (project_path, draft_rel) del primer project_*.md con §Requerimiento activo."""
-    try:
-        files = [f for f in os.listdir(memory_dir) if f.startswith("project_") and f.endswith(".md")]
-    except OSError:
-        return None, None
-
-    for fname in files:
-        fpath = os.path.join(memory_dir, fname)
-        try:
-            content = open(fpath, encoding="utf-8").read()
-        except OSError:
-            continue
-        if "## Requerimiento activo" not in content:
-            continue
-        project_path = _extract_field(content, "Path del proyecto")
-        draft_rel    = _extract_field(content, "Draft changes MD")
-        if project_path and draft_rel:
-            return project_path, draft_rel
-
-    return None, None
-
-
-def _extract_field(text, field):
-    """Extrae valor de una línea con formato 'Field: value'."""
-    for line in text.splitlines():
-        if line.startswith(field + ":"):
-            return line[len(field) + 1:].strip()
-    return ""
-
 
 def load_pricing(pricing_path):
     """Lee pricing.yml. Intenta pyyaml; si no está disponible, usa parser manual simple."""

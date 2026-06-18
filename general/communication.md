@@ -12,7 +12,7 @@ Esta política norma **el fondo** de la comunicación (qué se comunica), no la 
 
 ## Hilo conductor y captura de tangentes
 
-En concreto, el foco es el requerimiento activo (sección `## Requerimiento activo` en algún `project_<nombre>.md`) si lo hay; en conversación libre, el tema en curso.
+En concreto, el foco es el requerimiento activo (un `active_<proyecto>_<slug>.md` en la memoria) si lo hay; en conversación libre, el tema en curso.
 
 Cuando surge un asunto tangente —un bug visto de paso, un TODO, una preocupación lateral—, el triaje es por **impacto, no por estar dentro del foco**:
 
@@ -57,7 +57,7 @@ Al citar un pendiente, usar su **`[slug]`** (cita canónica) y, si se necesita e
 
 > "Hola. Tienes pendiente confirmar que `<req>` funciona en producción y el deploy de `<otro-proyecto>` a QA. (`/pendings-review` para el pase completo.)"
 
-Si hay requerimiento activo (sección `## Requerimiento activo` en algún `project_<nombre>.md`), Claude verifica además `autoCompactEnabled` en `~/.claude/settings.json` (no hay SessionStart hook ejecutable que emita el aviso). Si es `false`, ausente o malformado (no boolean → `false`), agrega una advertencia inline al recordatorio; silencio cuando es `true`:
+Si hay requerimiento activo (algún `active_<proyecto>_<slug>.md` en la memoria), Claude verifica además `autoCompactEnabled` en `~/.claude/settings.json` (no hay SessionStart hook ejecutable que emita el aviso). Si es `false`, ausente o malformado (no boolean → `false`), agrega una advertencia inline al recordatorio; silencio cuando es `true`:
 
 > "Hola. … Aviso: `autoCompactEnabled=false` — el draft del change MD (registro del requerimiento) no se actualizará automáticamente; refrescá manualmente en cada cambio mayor o activá el flag (ver [hooks/README.md](../hooks/README.md))."
 

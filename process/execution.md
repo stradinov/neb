@@ -50,9 +50,9 @@ Qué subagente por profile (default + paralelos por dimensión): ver la matriz c
 
 Al retomar un requerimiento interrumpido:
 
-1. Leer la memoria del proyecto (`project_<nombre>.md`).
+1. Leer la memoria del proyecto (`project_<nombre>.md` para contexto duradero + el `active_<proyecto>_<slug>.md` del REQ).
 2. Leer el MD del requerimiento (`<proyecto>/changes/<fecha>-<nombre>.md`) para ver estado.
-3. Si hay "Pendiente de entrega" → atender primero.
+3. Si el `active_*.md` tiene "Pendiente de entrega" → atender primero.
 4. Si la última fase no está cerrada → continuar desde ahí.
 5. Si la sesión se reanudó vía `claude --resume <nombre>`, eliminar la entrada correspondiente en `pendings.md` §"Sesiones pausadas".
 
@@ -88,7 +88,7 @@ Cambios menores que surgen durante el trabajo (rename de columna, archivo SQL fa
 
 Claude propone el cambio en una línea y procede con aprobación implícita o explícita. **No vuelve a clarificación ni genera estimado nuevo.**
 
-Al resolver, documentar de inmediato en la memoria del proyecto:
+Al resolver, documentar de inmediato en la memoria del proyecto (lo duradero en `project_<nombre>.md`; lo propio del REQ en su `active_<proyecto>_<slug>.md`):
 - Qué fue (una línea).
 - Cómo se resolvió (una línea).
-- Si requiere paso adicional en la entrega final.
+- Si requiere paso adicional en la entrega final → "Pendiente de entrega" del `active_*.md`.

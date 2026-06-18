@@ -108,6 +108,130 @@ def _normalize_remote(url):
     return u
 
 
+# --------------------------------------------------------------------------- memoria del proyecto (REQ activos)
+
+def _field(text, label):
+    """Valor de una línea tipo '- **Label:** value' o 'Label: value'. '' si no está.
+    El prefijo opcional [\\s\\-*]* tolera viñetas markdown y negritas (formato del template)."""
+    pat = re.compile(r"^[\s\-*]*" + re.escape(label) + r"\s*:\s*\**\s*(.+?)\s*$", re.MULTILINE)
+    m = pat.search(text)
+    return m.group(1).strip() if m else ""
+
+
+def _parse_active_block(block):
+    """Bloque de texto de un REQ activo → dict con los campos canónicos del REQ."""
+    return {
+        "name":             _field(block, "Nombre"),
+        "project_path":     _field(block, "Path del proyecto"),
+        "draft":            _field(block, "Draft changes MD"),
+        "state":            _field(block, "Estado"),
+        "plan":             _field(block, "Plan resumido"),
+        "files":            _field(block, "Archivos modificados hasta ahora"),
+        "next_steps":       _field(block, "Próximos pasos"),
+        "pending_delivery": _field(block, "Pendiente de entrega"),
+    }
+
+
+def find_active_reqs(memory_dir):
+    """TODOS los REQ activos del memory_dir → lista de dicts (cada uno + clave 'mtime').
+
+    Estructura A + compatibilidad de transición:
+      • active_*.md  — un REQ por archivo (formato nuevo). Soporta N REQ por proyecto.
+      • project_*.md con bloque '## Requerimiento activo' (legacy) — para no congelar
+        los REQ en vuelo mientras se migra.
+    Dedup por (project_path, name): si el mismo REQ aparece en ambos formatos, gana el
+    active_*.md; entre iguales, el de mtime mayor. Lista ordenada por mtime desc.
+    Devuelve [] ante cualquier error (defensivo; igual contrato que la antigua single)."""
+    try:
+        names = os.listdir(memory_dir)
+    except OSError:
+        return []
+
+    found = {}   # (project_path, name) -> (is_active_file, mtime, dict)
+    for fname in names:
+        if not fname.endswith(".md"):
+            continue
+        is_active = fname.startswith("active_")
+        is_legacy = fname.startswith("project_")
+        if not (is_active or is_legacy):
+            continue
+        fpath = os.path.join(memory_dir, fname)
+        try:
+            content = open(fpath, encoding="utf-8").read()
+            mtime = os.path.getmtime(fpath)
+        except (OSError, UnicodeDecodeError):
+            continue                                  # un archivo no-UTF-8 se salta, no aborta el escaneo
+
+        if is_active:
+            block = content
+        elif "## Requerimiento activo" in content:
+            block = content.split("## Requerimiento activo", 1)[1]
+        else:
+            continue
+
+        d = _parse_active_block(block)
+        if not (d["name"] and d["project_path"]):
+            continue                                  # mal-formado: ignorar (igual que legacy)
+        d["mtime"] = mtime
+        key = (d["project_path"], d["name"])
+        prev = found.get(key)
+        if prev is None or (is_active, mtime) > (prev[0], prev[1]):   # active_* gana; luego mtime
+            found[key] = (is_active, mtime, d)
+
+    reqs = [v[2] for v in found.values()]
+    reqs.sort(key=lambda d: d["mtime"], reverse=True)
+    return reqs
+
+
+def _read_json(path):
+    try:
+        with open(path, encoding="utf-8") as fh:
+            return json.load(fh)
+    except (OSError, ValueError):
+        return None
+
+
+def _expand_user(p, home_dir):
+    """Expande '~' / '~/...' usando home_dir EXPLÍCITO (os.path.expanduser ignora el
+    home temporal de los tests). Rutas absolutas se devuelven tal cual."""
+    if not p:
+        return ""
+    p = p.strip()
+    if p == "~":
+        return home_dir
+    if p.startswith("~/") or p.startswith("~\\"):
+        return os.path.join(home_dir, p[2:])
+    return p
+
+
+def resolve_memory_dir(home_dir, cwd, encoded):
+    """Dir de auto-memoria EFECTIVO. Respeta el setting nativo 'autoMemoryDirectory' de
+    Claude Code (precedencia basada en archivo: Local > Project > User); si ningún scope
+    lo define, cae al default derivado del cwd:
+        <home>/.claude/projects/<encoded>/memory
+    Cuando 'autoMemoryDirectory' está fijado, ÉL es el dir de memoria (contiene MEMORY.md
+    directamente; no se le anexa /projects/<encoded>).
+
+    Fuera de alcance (limitación conocida): scopes 'managed' y '--settings' no son
+    ubicables desde un hook. Defensivo: cualquier error → default."""
+    default = os.path.join(home_dir, ".claude", "projects", encoded, "memory")
+    try:
+        candidates = []
+        if cwd:
+            candidates.append(os.path.join(cwd, ".claude", "settings.local.json"))  # Local
+            candidates.append(os.path.join(cwd, ".claude", "settings.json"))        # Project
+        candidates.append(os.path.join(home_dir, ".claude", "settings.json"))       # User
+        for path in candidates:                       # primer scope que lo defina gana
+            data = _read_json(path)
+            if isinstance(data, dict) and data.get("autoMemoryDirectory"):
+                base = _expand_user(str(data["autoMemoryDirectory"]), home_dir)
+                if base:
+                    return base
+    except Exception:
+        pass
+    return default
+
+
 # --------------------------------------------------------------------------- resolución de path (dual-mode)
 
 def _is_usable_db(path):

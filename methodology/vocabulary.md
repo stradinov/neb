@@ -70,7 +70,7 @@ El REQ se proyecta (no se duplica) en varios artefactos; cada uno **deriva** del
 
 | Proyección | Qué refleja | Canónico |
 |---|---|---|
-| Memoria del proyecto `## Requerimiento activo` | estado vivo de la sesión (fuente de verdad local) | [`../workflow/memory.md`](../workflow/memory.md) |
+| Memoria del proyecto `active_<proyecto>_<slug>.md` (uno por REQ activo) | estado vivo del REQ (fuente de verdad local) | [`../workflow/memory.md`](../workflow/memory.md) |
 | Bitácora de relevo (`work` + lock ortogonal + `archived`) | relevo cross-dev; deriva de la memoria | [`../workflow/logbook.md`](../workflow/logbook.md) |
 | `pendings.md` (`[nombre-req]` tag) | seguimiento no bloqueante cross-sesión | [`../workflow/pendings.md`](../workflow/pendings.md) |
 | Métricas del REQ | retroalimentación de la metodología | [`../workflow/metrics.md`](../workflow/metrics.md) |

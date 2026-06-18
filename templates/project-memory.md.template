@@ -18,15 +18,9 @@ type: project
 
 <!-- una línea + commit hash -->
 
-## Pendiente de entrega
+## Requerimiento activo
 
-> Se elimina cuando la entrega final se completa. Si está vacía, eliminar la sección.
-
-Artefactos listos para entrega:
-- <archivo> (commit <hash>)
-
-Pasos exactos:
-1. <comando de deploy: scp/ssh/migración de BD/...>
-2. ...
-
-Crons o configuración a verificar.
+> El REQ en curso **no vive aquí**. Cada requerimiento activo vive en su propio
+> `active_<proyecto>_<slug>.md` (uno por REQ; soporta varios del mismo proyecto en paralelo),
+> junto con su "Pendiente de entrega". Ver `templates/active-req.md.template` y
+> [`workflow/memory.md`](../workflow/memory.md).

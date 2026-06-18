@@ -17,7 +17,7 @@ Hooks compartidos del equipo, enganchados via `.claude/settings.json` de cada pr
 
 Dos hooks en `~/.claude/settings.json` (config **personal del dev**) que preservan el estado de un requerimiento activo antes de que `autoCompactEnabled: true` borre el plan aprobado y el avance.
 
-**Fuente de verdad**: sección `## Requerimiento activo` del `project_<nombre>.md`. Si no existe, los hooks no hacen nada.
+**Fuente de verdad**: los `active_<proyecto>_<slug>.md` del dir de memoria (o la sección legacy `## Requerimiento activo` en `project_<nombre>.md`). Si no hay ninguno, los hooks no hacen nada.
 
 Se configuran una vez en `~/.claude/settings.json` del dev — no requieren activación por proyecto. Variantes en [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
 
@@ -27,15 +27,15 @@ Se configuran una vez en `~/.claude/settings.json` del dev — no requieren acti
 
 Tipo `agent`. Antes de cada auto-compactación:
 1. Localiza `~/.claude/projects/<project-id>/memory/`.
-2. Busca `project_*.md` con sección `## Requerimiento activo`.
-3. Extrae: Path del proyecto, Draft changes MD, Estado, Plan resumido, Archivos modificados, Próximos pasos.
+2. Busca los `active_*.md` (o `project_*.md` con sección legacy `## Requerimiento activo`).
+3. Por cada REQ activo extrae: Path del proyecto, Draft changes MD, Estado, Plan resumido, Archivos modificados, Próximos pasos.
 4. Actualiza (o crea) `<Path del proyecto>/<Draft changes MD>` con esa información.
 
 Independiente del OS (es un agente Claude, no un comando shell).
 
 #### `matcher: "manual"` — guardia para `/compact` explícito
 
-Tipo `command`. Bloquea `/compact` si hay `## Requerimiento activo` y el draft no fue modificado en los últimos 15 minutos. Si el draft es reciente o no hay requerimiento activo, permite.
+Tipo `command`. Bloquea `/compact` si hay un REQ activo (`active_*.md` o sección legacy) y el draft no fue modificado en los últimos 15 minutos. Si el draft es reciente o no hay requerimiento activo, permite.
 
 UX: el dev ve el bloqueo, actualiza el draft (cualquier cambio renueva el timestamp), re-ejecuta `/compact`.
 
@@ -53,7 +53,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Pricing**: `hooks/pricing.yml` — tabla manual. Actualizar cuando Anthropic publique nuevo modelo o cambie precios.
 - **Estado incremental**: `~/.claude/projects/<encoded-cwd>/<session-id>.usage-offset` y `.usage-state.json`. El hook procesa solo las líneas nuevas del JSONL desde la última invocación.
 - **Idempotente**: ejecutar dos veces sobre el mismo turno no duplica conteos — el offset file lo previene.
-- **REQ activo**: se localiza buscando `## Requerimiento activo` en `project_*.md` del directorio de memoria del proyecto. Extrae `Path del proyecto` y `Draft changes MD` (mismo formato que PreCompact).
+- **REQ activo**: se localiza vía `find_active_reqs` (los `active_*.md`, o sección legacy `## Requerimiento activo` en `project_*.md`). Con varios REQ activos, atribuye el costo del turno al de modificación más reciente. Extrae `Path del proyecto` y `Draft changes MD` (mismo formato que PreCompact).
 - **Marcadores en el draft**: el hook reemplaza el bloque entre `<!-- usage-tracker-start -->` y `<!-- usage-tracker-end -->`. Si los marcadores no están presentes, el hook no modifica el draft.
 - **Edge cases**:
   - Sin REQ activo → `exit 0` silencioso.

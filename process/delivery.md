@@ -45,7 +45,7 @@ Qué subagente por profile (default + obligatorio adicional por dimensión, p. e
 
 Antes de la entrega final:
 
-1. Verificar pendientes — sección "Pendiente de entrega" de la memoria + tareas abiertas.
+1. Verificar pendientes — sección "Pendiente de entrega" del `active_*.md` del REQ + tareas abiertas.
 2. Si hay pendientes → notificar y preguntar si resolverlos antes de cerrar.
 3. Presentar el **Reporte de cierre** — leer la sección `## Reporte de cierre` del draft del change MD y mostrarla al dev inline. Si el bloque de "Uso de API" está vacío (hook no corrió), indicarlo.
 4. Si no hay pendientes (o el dev decide no continuar) → preguntar:

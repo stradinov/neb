@@ -18,7 +18,7 @@ El **Change MD** es el **eje documental**: registra al REQ y todo enlace entre a
 | Plan aprobado | sección Trazabilidad → `**Plan aprobado:**` | Change MD | [approved-plans.md](approved-plans.md) |
 | Change MD | `**Commits:**` (`<hash>` o rango `<a>..<b>`) | git | [changes.md](changes.md) |
 | Change MD | `**Pendientes generados:**` (puntero por tag) | `pendings.md` | [pendings.md](pendings.md) |
-| Memoria del proyecto | `Draft changes MD:` | Change MD (inverso) | [memory.md](memory.md) |
+| Memoria del proyecto (`active_*.md`) | `Draft changes MD:` | Change MD (inverso) | [memory.md](memory.md) |
 | Incidente | `Originado por:` | Change MD original (inverso) | [`../general/incidents.md`](../general/incidents.md) |
 | Defecto (Fase 9) | tabla Diagnóstico → `REQ derivado` | REQ que lo corrige | [`../process/improvement.md`](../process/improvement.md) |
 
@@ -45,7 +45,7 @@ El último eslabón es la confirmación del cambio (ver [`../process/change-cont
 - **REQ → commit**: al cierre (Fase 8), el campo `**Commits:**` del Change MD se completa con el/los hash(es) — un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos. (Con entrega temprana del registro, el change MD pudo entregarse antes con `**Commits:**` aún vacío — ver [`changes.md`](changes.md) § "Ciclo de vida del draft"; el campo se completa igualmente al cierre.)
 - **commit → REQ**: el mensaje del commit nombra el tipo y el tema del REQ (`tipo: descripción`, ver [`../process/version-control.md`](../process/version-control.md) "Commits"). Permite ir de un hash suelto al REQ sin partir del Change MD.
 
-El draft del Change MD nace sin hashes (estado `En progreso`); el campo `**Commits:**` se llena cuando los commits ya existen. Mientras tanto, el cross-link inverso `Draft changes MD:` en la memoria del proyecto mantiene la trazabilidad de la sesión en curso.
+El draft del Change MD nace sin hashes (estado `En progreso`); el campo `**Commits:**` se llena cuando los commits ya existen. Mientras tanto, el cross-link inverso `Draft changes MD:` en el `active_*.md` del REQ mantiene la trazabilidad de la sesión en curso.
 
 ## Proyecto único
 
