@@ -9,10 +9,12 @@ allowed-tools: Bash, Write
 Cambia el modo del hook de preprocesado de prompts para esta sesión.
 Persiste hasta que se ejecute otro `/preprocess <modo>` o termine la sesión.
 
+> El hook arranca en modo **`off`** por defecto (inerte): no corrige nada hasta que lo enciendas aquí con `full` o `fast`.
+
 Uso:
-- `/preprocess full` — corrección + eco + confirmación previa.
-- `/preprocess fast` — corrección + eco; sin confirmación.
-- `/preprocess off` — hook deshabilitado para esta sesión.
+- `/preprocess full` — enciende el hook: corrección + eco + confirmación previa.
+- `/preprocess fast` — enciende el hook: corrección + eco; sin confirmación.
+- `/preprocess off` — vuelve al estado por defecto (hook inerte) para esta sesión.
 
 Argumento recibido: `$ARGUMENTS`
 

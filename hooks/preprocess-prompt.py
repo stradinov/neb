@@ -37,7 +37,7 @@ except ImportError:
 # ---------------------------------------------------------------------------
 
 DEFAULTS = {
-    "mode": "full",
+    "mode": "off",  # arranca inerte; el dev lo enciende con /preprocess full|fast o preprocess.json (REQ v5.4.0)
     "model": "claude-haiku-4-5-20251001",
     "prefix": "$$",
 }
@@ -117,7 +117,7 @@ def resolve_mode(prompt, cfg, home, session_id):
     if env_mode in VALID_MODES:
         return env_mode, prompt
 
-    return cfg.get("mode", "full"), prompt
+    return cfg.get("mode", "off"), prompt
 
 
 def is_trivial(prompt):

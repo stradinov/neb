@@ -4,6 +4,20 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.4.0] - 2026-06-22
+
+> **Minor** (cambio de comportamiento de default): el hook `preprocess-prompt` (`UserPromptSubmit`, opt-in personal) ahora arranca en modo **`off`** por defecto — se instala pero queda **inerte** hasta que el dev lo enciende con `/preprocess full|fast` o fija `"mode"` en su `preprocess.json`. Antes arrancaba en `full` (corrección + eco + confirmación) apenas se copiaba el bloque del template. Motivado por el riesgo de que el corrector altere texto pegado de propuestas ya definidas que no deben modificarse.
+
+### Changed
+
+- **`hooks/preprocess-prompt.py`**: `DEFAULTS["mode"]` `"full"` → `"off"`; fallback de `resolve_mode` alineado a `"off"`.
+- **`tooling/prompt-preprocessing.md`** + **`commands/preprocess.md`**: default `off` coherente en las 8 sedes de doc — tabla de modos (§4), ejemplo + tabla de config (§5), precedencia + nota de `$$` (§6), snippets de instalación PowerShell/bash (§7), nota de activación (§7), nota + escenario #5 (§11), y el slash command. Los snippets de §7 escribían `preprocess.json` con `"full"`, que por precedencia (archivo personal > default) habría anulado el cambio del código.
+
+### Notas
+
+- El template `claude-user-settings.json.template` **no cambia**: el hook se sigue instalando; solo arranca inerte. Activación explícita por dev.
+- `.claude-plugin/plugin.json` se sincroniza a 5.4.0 (corrige drift preexistente con `VERSION`, que iba en 5.3.1).
+
 ## [5.3.1] - 2026-06-22
 
 > **Patch** (ajuste de foco de rol — `roles-catalog.md` § Evolución/Acciones: "ajustar foco con sub-foco nuevo = REQ `docs:` patch"): el subagente `qa-process-engineer` gana un sub-foco de **precisión terminológica** dentro de su foco de vocabulario canónico ya existente. Audita contra el § "Índice de términos canónicos" de `vocabulary.md` (columnas "No confundir con" + "Sinónimos"): detecta sinónimos no declarados, mezcla de conceptos vecinos (REQ/registro/change MD/plan/entregable/commit) y términos nuevos sin clasificar. **No agente nuevo** (regla anti-role-inflation: ajustar foco antes que crear rol).

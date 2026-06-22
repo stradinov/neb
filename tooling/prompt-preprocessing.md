@@ -41,11 +41,13 @@ dev tipea prompt → UserPromptSubmit hook
 
 ## 4. Modos
 
+**El modo por defecto es `off`**: el hook se instala pero arranca **inerte** (no llama a Haiku ni inyecta contexto). El dev lo enciende cuando quiere con `/preprocess full|fast` o fijándolo en su `preprocess.json` (§5).
+
 | Modo | Corrección | Eco | Confirmación | Cuándo usar |
 |---|---|---|---|---|
-| `full` (default) | Sí | Sí | Según gate | Trabajo normal; máxima protección contra mala lectura |
+| `off` (default) | No | No | No | **Default**: arranca inerte. También para sesión exploratoria, dictado correcto o prompt pegado puro |
+| `full` | Sí | Sí | Según gate | Trabajo normal; máxima protección contra mala lectura |
 | `fast` | Sí | Sí | No | Conversación fluida donde la confirmación constante estorba |
-| `off` | No | No | No | Sesión exploratoria, dictado correcto, prompt pegado puro |
 
 ## 5. Configuración personal default
 
@@ -53,7 +55,7 @@ dev tipea prompt → UserPromptSubmit hook
 
 ```json
 {
-  "mode": "full",
+  "mode": "off",
   "model": "claude-haiku-4-5-20251001",
   "prefix": "$$"
 }
@@ -61,7 +63,7 @@ dev tipea prompt → UserPromptSubmit hook
 
 | Campo | Default | Notas |
 |---|---|---|
-| `mode` | `"full"` | Uno de `"full"`, `"fast"`, `"off"` |
+| `mode` | `"off"` | Uno de `"off"`, `"full"`, `"fast"`. **Default `off`** (arranca inerte); pon `"full"` o `"fast"` para activarlo de forma permanente |
 | `model` | `"claude-haiku-4-5-20251001"` | Modelo Anthropic para corregir. Subir a Sonnet si Haiku falla; cuesta más tokens y latencia |
 | `prefix` | `"$$"` | Prefijo opt-out por prompt. `$$` comparte tecla física en distribuciones US y Español LATAM/España |
 
@@ -75,7 +77,9 @@ Precedencia (primero que aplica gana):
 2. **Slash command** `/preprocess full|fast|off` — persiste durante la sesión, escribe `~/.claude/preprocess-state/<session_id>.json`.
 3. **Env var** `CLAUDE_PREPROCESS_MODE=fast` antes de lanzar `claude` — fija el modo de toda la sesión, ignora `preprocess.json`. En PowerShell: `$env:CLAUDE_PREPROCESS_MODE = "fast"`.
 4. **Archivo personal** `~/.claude/preprocess.json` — default personal.
-5. **Default hardcoded**: `full`.
+5. **Default hardcoded**: `off`.
+
+> Con el default en `off`, el prefijo `$$` solo tiene efecto observable si activaste el hook en la sesión (`/preprocess full|fast`): por su precedencia máxima fuerza `off` en ese turno pese al modo de sesión. En el estado por defecto (off) es redundante e inocuo (solo se elimina el `$$` del prompt).
 
 ## 7. Activación
 
@@ -93,13 +97,15 @@ Manual. (El proceso guiado de instalación de `neb` queda como pendiente del rep
 5. Verificar `claude` CLI en PATH: `claude --version`.
 6. Reiniciar la sesión `claude` para que cargue el hook.
 
+> Tras instalar, el hook arranca en modo **`off`** (inerte): no actúa hasta que lo enciendas con `/preprocess full` (o `fast`), o cambies `"mode"` en `preprocess.json`. Deliberado — copiar la instalación no altera el comportamiento de tus prompts hasta que tú lo decidas.
+
 Snippet PowerShell para Windows (copy/paste):
 
 ```powershell
 $env:USERPROFILE | ForEach-Object { New-Item -ItemType Directory -Force -Path "$_\.claude\commands" | Out-Null }
 Copy-Item "$env:NEB_HOME\commands\preprocess.md" "$env:USERPROFILE\.claude\commands\preprocess.md"
 @'
-{"mode": "full", "model": "claude-haiku-4-5-20251001", "prefix": "$$"}
+{"mode": "off", "model": "claude-haiku-4-5-20251001", "prefix": "$$"}
 '@ | Out-File -Encoding utf8 "$env:USERPROFILE\.claude\preprocess.json"
 ```
 
@@ -108,7 +114,7 @@ Snippet bash (Linux/Mac):
 ```bash
 mkdir -p ~/.claude/commands
 cp "$NEB_HOME/commands/preprocess.md" ~/.claude/commands/preprocess.md
-echo '{"mode": "full", "model": "claude-haiku-4-5-20251001", "prefix": "$$"}' > ~/.claude/preprocess.json
+echo '{"mode": "off", "model": "claude-haiku-4-5-20251001", "prefix": "$$"}' > ~/.claude/preprocess.json
 ```
 
 ## 8. Heurística de skip
@@ -171,7 +177,9 @@ Desactivación permanente: comentar bloque `UserPromptSubmit` en `~/.claude/sett
 
 ## 11. Verificación
 
-Escenarios a probar tras activar (medibles entre Enter y primer carácter de respuesta de Claude):
+> **El default es `off`**: los escenarios de corrección activa (3, 4, 6, 8, 9) requieren encender antes el hook con `/preprocess full` (o `fast`). En su estado por defecto, todo prompt pasa raw (como el escenario 7).
+
+Escenarios a probar (medibles entre Enter y primer carácter de respuesta de Claude):
 
 | # | Acción | Resultado esperado |
 |---|---|---|
@@ -179,7 +187,7 @@ Escenarios a probar tras activar (medibles entre Enter y primer carácter de res
 | 2 | Tipear `/help` | Pasa raw (slash command). Claude responde normal. |
 | 3 | Tipear `agreaga una funcion que valide el correo en el formulrio de contacto` | Latencia 13–25 s; Claude muestra eco en español canónico; espera `sí`/`ok` antes de actuar. |
 | 4 | Confirmar con `ok` | Claude actúa sobre la versión corregida (que vio en `additionalContext`). |
-| 5 | Tipear `$$explora rapido el repo` | Bypass; Claude actúa directo sin eco/confirmación. |
+| 5 | Con `/preprocess full` activo, tipear `$$explora rapido el repo` | El prefijo gana sobre la sesión (precedencia máxima): bypass en ese turno, Claude actúa directo sin eco/confirmación. |
 | 6 | `/preprocess fast` + prompt largo | Latencia 13–25 s; eco breve; sin confirmación. |
 | 7 | `/preprocess off` + prompt largo | Sin latencia adicional; sin eco. |
 | 8 | `/preprocess full` + prompt largo | Vuelve al comportamiento del escenario 3. |
