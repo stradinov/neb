@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.2.0] - 2026-06-22
+
+> **Minor**: nuevo índice de términos canónicos en `methodology/vocabulary.md` — mapa operativo de los conceptos que cambian comportamiento (fases, gates, artefactos, estados, perfiles, roles, entregas, validaciones, excepciones), con glosa en español llano (anglicismos → equivalente) y desambiguación (`No confundir con` + sinónimos). Cierra dos huecos: `Fase` y `Gate` no eran términos canónicos. Cambio aditivo; no toca las secciones ni anclas existentes.
+
+### Added
+
+- **`methodology/vocabulary.md` § "Índice de términos canónicos"**: tabla de 13 términos con esquema mínimo (Tipo · Glosa · No confundir con · Sinónimos · Canónico). Alta de `Fase` y `Gate` como términos canónicos (antes solo delegados por puntero). Glosa en español llano para lectores no técnicos; anglicismos (gate, profile, commit, ENUM, push, lock…) anotados con su equivalente. El índice **no duplica definiciones**: la columna *Canónico* enlaza a la fuente de verdad de cada término (sección interna del archivo, o `general/`, `process/`, `workflow/`, `profiles.md`, `roles-catalog.md`). Dos consumidores justifican la "redacción suficiente" por encima de la austeridad: el lector humano (comprensión de anglicismos) y el futuro revisor terminológico/editorial.
+
 ## [5.1.0] - 2026-06-19
 
 > **Minor**: nuevo hook opt-in `ops-capture` (`SessionEnd`) que captura el conocimiento operativo descubierto en una sesión a un inbox efímero, para revisión y aplicación **gated** por un comando del adoptante (p.ej. `/ops-review`). Mecanismo genérico; el dominio (qué es operativo, dónde aterriza) lo parametriza el overlay vía env vars. Implementa la pieza 2a de la metodología de memoria operativa.

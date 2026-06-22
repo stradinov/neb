@@ -17,6 +17,26 @@ La metodología usa vocabulario neutro para cubrir entregables de distinta natur
 | Dependientes | Referencias al dato, función o concepto afectado (escritura y lectura/display) | Callers de un método (software) · Secciones que citan un supuesto (análisis) |
 | Flujos críticos | Flujos con riesgo de regresión medio/alto que se deben re-validar | Tests de auth/pagos (software) · Casos de uso `[crítico]` del documento (análisis) |
 
+## Índice de términos canónicos
+
+Mapa operativo de los conceptos que **cambian comportamiento**. La fuente de verdad de cada término es la columna **Canónico** (aquí no se duplica la definición completa, solo se ubica y desambigua). Anglicismos anotados con su equivalente en español (→).
+
+| Término | Tipo | Glosa | No confundir con | Sinónimos | Canónico |
+|---|---|---|---|---|---|
+| **Requerimiento (REQ)** | unidad abstracta de trabajo | El trabajo lógico a realizar (un cambio coherente con un objetivo); no es ningún archivo. (*REQ* = "requerimiento") | registro · entregable · plan · commit | ✗ "ticket", "tarea", "issue" | [§ Requerimiento (REQ)](#requerimiento-req) |
+| **Fase** | propiedad del REQ (1–9) | La etapa del flujo en que está el REQ, de 1 Clarificación a 9 Retroalimentación. | gate · estado | — | [`../general/index.md`](../general/index.md) · [`../process/phase-transitions.md`](../process/phase-transitions.md) "Mapa de fases" |
+| **Gate** *(anglicismo)* | punto de control | Punto donde el avance **se detiene** hasta cumplir una condición o recibir tu OK. (*gate* = compuerta) | fase · estado | → "control", "compuerta" | [`../process/phase-transitions.md`](../process/phase-transitions.md) "Gates de cola" · [`../process/change-control-gate.md`](../process/change-control-gate.md) |
+| **Estado** | propiedad del REQ (ENUM) | La situación actual del REQ en una lista cerrada: En progreso · En validación · Listo para aprobación · Cerrado (+ sufijo "Bloqueado"). (*ENUM* = lista cerrada de valores) | fase · *lock* de la bitácora | ✗ "Propuesto" (no existe); histórico "Listo para producción" → "Listo para aprobación" | [§ Estados del requerimiento](#estados-del-requerimiento) |
+| **Artefacto** | objeto del flujo | Cualquier objeto que el flujo produce o usa para registrarse: plan, registro, entregable, métricas. | entregable · registro | — | [§ Vocabulario abstracto](#vocabulario-abstracto) · [`../workflow/index.md`](../workflow/index.md) |
+| **Registro del requerimiento** | subclase documental | El documento que cuenta *sobre* el REQ (contexto, alcance, resultado); su forma canónica es el "Change MD". No es el REQ. (*MD* = Markdown) | REQ · entregable | → "Change MD"; variante "Incident MD" | [§ Registro del requerimiento](#registro-del-requerimiento) |
+| **Entregable / elaboración** | lo que el REQ produce | El producto del REQ: código, un documento o un lineamiento. (En *self-applied* el entregable también es un `.md`.) | registro | → "elaboración" | [§ Vocabulario abstracto](#vocabulario-abstracto) |
+| **Entrega** | acción del flujo | Poner el entregable ante quien lo recibe: *deploy*, *push* o documento enviado. (*push* = subir los cambios al servidor remoto) | entrega para revisión ↔ entrega final | — | [§ Vocabulario abstracto](#vocabulario-abstracto) |
+| **Perfil (profile)** *(anglicismo)* | concretización por tipo de proyecto | El conjunto de reglas que adapta la metodología a un tipo de proyecto (build, convenciones de commit, roles…). (*profile* = perfil) | rol | → "perfil"; histórico "stack" (renombrado en 3.0.0) | [`profiles.md`](profiles.md) |
+| **Rol** | foco de revisión/autoría | Un enfoque especializado (persona o subagente) que revisa o redacta una dimensión del trabajo. | perfil | → "revisor" / "*reviewer*" (cuando es subagente) | [`roles-catalog.md`](roles-catalog.md) |
+| **Validación** | mecanismo de aceptación (4 tipos) | Cómo se comprueba que el entregable sirve antes de cerrar: en QA, local con artefactos, ciclo con cliente, o implícita. | gate de cierre · entrega | — | [§ Tipos de validación](#tipos-de-validación) |
+| **Riesgo de regresión** | eje ortogonal a la complejidad | Qué tan probable es que el cambio rompa algo que ya funcionaba (Bajo/Medio/Alto), aparte de qué tan grande sea. (*regresión* = una falla vieja que reaparece) | complejidad | — | [§ Niveles de riesgo de regresión](#niveles-de-riesgo-de-regresión) |
+| **Excepción** | desvío reglado del flujo | Un caso que se sale del flujo normal pero está previsto por una regla. | incidencia-durante-el-trabajo | — | [§ Estados del requerimiento](#estados-del-requerimiento) (`Bloqueado`) · [`../workflow/changes.md`](../workflow/changes.md) (Incident MD) |
+
 ## Requerimiento (REQ)
 
 El **requerimiento (REQ)** es la **unidad abstracta de trabajo** de la metodología: un cambio lógico coherente con un objetivo. No es ningún documento. El estado, la fase y la complejidad son **propiedades del REQ**; el change MD las **registra/refleja**, no las define (modelo proyección-no-identidad, ya en uso en [`../workflow/logbook.md`](../workflow/logbook.md) §"Entrada de la bitácora" y en [`../docs/how-it-works.md`](../docs/how-it-works.md) §"Ciclo de estados").
