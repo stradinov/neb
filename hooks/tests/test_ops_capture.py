@@ -39,8 +39,8 @@ class TestResolveInboxDir(unittest.TestCase):
 
 class TestInboxFilename(unittest.TestCase):
     def test_format(self):
-        got = OI.inbox_filename("gonher", "abc123", "20260619-101500")
-        self.assertEqual(got, "20260619-101500-gonher-abc123.inbox.md")
+        got = OI.inbox_filename("demo", "abc123", "20260619-101500")
+        self.assertEqual(got, "20260619-101500-demo-abc123.inbox.md")
 
     def test_sanitizes_unsafe_chars(self):
         got = OI.inbox_filename("my/proj name", "a:b*c", "20260619-101500")
