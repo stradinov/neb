@@ -117,3 +117,15 @@ cp ~/neb/hooks/pre-push-changelog ~/neb/.git/hooks/pre-push   # gate del CHANGEL
 Flujo: editás en el clon, fragment de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo (fork + PR si no tenés write). Para **dogfoodear** tus cambios antes de publicarlos, apuntá `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el cache del plugin) o corré `claude --plugin-dir <clon>`.
 
 El clon del núcleo y tu workspace son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)
+
+### Cómo se redactan los MDs (modos de redacción)
+
+El calibre de un texto depende de su **consumidor**. Esto es una guía ilustrativa; la fuente canónica es [`methodology/principles.md`](../methodology/principles.md) § "Lineamientos para editar MDs" (criterio de corte por consumidor + suficiencia).
+
+| Modo | Consumidor | Dónde | Calibre |
+|---|---|---|---|
+| **Normativa** | el agente (aplica el lineamiento) | `general/` · `methodology/` · `process/` · `workflow/` | Austera: criterio de corte estricto + suficiencia mínima (una regla enuncia condición · acción · consecuencia) |
+| **Explicativa** | humano que entiende la mecánica | [`how-it-works.md`](how-it-works.md) | Suficiencia; admite contexto y diagramas |
+| **Adopción** | humano que adopta o extiende | este archivo · `README.md` | Suficiencia + ejemplos y analogías moderadas |
+
+Los modos **no relajan** la austeridad de la normativa: nombran cuándo un texto de cara al humano admite legítimamente más contexto. La austeridad (no escribir lo que no cambia conducta) y la suficiencia (no cortar lo que el consumidor necesita) son los dos límites.

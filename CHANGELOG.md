@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.5.0] - 2026-06-22
+
+> **Minor**: cuadro pedagógico de los 3 modos de redacción (Normativa / Explicativa / Adopción) en `docs/user-guide.md` § "Contribuir al núcleo". Material explicativo de cara al contribuidor; la fuente canónica sigue siendo `methodology/principles.md` § "Lineamientos para editar MDs" — el cuadro **ilustra**, no duplica la regla. Cierra el REQ-4 (opcional) del roadmap vocabulario+editorial.
+
+### Added
+
+- **`docs/user-guide.md` § "Contribuir al núcleo (mantenedores)" > "Cómo se redactan los MDs"**: tabla de los 3 modos de redacción por consumidor (agente austero en el núcleo vs documentación de cara al humano en `docs/`/`README` con más contexto), enlazando a `methodology/principles.md` como fuente canónica. El cuadro vive en `docs/` (capa de adopción, exenta del test M/P) — es contenido modo "adopción" que ejemplifica su propia categoría.
+
 ## [5.4.0] - 2026-06-22
 
 > **Minor** (cambio de comportamiento de default): el hook `preprocess-prompt` (`UserPromptSubmit`, opt-in personal) ahora arranca en modo **`off`** por defecto — se instala pero queda **inerte** hasta que el dev lo enciende con `/preprocess full|fast` o fija `"mode"` en su `preprocess.json`. Antes arrancaba en `full` (corrección + eco + confirmación) apenas se copiaba el bloque del template. Motivado por el riesgo de que el corrector altere texto pegado de propuestas ya definidas que no deben modificarse.
