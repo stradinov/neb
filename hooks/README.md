@@ -120,6 +120,20 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Configurable** en sesión vía `/preprocess full|fast|off`, prefijo `$$` por prompt o env var `CLAUDE_PREPROCESS_MODE`.
 - **Excepción a la filosofía "< 100ms"**: documentada explícitamente — la llamada inevitable a `claude -p` con Haiku justifica 13–25 s (medido localmente; el plan estimaba 2–4 s, la realidad fue mayor). Mitigaciones: timeout 30 s, filtros agresivos de skip, modo `off`, opt-in personal, guard de subsesión interna via env var `NEB_INTERNAL_SUBSESSION` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) que setea en el subproceso — consumida por todos los hooks de sesión vía `hooks/lib/subsession.py`.
 
+### ops-capture
+
+`SessionEnd` — captura asistida de **conocimiento operativo** descubierto en la sesión. Lee el transcript, aplica un **gate barato** (extrae fragmentos con señales operativas — ssh, mysql, deploy, IPs, DDL…; si no hay, no hace nada y no cuesta nada), e invoca un subagente vía `claude -p` que extrae **deltas propuestos** a un **inbox efímero** (`~/.claude/ops-inbox/`, configurable con `NEB_OPS_INBOX_DIR`). **NO toca ninguna fuente de verdad** — la aplicación de los deltas es **gated** por un comando del adoptante (en el overlay Onibex: `/ops-review`). Implementa la pieza 2a de la metodología (memoria operativa desde sesiones).
+
+- **Tipo**: `command` (Python cross-OS, `hooks/ops-capture.py`). En Windows declarar `"shell": "powershell"` (consume stdin); en Linux/Mac invocar con `python3`. La lógica determinística (gate, naming, parse del transcript) vive en `hooks/lib/ops_inbox.py`, cubierta por `hooks/tests/test_ops_capture.py`.
+- **Requiere**: Python 3 (`py`/`python3`) y el `claude` CLI en PATH (sin CLI → `exit 0` silencioso).
+- **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
+- **Mecanismo genérico, dominio en el overlay**: el prompt de detección por defecto es genérico; el overlay lo especializa con `NEB_OPS_CAPTURE_PROMPT_FILE` (prompt con vocabulario de dominio) y `NEB_OPS_SIGNALS_EXTRA` (regex extra del gate). Modelo configurable con `NEB_OPS_CAPTURE_MODEL` (default Haiku).
+- **Defensivo**: ante cualquier falla (sin transcript, sin actividad operativa, sin CLI, timeout 120s) `exit 0` — nunca bloquea el cierre de sesión. El subagente tiene instrucción de **no volcar secretos** al inbox.
+- **Seguridad (decisión de diseño)**: el hook re-envía fragmentos del transcript a la API (vía `claude -p`) y **NO redacta/filtra secretos de entrada**. El transcript de la sesión ya pasó por la API durante la propia sesión (Claude Code), así que el hook no agrega exposición nueva. El manejo de credenciales es responsabilidad **operativa del equipo adoptante**, no del hook — por diseño, el skill no filtra contenido por seguridad.
+- **Opt-in por proyecto** (no auto-registrado por el plugin), como `usage-tracker`/`logbook-sync`.
+- **Guard de subsesión interna**: si `NEB_INTERNAL_SUBSESSION=1` → no captura — evita capturar la subsesión Haiku del corrector y la propia recursión (invoca `claude -p`). Ver `hooks/lib/subsession.py`.
+- **Lógica completa**: `hooks/ops-capture.py` + `hooks/lib/ops_inbox.py`.
+
 ### pre-push-changelog (git hook del repo, no Claude Code)
 
 `.git/hooks/pre-push` — git hook nativo del **clon del maintainer** (`cp hooks/pre-push-changelog .git/hooks/pre-push`). Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX). Encadena 4 gates: integridad de la cadena de imports del arranque (`assemble-startup.py --check`), términos vetados vía extension point del overlay (`$NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh` si existe), fragment obligatorio para cambios normativos, y sincronía `CHANGELOG.md` ↔ `changelog.d/`. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".

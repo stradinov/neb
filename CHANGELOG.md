@@ -4,6 +4,18 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.1.0] - 2026-06-19
+
+> **Minor**: nuevo hook opt-in `ops-capture` (`SessionEnd`) que captura el conocimiento operativo descubierto en una sesión a un inbox efímero, para revisión y aplicación **gated** por un comando del adoptante (p.ej. `/ops-review`). Mecanismo genérico; el dominio (qué es operativo, dónde aterriza) lo parametriza el overlay vía env vars. Implementa la pieza 2a de la metodología de memoria operativa.
+
+### Added
+
+- **Hook `ops-capture`** (`hooks/ops-capture.py`, `SessionEnd`, tipo `command` Python cross-OS, **opt-in**). Lee el transcript de la sesión, aplica un **gate barato** (extrae fragmentos con señales operativas; sin señales no invoca el modelo), e invoca un subagente vía `claude -p` que extrae **deltas propuestos** a un **inbox efímero** (`~/.claude/ops-inbox/`, configurable con `NEB_OPS_INBOX_DIR`). NO toca ninguna fuente de verdad. Guard de subsesión interna (`NEB_INTERNAL_SUBSESSION`) para no recursar al invocar `claude -p`. Defensivo: `exit 0` siempre.
+- **Helper `hooks/lib/ops_inbox.py`** — lógica determinística: resolución del inbox, naming sanitizado cross-OS, parse del transcript JSONL y el gate de actividad operativa (vocabulario genérico, ampliable con `NEB_OPS_SIGNALS_EXTRA`).
+- **Parametrización por el overlay**: `NEB_OPS_CAPTURE_PROMPT_FILE` (prompt de detección con vocabulario de dominio), `NEB_OPS_SIGNALS_EXTRA` (regex extra del gate), `NEB_OPS_CAPTURE_MODEL` (modelo, default Haiku).
+- **Cobertura**: `hooks/tests/test_ops_capture.py` (14 tests del helper).
+- **Registro**: bloque opt-in en `hooks/settings.template.json` (`SessionEnd`, Windows + Linux) y sección en `hooks/README.md`.
+
 ## [5.0.0] - 2026-06-17
 
 > **Major**: la memoria de un requerimiento pasa de una sección `## Requerimiento activo` dentro de `project_<nombre>.md` a un **archivo por REQ** (`active_<proyecto>_<slug>.md`), habilitando **varios REQ activos del mismo proyecto en paralelo** en la bitácora de relevo. Además, los hooks ahora **respetan `autoMemoryDirectory`** (setting nativo de Claude Code) para una memoria única independiente del cwd. **Compatible hacia atrás**: los hooks siguen leyendo la sección legacy durante la transición. El major es por el cambio de vocabulario/estructura canónica de la memoria; no hay ruptura de imports.

@@ -59,6 +59,25 @@
             "command": "bash \"${NEB_HOME:-$HOME/.claude/neb}/hooks/logbook-sync.sh\""
           }
         ]
+      },
+      {
+        "_os_note": "ops-capture — WINDOWS (PowerShell). Opt-in: captura conocimiento operativo a un inbox para /ops-review. Consume stdin → shell:powershell. Para Linux/Mac usar el bloque siguiente (eliminar este).",
+        "hooks": [
+          {
+            "type": "command",
+            "shell": "powershell",
+            "command": "py \"$env:NEB_HOME\\hooks\\ops-capture.py\""
+          }
+        ]
+      },
+      {
+        "_os_note": "ops-capture — LINUX/MAC. Eliminar el bloque Windows de arriba al usar este.",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${NEB_HOME:-$HOME/.claude/neb}/hooks/ops-capture.py\""
+          }
+        ]
       }
     ],
     "PreCompact": [
