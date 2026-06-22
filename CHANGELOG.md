@@ -4,6 +4,15 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.3.1] - 2026-06-22
+
+> **Patch** (ajuste de foco de rol — `roles-catalog.md` § Evolución/Acciones: "ajustar foco con sub-foco nuevo = REQ `docs:` patch"): el subagente `qa-process-engineer` gana un sub-foco de **precisión terminológica** dentro de su foco de vocabulario canónico ya existente. Audita contra el § "Índice de términos canónicos" de `vocabulary.md` (columnas "No confundir con" + "Sinónimos"): detecta sinónimos no declarados, mezcla de conceptos vecinos (REQ/registro/change MD/plan/entregable/commit) y términos nuevos sin clasificar. **No agente nuevo** (regla anti-role-inflation: ajustar foco antes que crear rol).
+
+### Changed
+
+- **`agents/qa-process-engineer.md`** + **`profiles/self-applied/roles.md`**: el foco "Vocabulario canónico" se desdobla en *(a)* agnóstico del profile [existente] y *(b)* precisión terminológica [nuevo], con las columnas "No confundir con"/"Sinónimos" del Índice como oráculo verificable. `description` del agente actualizada.
+- **`methodology/roles-catalog.md`** § "Atribución del defecto": nueva fila routea "sinónimo no declarado / término canónico mezclado" a QA (sub-foco precisión terminológica).
+
 ## [5.3.0] - 2026-06-22
 
 > **Minor**: política editorial en `methodology/principles.md` § "Lineamientos para editar MDs". Absorbe los lineamientos de redacción del REQ `md-redaction-guidelines` (tría de ejemplos + subsección `### Claridad`) y agrega el contrapeso de **suficiencia** (anti-"escuetez falsa") como contrato de output, más el calibre por **consumidor** (agente austero vs documentación de cara al adoptante en `docs/` y `README.md`, que admite más contexto). Generaliza el criterio de corte de "comportamiento del LLM" a "del consumidor" (cambio de fuerza normativa declarado, no Patch). Plan-review (qa-process-engineer + process-improvement-analyst + context-completeness-reviewer) descartó una tabla de "3 modos" por duplicar la excepción `docs/`, y reformuló la suficiencia para no prescribir razonamiento interno.

@@ -106,6 +106,7 @@ Criterios de atribución por tipo de defecto:
 |---|---|
 | Inconsistencia entre archivos / contradicción con política | QA Process Engineer / Code Reviewer |
 | Sesgo de profile en vocabulario canónico | QA Process Engineer (sub-foco existente) |
+| Sinónimo no declarado / término canónico mezclado | QA Process Engineer (sub-foco precisión terminológica) |
 | Ceremonia innecesaria / valor cuestionable | Process Improvement Analyst |
 | Vulnerabilidad de seguridad | Security Reviewer |
 | Performance issue / query lenta | Performance Reviewer / Database Engineer |

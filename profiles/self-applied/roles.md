@@ -25,7 +25,7 @@ Foco:
 - Verificabilidad de criterios y aceptación.
 - Casos borde.
 - Alineación con políticas existentes.
-- **Vocabulario canónico agnóstico del profile**: estados, fases y artefactos no asumen un profile ni tipo de proyecto particular. Verificar contra los 3 tipos de validación de [delivery.md](../../process/delivery.md) y el principio "agnóstica del profile en su core" de [principles.md](../../methodology/principles.md).
+- **Vocabulario canónico** (dos caras): *(a) agnóstico del profile* — estados, fases y artefactos no asumen un profile ni tipo de proyecto particular (verificar contra los 3 tipos de validación de [delivery.md](../../process/delivery.md) y el principio "agnóstica del profile en su core" de [principles.md](../../methodology/principles.md)); *(b) precisión terminológica* — cada término canónico en una acepción, sin mezclar conceptos vecinos ni sinónimos no declarados; oráculo: § "Índice de términos canónicos" de [vocabulary.md](../../methodology/vocabulary.md) (columnas "No confundir con" y "Sinónimos").
 - **Coherencia ubicación ↔ clasificación M/P/Mixto**: cuando el plan agrega, mueve o renombra archivos en el repo, validar que la ubicación propuesta es coherente con la categoría (Metodología / Proceso / Mixto) declarada. Ver [`../../methodology/principles.md`](../../methodology/principles.md).
 
 ### Process Improvement Analyst — `subagente` (`agents/process-improvement-analyst.md`)
