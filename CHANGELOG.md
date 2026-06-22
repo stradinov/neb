@@ -4,6 +4,19 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.3.0] - 2026-06-22
+
+> **Minor**: política editorial en `methodology/principles.md` § "Lineamientos para editar MDs". Absorbe los lineamientos de redacción del REQ `md-redaction-guidelines` (tría de ejemplos + subsección `### Claridad`) y agrega el contrapeso de **suficiencia** (anti-"escuetez falsa") como contrato de output, más el calibre por **consumidor** (agente austero vs documentación de cara al adoptante en `docs/` y `README.md`, que admite más contexto). Generaliza el criterio de corte de "comportamiento del LLM" a "del consumidor" (cambio de fuerza normativa declarado, no Patch). Plan-review (qa-process-engineer + process-improvement-analyst + context-completeness-reviewer) descartó una tabla de "3 modos" por duplicar la excepción `docs/`, y reformuló la suficiencia para no prescribir razonamiento interno.
+
+### Changed
+
+- **§ "Lineamientos para editar MDs" (intro)**: criterio de corte generalizado a "comportamiento del **consumidor**". El consumidor por defecto es el agente (redacción austera); la documentación de cara al adoptante (`docs/`, `README.md`) admite más contexto/ejemplos (no es lineamiento que el agente aplique). Se declara el **piso inferior** de suficiencia.
+- **§ "Lineamientos para editar MDs" > Eliminar**: el bullet de ejemplos pasa a una **tría** convertir/cortar/conservar (un ejemplo con un matiz de conducta no enunciado se eleva a regla; si solo re-ilustra, se corta; cita literal se conserva).
+
+### Added
+
+- **§ "Lineamientos para editar MDs" > `### Claridad`** (nueva subsección): regla-como-contrato-de-output; término-canónico-una-acepción (enlaza a § "Coherencia global" eje 1); claridad-sobre-compresión; y **suficiencia** (una regla normativa enuncia condición · acción · consecuencia; cortar por debajo es escuetez falsa, no austeridad). Canoniza la noción "redacción suficiente" que el changelog 5.2.0 usó inline.
+
 ## [5.2.0] - 2026-06-22
 
 > **Minor**: nuevo índice de términos canónicos en `methodology/vocabulary.md` — mapa operativo de los conceptos que cambian comportamiento (fases, gates, artefactos, estados, perfiles, roles, entregas, validaciones, excepciones), con glosa en español llano (anglicismos → equivalente) y desambiguación (`No confundir con` + sinónimos). Cierra dos huecos: `Fase` y `Gate` no eran términos canónicos. Cambio aditivo; no toca las secciones ni anclas existentes.

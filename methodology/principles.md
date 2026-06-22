@@ -105,7 +105,7 @@ El system prompt base de Claude prescribe cambio mínimo: no refactor, no cleanu
 
 ## Lineamientos para editar MDs
 
-Editar la metodología es aplicarla (ver § "Características" — Reflexiva): estos lineamientos son núcleo, no periferia de un profile. **Criterio de corte**: si eliminar una frase no cambia el comportamiento esperado del LLM, no escribirla; si ya está, eliminarla.
+Editar la metodología es aplicarla (ver § "Características" — Reflexiva): estos lineamientos son núcleo, no periferia de un profile. **Criterio de corte**: si eliminar una frase no cambia el comportamiento esperado del **consumidor**, no escribirla; si ya está, eliminarla. El consumidor es por defecto el agente (redacción normativa, austera); la documentación de cara al adoptante —`docs/` (excepción de § "Capas del repo y test de pertenencia") y el `README.md`— tiene como consumidor a un humano y **admite** más contexto, ejemplos y analogías moderadas (no es lineamiento que el agente aplique en el flujo). El criterio tiene además un **piso inferior**: la suficiencia (§ Claridad) — no cortar por debajo de lo que el consumidor necesita para actuar.
 
 ### Eliminar
 
@@ -115,7 +115,7 @@ Editar la metodología es aplicarla (ver § "Características" — Reflexiva): e
 - Encabezados y separadores `---` ornamentales que no abren contenido nuevo.
 - Listas tipo "Cuándo leer esto" / "Para qué sirven" cuando son obvias del nombre o contexto.
 - Re-explicaciones de reglas ya enunciadas en el mismo archivo.
-- Ejemplos cuando la regla es clara sin ellos.
+- Ejemplos que solo re-ilustran una regla ya clara. Antes de cortar un ejemplo aplica la tría: si carga un matiz de conducta aún no enunciado, conviértelo en norma (eleva el matiz a regla); si solo re-ilustra, córtalo; si es una cita literal que Claude debe emitir, consérvala (§ Conservar).
 - Redundancias entre archivos — una sola fuente de verdad, enlazar desde el resto.
 
 ### Conservar
@@ -126,6 +126,13 @@ Editar la metodología es aplicarla (ver § "Características" — Reflexiva): e
 - Citas literales que Claude debe emitir (entre `>`).
 - Enlaces relativos a otros archivos.
 - El "por qué" cuando determina decisiones en edge cases (no cuando es justificación general).
+
+### Claridad
+
+- **Regla como contrato de output, no como narración del lector.** Redacta qué se produce o qué conducta se espera (observable en el turno), no el efecto en el lector ("el dev obtiene…", "el lector baja al detalle si lo necesita").
+- **Término canónico, una sola acepción** (cara redaccional de § "Coherencia global sobre cambio mínimo" eje 1 — vocabulario canónico): no lo reuses en su sentido coloquial (p.ej. "foco", "hilo") ni prestes el marco de un concepto para nombrar otra distinción.
+- **Claridad sobre compresión.** Cortar relleno no es empacar condición + acción + opciones en una etiqueta telegráfica densa. Si una frase obliga al lector a reconstruir el referente, desempácala.
+- **Suficiencia: condición, acción y consecuencia.** Contrapeso de § Eliminar: una regla normativa está completa cuando enuncia su condición de aplicación, la acción/output esperado y qué se rompe si se omite. Cortar por debajo de ese piso es *escuetez falsa*, no austeridad — el "por qué" que se conserva es el que determina decisiones en edge cases (§ Conservar).
 
 ### No tocar
 
