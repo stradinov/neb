@@ -1,10 +1,10 @@
 # CONTRIBUTING reorientado a issues + esquema de descripción de defecto
 
-**Estado:** En validación
+**Estado:** Cerrado
 **Fecha inicio:** 2026-06-22
-**Fecha cierre:** —
+**Fecha cierre:** 2026-06-22
 **Complejidad estimada:** baja
-**Complejidad real:** —
+**Complejidad real:** baja
 **Riesgo de regresión:** bajo  <!-- docs + infra de GitHub (issue forms); sin cambio en núcleo de metodología ni imports -->
 
 ## Contexto
@@ -31,12 +31,12 @@ El dev pidió convertir ese punto en el canal único y que los issues se den de 
 
 ## Plan de pruebas
 
-- [ ] Sintaxis YAML válida en los 3 archivos de `.github/ISSUE_TEMPLATE/` (estructura de GitHub issue forms: `name`/`description`/`body` con `type` válidos).
-- [ ] `CONTRIBUTING.md` no conserva ninguna instrucción de fork/PR/bump/SemVer dirigida al contribuyente.
-- [ ] Un defecto de documentación se puede reportar sin inventar versión/entorno (esos campos + pasos son `required: false`); quedan obligatorios solo resumen, componente, observado, esperado, severidad y confirmaciones.
-- [ ] Enlaces internos del `CONTRIBUTING.md` resuelven (`README.md`, `docs/user-guide.md`, `CLAUDE.md`).
-- [ ] `assemble-changelog.py --check` verde con 5.7.0; `VERSION` == `.claude-plugin/plugin.json`.
-- [ ] Revisión de roles (self-applied) sin hallazgos bloqueantes.
+- [x] Sintaxis YAML válida en los 3 archivos de `.github/ISSUE_TEMPLATE/` (estructura de GitHub issue forms: `name`/`description`/`body` con `type` válidos).
+- [x] `CONTRIBUTING.md` no conserva ninguna instrucción de fork/PR/bump/SemVer dirigida al contribuyente.
+- [x] Un defecto de documentación se puede reportar sin inventar versión/entorno (esos campos + pasos son `required: false`); quedan obligatorios solo resumen, componente, observado, esperado, severidad y confirmaciones.
+- [x] Enlaces internos del `CONTRIBUTING.md` resuelven (`README.md`, `docs/user-guide.md`, `CLAUDE.md`).
+- [x] `assemble-changelog.py --check` verde con 5.7.0; `VERSION` == `.claude-plugin/plugin.json`.
+- [x] Revisión de roles (self-applied) sin hallazgos bloqueantes (qa-process-engineer + process-improvement-analyst + context-completeness-reviewer; 3 recomendados aplicados, 0 bloqueantes).
 
 > Riesgo bajo → checklist basta.
 
@@ -50,15 +50,23 @@ El dev pidió convertir ese punto en el canal único y que los issues se den de 
 | `.github/ISSUE_TEMPLATE/config.yml` | Nuevo (hecho) |
 | `changelog.d/5.7.0.md` + `VERSION` + `plugin.json` | Bump Minor (hecho) |
 
+## Diagnóstico de defectos
+
+| Defecto | Etapa de origen | Tipo de causa | Patrón / aislado | REQ derivado |
+|---|---|---|---|---|
+| El change MD + changelog afirmaban "alineado a la severidad de `incidents.md`" — equivalencia P1/P2 ↔ Bloqueante/Fricción/Cosmético inexacta (afirmada como hecho sin verificar) | Fase 4 | ejecución | aislado | `—` (no deriva ajuste a metodología) |
+
+El defecto se cazó **en el plan-review pre-push** (los 3 revisores), no escapó a entrega. El principio existente (`methodology/principles.md` § "Suposiciones explícitas antes de afirmar") ya lo cubre y el revisor lo aplicó como diseñado → +1 utilidad a los roles; sin cambio derivado a la metodología.
+
 ## Trazabilidad
 
 - **Plan aprobado:** conversacional (diagnóstico + menú de 3 decisiones: alcance = defecto+mejora, flujo viejo = eliminar, formato = issue forms).
-- **Commits:** pendiente (gate de commit/push con OK del dev).
+- **Commits:** `4d44427` (REQ) — pusheado a `origin/main`. Cambio editorial preexistente `docs/how-it-works.md` confirmado aparte en `0b9e5c5`.
 - **Pendientes generados:** `—` (CODE_OF_CONDUCT ya estaba declarado en el CONTRIBUTING).
 
 ## Reporte de cierre
 
 | Señal | Valor |
 |---|---|
-| Complejidad estimada / real | baja / — |
-| Re-entregas | — |
+| Complejidad estimada / real | baja / baja |
+| Re-entregas en validación | 0 (3 recomendados del plan-review aplicados pre-entrega) |
