@@ -2,7 +2,7 @@
 
 Roles fijos — sin detección por dimensiones de código. El entregable es markdown puro.
 
-> **Nota sobre nombres de rol**: los nombres "Process Architect", "QA Process Engineer" y "Process Improvement Analyst" (y sus agentes `qa-process-engineer`, `process-improvement-analyst`) conservan la palabra "Process". Aquí "Process" se refiere al concepto general de **proceso de metodología** (Process Architect = arquitecto del proceso metodológico), no al nombre actual del profile. La etiqueta sobrevive al rename del profile por inercia conceptual; el rename de roles se evalúa en REQ separado si aparece fricción real (ver `process/roles-invocation.md` "Nota sobre nombres de rol").
+> **Nota sobre nombres de rol**: los nombres "Process Architect", "QA Process Engineer" y "Process Improvement Analyst" (y sus agentes `qa-process-engineer`, `process-improvement-analyst`) conservan la palabra "Process". Aquí "Process" se refiere al concepto general de **proceso de metodología** (Process Architect = arquitecto del proceso metodológico), no al nombre actual del profile. La etiqueta sobrevive al renombre del profile por inercia conceptual; el renombre de roles se evalúa en REQ separado si aparece fricción real (ver `process/roles-invocation.md` "Nota sobre nombres de rol").
 
 ## Rol principal — Process Architect — `persona`
 

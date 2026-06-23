@@ -19,7 +19,7 @@ Se invocan como subagentes en plan-review. Ver [`profiles/self-applied/roles.md`
 
 Foco al revisar un profile nuevo o modificado:
 
-- Consistencia entre `profiles/index.md`, `general/profile-detection.md` (detección runtime) y los acoples de `process/roles-invocation.md` / `general/`.
+- Consistencia entre `profiles/index.md`, `general/profile-detection.md` (detección en tiempo de ejecución) y los acoples de `process/roles-invocation.md` / `general/`.
 - Verificabilidad de la heurística de detección (sin ambigüedad de prioridad, sin falsos positivos evidentes).
 - Casos borde: ¿el overlay se activa sobre directorios no previstos? ¿el profile raíz colisiona con otro?
 - Vocabulario canónico: el glosario del profile concretiza — no contradice — el vocabulario abstracto de `methodology/vocabulary.md`.

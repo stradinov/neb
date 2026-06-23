@@ -4,6 +4,15 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.6.0] - 2026-06-22
+
+> **Minor**: política de idioma codificada + barrido repo-wide. Se establece que la prosa de los `.md` va en **español mexicano (tuteo)** y que solo se conservan en inglés identifiers/comandos/paths/commits y términos tecnológicos; el resto de anglicismos de prosa se traducen. La política vive en `general/communication.md § "Idioma"` (referenciando `tooling/redaccion-es.md`), con enlace desde `methodology/principles.md`. Cambio de fuerza normativa (endurece la regla de idioma del baseline) → Minor, no Patch.
+
+### Changed
+
+- **`general/communication.md § "Idioma"`** + **`methodology/principles.md § "No tocar"`**: prosa de los `.md` = español mexicano (tuteo, nunca voseo); inglés solo en identifiers/comandos/paths/commits y términos tecnológicos (commit, prompt, hook, plugin, deploy…); el resto de anglicismos de prosa se traducen. Sede canónica en `communication.md`; `principles.md` enlaza; referencia a `tooling/redaccion-es.md` (ya en `variedad: mexico`, `permitir_voseo: false`).
+- **Barrido repo-wide (~45 `.md` de prosa)**: voseo→tuteo mexicano + traducción de anglicismos por **allowlist** (markers→marcadores, setea→establece, setup→configuración, runtime→tiempo de ejecución, scaffold→estructura base, troubleshooting→resolución de problemas, system prompt→prompt de sistema, gitignored→ignorada por Git, commitear→hacer commit, rename→renombre, full-text→texto completo, outputs→salidas, fragment→fragmento, cache→caché, deprecado→obsoleto, default→por defecto). Intactos: anglicismos canónicos (`gate`/`profile`/`overlay`/`workflow`/`override`/`baseline`), términos tecnológicos, identifiers/comandos/paths/filenames, headings citados ("Default por profile"), code spans, la ilustración del voseo rioplatense en `redaccion-es.md`, y bloques `<!-- human -->`.
+
 ## [5.5.1] - 2026-06-22
 
 > **Patch**: correcciones de redacción en docs de adopción (`README.md`, `docs/user-guide.md`) — sintaxis, claridad, anglicismos de prosa → español, inicio de tuteo — a partir de una revisión editorial externa (ChatGPT) aplicada como deltas gated. Sin cambio de sentido ni de alcance normativo. El barrido repo-wide de tuteo + anglicismos y la codificación de la política de idioma quedan para una versión posterior (5.6.0).

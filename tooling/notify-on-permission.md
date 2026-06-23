@@ -55,7 +55,7 @@ Manual, mismo procedimiento que [`notify-on-stop.md § 6`](notify-on-stop.md).
 
 1. Copiar el bloque `Notification` de [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template) a `~/.claude/settings.json`. Elegir el bloque OS apropiado (Windows / Linux-Mac).
 
-2. Verificar que `NEB_HOME` esté seteado al checkout local del repo.
+2. Verificar que `NEB_HOME` esté establecido al checkout local del repo.
 
 3. (Opcional) Crear `~/.claude/notify-on-permission.json` con valores explícitos. Si está ausente, los defaults aplican.
 

@@ -2,11 +2,11 @@
 
 ## Punto de extensión (promesa 5 — Customizable)
 
-Este archivo define el contrato de customización de Neb. Para adaptar defaults y reglas a tu contexto sin forkear el núcleo, creá `personal/<usuario>.md` a partir de [`templates/personal.md.template`](../templates/personal.md.template).
+Este archivo define el contrato de customización de Neb. Para adaptar defaults y reglas a tu contexto sin forkear el núcleo, crea `personal/<usuario>.md` a partir de [`templates/personal.md.template`](../templates/personal.md.template).
 
 Pasos:
 
-1. Importá el archivo al final de tu `~/CLAUDE.md` — ver §"Orden de carga".
+1. Importa el archivo al final de tu `~/CLAUDE.md` — ver §"Orden de carga".
 2. Cada override en `personal/<usuario>.md` estrecha o agrega sobre `general/`; nunca lo relaja — ver §"Regla central".
 3. Puntos de customización preconfigurados: [coding-standards.md](coding-standards.md), [git-conventions.md](git-conventions.md), [done-criteria.md](done-criteria.md).
 
@@ -43,7 +43,7 @@ En el `~/CLAUDE.md` del dev:
 
 `~/.claude/neb` es la ruta convencional; ajustar al directorio real del clon.
 
-Override solo para un proyecto: `<proyecto>/.claude/personal.md` (gitignored, importado al final del `CLAUDE.md` del proyecto).
+Override solo para un proyecto: `<proyecto>/.claude/personal.md` (ignorada por Git, importado al final del `CLAUDE.md` del proyecto).
 
 ## Qué va en el personal
 

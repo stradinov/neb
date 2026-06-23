@@ -20,7 +20,7 @@ Argumento recibido: `$ARGUMENTS`
 
 Implementación:
 
-1. Validar que el argumento es exactamente uno de: `full`, `fast`, `off`. Si no, responder: "Modo inválido. Usá `/preprocess full|fast|off`."
+1. Validar que el argumento es exactamente uno de: `full`, `fast`, `off`. Si no, responder: "Modo inválido. Usa `/preprocess full|fast|off`."
 2. Resolver el HOME del dev (`~` en POSIX, `$env:USERPROFILE` en Windows).
 3. Resolver el `session_id` de la sesión actual. En Claude Code, el directorio de sesión vive en `~/.claude/projects/<encoded-cwd>/<session-id>.jsonl`. El `<encoded-cwd>` se obtiene sanitizando el CWD: `:` → `-`, luego `/` y `\` → `-`. El `<session-id>` es el archivo `.jsonl` más reciente en ese directorio.
 4. Crear el directorio `~/.claude/preprocess-state/` si no existe.

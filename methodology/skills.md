@@ -74,6 +74,6 @@ El skill no se actualiza automáticamente. Tres triggers:
 
 1. **Comando manual en Fase 8**: si el REQ tocó código cubierto por el skill, correr `scripts/regen-maps.py --all`.
 2. **Regla en metodología**: si el REQ agrega un proyecto al common o cambia `projects.json`, regenerar el skill en Fase 8.
-3. **Revisión mensual**: el Skill Maintainer (asignado en `personal/<usuario>.md`) regenera, revisa diff, commitea baselines.
+3. **Revisión mensual**: el Skill Maintainer (asignado en `personal/<usuario>.md`) regenera, revisa diff, hace commit de baselines.
 
 Ver procedimiento completo en `profiles/skill-authoring/deployment.md`.

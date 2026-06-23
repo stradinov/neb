@@ -1,6 +1,6 @@
 # Profiles
 
-Metodologías específicas por tipo de proyecto. Abstrae lo que NO es universal: comandos de build, paths de deploy, keys SSH, convenciones de framework, troubleshooting.
+Metodologías específicas por tipo de proyecto. Abstrae lo que NO es universal: comandos de build, paths de deploy, keys SSH, convenciones de framework, resolución de problemas.
 
 ## Disponibles
 
@@ -21,7 +21,7 @@ Single source of truth — consumida por:
 
 - Claude al iniciar trabajo y al re-evaluar profile durante la sesión (ver [`general/profile-detection.md`](../general/profile-detection.md)).
 
-El consumidor es la detección runtime de Claude, que aplica esta tabla vía `general/profile-detection.md`. Si la tabla cambia, actualizar `general/profile-detection.md` en el mismo commit.
+El consumidor es la detección en tiempo de ejecución de Claude, que aplica esta tabla vía `general/profile-detection.md`. Si la tabla cambia, actualizar `general/profile-detection.md` en el mismo commit.
 
 Inspeccionando el repo, el primer indicador que coincide gana:
 

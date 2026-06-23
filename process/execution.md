@@ -22,7 +22,7 @@ Los estándares de código (baseline: sin comentarios salvo WHY no obvio, saniti
 
 Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquitectónicas, o conviene ver el plan antes de gastar tiempo en código.
 
-NO usar para: bug fix de una línea, renames triviales, tareas exploratorias.
+NO usar para: bug fix de una línea, renombres triviales, tareas exploratorias.
 
 Selección de modelo en plan mode: ver [models.md](../general/models.md).
 
@@ -40,7 +40,7 @@ Antes de cada confirmación del cambio que toque el entregable del proyecto dest
 
 Antes de declarar Fase 4 terminada y transicionar a Fase 5, el rol principal (persona) invoca al menos un subagente del profile como gate adversarial del **artefacto implementado** — no del plan. El subagente recibe un briefing explícito con el artefacto final usando la misma plantilla que Fase 3 (ver [`process/plan-review.md`](plan-review.md) "Plantilla de briefing"), adaptando la sección "Plan propuesto" para describir el artefacto producido.
 
-Qué subagente por profile (default + paralelos por dimensión): ver la matriz columna **F4** en [`roles-invocation.md`](roles-invocation.md) § "Cobertura mínima por fase". Si el profile no tiene subagente formalizado, el dev declara override explícito antes de avanzar a Fase 5.
+Qué subagente por profile (por defecto + paralelos por dimensión): ver la matriz columna **F4** en [`roles-invocation.md`](roles-invocation.md) § "Cobertura mínima por fase". Si el profile no tiene subagente formalizado, el dev declara override explícito antes de avanzar a Fase 5.
 
 **Adicional transversal**: el `context-completeness-reviewer` se invoca en este gate cuando el artefacto producido difiere del plan aprobado en ≥1 archivo no listado o ≥1 sección no descrita, o cuando el rol principal detecta que hubo decisiones tomadas en implementación que no estaban en el plan. Aplica a cualquier profile. Output: tabla de suposiciones contexto/dominio; si hay filas no resueltas, el cierre del gate queda bloqueado hasta resolver. Ver [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`".
 
@@ -84,7 +84,7 @@ Para retomar trabajo **en otra máquina o por otro dev** (lo que `--resume` no p
 
 (Para incidentes detectados post-entrega final, ver [incidents.md](../general/incidents.md).)
 
-Cambios menores que surgen durante el trabajo (rename de columna, archivo SQL faltante, bug detectado en repaso) se tratan como **incidencias durante el trabajo** — no como sub-requerimientos — siempre que no afecten el plan original.
+Cambios menores que surgen durante el trabajo (renombre de columna, archivo SQL faltante, bug detectado en repaso) se tratan como **incidencias durante el trabajo** — no como sub-requerimientos — siempre que no afecten el plan original.
 
 Claude propone el cambio en una línea y procede con aprobación implícita o explícita. **No vuelve a clarificación ni genera estimado nuevo.**
 

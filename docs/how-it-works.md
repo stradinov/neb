@@ -91,7 +91,7 @@ desactiva la inyección para ese repo.
 
 Dos variables fijan los paths del entorno: `NEB_HOME` (el directorio del plugin
 instalado / checkout de neb) y `NEB_WORKSPACE` (la raíz del workspace, donde
-viven el overlay y `personal/`). Cómo setearlas: [user-guide § Configurar el entorno](user-guide.md).
+viven el overlay y `personal/`). Cómo establecerlas: [user-guide § Configurar el entorno](user-guide.md).
 
 ---
 

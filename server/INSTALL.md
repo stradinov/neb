@@ -12,7 +12,7 @@ infra) lo ajusta cada adoptante.
 > configurado, un proyecto publica su trabajo al catálogo compartido del equipo **solo si** su `CLAUDE.md`
 > trae el marcador `<!-- neb-logbook: central -->` (works con-REQ **y sesiones exploratorias**: su
 > transcript, sin `tool_result`, queda buscable por el equipo). Sin el marcador la bitácora queda
-> **local-only** (el default; la bitácora local ya cubre el relevo del propio dev). (El opt-in por perfil
+> **local-only** (por defecto; la bitácora local ya cubre el relevo del propio dev). (El opt-in por perfil
 > es un follow-up.) Un dev que trabaja solo **no necesita montar el central**.
 
 ## Requisitos
@@ -38,8 +38,8 @@ mysql neb_logbook < schema.sql
 
 ## 2. Configuración (env)
 
-Copiá `.env.example` a un archivo **no versionado** y poblá. El token y la contraseña **nunca**
-se commitean ni viven en `.md`/`personal/`.
+Copia `.env.example` a un archivo **no versionado** y puebla. El token y la contraseña **nunca**
+se hacen commit ni viven en `.md`/`personal/`.
 
 ```bash
 NEB_LOGBOOK_TOKEN=$(python -c "import secrets; print(secrets.token_urlsafe(48))")
@@ -54,7 +54,7 @@ pip install -r requirements.txt
 python logbook_server.py --host 127.0.0.1 --port 8787
 ```
 
-Ejemplo de unit systemd (ajustá rutas/usuario):
+Ejemplo de unit systemd (ajusta rutas/usuario):
 
 ```ini
 [Unit]
@@ -73,7 +73,7 @@ WantedBy=multi-user.target
 
 ## 4. Exposición
 
-El servidor escucha HTTP en `127.0.0.1:8787`. Elegí una:
+El servidor escucha HTTP en `127.0.0.1:8787`. Elige una:
 
 - **Tras reverse proxy (recomendado)** — un Apache/nginx ya existente termina TLS y proxea a
   `127.0.0.1:8787`. Ejemplo Apache (vhost/location):
@@ -86,12 +86,12 @@ El servidor escucha HTTP en `127.0.0.1:8787`. Elegí una:
   ```
   El cliente apunta `NEB_LOGBOOK_ENDPOINT=https://tu-host/neb-logbook`.
 
-- **Puerto propio** — exponé `:8787` directamente (idealmente solo dentro de la red del equipo /
+- **Puerto propio** — expón `:8787` directamente (idealmente solo dentro de la red del equipo /
   VPN). El servidor no termina TLS por sí mismo.
 
 ## 5. Configurar el cliente (cada dev)
 
-En la máquina de cada dev, exportá (como `NEB_HOME`: shell rc o `~/.claude/settings.json` campo `env`):
+En la máquina de cada dev, exporta (como `NEB_HOME`: shell rc o `~/.claude/settings.json` campo `env`):
 
 ```bash
 export NEB_LOGBOOK_ENDPOINT="https://tu-host/neb-logbook"
@@ -113,9 +113,9 @@ curl -s -H "Authorization: Bearer $NEB_LOGBOOK_TOKEN" http://127.0.0.1:8787/work
 
 ## Búsqueda (FULLTEXT)
 
-`/search` usa `FULLTEXT` InnoDB sobre `text_plain` con `utf8mb4`. Por default `ft_min_word_len=4`
-(palabras de <4 caracteres no se indexan) y aplica la lista de stopwords. Si necesitás indexar
-términos cortos, ajustá `ft_min_word_len` en `my.cnf` y reconstruí el índice
+`/search` usa `FULLTEXT` InnoDB sobre `text_plain` con `utf8mb4`. Por defecto `ft_min_word_len=4`
+(palabras de <4 caracteres no se indexan) y aplica la lista de stopwords. Si necesitas indexar
+términos cortos, ajusta `ft_min_word_len` en `my.cnf` y reconstruye el índice
 (`OPTIMIZE TABLE transcript;`).
 
 ## Retención

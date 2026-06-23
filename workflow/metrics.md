@@ -32,7 +32,7 @@ Los umbrales son sugeridos, ajustables por experiencia. Si una desviación tiene
 
 Captura: las 3 primeras dependen de señal explícita o ausencia de ella; las 3 últimas son **auto-reportadas por Claude al cierre** (silenciosas para el dev — visibles al revisar Métricas del MD antes de aprobar cierre).
 
-- **Incidencias surgidas**: cambios menores no planeados durante la implementación (rename de columna, archivo SQL faltante, bug detectado en repaso). Sobre el **alcance**.
+- **Incidencias surgidas**: cambios menores no planeados durante la implementación (renombre de columna, archivo SQL faltante, bug detectado en repaso). Sobre el **alcance**.
 - **Errores de implementación de Claude**: veces que Claude se desvió del plan aprobado y el dev tuvo que señalarlo. Sobre la **ejecución**. NO cuenta autocorrección dentro de la misma respuesta. NO cuenta clarificación legítima sobre info inexistente.
 - **Faltas de contexto**: veces que Claude pidió o asumió algo ya documentado en CLAUDE.md, memoria del proyecto o repo de metodología. Sobre la **recuperación de información**. Señal de gap en docs, no en el agente.
 - **Implementaciones sin aprobación**: veces que Claude entró a Fase 4 sin OK explícito ni implícito según [`planning.md`](../process/planning.md) § "Propuesta de implementación". **No cuenta como falta** la aprobación implícita válida (pregunta sobre detalles o contrapropuesta que **asume** que el código se escribirá) — eso es aprobación. **Sí cuenta** solo: silencio, pregunta de aclaración sin presuponer implementación, o contrapropuesta que requiere nueva confirmación.
@@ -104,7 +104,7 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 | Tiempo wall-clock | 2/5 | ❌ No admitida | Ruido por tools lentas; no atribuible a fases; varía con modelo |
 | Líneas de código netas | 2/5 | ❌ No admitida | No comparable cross-profile; no atribuible; refactors la distorsionan |
 | Conteo de commits | 1/5 | ❌ No admitida | No correlaciona con calidad; no atribuible |
-| Pausas / SessionStart | 1/5 | ❌ No admitida | Mezcla señal con ruido de runtime; sin acción derivada clara |
+| Pausas / SessionStart | 1/5 | ❌ No admitida | Mezcla señal con ruido de tiempo de ejecución; sin acción derivada clara |
 | Duración calendario | 3/5 | ❌ No admitida (descartada en sesión de diseño) | Útil pero cubre otro propósito (gestión de bloqueos); no es datos informativos |
 
 ### Tokens, costo y breakdown por modelo

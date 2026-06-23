@@ -4,7 +4,7 @@ Lineamiento meta-organizacional: cuándo crear un profile, qué archivos requier
 
 ## ¿Qué es un profile?
 
-Un profile es un conjunto de archivos Markdown bajo `profiles/<nombre>/` que concretiza la metodología para un tipo de proyecto específico. Claude lo carga al detectar el directorio del proyecto y aplica sus convenciones (fases adaptadas, comandos exactos, roles, deploy, troubleshooting) en vez de los lineamientos genéricos.
+Un profile es un conjunto de archivos Markdown bajo `profiles/<nombre>/` que concretiza la metodología para un tipo de proyecto específico. Claude lo carga al detectar el directorio del proyecto y aplica sus convenciones (fases adaptadas, comandos exactos, roles, deploy, resolución de problemas) en vez de los lineamientos genéricos.
 
 > **Nota histórica**: hasta 2.x este concepto se llamaba *stack*. Se renombró en 3.0.0 porque "stack" colisionaba con el "tech stack" genérico (las propias heurísticas de detección hablan del stack tecnológico del proyecto) y el concepto cubre más que tecnología: proceso, roles, deploy y convenciones — un *perfil de trabajo*. Detalle y tabla de migración: [`CHANGELOG.md`](../CHANGELOG.md) § [3.0.0]. Los CHANGELOG y change MDs anteriores a 3.0.0 conservan el término viejo.
 
@@ -43,7 +43,7 @@ Regla: si el trabajo produce un tipo de entregable diferente al repo padre y ocu
 - `deployment.md` — cómo se deploya, ambiente, validación, distribución al equipo.
 - `conventions.md` — convenciones específicas (estructura de código/archivos, naming, patrones).
 - `troubleshooting.md` — síntomas comunes + diagnóstico + solución.
-- `roles.md` — rol principal, revisores default, subagentes por fase.
+- `roles.md` — rol principal, revisores por defecto, subagentes por fase.
 
 ### Opcionales
 

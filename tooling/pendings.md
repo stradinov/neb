@@ -26,7 +26,7 @@ owner: <usuario>
 - **Roadmap:** alpha
 ```
 
-- `- **Peso:** <int>` en `[0,100]` (default 0 si ausente/no numérico, clamp).
+- `- **Peso:** <int>` en `[0,100]` (por defecto 0 si ausente/no numérico, clamp).
 - `- **Temas:** <csv>` → slugs (`split(',')`, trim, `normalize()`).
 - `- **Roadmap:** <proyecto|—>` → si trae un proyecto, ese objetivo delega el **orden fino** entre sus pendings al roadmap real (repo `roadmap`).
 - Un tema en >1 objetivo gana el **mayor peso** (max). Temas no mencionados → peso 0.
@@ -37,7 +37,7 @@ El parser **tolera la ausencia** de `compas.md` (degrada a señales intrínsecas
 
 Toda consulta del dev sobre sus pendientes —desde "cuáles son mis pendientes" hasta priorizar o pasar lista— se atiende por el skill [`pendings-review`](../skills/pendings-review/SKILL.md), que aplica la **capa de valor**: prioriza por banda, consulta la brújula `compas.md` y, si falta o la cobertura es baja, dispara `infer_objectives` para aprenderla (ver jerarquía abajo).
 
-Los verbos `list` y `show` de `pendings.py` son **acceso de bajo nivel / debug** (volcado JSON sin priorización ni brújula). NO son una vía de consulta equivalente ofrecida al dev: usarlos para responder "cuáles son mis pendientes" **salta la capa de valor** y oculta el nudge de `compas.md`. Reservalos para inspección puntual, scripting o diagnóstico.
+Los verbos `list` y `show` de `pendings.py` son **acceso de bajo nivel / debug** (volcado JSON sin priorización ni brújula). NO son una vía de consulta equivalente ofrecida al dev: usarlos para responder "cuáles son mis pendientes" **salta la capa de valor** y oculta el nudge de `compas.md`. Resérvalos para inspección puntual, scripting o diagnóstico.
 
 ## Cómo citar un pendiente (notación canónica)
 
@@ -66,7 +66,7 @@ De mayor a menor:
 
 `normalize()` (definida en `pendings.py`, reusada por el recomendador) = minúsculas + sin acentos (NFKD + descarte de combinantes `Mn`) — espejo del `remove_diacritics` del matching FTS5 de la capa de temas. El emparejamiento con el roadmap es **token-match dentro del CSV** de la columna `Subsistemas` del `roadmap.md` (o el frontmatter `subsystems:` de cada `initiatives/INIT-*/initiative.md`, que **gana si diverge**). Ejemplo (proyecto `alpha`): `subsystems: [catálogo, pedidos]` → tokens `{catalogo, pedidos}`; un tema `catalogo` del pending matchea `catálogo` del roadmap. El bonus por iniciativa: `alta`+15 · `media`+8 · `baja`+3 (clamp a 100).
 
-**Override de ruta del roadmap:** env `NEB_ROADMAP_DIR` (default `~/roadmap`). Si el dev mueve el repo sin setear el env, el orden fino degrada silenciosamente a solo el peso de `compas.md` (no rompe).
+**Override de ruta del roadmap:** env `NEB_ROADMAP_DIR` (por defecto `~/roadmap`). Si el dev mueve el repo sin establecer el env, el orden fino degrada silenciosamente a solo el peso de `compas.md` (no rompe).
 
 ## Traducción de enums (DB inglés → presentación español)
 
@@ -84,4 +84,4 @@ La DB guarda **siempre** el enum en inglés; la presentación (skill/recomendado
 
 ## Convención de paths
 
-Citar archivos según la tabla de referencias del [`CLAUDE.md`](../CLAUDE.md) (nombre + repo para archivos del núcleo; paths absolutos solo en `personal/*.md`). El repo `roadmap` se localiza vía "Directorio de repos locales" del `personal/<usuario>.md`; en el núcleo el default es `~/roadmap` con override `NEB_ROADMAP_DIR`.
+Citar archivos según la tabla de referencias del [`CLAUDE.md`](../CLAUDE.md) (nombre + repo para archivos del núcleo; paths absolutos solo en `personal/*.md`). El repo `roadmap` se localiza vía "Directorio de repos locales" del `personal/<usuario>.md`; en el núcleo el valor por defecto es `~/roadmap` con override `NEB_ROADMAP_DIR`.

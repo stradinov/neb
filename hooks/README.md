@@ -85,12 +85,12 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 - **Tipo**: `command`. Dos scripts hermanos: `.ps1` (Windows) + `.sh` (Linux/Mac).
 - **Requiere**:
-  - **Windows**: PowerShell 5+, `NEB_HOME` seteado.
+  - **Windows**: PowerShell 5+, `NEB_HOME` establecido.
   - **Linux/Mac**: `bash`, un player en PATH (`afplay`/`paplay`/`aplay`/`play`). `jq` es blando (sin él, defaults completos).
 - **Input**: JSON por stdin (no se usa — sin walk-back).
 - **Output**: ninguno (reproduce audio async en background process).
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, player ausente), `exit 0` silencioso.
-- **Configurable** en `~/.claude/notify-on-permission.json`: `enabled`, `wav`. Defaults: 1 chime fijo. Sin scaling ni `min_seconds` (el evento no tiene duración medible).
+- **Configurable** en `~/.claude/notify-on-permission.json`: `enabled`, `wav`. Por defecto: 1 chime fijo. Sin scaling ni `min_seconds` (el evento no tiene duración medible).
 - **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), igual que `notify-on-stop`.
 - **Coexiste con `Stop`** (`notify-on-stop`): eventos semánticamente distintos; pueden disparar chimes en secuencia. Ver `tooling/notify-on-permission.md` § 5.
 
@@ -100,12 +100,12 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 - **Tipo**: `command`. Dos scripts hermanos: `.ps1` (Windows) + `.sh` (Linux/Mac).
 - **Requiere**:
-  - **Windows**: PowerShell 5+, `NEB_HOME` seteado.
+  - **Windows**: PowerShell 5+, `NEB_HOME` establecido.
   - **Linux/Mac**: `bash`, `jq` (requisito blando — sin jq, defaults + 1 chime de cortesía), un player en PATH (`afplay`/`paplay`/`aplay`/`play`).
 - **Input**: JSON por stdin con `transcript_path`.
 - **Output**: ninguno (reproduce audio async en background process).
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0` silencioso.
-- **Configurable** en `~/.claude/notify-on-stop.json`: `enabled`, `wav`, `min_seconds`, `max_chimes`, `scaling` (`per-minute` o `fixed`). Defaults: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
+- **Configurable** en `~/.claude/notify-on-stop.json`: `enabled`, `wav`, `min_seconds`, `max_chimes`, `scaling` (`per-minute` o `fixed`). Por defecto: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
 - **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) y abandona — evita el "chime fantasma" del subproceso `claude -p` invocado por [`preprocess-prompt.py`](#preprocess-promptpy). Cross-link en `tooling/notify-on-stop.md` § Guard de subsesión interna.
 
 ### preprocess-prompt.py
@@ -118,7 +118,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Output**: JSON con `hookSpecificOutput.additionalContext` (preámbulo para Claude principal). Sin output si el hook decide skipear (slash command, trivial, payload puro, error).
 - **Defensivo**: ante cualquier falla (red, API, timeout, CLI ausente), `exit 0` silencioso y el prompt pasa raw — nunca bloquea la sesión.
 - **Configurable** en sesión vía `/preprocess full|fast|off`, prefijo `$$` por prompt o env var `CLAUDE_PREPROCESS_MODE`.
-- **Excepción a la filosofía "< 100ms"**: documentada explícitamente — la llamada inevitable a `claude -p` con Haiku justifica 13–25 s (medido localmente; el plan estimaba 2–4 s, la realidad fue mayor). Mitigaciones: timeout 30 s, filtros agresivos de skip, modo `off`, opt-in personal, guard de subsesión interna via env var `NEB_INTERNAL_SUBSESSION` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) que setea en el subproceso — consumida por todos los hooks de sesión vía `hooks/lib/subsession.py`.
+- **Excepción a la filosofía "< 100ms"**: documentada explícitamente — la llamada inevitable a `claude -p` con Haiku justifica 13–25 s (medido localmente; el plan estimaba 2–4 s, la realidad fue mayor). Mitigaciones: timeout 30 s, filtros agresivos de skip, modo `off`, opt-in personal, guard de subsesión interna via env var `NEB_INTERNAL_SUBSESSION` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) que establece en el subproceso — consumida por todos los hooks de sesión vía `hooks/lib/subsession.py`.
 
 ### ops-capture
 
@@ -127,7 +127,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Tipo**: `command` (Python cross-OS, `hooks/ops-capture.py`). En Windows declarar `"shell": "powershell"` (consume stdin); en Linux/Mac invocar con `python3`. La lógica determinística (gate, naming, parse del transcript) vive en `hooks/lib/ops_inbox.py`, cubierta por `hooks/tests/test_ops_capture.py`.
 - **Requiere**: Python 3 (`py`/`python3`) y el `claude` CLI en PATH (sin CLI → `exit 0` silencioso).
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
-- **Mecanismo genérico, dominio en el overlay**: el prompt de detección por defecto es genérico; el overlay lo especializa con `NEB_OPS_CAPTURE_PROMPT_FILE` (prompt con vocabulario de dominio) y `NEB_OPS_SIGNALS_EXTRA` (regex extra del gate). Modelo configurable con `NEB_OPS_CAPTURE_MODEL` (default Haiku).
+- **Mecanismo genérico, dominio en el overlay**: el prompt de detección por defecto es genérico; el overlay lo especializa con `NEB_OPS_CAPTURE_PROMPT_FILE` (prompt con vocabulario de dominio) y `NEB_OPS_SIGNALS_EXTRA` (regex extra del gate). Modelo configurable con `NEB_OPS_CAPTURE_MODEL` (por defecto, Haiku).
 - **Defensivo**: ante cualquier falla (sin transcript, sin actividad operativa, sin CLI, timeout 120s) `exit 0` — nunca bloquea el cierre de sesión. El subagente tiene instrucción de **no volcar secretos** al inbox.
 - **Seguridad (decisión de diseño)**: el hook re-envía fragmentos del transcript a la API (vía `claude -p`) y **NO redacta/filtra secretos de entrada**. El transcript de la sesión ya pasó por la API durante la propia sesión (Claude Code), así que el hook no agrega exposición nueva. El manejo de credenciales es responsabilidad **operativa del equipo adoptante**, no del hook — por diseño, el skill no filtra contenido por seguridad.
 - **Opt-in por proyecto** (no auto-registrado por el plugin), como `usage-tracker`/`logbook-sync`.
@@ -136,13 +136,13 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 ### pre-push-changelog (git hook del repo, no Claude Code)
 
-`.git/hooks/pre-push` — git hook nativo del **clon del maintainer** (`cp hooks/pre-push-changelog .git/hooks/pre-push`). Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX). Encadena 4 gates: integridad de la cadena de imports del arranque (`assemble-startup.py --check`), términos vetados vía extension point del overlay (`$NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh` si existe), fragment obligatorio para cambios normativos, y sincronía `CHANGELOG.md` ↔ `changelog.d/`. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
+`.git/hooks/pre-push` — git hook nativo del **clon del maintainer** (`cp hooks/pre-push-changelog .git/hooks/pre-push`). Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX). Encadena 4 gates: integridad de la cadena de imports del arranque (`assemble-startup.py --check`), términos vetados vía extension point del overlay (`$NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh` si existe), fragmento obligatorio para cambios normativos, y sincronía `CHANGELOG.md` ↔ `changelog.d/`. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
 
 ## Activación en un proyecto
 
-Bajo el plugin de Neb, el `SessionStart` se auto-registra (ver §"Bajo el plugin de Neb" abajo). Los demás hooks son **opt-in por proyecto**: agregalos al `<proyecto>/.claude/settings.json` tomando [`templates/claude-settings.json.template`](../templates/claude-settings.json.template) (o `settings.template.json`) como base.
+Bajo el plugin de Neb, el `SessionStart` se auto-registra (ver §"Bajo el plugin de Neb" abajo). Los demás hooks son **opt-in por proyecto**: agrégalos al `<proyecto>/.claude/settings.json` tomando [`templates/claude-settings.json.template`](../templates/claude-settings.json.template) (o `settings.template.json`) como base.
 
-> El script `link-into-project.sh` que generaba ese `settings.json` (modelo clone) fue eliminado en 3.0.0; partí de `templates/` para configurarlo.
+> El script `link-into-project.sh` que generaba ese `settings.json` (modelo clone) fue eliminado en 3.0.0; parte de `templates/` para configurarlo.
 
 ## Bajo el plugin de Neb
 

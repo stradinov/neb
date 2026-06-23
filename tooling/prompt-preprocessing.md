@@ -45,7 +45,7 @@ dev tipea prompt → UserPromptSubmit hook
 
 | Modo | Corrección | Eco | Confirmación | Cuándo usar |
 |---|---|---|---|---|
-| `off` (default) | No | No | No | **Default**: arranca inerte. También para sesión exploratoria, dictado correcto o prompt pegado puro |
+| `off` (por defecto) | No | No | No | **Por defecto**: arranca inerte. También para sesión exploratoria, dictado correcto o prompt pegado puro |
 | `full` | Sí | Sí | Según gate | Trabajo normal; máxima protección contra mala lectura |
 | `fast` | Sí | Sí | No | Conversación fluida donde la confirmación constante estorba |
 
@@ -61,13 +61,13 @@ dev tipea prompt → UserPromptSubmit hook
 }
 ```
 
-| Campo | Default | Notas |
+| Campo | Por defecto | Notas |
 |---|---|---|
-| `mode` | `"off"` | Uno de `"off"`, `"full"`, `"fast"`. **Default `off`** (arranca inerte); pon `"full"` o `"fast"` para activarlo de forma permanente |
+| `mode` | `"off"` | Uno de `"off"`, `"full"`, `"fast"`. **Por defecto `off`** (arranca inerte); pon `"full"` o `"fast"` para activarlo de forma permanente |
 | `model` | `"claude-haiku-4-5-20251001"` | Modelo Anthropic para corregir. Subir a Sonnet si Haiku falla; cuesta más tokens y latencia |
 | `prefix` | `"$$"` | Prefijo opt-out por prompt. `$$` comparte tecla física en distribuciones US y Español LATAM/España |
 
-Cualquier campo ausente cae al default hardcoded en el script. Si el archivo no existe, todos los defaults aplican.
+Cualquier campo ausente cae al valor por defecto hardcoded en el script. Si el archivo no existe, todos los valores por defecto aplican.
 
 ## 6. Cambio de modo en sesión
 
@@ -76,10 +76,10 @@ Precedencia (primero que aplica gana):
 1. **Prefijo por prompt** `$$` (bypass una sola vez para ese turno). Ej: `$$explora rapido el repo` → Claude actúa directo, sin eco/confirmación.
 2. **Slash command** `/preprocess full|fast|off` — persiste durante la sesión, escribe `~/.claude/preprocess-state/<session_id>.json`.
 3. **Env var** `CLAUDE_PREPROCESS_MODE=fast` antes de lanzar `claude` — fija el modo de toda la sesión, ignora `preprocess.json`. En PowerShell: `$env:CLAUDE_PREPROCESS_MODE = "fast"`.
-4. **Archivo personal** `~/.claude/preprocess.json` — default personal.
-5. **Default hardcoded**: `off`.
+4. **Archivo personal** `~/.claude/preprocess.json` — valor por defecto personal.
+5. **Por defecto hardcoded**: `off`.
 
-> Con el default en `off`, el prefijo `$$` solo tiene efecto observable si activaste el hook en la sesión (`/preprocess full|fast`): por su precedencia máxima fuerza `off` en ese turno pese al modo de sesión. En el estado por defecto (off) es redundante e inocuo (solo se elimina el `$$` del prompt).
+> Con el valor por defecto en `off`, el prefijo `$$` solo tiene efecto observable si activaste el hook en la sesión (`/preprocess full|fast`): por su precedencia máxima fuerza `off` en ese turno pese al modo de sesión. En el estado por defecto (off) es redundante e inocuo (solo se elimina el `$$` del prompt).
 
 ## 7. Activación
 
@@ -164,7 +164,7 @@ Umbral conservador a propósito: ante duda, pasa a Capa B (Haiku decide).
   - `logbook-sync.{sh,ps1}` (`Stop`/`SessionEnd`/`PreCompact`) — no escribe la subsesión a la bitácora.
   - `notify-on-stop` / `notify-on-permission` — evitan el "chime fantasma".
 
-  **Alias legacy** `CLAUDE_PREPROCESS_RECURSION` (deprecado, retiro diferido a un major): `mark_internal_subsession` setea **ambas** y todos los consumidores chequean **ambas**, para tolerar la convivencia de plugins de distinta versión en el equipo durante la transición.
+  **Alias legacy** `CLAUDE_PREPROCESS_RECURSION` (obsoleto, retiro diferido a un major): `mark_internal_subsession` establece **ambas** y todos los consumidores chequean **ambas**, para tolerar la convivencia de plugins de distinta versión en el equipo durante la transición.
 
 ## 10. Cuándo desactivarlo
 
@@ -177,7 +177,7 @@ Desactivación permanente: comentar bloque `UserPromptSubmit` en `~/.claude/sett
 
 ## 11. Verificación
 
-> **El default es `off`**: los escenarios de corrección activa (3, 4, 6, 8, 9) requieren encender antes el hook con `/preprocess full` (o `fast`). En su estado por defecto, todo prompt pasa raw (como el escenario 7).
+> **El valor por defecto es `off`**: los escenarios de corrección activa (3, 4, 6, 8, 9) requieren encender antes el hook con `/preprocess full` (o `fast`). En su estado por defecto, todo prompt pasa raw (como el escenario 7).
 
 Escenarios a probar (medibles entre Enter y primer carácter de respuesta de Claude):
 

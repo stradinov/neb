@@ -32,7 +32,7 @@ Si el prompt es ambiguo o cumple algún criterio de [execution.md](execution.md)
 
 ## Selección de roles (paso 0 antes del plan inicial)
 
-Si el REQ activa plan-review (ver [process/plan-review.md](plan-review.md) "Cuándo aplica"), Claude analiza el plan de archivos de la propuesta y propone los roles antes de generar el plan inicial. Algoritmo de detección automática y catálogo de dimensiones en [process/roles-invocation.md](roles-invocation.md). Para casos rutinarios usa default sin preguntar; para casos especiales pregunta al dev.
+Si el REQ activa plan-review (ver [process/plan-review.md](plan-review.md) "Cuándo aplica"), Claude analiza el plan de archivos de la propuesta y propone los roles antes de generar el plan inicial. Algoritmo de detección automática y catálogo de dimensiones en [process/roles-invocation.md](roles-invocation.md). Para casos rutinarios usa por defecto sin preguntar; para casos especiales pregunta al dev.
 
 ## Estimación, plan y plan de pruebas
 
@@ -75,7 +75,7 @@ Resumen de los criterios dispersos en este archivo y en `communication.md` / `tr
 
 | Situación | ¿Plan? | ¿Aprobación del plan? | ¿Se persiste? | Canónico |
 |---|---|---|---|---|
-| Trivial (1 línea, typo, rename obvio) | No | N/A | No | § Clarificación (arriba) |
+| Trivial (1 línea, typo, renombre obvio) | No | N/A | No | § Clarificación (arriba) |
 | No-formal (sin trigger de formalización) | No (prosa) | N/A | No | [`phase-transitions.md`](phase-transitions.md) § "Trigger de formalización" |
 | Baja (≤2 elementos) | Solo plan de pruebas | Implícita o explícita | No | § Estimación + § Propuesta de implementación (arriba) |
 | Media/alta vía plan mode | Sí | Explícita (`ExitPlanMode`) | Sí — hook | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |

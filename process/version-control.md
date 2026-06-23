@@ -10,7 +10,7 @@ El formato del mensaje, los tipos y las prohibiciones (`--no-verify`, `--force`/
 
 El principio del gate (OK explícito antes de confirmar un cambio del entregable en Fase 4; granularidad por confirmación; excepciones `self-applied`, autonomía declarada por proyecto y solo-`.md`) vive en [`../process/change-control-gate.md`](../process/change-control-gate.md) § "Autorización de la confirmación del cambio". En git, "confirmar" = `git commit` local; el OK aplica por cada `git commit` separado.
 
-Exclusión propia del mecanismo git — el gate **no aplica** a los artefactos de gobernanza del REQ: el propio change MD, bump de `VERSION`, regeneración de `CHANGELOG.md`, fragments en `changelog.d/`. Estos se agrupan en el commit de cierre del REQ.
+Exclusión propia del mecanismo git — el gate **no aplica** a los artefactos de gobernanza del REQ: el propio change MD, bump de `VERSION`, regeneración de `CHANGELOG.md`, fragmentos en `changelog.d/`. Estos se agrupan en el commit de cierre del REQ.
 
 ### Autonomía de Claude sobre archivos `.md` — operaciones git
 
@@ -18,7 +18,7 @@ El principio (Claude es dueño operativo de los **artefactos que Neb genera** y,
 
 - **Cubre**: `git commit`, `git push`, creación de ramas, `git merge`, `git rebase` sobre rama propia, `git cherry-pick`, y operaciones destructivas (`reset --hard`, `branch -D`, `push --force` sobre ramas distintas a `main`/`master`) en cualquier path del repo (`changes/`, `research/`, `reqs/<algo>/`, `README.md`, `docs/`, `CHANGELOG.md`, `CLAUDE.md`, etc.). Creación y edición.
 - **No cubre** (requiere OK pese a tocar solo `.md`):
-  - `push --force` a `main`/`master` — mantiene warn + OK por el system prompt de Claude Code.
+  - `push --force` a `main`/`master` — mantiene warn + OK por el prompt de sistema de Claude Code.
   - Commits/pushes mixtos `.md` + código — el commit completo pide OK por el componente más restrictivo (código); la autonomía sobre `.md` no contagia al resto.
   - Memorias personales del dev en `~/.claude/projects/<machine>/memory/*.md` — Claude propone deltas inline; el dev los aplica ("No editar a mano" del `CLAUDE.md` raíz del repo).
   - **Segmentos de contenido humano** (`<!-- human -->` … `<!-- /human -->`) dentro de un `.md` — el bloque marca contenido bajo control directo de un humano, cuya voz e intención no se alteran sin él; modificarlo requiere OK explícito aunque el commit sea solo-`.md` (Claude propone deltas inline). La autonomía cubre el resto del archivo. Ver [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Ownership de archivos `.md`".
@@ -80,7 +80,7 @@ Claude ejecuta estos pasos como parte de Fase 6/7, antes del push del REQ:
 El git hook `.git/hooks/pre-push` del repo `neb` (lo instala el maintainer: `cp hooks/pre-push-changelog .git/hooks/pre-push`) corre `assemble-changelog.py --check` antes de cada push que toca `changelog.d/`. Si retorna 1:
 
 - El push aborta con mensaje claro.
-- Claude (leyendo el mensaje del hook) regenera (`py bootstrap/assemble-changelog.py`), commitea `CHANGELOG.md` como commit final del REQ y reintenta push.
+- Claude (leyendo el mensaje del hook) regenera (`py bootstrap/assemble-changelog.py`), hace commit de `CHANGELOG.md` como commit final del REQ y reintenta push.
 
 Bypass: `git push --no-verify` — requiere autorización explícita del dev (ver § Commits).
 
@@ -88,7 +88,7 @@ Bypass: `git push --no-verify` — requiere autorización explícita del dev (ve
 
 Dos sesiones paralelas pueden crear `changelog.d/1.5.0.md` cada una con contenido distinto, o ambas bumpear `VERSION` al mismo valor. Reglas:
 
-- La primera en cerrar Fase 4 commitea primero y reclama el número.
-- La segunda renombra su fragment al siguiente valor disponible (e.g. `changelog.d/1.5.0.md` → `changelog.d/1.6.0.md`) y bumpea `VERSION` al mismo valor.
+- La primera en cerrar Fase 4 hace commit primero y reclama el número.
+- La segunda renombra su fragmento al siguiente valor disponible (e.g. `changelog.d/1.5.0.md` → `changelog.d/1.6.0.md`) y bumpea `VERSION` al mismo valor.
 - Un hueco en la historia (e.g. v1.5.0 saltado entre v1.4.0 y v1.6.0) es aceptable y no se reescribe historia.
-- `VERSION` sigue siendo single-line por convención SemVer; la colisión sobre `VERSION` es trivial (1 número, primera en commitear gana).
+- `VERSION` sigue siendo single-line por convención SemVer; la colisión sobre `VERSION` es trivial (1 número, primera en hacer commit gana).

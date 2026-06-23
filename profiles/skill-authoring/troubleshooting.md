@@ -77,7 +77,7 @@
    python ~/.claude/skills/<nombre>/scripts/regen-maps.py --all
    ```
 2. Revisar el diff: solo deben cambiar las secciones entre marcadores `<!-- autogen-start/end -->`.
-3. Commitear los baselines actualizados (solo el Skill Maintainer).
+3. Hacer commit de los baselines actualizados (solo el Skill Maintainer).
 
 Si el script falla, ver los logs del script y verificar que los paths de los repos están correctos en la configuración.
 

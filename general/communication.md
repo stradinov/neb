@@ -59,7 +59,7 @@ Al citar un pendiente, usar su **`[slug]`** (cita canónica) y, si se necesita e
 
 Si hay requerimiento activo (algún `active_<proyecto>_<slug>.md` en la memoria), Claude verifica además `autoCompactEnabled` en `~/.claude/settings.json` (no hay SessionStart hook ejecutable que emita el aviso). Si es `false`, ausente o malformado (no boolean → `false`), agrega una advertencia inline al recordatorio; silencio cuando es `true`:
 
-> "Hola. … Aviso: `autoCompactEnabled=false` — el draft del change MD (registro del requerimiento) no se actualizará automáticamente; refrescá manualmente en cada cambio mayor o activá el flag (ver [hooks/README.md](../hooks/README.md))."
+> "Hola. … Aviso: `autoCompactEnabled=false` — el draft del change MD (registro del requerimiento) no se actualizará automáticamente; refresca manualmente en cada cambio mayor o activa el flag (ver [hooks/README.md](../hooks/README.md))."
 
 ## Reporte de error o bloqueo
 
@@ -69,15 +69,16 @@ Mismo principio de decisión que el menú: **qué falla, qué bloquea, qué opci
 
 Cuando el dev anuncia que pausará el trabajo para continuar después en otra sesión, Claude ejecuta el procedimiento de handoff antes de cerrar el turno y **confirma al dev en una línea**: nombre asignado y cómo reanudar.
 
-> "Nombré la sesión `checkout-bugfix`. Reanudás con `claude --resume checkout-bugfix`. Anotada en pendings."
+> "Nombré la sesión `checkout-bugfix`. Reanudas con `claude --resume checkout-bugfix`. Anotada en pendings."
 
 El procedimiento completo (nombrado en kebab-case, `/rename`, registro en `pendings.md` bajo `## Sesiones pausadas`, comandos de reanudación, retomar una sesión interrumpida) vive en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)". La capa de comunicación solo carga el contrato comunicativo: confirmar en una línea.
 
 ## Idioma
 
-- Conversación con el dev: español.
-- Commits, código, identifiers, comentarios técnicos: inglés.
+- Conversación con el dev y **prosa de los `.md`**: **español mexicano (tuteo)** — "tú", "ejecuta", "reinicia"; nunca voseo.
+- Commits, código, identifiers, comandos, paths y **términos tecnológicos** (commit, prompt, hook, plugin, deploy…): inglés. El resto de anglicismos de prosa se traducen.
 - Mensajes de error de Claude → dev: español.
+- Taxonomía de extranjerismos y variedad regional (configurable): [`../tooling/redaccion-es.md`](../tooling/redaccion-es.md) (en `variedad: mexico`, `permitir_voseo: false`).
 
 ## Delegaciones
 

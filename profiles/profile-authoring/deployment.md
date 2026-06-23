@@ -24,7 +24,7 @@ Tras crear o modificar un profile:
 
 1. Maintainer hace `git push` al repo `neb`.
 2. Cada dev ejecuta `git pull` en su clon.
-3. Si el profile nuevo agrega heurística: basta con que esté en `profiles/index.md` + `general/profile-detection.md`. Bajo el plugin no hace falta re-enganchar proyectos cliente — Claude lee la heurística en runtime; el arranque se inyecta por el hook `SessionStart`.
+3. Si el profile nuevo agrega heurística: basta con que esté en `profiles/index.md` + `general/profile-detection.md`. Bajo el plugin no hace falta re-enganchar proyectos cliente — Claude lee la heurística en tiempo de ejecución; el arranque se inyecta por el hook `SessionStart`.
 4. Si el profile nuevo trae subagentes propios: se auto-descubren del plugin; `/reload-plugins` (o sesión nueva) para refrescar.
 
 ## Lo que NO hace Claude

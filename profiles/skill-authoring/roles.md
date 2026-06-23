@@ -45,10 +45,10 @@
 **Revisor periódico.** No es un rol activo en cada REQ — se activa en:
 
 1. **Comando manual en Fase 8**: si el REQ tocó código cubierto por el skill, correr `scripts/regen-maps.py --all` (o el flag pertinente).
-2. **Revisión mensual**: revisar diff de autogen, commitear baselines a main.
+2. **Revisión mensual**: revisar diff de autogen, hacer commit de baselines a main.
 3. **Distribución**: el cambio viaja en el plugin; los adoptantes hacen `claude plugin update` (o reinstalan); `/reload-plugins` para tomar cambios sin reiniciar.
 
-**Único autorizado** para commitear cambios a las secciones autogeneradas (`<!-- autogen-start/end -->`).
+**Único autorizado** para hacer commit de cambios a las secciones autogeneradas (`<!-- autogen-start/end -->`).
 
 Asignado en `personal/<usuario>.md`.
 

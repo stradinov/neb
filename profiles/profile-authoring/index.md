@@ -19,7 +19,7 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 | **Profile Author** | Dev que diseña y escribe el profile en esta iteración |
 | **Profile raíz** | Profile que cubre un repo autónomo con `.git` propio; heurística por indicadores estructurales |
 | **Overlay** | Profile que cubre un subdirectorio/tipo de trabajo dentro de un repo detectado por otro profile |
-| **Heurística de detección** | Regla en `profiles/index.md` que activa el profile al detectar el cwd del proyecto; Claude la lee en runtime (ver `general/profile-detection.md`) |
+| **Heurística de detección** | Regla en `profiles/index.md` que activa el profile al detectar el cwd del proyecto; Claude la lee en tiempo de ejecución (ver `general/profile-detection.md`) |
 | **Validación en uso** | El profile se valida al entregar (smoke de detección + regresión de profiles existentes); los gaps en sesiones posteriores son señal de Fase 9, no un gate de cierre |
 
 > Overlay sobre `self-applied`: la concretización del [vocabulario abstracto](../../methodology/vocabulary.md) (Entregable, Entrega final, etc.) se hereda de [`self-applied`](../self-applied/index.md). La tabla anterior lista solo los términos propios de profile-authoring.
@@ -30,10 +30,10 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 |---|---|
 | **Fase 1 — Clarificación** | Identificar: qué profile se crea/actualiza, qué gap cierra, si es overlay o raíz, archivos hermanos afectados, si requiere subagente nuevo o hereda revisores de `self-applied` |
 | **Fase 3 — Propuesta** | El plan lista: archivos a crear/editar, acoples cross-cutting (`profiles/index.md`, `general/profile-detection.md`, `process/roles-invocation.md`, `process/delivery.md`, `process/execution.md`), heurística propuesta, decisión overlay vs raíz |
-| **Fase 4 — Implementación** | Crear/editar archivos en `profiles/<nombre>/`. Si se agrega heurística, actualizarla en `profiles/index.md` + `general/profile-detection.md` (Claude la lee en runtime). Al terminar: verificar que el profile se detecta abriendo una sesión Claude en un directorio cubierto |
+| **Fase 4 — Implementación** | Crear/editar archivos en `profiles/<nombre>/`. Si se agrega heurística, actualizarla en `profiles/index.md` + `general/profile-detection.md` (Claude la lee en tiempo de ejecución). Al terminar: verificar que el profile se detecta abriendo una sesión Claude en un directorio cubierto |
 | **Fase 5 — Validación** | Smoke de detección: abrir una sesión Claude en cwd cubierto y confirmar que el profile activo es el correcto (Claude aplica la heurística de `profiles/index.md`) |
 | **Fase 6–7 — Entrega** | Commit + push al repo `neb`. Avisar al equipo si la heurística nueva puede afectar detección en proyectos existentes |
-| **Fase 8 — Documentación** | Change MD + bump SemVer (minor si profile nuevo; patch si edición) + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py` + actualizar `profiles/index.md` |
+| **Fase 8 — Documentación** | Change MD + bump SemVer (minor si profile nuevo; patch si edición) + nuevo fragmento `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py` + actualizar `profiles/index.md` |
 | **Fase 9 — Retrospectiva** | Si el REQ surgió de un gap en uso, anotar si era sub-especificación del profile o necesidad de uno nuevo |
 
 ## Archivos clave del profile
@@ -45,8 +45,8 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 | Convenciones de escritura (estructura, imports, heurística) | `profiles/profile-authoring/conventions.md` |
 | Deploy + distribución | `profiles/profile-authoring/deployment.md` |
 | Roles | `profiles/profile-authoring/roles.md` |
-| Troubleshooting | `profiles/profile-authoring/troubleshooting.md` |
-| Scaffold de profile nuevo | `bootstrap/init-profile-subproject.sh` |
+| Resolución de problemas | `profiles/profile-authoring/troubleshooting.md` |
+| Estructura base de profile nuevo | `bootstrap/init-profile-subproject.sh` |
 
 ## Agregar un profile nuevo
 

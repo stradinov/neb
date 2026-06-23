@@ -85,11 +85,11 @@ Operacionalización: subagente `context-completeness-reviewer` (ver [`../agents/
 - Reglas absolutas sin "por qué".
 - Versionado por fecha en el nombre del archivo (git ya tiene historial). *Excepción*: artefactos donde el orden cronológico es información de valor primaria (`<proyecto>/changes/`, `~/.claude/approved-plans/`) — la fecha en el nombre permite ordenar/filtrar sin abrir git log y resiste renombres.
 - Sincronizar manualmente entre proyectos (por eso este repo existe).
-- **Instruir a Claude cómo razonar o ejecutar internamente, en lugar de qué producir.** Algoritmos paso a paso para tareas de inferencia natural, ciclos de self-management (cambiar modelo, restaurar modelo, etc.) o duplicación de instrucciones del system prompt consumen contexto sin agregar valor — Claude ya las hace solo. Especificar el output esperado o asignar la responsabilidad a un rol.
+- **Instruir a Claude cómo razonar o ejecutar internamente, en lugar de qué producir.** Algoritmos paso a paso para tareas de inferencia natural, ciclos de self-management (cambiar modelo, restaurar modelo, etc.) o duplicación de instrucciones del prompt de sistema consumen contexto sin agregar valor — Claude ya las hace solo. Especificar el output esperado o asignar la responsabilidad a un rol.
 
 ## Coherencia global sobre cambio mínimo
 
-El system prompt base de Claude prescribe cambio mínimo: no refactor, no cleanup adyacente, default no comments. Para código fuente es virtud. Para entregables del profile `self-applied` (metodología, proceso, artefactos auto-aplicados) es vicio: una edición localizada puede invalidar vocabulario canónico, referencias cruzadas o invariantes que solo se manifiestan cuando otra sesión aplica el lineamiento.
+El prompt de sistema base de Claude prescribe cambio mínimo: no refactor, no cleanup adyacente, default no comments. Para código fuente es virtud. Para entregables del profile `self-applied` (metodología, proceso, artefactos auto-aplicados) es vicio: una edición localizada puede invalidar vocabulario canónico, referencias cruzadas o invariantes que solo se manifiestan cuando otra sesión aplica el lineamiento.
 
 **Override (solo profile `self-applied`)**: antes de cerrar una edición, Claude verifica los tres ejes:
 
@@ -99,7 +99,7 @@ El system prompt base de Claude prescribe cambio mínimo: no refactor, no cleanu
 
 **Exclusión** (alineada con [`../process/plan-review.md`](../process/plan-review.md) § "Cuándo aplica"): cosméticos puros — typos sin término canónico, reordenamientos dentro de una sección, fix de enlaces rotos. Para esos basta "Detectar y reportar (no fix silencioso)" más abajo.
 
-**Cobertura**: solo `self-applied`. El resto de profiles listados en [../profiles/index.md](../profiles/index.md) sigue el cambio mínimo del system prompt base; ampliaciones específicas se declaran en `profiles/<X>/conventions.md`.
+**Cobertura**: solo `self-applied`. El resto de profiles listados en [../profiles/index.md](../profiles/index.md) sigue el cambio mínimo del prompt de sistema base; ampliaciones específicas se declaran en `profiles/<X>/conventions.md`.
 
 **Relación con otros gates**: este principio es turno-a-turno (Claude lo aplica antes de cerrar cada edit). El subagente `qa-process-engineer` audita formalmente los tres ejes en Fase 3 (plan-review) y Fase 4 (gate de cierre) — ver `profiles/self-applied/roles.md`. "Detectar y reportar (no fix silencioso)" más abajo es reactivo (qué hacer al encontrar inconsistencia mientras editas).
 
@@ -138,12 +138,12 @@ Editar la metodología es aplicarla (ver § "Características" — Reflexiva): e
 
 - Estructura de carpetas.
 - Nombres de archivos (renombrar rompe imports en proyectos cliente).
-- Idioma según convención (español para conversación, inglés para identifiers/commits).
+- Idioma según convención: español **mexicano (tuteo)** en prosa, inglés en identifiers/commits/comandos/paths y términos tecnológicos (canónico en [`../general/communication.md`](../general/communication.md) § "Idioma").
 - Enlaces que apunten a secciones eliminadas: redirigir al archivo o sección equivalente, no dejar enlace roto.
 
 ### Declarar (nunca Patch)
 
-- Cambiar la fuerza o el alcance normativo de una regla no es redacción: relajar o endurecer un lineamiento del baseline (recomendación ↔ obligación), o promover un ejemplo, hipótesis o prosa explicativa a regla, se declara como tal en el plan y en el fragment del CHANGELOG, y clasifica como Minor o Major según el `CLAUDE.md` del repo § "Versionado SemVer" — nunca Patch.
+- Cambiar la fuerza o el alcance normativo de una regla no es redacción: relajar o endurecer un lineamiento del baseline (recomendación ↔ obligación), o promover un ejemplo, hipótesis o prosa explicativa a regla, se declara como tal en el plan y en el fragmento del CHANGELOG, y clasifica como Minor o Major según el `CLAUDE.md` del repo § "Versionado SemVer" — nunca Patch.
 
 ### Detectar y reportar (no fix silencioso)
 

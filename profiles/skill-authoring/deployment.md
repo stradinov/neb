@@ -55,13 +55,13 @@ git commit -m "skill-authoring: <descripción del cambio>"
 git push
 ```
 
-El Skill Maintainer (asignado en `personal/<usuario>.md`) es quien commitea las **baselines de contenido autogenerado** (`<!-- autogen-start/end -->`). Los demás cambios pueden commitearlos los Skill Authors autorizados.
+El Skill Maintainer (asignado en `personal/<usuario>.md`) es quien hace commit de las **baselines de contenido autogenerado** (`<!-- autogen-start/end -->`). De los demás cambios pueden hacer commit los Skill Authors autorizados.
 
 ## Distribución al equipo
 
 El cambio viaja en el plugin. El skill versionado en `neb` llega al resto del equipo cuando:
 
-1. Skill Maintainer commitea + pushea los cambios.
+1. Skill Maintainer hace commit + pushea los cambios.
 2. Los adoptantes hacen `claude plugin update` (o reinstalan el plugin).
 3. `/reload-plugins` para tomar los cambios sin reiniciar la sesión.
 

@@ -34,7 +34,7 @@
 2. Verificar el pattern regex: `/methodology/profiles/[^/]+(/|$)` — el `[^/]+` asegura al menos un segmento de nombre de profile.
 3. Si la heurística está presente pero activa otro profile, revisar el orden — el overlay de `profile-authoring` debe ir antes que la heurística de `self-applied` (`methodology/principles.md + process/plan-review.md`).
 
-**Solución**: corregir la heurística en `profiles/index.md` + `general/profile-detection.md` (Claude la lee en runtime) para que el overlay de `profile-authoring` esté en posición 2 (después de `reqs/` y antes de `skills/` y `self-applied`). Ver el orden canónico en `profiles/index.md`.
+**Solución**: corregir la heurística en `profiles/index.md` + `general/profile-detection.md` (Claude la lee en tiempo de ejecución) para que el overlay de `profile-authoring` esté en posición 2 (después de `reqs/` y antes de `skills/` y `self-applied`). Ver el orden canónico en `profiles/index.md`.
 
 ---
 
@@ -54,4 +54,4 @@
 
 **Diagnóstico**: cambios en la tabla sin actualizar la política de detección runtime, o viceversa.
 
-**Solución**: actualizar ambos en el mismo commit. `profiles/index.md` es la single source of truth de la heurística; `general/profile-detection.md` define cuándo y cómo Claude la aplica en runtime. Ver nota en `profiles/index.md`.
+**Solución**: actualizar ambos en el mismo commit. `profiles/index.md` es la single source of truth de la heurística; `general/profile-detection.md` define cuándo y cómo Claude la aplica en tiempo de ejecución. Ver nota en `profiles/index.md`.

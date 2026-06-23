@@ -151,4 +151,4 @@ Eje ortogonal a la complejidad. 1 elemento cambiado con muchos dependientes = co
 |-------|----------|----------|
 | Bajo  | Cambios aislados sin dependientes, docs/comentarios/typos, lógica sin condicionales sensibles | Typo en MD, log nuevo, comentario, formato |
 | Medio | Lógica con dependientes acotados conocidos, configs no críticos, cambios localizados con uso identificable | Nuevo método con 2-3 dependientes, config de feature flag, cambio en helper |
-| Alto  | Muchos dependientes, contratos públicos, flujos críticos (auth, pagos, datos), refactor transversal | Cambio en hash de password, modificar query SQL central, cambio de schema, rename de método público |
+| Alto  | Muchos dependientes, contratos públicos, flujos críticos (auth, pagos, datos), refactor transversal | Cambio en hash de password, modificar query SQL central, cambio de schema, renombre de método público |

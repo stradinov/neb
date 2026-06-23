@@ -28,7 +28,7 @@ Secciones adicionales permitidas si el profile las necesita (e.g. "Agregar un pr
 
 ## Reglas para la heurística de detección
 
-La heurística vive en `profiles/index.md` (single source of truth); `general/profile-detection.md` define cuándo y cómo Claude la aplica en runtime. Ambos deben estar sincronizados.
+La heurística vive en `profiles/index.md` (single source of truth); `general/profile-detection.md` define cuándo y cómo Claude la aplica en tiempo de ejecución. Ambos deben estar sincronizados.
 
 - **Solo existencia de paths**: existencia de directorios/archivos o match de pattern sobre el path absoluto. Sin leer contenido de archivos (solo si es estrictamente necesario).
 - **Idempotente**: aplicar la heurística sobre el mismo directorio N veces → mismo resultado.

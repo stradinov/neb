@@ -1,6 +1,6 @@
 # Onboarding
 
-Política transversal. Define el comportamiento de Claude al detectar un usuario nuevo y qué ofrece el tour de bienvenida disponible vía `/wakeup`. Los **pasos** del setup (instalar, montar overlay, definir profile) viven en [`../docs/user-guide.md`](../docs/user-guide.md); este archivo define **cuándo** Claude ofrece el tour y **qué opciones** presenta — no los pasos en sí.
+Política transversal. Define el comportamiento de Claude al detectar un usuario nuevo y qué ofrece el tour de bienvenida disponible vía `/wakeup`. Los **pasos** de la configuración (instalar, montar overlay, definir profile) viven en [`../docs/user-guide.md`](../docs/user-guide.md); este archivo define **cuándo** Claude ofrece el tour y **qué opciones** presenta — no los pasos en sí.
 
 ## Trigger de oferta pasiva
 
@@ -8,7 +8,7 @@ Política transversal. Define el comportamiento de Claude al detectar un usuario
 
 **Acción**: al cierre del primer turno que cumpla la condición, Claude agrega:
 
-> "Para un tour de Neb (3-5 min), invocá `/wakeup`."
+> "Para un tour de Neb (3-5 min), invoca `/wakeup`."
 
 Sin preámbulo, sin interrumpir el trabajo. El tour es opt-in.
 

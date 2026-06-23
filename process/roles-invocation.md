@@ -2,11 +2,11 @@
 
 Selección de roles por contexto, algoritmo de detección y consolidación, modo de anuncio y cobertura mínima por fase. El catálogo de roles (definiciones, dimensiones, implementación, evolución) vive en [`../methodology/roles-catalog.md`](../methodology/roles-catalog.md).
 
-**Nota sobre nombres de rol**: los roles "Process Architect", "QA Process Engineer" y "Process Improvement Analyst" (y los subagentes `qa-process-engineer`, `process-improvement-analyst`) conservan la palabra "Process" en su nombre. Aquí "Process" se refiere al concepto general de **proceso de metodología** (Process Architect = arquitecto del proceso metodológico), no al nombre actual del profile. La etiqueta sobrevive al rename del profile por inercia conceptual; el rename de roles se evalúa en REQ separado si aparece fricción real.
+**Nota sobre nombres de rol**: los roles "Process Architect", "QA Process Engineer" y "Process Improvement Analyst" (y los subagentes `qa-process-engineer`, `process-improvement-analyst`) conservan la palabra "Process" en su nombre. Aquí "Process" se refiere al concepto general de **proceso de metodología** (Process Architect = arquitecto del proceso metodológico), no al nombre actual del profile. La etiqueta sobrevive al renombre del profile por inercia conceptual; el renombre de roles se evalúa en REQ separado si aparece fricción real.
 
 ## Selección de roles por contexto
 
-Claude propone los roles en Fase 3 (Propuesta) antes de generar el plan inicial. Para casos rutinarios usa default sin preguntar; para casos especiales (profile desconocido, tipo REQ raro, plan toca dimensión nueva) pregunta al dev.
+Claude propone los roles en Fase 3 (Propuesta) antes de generar el plan inicial. Para casos rutinarios usa por defecto sin preguntar; para casos especiales (profile desconocido, tipo REQ raro, plan toca dimensión nueva) pregunta al dev.
 
 ### Default por profile
 
@@ -21,7 +21,7 @@ Claude propone los roles en Fase 3 (Propuesta) antes de generar el plan inicial.
 
 ### Overrides por dimensión del plan
 
-Cuando el plan toca dimensiones específicas, se agregan revisores adicionales (sin remover los default). Ver tabla "Dimensiones del plan" en [`../methodology/roles-catalog.md`](../methodology/roles-catalog.md).
+Cuando el plan toca dimensiones específicas, se agregan revisores adicionales (sin remover los por defecto). Ver tabla "Dimensiones del plan" en [`../methodology/roles-catalog.md`](../methodology/roles-catalog.md).
 
 ## Algoritmo de detección y consolidación
 

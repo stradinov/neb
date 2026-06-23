@@ -4,7 +4,7 @@ Proyectos auto-aplicados — la metodología que se edita es la que se aplica. C
 
 ## Por qué `self-applied` sin sufijo de dominio
 
-El nombre rompe deliberadamente los patrones de naming del repo (`<adjetivo>-<dominio>` como `<lenguaje>-<framework>`; `*-authoring` como `skill-authoring`). El sustantivo de dominio se omite porque el profile cubre cualquier marco auto-aplicado — metodología pura (principios, vocabulario, ENUMs), proceso puro (fases, gates, comandos), artefactos (changes, pendings, plans) — y no se restringe a un dominio. Nombrarlo `self-applied-methodology` o `self-applied-process` reintroduciría la asimetría que el rename buscaba eliminar (ver [`methodology/principles.md`](../../methodology/principles.md)).
+El nombre rompe deliberadamente los patrones de naming del repo (`<adjetivo>-<dominio>` como `<lenguaje>-<framework>`; `*-authoring` como `skill-authoring`). El sustantivo de dominio se omite porque el profile cubre cualquier marco auto-aplicado — metodología pura (principios, vocabulario, ENUMs), proceso puro (fases, gates, comandos), artefactos (changes, pendings, plans) — y no se restringe a un dominio. Nombrarlo `self-applied-methodology` o `self-applied-process` reintroduciría la asimetría que el renombre buscaba eliminar (ver [`methodology/principles.md`](../../methodology/principles.md)).
 
 La 4ª categoría de naming "Profiles auto-aplicados / reflexivos" está documentada en [`methodology/profiles.md`](../../methodology/profiles.md).
 
@@ -19,7 +19,7 @@ La 4ª categoría de naming "Profiles auto-aplicados / reflexivos" está documen
 
 ## Antes de proponer ubicación de archivos
 
-Cualquier archivo nuevo o relocalización en el repo deriva su path de la clasificación Metodología / Proceso / Mixto. Consultar [`../../methodology/principles.md`](../../methodology/principles.md) antes de proponer ubicación en Fases 1–3 (ver bullet en [`../../process/planning.md`](../../process/planning.md) § "Insumos de contexto"). El gate aplica a creación, movimiento y rename — no a ediciones in-place.
+Cualquier archivo nuevo o relocalización en el repo deriva su path de la clasificación Metodología / Proceso / Mixto. Consultar [`../../methodology/principles.md`](../../methodology/principles.md) antes de proponer ubicación en Fases 1–3 (ver bullet en [`../../process/planning.md`](../../process/planning.md) § "Insumos de contexto"). El gate aplica a creación, movimiento y renombre — no a ediciones in-place.
 
 ## Detección
 

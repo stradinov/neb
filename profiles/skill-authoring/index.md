@@ -34,7 +34,7 @@ Si el REQ también toca la metodología general (lineamientos, profiles, etc.), 
 | **Fase 4 — Implementación** | Editar fuente en `methodology/skills/<nombre>/`. Los skills se auto-descubren del plugin; tras editar, `/reload-plugins` (o `claude plugin update <plugin>`) refresca; sesión nueva ya está |
 | **Fase 5 — Validación** | (1) Smoke load: `/skills` en sesión nueva confirma que el skill carga. (2) Correr los casos afectados de `validation-prompts.md` y documentar resultados |
 | **Fase 6–7 — Entrega** | Commit + push al repo `neb`. Aviso al equipo si hay cambios en `description` del frontmatter (puede afectar undertriggering para el resto) |
-| **Fase 8 — Documentación** | Change MD del REQ + bump SemVer (`methodology/skills.md` ← patch, `profiles/` ← minor/patch según alcance) + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py` + actualizar `skills/README.md` (inventario) |
+| **Fase 8 — Documentación** | Change MD del REQ + bump SemVer (`methodology/skills.md` ← patch, `profiles/` ← minor/patch según alcance) + nuevo fragmento `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py` + actualizar `skills/README.md` (inventario) |
 | **Fase 9 — Retrospectiva** | Si el REQ surgió de un gap de validación en uso, anotar si era sub-especificación o undertriggering y si el patrón es generalizable |
 
 ## Archivos clave del profile
@@ -46,7 +46,7 @@ Si el REQ también toca la metodología general (lineamientos, profiles, etc.), 
 | Convenciones de escritura (frontmatter, progressive disclosure, restricción) | `profiles/skill-authoring/conventions.md` |
 | Deploy + distribución | `profiles/skill-authoring/deployment.md` |
 | Roles | `profiles/skill-authoring/roles.md` |
-| Troubleshooting | `profiles/skill-authoring/troubleshooting.md` |
+| Resolución de problemas | `profiles/skill-authoring/troubleshooting.md` |
 | Andamiaje con skill-creator de Anthropic | `profiles/skill-authoring/skill-creator-integration.md` |
 
 ## Agregar un skill nuevo
@@ -56,6 +56,6 @@ Si el REQ también toca la metodología general (lineamientos, profiles, etc.), 
 3. Registrar en `skills/README.md` (inventario maestro).
 4. Registrar en `profiles/<profile>/skills.md` del profile donde aplica.
 5. Agregar caso(s) en `skills/<nombre>/validation-prompts.md` (al menos 1 positivo + 1 negativo).
-6. Bump minor + nuevo fragment `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
+6. Bump minor + nuevo fragmento `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
 
 Ver `methodology/skills.md` para la decisión de si crear un skill es la opción correcta.

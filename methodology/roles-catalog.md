@@ -37,7 +37,7 @@ Foco: DDL, migraciones, queries, integridad referencial, índices, planes de eje
 
 ### SysAdmin / SRE
 
-Foco: deploy, configs de servidor, performance en runtime, observabilidad, capacidad, recuperación ante fallos.
+Foco: deploy, configs de servidor, performance en tiempo de ejecución, observabilidad, capacidad, recuperación ante fallos.
 
 ## Implementación de roles
 

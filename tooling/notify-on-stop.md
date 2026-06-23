@@ -20,7 +20,7 @@ Opt-in personal porque no todos los devs lo quieren (entorno de oficina comparti
 |---|---|---|
 | 1. Detectar fin de turno | Claude Code | Dispara `Stop` hook con `transcript_path` en stdin |
 | 2. Guard de subsesión interna | Hook (script) | Si `NEB_INTERNAL_SUBSESSION=1` (o alias legacy), `exit 0` |
-| 3. Cargar config personal | Hook (script) | Lee `~/.claude/notify-on-stop.json`; campos ausentes caen a defaults |
+| 3. Cargar config personal | Hook (script) | Lee `~/.claude/notify-on-stop.json`; campos ausentes caen a los valores por defecto |
 | 4. Calcular duración del turno | Hook (script) | Walk-back del transcript al último user message no-`toolUseResult` |
 | 5. Reproducir N chimes | Hook (script) | Player nativo en background process; el hook retorna inmediato |
 
@@ -43,7 +43,7 @@ Claude termina turno → Stop hook
 
 | Modo | Cálculo de N | Caso de uso |
 |---|---|---|
-| `per-minute` (default) | `clamp(1 + floor(secs/60), 1, max_chimes)` | Señal de "qué tan largo fue el turno"; útil para distinguir turnos cortos de largos sin mirar la terminal. |
+| `per-minute` (por defecto) | `clamp(1 + floor(secs/60), 1, max_chimes)` | Señal de "qué tan largo fue el turno"; útil para distinguir turnos cortos de largos sin mirar la terminal. |
 | `fixed` | `1` constante | Aviso uniforme; útil si los chimes múltiples molestan. |
 
 ## 5. Configuración personal default
@@ -60,15 +60,15 @@ Claude termina turno → Stop hook
 }
 ```
 
-| Campo | Tipo | Default | Notas |
+| Campo | Tipo | Por defecto | Notas |
 |---|---|---|---|
 | `enabled` | bool | `true` | `false` → `exit 0` inmediato sin reproducir. |
-| `wav` | string \| null | `null` (= `$NEB_HOME/personal/chimes-loud.wav`) | Path absoluto. Si no existe → fallback al default + warning a stderr. |
+| `wav` | string \| null | `null` (= `$NEB_HOME/personal/chimes-loud.wav`) | Path absoluto. Si no existe → fallback al valor por defecto + warning a stderr. |
 | `min_seconds` | int | `10` | Turnos más cortos → skip silencioso. Útil para que respuestas triviales no suenen. |
 | `max_chimes` | int | `5` | Clamp `[1, 20]`. |
 | `scaling` | `"per-minute"` \| `"fixed"` | `"per-minute"` | Cualquier otro valor cae a `"per-minute"`. |
 
-Cualquier campo ausente cae al default hardcoded en el script. Si el archivo no existe, todos los defaults aplican. JSON malformado loguea a stderr y aplica defaults.
+Cualquier campo ausente cae al valor por defecto hardcoded en el script. Si el archivo no existe, todos los valores por defecto aplican. JSON malformado loguea a stderr y aplica los valores por defecto.
 
 ## 6. Activación
 
@@ -76,9 +76,9 @@ Manual. (El proceso guiado de instalación de `neb` queda como pendiente del rep
 
 1. Copiar el bloque `Stop` de [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template) a `~/.claude/settings.json` del dev. Elegir el bloque OS apropiado (Windows / Linux-Mac).
 
-2. Verificar que `NEB_HOME` esté seteado al checkout local del repo.
+2. Verificar que `NEB_HOME` esté establecido al checkout local del repo.
 
-3. (Opcional) Crear `~/.claude/notify-on-stop.json` con valores explícitos. Si está ausente, los defaults aplican.
+3. (Opcional) Crear `~/.claude/notify-on-stop.json` con valores explícitos. Si está ausente, los valores por defecto aplican.
 
 4. **Linux/Mac**: verificar `jq` y un player de audio:
    - macOS: `afplay` viene de serie. `jq` vía `brew install jq`.
@@ -106,7 +106,7 @@ El dev tenía una versión personal de este hook en `~/.claude/hooks/notify-on-s
 
 1. Borrar `~/.claude/hooks/notify-on-stop.ps1` (queda obsoleto; ahora vive en `methodology/hooks/`).
 2. Editar `~/.claude/settings.json` → reemplazar la entrada `Stop` actual por el bloque Windows del template (apunta a `$env:NEB_HOME\hooks\notify-on-stop.ps1`).
-3. Opcional: crear `~/.claude/notify-on-stop.json` con valores explícitos; si está ausente, los defaults producen exactamente el comportamiento previo (1 chime + 1/minuto, max 5, skip < 10s).
+3. Opcional: crear `~/.claude/notify-on-stop.json` con valores explícitos; si está ausente, los valores por defecto producen exactamente el comportamiento previo (1 chime + 1/minuto, max 5, skip < 10s).
 4. Reiniciar sesión `claude`.
 
 ## 7. Guard de subsesión interna
@@ -128,9 +128,9 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 
 - `enabled: false` en el config.
 - `$env:NEB_INTERNAL_SUBSESSION = '1'` (o el alias legacy `CLAUDE_PREPROCESS_RECURSION`) — guard de subsesión interna.
-- Duración del turno < `min_seconds` (default 10).
+- Duración del turno < `min_seconds` (por defecto 10).
 - `transcript_path` ausente o ilegible — fallback a `play_n 1` (1 chime de cortesía, no skip total).
-- WAV inexistente y default inexistente.
+- WAV inexistente y valor por defecto inexistente.
 - Linux/Mac sin ningún player en PATH.
 
 ## 9. Limitaciones y alcances
@@ -153,7 +153,7 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 - **Latencia**: < 100 ms del hook al `exit 0`; el sonido corre async en background process. Cumple la filosofía de hooks.
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0`. Nunca bloquea la sesión.
 - **Cross-OS Windows**: `"shell": "powershell"` + `$env:VAR` (mismo bug de stdin documentado en `preprocess-prompt.py`).
-- **Linux/Mac**: `jq` es requisito blando — sin `jq`, el script cae a defaults completos y solo puede emitir 1 chime de cortesía (no calcula duración).
+- **Linux/Mac**: `jq` es requisito blando — sin `jq`, el script cae a valores por defecto completos y solo puede emitir 1 chime de cortesía (no calcula duración).
 - **Múltiples hooks `Stop`**: Claude Code los ejecuta secuencialmente; convive con otros hooks `Stop` del repo (e.g. `usage-tracker.sh`).
 - **Coexistencia con `Notification`** (`notify-on-permission`): eventos semánticamente distintos. Si el dev activa ambos, suenan chimes en secuencia (permission → approve → tool corre → cierre de turno). Ver [`tooling/notify-on-permission.md`](notify-on-permission.md) § 5.
 - **Sin secretos**: no lee ni escribe credenciales.
@@ -174,15 +174,15 @@ Escenarios a probar tras activar:
 
 | # | Acción | Resultado esperado |
 |---|---|---|
-| 1 | Turno < 10s (default `min_seconds`) | Sin chime. |
+| 1 | Turno < 10s (por defecto `min_seconds`) | Sin chime. |
 | 2 | Turno ~30s | 1 chime. |
 | 3 | Turno ~90s | 2 chimes (`1 + floor(90/60) = 2`). |
 | 4 | Turno ~6 min | 5 chimes (clamp por `max_chimes`). |
 | 5 | Config `scaling: "fixed"`, turno largo | 1 chime constante. |
 | 6 | Config `enabled: false` | Sin chime aun en turno largo. |
-| 7 | Config `wav` apuntando a archivo inexistente | Fallback al default + warning stderr; chime suena. |
-| 8 | Config JSON malformado | Todos defaults aplicados; warning stderr. |
-| 9 | Sin config (archivo ausente) | Defaults; chime suena igual que escenarios 2-4. |
+| 7 | Config `wav` apuntando a archivo inexistente | Fallback al valor por defecto + warning stderr; chime suena. |
+| 8 | Config JSON malformado | Todos los valores por defecto aplicados; warning stderr. |
+| 9 | Sin config (archivo ausente) | Valores por defecto; chime suena igual que escenarios 2-4. |
 | 10 | **Prompt no trivial con `preprocess-prompt.py` activo** (escenario clave) | Solo 1 chime al final del turno real. **Sin chime fantasma** del subproceso `claude -p` (guard de subsesión interna). |
 | 11 | Transcript inaccesible (path inválido en payload) | 1 chime de cortesía + `exit 0`. |
 | 12 | Linux/Mac sin player instalado | `exit 0` silencioso. |
