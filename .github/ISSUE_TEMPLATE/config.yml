@@ -3,6 +3,3 @@ contact_links:
   - name: 📖 Documentación de Neb
     url: https://github.com/stradinov/neb#readme
     about: Antes de abrir un issue, revisa el README y la Guía del usuario para ubicar el componente.
-  - name: 💬 Discusiones
-    url: https://github.com/stradinov/neb/discussions
-    about: Para preguntas de uso o dudas abiertas que no son un defecto ni una propuesta concreta.
