@@ -1,0 +1,109 @@
+name: "🐞 Reporte de defecto"
+description: Algo de Neb no se comporta como su documentación o sus reglas indican.
+title: "[defecto] "
+labels: ["defecto"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por reportar. Llena los campos con **hechos confirmados**; si tienes una idea de la causa, márcala como **hipótesis** más abajo — no la mezcles con lo observado.
+
+        ⚠️ **No incluyas información personal (PII), datos de clientes, marcas ni rutas absolutas de tu máquina.** Usa ejemplos genéricos.
+  - type: input
+    id: resumen
+    attributes:
+      label: Resumen (BLUF)
+      description: Qué falla, en una línea.
+      placeholder: "El comando /wakeup no monta el workspace cuando el directorio ya existe."
+    validations:
+      required: true
+  - type: dropdown
+    id: componente
+    attributes:
+      label: Componente de Neb afectado
+      options:
+        - Fase / proceso
+        - Profile
+        - Skill
+        - Hook / neb.db
+        - Comando
+        - Documentación
+        - Vocabulario / ENUM
+        - Plugin / packaging
+        - Otro / no estoy seguro
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Versión de Neb
+      description: Versión del plugin instalado (consúltala con `/plugin`). Déjala en blanco si reportas documentación del repo y no aplica.
+      placeholder: "5.6.0"
+    validations:
+      required: false
+  - type: input
+    id: entorno
+    attributes:
+      label: Entorno
+      description: Sistema operativo y versión de Claude Code. Solo si aplica (plugin/hook/comando).
+      placeholder: "Windows 11 · Claude Code 2.x"
+    validations:
+      required: false
+  - type: textarea
+    id: observado
+    attributes:
+      label: Comportamiento observado (hechos confirmados)
+      description: Qué pasó realmente. Solo lo que observaste, citable.
+    validations:
+      required: true
+  - type: textarea
+    id: esperado
+    attributes:
+      label: Comportamiento esperado
+      description: Qué debería pasar y, si aplica, contra qué regla o sección de la metodología.
+    validations:
+      required: true
+  - type: textarea
+    id: reproducir
+    attributes:
+      label: Pasos para reproducir
+      description: Numerados, del estado inicial al fallo. Para defectos de documentación o redacción, indica el archivo y la sección en vez de pasos.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: false
+  - type: textarea
+    id: evidencia
+    attributes:
+      label: Evidencia
+      description: Transcript, mensaje de error o captura. Sin PII, datos de clientes, marcas ni rutas absolutas.
+    validations:
+      required: false
+  - type: textarea
+    id: hipotesis
+    attributes:
+      label: Hipótesis de causa (opcional)
+      description: Si tienes una idea de la causa, anótala aquí, explícitamente como hipótesis — separada de los hechos de arriba.
+    validations:
+      required: false
+  - type: dropdown
+    id: impacto
+    attributes:
+      label: Severidad / impacto
+      options:
+        - Bloqueante (impide trabajar / rompe un flujo crítico)
+        - Fricción (hay workaround o afecta parcialmente)
+        - Cosmético (redacción, formato, detalle menor)
+    validations:
+      required: true
+  - type: checkboxes
+    id: confirmaciones
+    attributes:
+      label: Confirmaciones
+      options:
+        - label: Busqué en los issues existentes y este defecto no está duplicado.
+          required: true
+        - label: La evidencia no contiene PII, datos de clientes, marcas ni rutas absolutas.
+          required: true

@@ -1,0 +1,72 @@
+name: "💡 Propuesta de mejora"
+description: Una fricción, un gap o una idea para mejorar la metodología o sus herramientas.
+title: "[mejora] "
+labels: ["mejora"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Las propuestas se trían como cualquier requerimiento de Neb: si se acepta, se clarifica el alcance antes de implementarse. Describe el **problema** antes que la solución.
+
+        ⚠️ **No incluyas información personal (PII), datos de clientes, marcas ni rutas absolutas de tu máquina.** Usa ejemplos genéricos.
+  - type: input
+    id: resumen
+    attributes:
+      label: Resumen (BLUF)
+      description: Qué quieres mejorar, en una línea.
+      placeholder: "Falta un gate que verifique la rama activa antes de editar un repo."
+    validations:
+      required: true
+  - type: dropdown
+    id: componente
+    attributes:
+      label: Componente de Neb
+      options:
+        - Fase / proceso
+        - Profile
+        - Skill
+        - Hook / neb.db
+        - Comando
+        - Documentación
+        - Vocabulario / ENUM
+        - Plugin / packaging
+        - Otro / transversal
+    validations:
+      required: true
+  - type: textarea
+    id: friccion
+    attributes:
+      label: Fricción o gap observado
+      description: Qué problema, limitación o riesgo motiva la propuesta. Si surgió en un caso real, descríbelo (genérico, sin datos sensibles).
+    validations:
+      required: true
+  - type: textarea
+    id: propuesta
+    attributes:
+      label: Propuesta
+      description: Qué cambiarías (un lineamiento, una fase, un profile, un skill, un documento…) y cómo.
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Alternativas consideradas (opcional)
+      description: Otros caminos que evaluaste y por qué los descartas.
+    validations:
+      required: false
+  - type: textarea
+    id: impacto
+    attributes:
+      label: Impacto / a quién beneficia (opcional)
+      description: Qué mejora y para quién (todos los profiles, uno en particular, mantenedores…).
+    validations:
+      required: false
+  - type: checkboxes
+    id: confirmaciones
+    attributes:
+      label: Confirmaciones
+      options:
+        - label: Busqué en los issues existentes y esta propuesta no está duplicada.
+          required: true
+        - label: La descripción no contiene PII, datos de clientes, marcas ni rutas absolutas.
+          required: true
