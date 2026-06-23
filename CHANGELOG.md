@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.9.0] - 2026-06-23
+
+> **Minor**: endurecimiento de `tooling/revision-editorial-externa.md` para erradicar la alucinación de estructura del agente externo, que reincidió pese a la lección en prosa de 5.8.1–5.8.2. Tres lineamientos nuevos en el flujo de revisión.
+
+### Changed
+
+- **`tooling/revision-editorial-externa.md`**: el agente externo ahora (1) **relee la guía en crudo antes de cada documento** —cierra el ciclo de "documento vivo": antes trabajaba con la copia del briefing inicial y nunca recibía las lecciones/allowlist agregadas a media sesión—; (2) **lee la guía y el documento en crudo** (`raw.githubusercontent.com`) en vez de la vista renderizada de GitHub, que le hacía perder los saltos de línea; (3) tiene la **estructura/formato fuera de alcance** como regla dura —solo revisa redacción—. La lección de estructura se reformuló en consecuencia y el prompt recurrente del § "Para el maintainer" pasó a URLs en crudo.
+
 ## [5.8.2] - 2026-06-23
 
 > **Patch**: revisión editorial de `CONTRIBUTING.md` (anglicismos de prosa → español) vía el flujo de `tooling/revision-editorial-externa.md`, + 2ª evolución de esa guía. El gate de verificación volvió a rechazar hallazgos de estructura **alucinados** por el agente externo (esta vez colapsó todos los saltos de línea del archivo, no solo una tabla; el archivo estaba intacto).
