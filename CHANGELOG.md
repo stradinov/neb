@@ -4,6 +4,15 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.9.1] - 2026-06-23
+
+> **Patch**: revisión editorial de `commands/wakeup.md` (anglicismos de prosa → español) — **1.ª validación en uso de la guía endurecida v5.9.0**: el agente externo NO reportó estructura (la declaró fuera de alcance). Allowlist de la guía ampliada; 4 términos pervasivos (`workspace`/`opt-in`/`tour`/`dry-run`) diferidos a un barrido repo-wide.
+
+### Changed
+
+- **`commands/wakeup.md`**: customizable→personalizable, fallback→ruta de reserva (+ precisión "una instalación reciente"), re-detectes→repitas la detección, config→configuración, refiriendo→remitiendo.
+- **`tooling/revision-editorial-externa.md`**: allowlist += customizable→personalizable, fallback→ruta de reserva, config→configuración, y el mapeo canónico de los 4 términos del barrido pendiente (`workspace`→espacio de trabajo, `opt-in`→opcional/voluntario, `tour`→recorrido, `dry-run`→simulación) con sus excepciones de conservación (`NEB_WORKSPACE`, `setup-workspace.sh`, flag `--dry-run`); regla anti-prefijo `re-` calcado.
+
 ## [5.9.0] - 2026-06-23
 
 > **Minor**: endurecimiento de `tooling/revision-editorial-externa.md` para erradicar la alucinación de estructura del agente externo, que reincidió pese a la lección en prosa de 5.8.1–5.8.2. Tres lineamientos nuevos en el flujo de revisión.
