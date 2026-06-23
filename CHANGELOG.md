@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.8.0] - 2026-06-22
+
+> **Minor**: nuevo recurso opt-in `tooling/revision-editorial-externa.md` — **briefing dirigido al agente LLM externo** (ChatGPT u otro) que actúa como consultor editorial de los `.md` de Neb. El maintainer apunta al agente a este doc; el doc define rol, reglas, contrato de salida `[ACTUAL]`/`[PROPUESTO]` con banderas, qué revisar, allowlist de anglicismos + protecciones, lecciones aprendidas (primer pase v5.5.1–5.6.0) y la norma de **evolución**: el contrato cierra con una sección `PROPUESTAS PARA LA GUÍA` (el agente sugiere mejoras a este briefing en cada reporte) que Claude evalúa y promueve a norma.
+
+### Added
+
+- **`tooling/revision-editorial-externa.md`**: guía de revisión editorial por agentes externos, registrada en `tooling/index.md`. Referencia (no duplica) la política de idioma (`general/communication.md § "Idioma"`), la doctrina editorial (`methodology/principles.md`), el vocabulario canónico (`methodology/vocabulary.md`) y la taxonomía (`tooling/redaccion-es.md`). Lecciones clave: verificar `[ACTUAL]` (el agente externo puede servir caché o normalizar el texto), aplicar allowlist en vez de las sugerencias del agente a ciegas (no ve consistencia repo-wide), proteger bloques `<!-- human -->`/citas/headings, y pasar las sugerencias por un gate in-repo antes de un barrido grande.
+
 ## [5.7.0] - 2026-06-22
 
 > **Minor**: el canal de contribución se reorienta a **issues de GitHub** con esquema guiado. Se retira del `CONTRIBUTING.md` el flujo fork → rama → `changelog.d` → bump SemVer → Pull Request (ceremonia interna del mantenedor que se presentaba, falsamente, como guía para externos) y se establece como canal único abrir un issue con plantilla. Nuevo lineamiento de contribución → Minor.
