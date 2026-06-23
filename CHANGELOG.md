@@ -4,6 +4,15 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.5.1] - 2026-06-22
+
+> **Patch**: correcciones de redacción en docs de adopción (`README.md`, `docs/user-guide.md`) — sintaxis, claridad, anglicismos de prosa → español, inicio de tuteo — a partir de una revisión editorial externa (ChatGPT) aplicada como deltas gated. Sin cambio de sentido ni de alcance normativo. El barrido repo-wide de tuteo + anglicismos y la codificación de la política de idioma quedan para una versión posterior (5.6.0).
+
+### Changed
+
+- **`README.md`**: 9 correcciones. Dentro del pitch `<!-- human -->` con OK del dev (comma splice, claridad de la enumeración, "definición de tus proyectos"); fuera del bloque (completar "ejecuta" antes de los bloques de comando, "setup" → "configuración inicial", referente "que Neb describe"). Separadores ornamentales `---` y "la Nebuchadnezzar" conservados por decisión del dev.
+- **`docs/user-guide.md`**: 23 correcciones — gramática/claridad + anglicismos de prosa → español (markers→marcadores, setea→establece, setup→configuración, runtime→tiempo de ejecución, scaffold→estructura base, troubleshooting→resolución de problemas, system prompt→prompt de sistema, gitignored→ignorada por Git, commitear→hacer commit, rename→renombre, full-text→texto completo, outputs→salidas, fragment→fragmento, cache→caché, deprecado→obsoleto, default→por defecto) + "por vos" → "por ti".
+
 ## [5.5.0] - 2026-06-22
 
 > **Minor**: cuadro pedagógico de los 3 modos de redacción (Normativa / Explicativa / Adopción) en `docs/user-guide.md` § "Contribuir al núcleo". Material explicativo de cara al contribuidor; la fuente canónica sigue siendo `methodology/principles.md` § "Lineamientos para editar MDs" — el cuadro **ilustra**, no duplica la regla. Cierra el REQ-4 (opcional) del roadmap vocabulario+editorial.

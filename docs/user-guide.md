@@ -13,7 +13,7 @@ Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni 
 
 Luego escribí `/wakeup` — el tour conecta o monta tu workspace (vía `setup-workspace.sh`) y te guía por los pasos de abajo. Un hook `SessionStart` inyecta el arranque de la metodología en cada sesión; los skills, agents y commands del plugin se auto-descubren.
 
-> El modelo de **clonar el repo + correr `bootstrap/install.sh`** fue **eliminado en 3.0.0** (deprecado desde 2.0.0) como vía de uso. El clon solo es necesario para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores)).
+> El modelo de **clonar el repo + correr `bootstrap/install.sh`** fue **eliminado en 3.0.0** (obsoleto desde 2.0.0) como vía de uso. El clon solo es necesario para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores)).
 
 ## Conectarse al workspace del equipo
 
@@ -25,7 +25,7 @@ git clone <repo-workspace-del-equipo> && cd <repo>
 /wakeup
 ```
 
-`/wakeup` detecta que el clon ya es un workspace (markers estructurales: `*/overlays/detect-profile.local.sh` — el mismo criterio que usa el hook en runtime) y ofrece **conectarlo**: setea `NEB_WORKSPACE` en tu `settings.json` y crea tu `personal/<usuario>.md` si falta. El paso final real es **abrir una sesión nueva** de Claude Code: ahí el hook ya inyecta el arranque con el overlay de tu equipo.
+`/wakeup` detecta que el clon ya es un workspace (marcadores estructurales: `*/overlays/detect-profile.local.sh` — el mismo criterio que usa el hook en tiempo de ejecución) y ofrece **conectarlo**: establece `NEB_WORKSPACE` en tu `settings.json` y crea tu `personal/<usuario>.md` si falta. El paso final es **abrir una sesión nueva** de Claude Code: ahí el hook ya inyecta el arranque con el overlay de tu equipo.
 
 ## Montar tu overlay
 
@@ -45,14 +45,14 @@ tu-workspace/
 
 ### Configurar el entorno
 
-El tour `/wakeup` corre el script de setup por vos (idempotente — seguro de repetir, sirve para reset o migración). El script (`setup-workspace.sh`, viene con el plugin) crea lo que falte (`overlay/`, `personal/`, `changes/`) y setea **dos variables** en tu shell profile (con backup):
+El tour `/wakeup` ejecuta el script de configuración por ti (idempotente — seguro de repetir, sirve para restablecimiento o migración). El script (`setup-workspace.sh`, viene con el plugin) crea lo que falte (`overlay/`, `personal/`, `changes/`) y establece **dos variables** en tu shell profile (con backup):
 
 | Variable | Apunta a | Para |
 |---|---|---|
 | `NEB_HOME` | el directorio del plugin instalado | hooks (`$NEB_HOME/hooks`), templates y bootstrap del núcleo |
 | `NEB_WORKSPACE` | la raíz de tu workspace de gobernanza | tu overlay, `personal/`, `changes/` |
 
-Reiniciá tu shell para que tomen efecto. El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (default `overlay`).
+Reiniciá tu shell para que surtan efecto. El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (por defecto `overlay`).
 
 ## Definir tu primer profile
 
@@ -62,13 +62,13 @@ Un *profile* concreta Neb para un tipo de proyecto (comandos de build, convencio
 bash bootstrap/init-profile-subproject.sh <nombre>
 ```
 
-Genera el scaffold con los archivos mínimos. Referencia completa: [`methodology/profiles.md`](../methodology/profiles.md).
+Genera la estructura base con los archivos mínimos. Referencia completa: [`methodology/profiles.md`](../methodology/profiles.md).
 
 Definir un profile **puede implicar** crear capacidades de apoyo:
 
 ### Skill de apoyo al profile
 
-Un skill carga conocimiento de dominio cuando Claude lo necesita (mapas de código, convenciones específicas, troubleshooting).
+Un skill carga conocimiento de dominio cuando Claude lo necesita (mapas de código, convenciones específicas, resolución de problemas).
 
 1. Crear `skills/<nombre>/SKILL.md` con los campos `name` y `description`.
 2. Agregar archivos de contenido y scripts si aplica.
@@ -81,15 +81,15 @@ El agente los descubre automáticamente.
 Un profile puede definir revisores adversariales propios (por dimensión: seguridad, datos, convenciones) que actúan en el plan-review.
 
 1. Crear `agents/<nombre>.md` con los campos `name`, `description` y `tools`.
-2. El cuerpo constituye el system prompt del rol.
+2. El cuerpo constituye el prompt de sistema del rol.
 
-Los agents se auto-descubren del plugin: basta con crear el `agents/<nombre>.md`. Tras agregarlo, `/reload-plugins` lo carga sin reiniciar; en sesión nueva ya está.
+Los agents se auto-descubren del plugin: basta con crear el `agents/<nombre>.md`. Tras agregarlo, `/reload-plugins` lo carga sin reiniciar; en una sesión nueva ya quedan disponibles.
 
 ## Versionar tu configuración personal
 
-`personal/<usuario>.md` guarda tus preferencias, atajos y overrides individuales (qué son y su contrato "estrecha o agrega, nunca relaja": ver [how-it-works § Personalización](how-it-works.md) y [`methodology/personal-vs-team.md`](../methodology/personal-vs-team.md)). Viene **gitignored** — tu configuración no se publica ni sale del plugin.
+`personal/<usuario>.md` guarda tus preferencias, atajos y overrides individuales (qué son y su contrato "estrecha o agrega, nunca relaja": ver [how-it-works § Personalización](how-it-works.md) y [`methodology/personal-vs-team.md`](../methodology/personal-vs-team.md)). Viene **ignorada por Git** — tu configuración no se publica ni sale del plugin.
 
-Si querés versionarla (respaldo, portabilidad entre máquinas), quitá la regla `personal/` de **tu** `.gitignore` (no del de `neb/`) y commiteala en tu repo privado. Excluí binarios (`*.wav` y similares). Sus cambios se trazan con el commit normal; no llevan change MD.
+Si querés versionarla (respaldo, portabilidad entre máquinas), quitá la regla `personal/` de **tu** `.gitignore` (no del de `neb/`) y haz commit de ella en tu repo privado. Excluí binarios (`*.wav` y similares). Sus cambios se trazan con el commit normal; no llevan change MD.
 
 ## Retomar y relevar trabajo (bitácora de relevo)
 
@@ -97,13 +97,13 @@ Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque
 
 Con el comando `/logbook`:
 
-- **`/logbook`** — lista tus trabajos a medias (con-REQ y sesiones exploratorias) con su contexto.
+- **`/logbook`** — lista tus trabajos a medias (con REQ y sesiones exploratorias) con su contexto.
 - **`/logbook retomar <id>`** — reconstruye el contexto: para un REQ, toma el mando y abre una sesión nueva con el transcript; para una exploración, te entrega el `claude --resume`.
 - **`/logbook tomar | liberar | solicitar <id>`** — opera el "mando" del trabajo (un solo dueño a la vez).
 - **`/logbook search <texto>`** — busca en el corpus de transcripts (requiere central).
-- **`/logbook renombrar <id> <nuevo-slug>`** — rename gobernado del REQ (requiere central).
+- **`/logbook renombrar <id> <nuevo-slug>`** — renombre gobernado del REQ (requiere central).
 
-Por defecto la bitácora es **local** (tu máquina) — si trabajás solo, no necesitás nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva, con búsqueda full-text del corpus— lo habilita el **backend central** del equipo (servidor opcional; montaje en [`../server/INSTALL.md`](../server/INSTALL.md)). **Privacidad**: la bitácora es **local por default** —nada se publica al equipo salvo que lo pidas, aunque tengas el central configurado—. Para que un proyecto comparta su trabajo al catálogo central (works **y sesiones exploratorias**, con su transcript sin los outputs de herramientas), agregá `<!-- neb-logbook: central -->` a su `CLAUDE.md` (**opt-in por proyecto**). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
+Por defecto la bitácora es **local** (tu máquina) — si trabajás solo, no necesitás nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva, con búsqueda de texto completo del corpus— lo habilita el **backend central** del equipo (servidor opcional; montaje en [`../server/INSTALL.md`](../server/INSTALL.md)). **Privacidad**: la bitácora es **local por defecto** —nada se publica al equipo salvo que lo pidas, aunque tengas el central configurado—. Para que un proyecto comparta su trabajo al catálogo central (works **y sesiones exploratorias**, con su transcript sin las salidas de herramientas), agregá `<!-- neb-logbook: central -->` a su `CLAUDE.md` (**opt-in por proyecto**). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
 
 ## Contribuir al núcleo (mantenedores)
 
@@ -114,7 +114,7 @@ git clone https://github.com/stradinov/neb ~/neb   # o donde prefieras
 cp ~/neb/hooks/pre-push-changelog ~/neb/.git/hooks/pre-push   # gate del CHANGELOG
 ```
 
-Flujo: editás en el clon, fragment de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo (fork + PR si no tenés write). Para **dogfoodear** tus cambios antes de publicarlos, apuntá `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el cache del plugin) o corré `claude --plugin-dir <clon>`.
+Flujo: editás en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo (fork + PR si no tenés write). Para **dogfoodear** tus cambios antes de publicarlos, apuntá `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corré `claude --plugin-dir <clon>`.
 
 El clon del núcleo y tu workspace son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)
 
