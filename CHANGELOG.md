@@ -4,6 +4,15 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.8.2] - 2026-06-23
+
+> **Patch**: revisión editorial de `CONTRIBUTING.md` (anglicismos de prosa → español) vía el flujo de `tooling/revision-editorial-externa.md`, + 2ª evolución de esa guía. El gate de verificación volvió a rechazar hallazgos de estructura **alucinados** por el agente externo (esta vez colapsó todos los saltos de línea del archivo, no solo una tabla; el archivo estaba intacto).
+
+### Changed
+
+- **`CONTRIBUTING.md`**: bumps→incrementos, gap→brecha, triage/triar/tría→clasificar/clasificación, transcripts→transcripciones, naming→convención de nombres, imports→`@imports`, ownership→propiedad; `self-applied` marcado como código; corte de la promesa futura de `CODE_OF_CONDUCT.md`.
+- **`tooling/revision-editorial-externa.md`** (evolución desde `PROPUESTAS PARA LA GUÍA`): allowlist ampliada (bump→incremento, gap→brecha, triage/triar/tría→clasificar/clasificación, transcripts→transcripciones, naming→convención de nombres, ownership→propiedad); lección de estructura reforzada (el agente colapsa saltos de línea en todo el archivo, no solo tablas, y omite emojis); queda `done` como único caso a decidir repo-wide.
+
 ## [5.8.1] - 2026-06-23
 
 > **Patch**: revisión editorial de `methodology/promises.md` (anglicismos de prosa → español, idiom, corte de redundancia) aplicada vía el flujo de `tooling/revision-editorial-externa.md`, + primera **evolución** de esa guía a partir de las `PROPUESTAS PARA LA GUÍA` del agente externo y de lo aprendido en el pase. El gate de verificación rechazó hallazgos de estructura de tabla **alucinados** por el agente (la tabla estaba intacta).
