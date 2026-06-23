@@ -15,8 +15,9 @@ Cada requerimiento sigue un flujo de fases secuenciales:
 | 1–3 | Clarificación → Propuesta | El agente extrae requisitos y produce un plan concreto. No avanza a implementación sin aprobación explícita. |
 | 4 | Implementación | El agente ejecuta el plan. Ante cualquier desviación, detiene el trabajo y reporta antes de continuar. |
 | 5–6 | Validación | Se verifica el cumplimiento de los criterios de aceptación. Un revisor adversarial da visto bueno por dimensión. |
-| 7 | Entrega | El cambio se cierra con sus artefactos: documento de cambio, confirmación del cambio, versión si aplica. |
-| 9 | Mejora | Loop de retroalimentación que refina los lineamientos de Neb a partir del uso real. |
+| 7 | Entrega | El cambio se cierra con sus artefactos: registro del requerimiento, confirmación del cambio, versión si aplica. |
+| 8 | Documentación | Se completa la documentación pendiente al cerrar el requerimiento. |
+| 9 | Mejora | Ciclo de retroalimentación que refina los lineamientos de Neb a partir del uso real. |
 
 ### Gate de plan-review
 
@@ -32,8 +33,8 @@ invoca; sus hallazgos se incorporan al plan antes de pasar a implementación.
 **En progreso** → **En validación** → **Listo para aprobación** → **Cerrado**
 
 En cualquier estado puede adquirir el sufijo **Bloqueado**, que indica que
-requiere input externo antes de continuar. El estado se registra en el
-documento de cambio del requerimiento.
+requiere input externo antes de continuar. El estado se anota en el
+registro del requerimiento.
 
 ---
 
@@ -55,7 +56,7 @@ fijo durante la sesión y cambia únicamente cuando el contexto lo requiere.
 - `self-applied` — la propia Neb (el repo se gobierna con sus propias reglas)
 - `profile-authoring` — creación de un profile nuevo
 - `skill-authoring` — creación de un skill nuevo
-- `research` — investigación multi-fuente con verificación adversarial
+- `research` — investigación multifuente con verificación adversarial
 
 ---
 
@@ -83,7 +84,7 @@ comunicación, detección de profile, onboarding— ensambladas desde
 `general/startup.md`, más el overlay y la configuración personal del adoptante.
 El resto del contenido se carga on-demand según lo que el contexto requiera.
 
-Los proyectos cliente **no** necesitan ninguna línea de `@import` en su
+Los proyectos cliente **no** necesitan importar el núcleo en su
 `CLAUDE.md`: el hook inyecta el arranque en toda sesión, de modo que un
 `CLAUDE.md` de proyecto conserva solo sus imports de profile y su contenido
 propio. El marcador `<!-- neb: skip -->` en el `CLAUDE.md` de un proyecto
@@ -99,12 +100,12 @@ viven el overlay y `personal/`). Cómo establecerlas: [user-guide § Configurar 
 
 | Artefacto | Ubicación | Versionado |
 |---|---|---|
-| Documento de cambio | `<proyecto>/changes/<fecha>-<nombre>.md` | Sí, en el repo del proyecto |
+| Change MD (registro del requerimiento) | `<proyecto>/changes/<fecha>-<nombre>.md` | Sí, en el repo del proyecto |
 | Plan aprobado | `~/.claude/approved-plans/<ts>-<proyecto>-<slug>.md` | No (histórico cross-proyecto) |
 | Pendientes | `~/.claude/pendings.md` | No (seguimiento cross-sesión) |
 | Bitácora de relevo | `~/.claude/neb.db` (local) + central opcional | No (relevo cross-dev de sesiones a medias) |
 
-Cada documento de cambio registra: contexto y objetivo, decisiones tomadas,
+Cada registro del requerimiento documenta: contexto y objetivo, decisiones tomadas,
 plan de pruebas, historial de estados y estado final. Constituye el rastro
 auditable de qué se realizó y por qué.
 
@@ -112,10 +113,10 @@ auditable de qué se realizó y por qué.
 
 ## Carácter auto-aplicado
 
-El repo de neb se rige por sus propias reglas. Cualquier modificación a
+El repo de Neb se rige por sus propias reglas. Cualquier modificación a
 Neb es un requerimiento que sigue el flujo de Neb: fases, gate de
-plan-review, artefactos y versionado. El historial de documentos de cambio
-del repo registra cómo se tomó cada decisión de diseño.
+plan-review, artefactos y versionado. El historial de registros del requerimiento
+del repo documenta cómo se tomó cada decisión de diseño.
 
 ---
 
