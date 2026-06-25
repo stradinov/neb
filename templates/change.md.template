@@ -91,7 +91,7 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 ## Trazabilidad
 
 - **Plan aprobado:** `~/.claude/approved-plans/<archivo>.md` (media/alta: hook en plan mode, o el path del `Write` conversacional; `—` en trivial/baja/no-formal)
-- **Commits:** `<hash>` o `<hash-inicial>..<hash-final>`
+- **Commits:** `esta confirmación` (si cierras el registro en el mismo commit que el entregable) o `<hash>` / `<hash-inicial>..<hash-final>` (si ya se entregó antes)
 - **Pendientes generados:** ver `~/.claude/pendings.md` tag `[<slug>]` (o `ninguno`)
 
 ## Métricas

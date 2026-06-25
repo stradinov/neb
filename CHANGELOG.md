@@ -4,6 +4,18 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.1.0] - 2026-06-25
+
+> **Minor**: documenta la convención (antes implícita) de **finalizar el registro del requerimiento dentro del commit que entrega el entregable**, anotando `**Commits:** esta confirmación` en vez del hash literal. Evita un cierre `.md`-only posterior que dispara el Gate 3 del pre-push (todo `changes/` cuenta como normativo y exige fragment) y obligaría a `--no-verify`. Surge de la Fase 9 del REQ de eliminación de la política de modelos (v6.0.0), donde el cierre tardío del registro requirió bypass.
+
+### Added
+
+- **`workflow/changes.md`** (§ "Ciclo de vida del draft", fila "Cierre"): convención de cerrar el registro en el mismo commit del entregable con `**Commits:** esta confirmación` (sin hash literal); el cierre en commit aparte solo aplica cuando el registro ya se entregó antes (entrega temprana).
+
+### Changed
+
+- **`templates/change.md.template`** (§ Trazabilidad, `**Commits:**`): ofrece `esta confirmación` como opción (cierre dentro del release) junto a `<hash>`/`<rango>`.
+
 ## [6.0.0] - 2026-06-25
 
 > **Major (ruptura de import):** se elimina la política transversal de modelos (`general/models.md`) del kernel. Razón: el agente del loop principal no puede conmutar su propio modelo (lo fija el dev/config), así que una política always-on que orientara la "selección de modelo según contexto" no aporta lineamiento accionable por el agente; la elección de modelo queda fuera de la metodología, en la configuración de Claude Code del dev. Se retira el `@import` de `general/startup.md` y se depuran todas las referencias vivas. Major porque elimina un archivo importado (cambio incompatible del kernel, ver `CLAUDE.md` § "Versionado SemVer").
