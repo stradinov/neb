@@ -75,10 +75,13 @@ El procedimiento completo (nombrado en kebab-case, `/rename`, registro en `pendi
 
 ## Idioma
 
-- Conversación con el dev y **prosa de los `.md`**: **español mexicano (tuteo)** — "tú", "ejecuta", "reinicia"; nunca voseo.
-- Commits, código, identifiers, comandos, paths y **términos tecnológicos** (commit, prompt, hook, plugin, deploy…): inglés. El resto de anglicismos de prosa se traducen.
-- Mensajes de error de Claude → dev: español.
-- Taxonomía de extranjerismos y variedad regional (configurable): [`../tooling/redaccion-es.md`](../tooling/redaccion-es.md) (en `variedad: mexico`, `permitir_voseo: false`).
+El **idioma base es español** en todo lo que el agente produce para el dev y el repo. La **variedad regional, el registro y la tolerancia a extranjerismos** son punto de customización (promesa 5), no baseline del núcleo.
+
+- **Conversación dev↔Claude** y **mensajes de error Claude→dev**: español; variedad y registro según el punto de customización.
+- **Prosa de los `.md`**: español; la variedad la fija la convención del repo/adoptante.
+- **Commits, código, identifiers, comandos, paths y términos tecnológicos** (commit, prompt, hook, plugin, deploy…): inglés. El resto de anglicismos de prosa se traducen.
+
+> **Punto de customización** (promesa 5): variedad regional, registro y extranjerismos se ajustan sin tocar el núcleo. Un **individuo** los declara en `personal/<usuario>.md` § "Preferencias de comunicación" (o, solo para un proyecto, en `<proyecto>/.claude/personal.md`); un **adoptante**, en su overlay. Esquema y perillas (variedad, `permitir_voseo`, registro, extranjerismos): [`../tooling/redaccion-es.md`](../tooling/redaccion-es.md). Variedad de este repo: `variedad: mexico`, `permitir_voseo: false`, tuteo.
 
 ## Delegaciones
 

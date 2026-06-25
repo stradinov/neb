@@ -138,7 +138,7 @@ Editar la metodología es aplicarla (ver § "Características" — Reflexiva): e
 
 - Estructura de carpetas.
 - Nombres de archivos (renombrar rompe imports en proyectos cliente).
-- Idioma según convención: español **mexicano (tuteo)** en prosa, inglés en identifiers/commits/comandos/paths y términos tecnológicos (canónico en [`../general/communication.md`](../general/communication.md) § "Idioma").
+- Idioma según convención: **español** en prosa (variedad de este repo: mexicano/tuteo — punto de customización, ver [`../general/communication.md`](../general/communication.md) § "Idioma"); inglés en identifiers/commits/comandos/paths y términos tecnológicos.
 - Enlaces que apunten a secciones eliminadas: redirigir al archivo o sección equivalente, no dejar enlace roto.
 
 ### Declarar (nunca Patch)

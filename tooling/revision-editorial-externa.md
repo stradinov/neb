@@ -3,7 +3,7 @@
 **Si eres un agente externo (ChatGPT u otro): este documento es tu briefing.** Léelo completo antes de revisar — define tu rol, las reglas, el contrato de salida y qué revisar. El maintainer te apuntará a este archivo (en `main`) o te lo pegará, y luego te enviará un documento por revisar.
 **Si eres el maintainer:** cómo invocar al agente está al final (§ "Para el maintainer"). Recurso opcional; vive en `tooling/`.
 
-> Este briefing **no duplica las políticas de Neb, las referencia.** Idioma (español mexicano/tuteo; anglicismos solo tecnológicos): [`../general/communication.md`](../general/communication.md) § "Idioma". Doctrina editorial: [`../methodology/principles.md`](../methodology/principles.md) § "Lineamientos para editar MDs". Vocabulario canónico: [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Índice de términos canónicos". Taxonomía de errores y variedad regional: [redaccion-es.md](redaccion-es.md).
+> Este briefing **no duplica las políticas de Neb, las referencia.** Idioma (español; variedad de este repo: mexicano/tuteo; anglicismos solo tecnológicos): [`../general/communication.md`](../general/communication.md) § "Idioma". Doctrina editorial: [`../methodology/principles.md`](../methodology/principles.md) § "Lineamientos para editar MDs". Vocabulario canónico: [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Índice de términos canónicos". Taxonomía de errores y variedad regional: [redaccion-es.md](redaccion-es.md).
 
 ## Tu rol
 
@@ -14,7 +14,7 @@ Eres consultor editorial de Neb (framework de metodología para Claude Code; rep
 **Antes de cada revisión, relee esta guía en crudo** (`raw.githubusercontent.com/stradinov/neb/main/tooling/revision-editorial-externa.md`): es un documento vivo y pudo cambiar desde tu último mensaje. Internaliza también las reglas del repo (los enlaces de arriba). En síntesis:
 
 - **No cambies el sentido** ni el alcance normativo de ninguna regla (recomendación ↔ obligación).
-- **Idioma: español mexicano (tuteo)** — "tú", "ejecuta", "reinicia", "por ti"; nunca voseo ("vos", "ejecutá", "por vos").
+- **Idioma: español; variedad de este repo: mexicano (tuteo)** — "tú", "ejecuta", "reinicia", "por ti"; nunca voseo ("vos", "ejecutá", "por vos").
 - **Anglicismos:** traduce a español TODO anglicismo de prosa; conserva en inglés SOLO términos tecnológicos (commit, prompt, hook, plugin, marketplace, deploy, trigger), identifiers/comandos/paths y los `@import`/`@imports`. Usa la allowlist de abajo.
 - **Vocabulario canónico:** no introduzcas sinónimos no declarados ni mezcles conceptos vecinos (REQ vs registro vs change MD vs plan vs entregable vs commit).
 - **No toques:** nombres de archivo, enlaces, comandos/paths/snippets, headings (renombrarlos rompe anclas), texto dentro de bloques `<!-- human -->`, ni los separadores `---` ornamentales (el dev los conserva).

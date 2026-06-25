@@ -14,7 +14,9 @@ type: personal
 
 ## Preferencias de comunicación
 
-<!-- ej. "respuestas <100 palabras" o "tablas en lugar de bullets cuando hay 5+ ítems" -->
+<!-- Idioma/variedad/registro: SUSTITUYEN el default del equipo (ver tooling/redaccion-es.md).
+     ej: variedad: rioplatense, permitir_voseo: true, registro: informal
+     Formato de salida: "respuestas <100 palabras", "tablas cuando hay 5+ ítems" -->
 
 ## Convenciones individuales
 
