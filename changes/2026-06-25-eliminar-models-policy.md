@@ -1,8 +1,8 @@
 # Eliminar la política transversal de modelos (`general/models.md`)
 
-**Estado:** En validación
+**Estado:** Cerrado
 **Fecha inicio:** 2026-06-25
-**Fecha cierre:** —
+**Fecha cierre:** 2026-06-25
 **Complejidad estimada:** baja
 **Complejidad real:** baja
 **Riesgo de regresión:** medio  <!-- elimina un archivo importado por startup.md; el gate assemble-startup --check protege contra import roto -->
@@ -49,8 +49,19 @@ Decisión: **eliminar `general/models.md`** y depurar todas sus referencias, en 
 ## Trazabilidad
 
 - **Plan aprobado:** conversacional; el dev eligió "Eliminarlo (Major)" tras ver el impacto (rompe `@import`, 5+ referencias) y aprobó el plan de ejecución.
-- **Commits:** esta confirmación (repo `neb`).
+- **Commits:** `08d470e` (repo `neb`, pusheado a `origin/main`).
 - **Pendientes generados:** ninguno. (Supera el pendiente de materialización de v5.11.0 y reemplaza el REQ de reescritura revertido.)
+
+## Entregas
+
+### Revisión
+- Entrega ejecutada: gate de cierre Fase 4 — `qa-process-engineer` + `context-completeness-reviewer` (DESBLOQUEADO tras corregir referencia colgante `revision-editorial-externa.md:64`).
+- Fecha: 2026-06-25
+
+### Final (Aprobación)
+- Entrega ejecutada: `git push origin main` (`08d470e`).
+- Fecha: 2026-06-25
+- Autorización por: dev (menú commit + push).
 
 ## Reporte de cierre
 
