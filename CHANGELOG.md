@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.9.3] - 2026-06-23
+
+> **Patch**: corrige un drift doc↔script en `docs/user-guide.md` (detectado al revisar el barrido 5.9.2): el script `setup-workspace.sh` escribe en `~/.claude/settings.json`, no en el "shell profile", y el efecto se toma al abrir una sesión nueva de Claude Code, no al reiniciar el shell.
+
+### Fixed
+
+- **`docs/user-guide.md`** § "Configurar el entorno": "establece dos variables en tu shell profile (con backup)" → "en `~/.claude/settings.json` (merge no-destructivo)"; "Reinicia tu shell para que surtan efecto" → "Abre una sesión nueva de Claude Code…". Alinea la guía con el comportamiento real del script (`setup-workspace.sh` L192/L209: el shell profile ya no se edita).
+
 ## [5.9.2] - 2026-06-23
 
 > **Patch**: barrido terminológico repo-wide en los docs **de cara al humano** — traducción de los 4 anglicismos pervasivos (`workspace`/`opt-in`/`tour`/`dry-run`) decididos en v5.9.1. ~70 ediciones en 18 docs; identifiers, flags, filenames, comillas de output y frontmatter conservados. Validado con plan-review (completitud + consistencia).

@@ -45,14 +45,14 @@ tu-workspace/
 
 ### Configurar el entorno
 
-El recorrido `/wakeup` ejecuta el script de configuración por ti (idempotente — seguro de repetir, sirve para restablecimiento o migración). El script (`setup-workspace.sh`, viene con el plugin) crea lo que falte (`overlay/`, `personal/`, `changes/`) y establece **dos variables** en tu shell profile (con backup):
+El recorrido `/wakeup` ejecuta el script de configuración por ti (idempotente — seguro de repetir, sirve para restablecimiento o migración). El script (`setup-workspace.sh`, viene con el plugin) crea lo que falte (`overlay/`, `personal/`, `changes/`) y establece **dos variables** en `~/.claude/settings.json` (merge no-destructivo):
 
 | Variable | Apunta a | Para |
 |---|---|---|
 | `NEB_HOME` | el directorio del plugin instalado | hooks (`$NEB_HOME/hooks`), templates y bootstrap del núcleo |
 | `NEB_WORKSPACE` | la raíz de tu espacio de trabajo de gobernanza | tu overlay, `personal/`, `changes/` |
 
-Reinicia tu shell para que surtan efecto. El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (por defecto `overlay`).
+Abre una **sesión nueva** de Claude Code para que surtan efecto (settings.json se lee por sesión). El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (por defecto `overlay`).
 
 ## Definir tu primer profile
 
