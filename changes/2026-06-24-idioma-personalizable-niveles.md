@@ -1,6 +1,6 @@
 # Idioma personalizable por niveles (individuo / adoptante / núcleo)
 
-**Estado:** Implementado y validado (Fase 4) — commit pendiente
+**Estado:** Cerrado
 **Fecha cierre:** 2026-06-24
 **Fecha inicio:** 2026-06-24
 **Complejidad estimada:** media
@@ -111,6 +111,6 @@ Recomiendo **(i)**. El plan abajo asume (i).
 
 ## Trazabilidad
 
-- **Plan aprobado:** plan-review completo (3 roles, hallazgos incorporados); OK del dev **pendiente** antes de Fase 4.
-- **Commits:** pendiente.
-- **Pendientes generados:** pendiente.
+- **Plan aprobado:** plan-review completo (3 roles, hallazgos incorporados) + OK del dev.
+- **Commits:** `e65f8e7` (pusheado a `origin/main`).
+- **Pendientes generados:** ninguno. Saneo extra durante Fase 4: se quitó la marca "Onibex" que se había introducido en el núcleo público (agnosticismo, promesa 2).

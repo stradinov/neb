@@ -56,6 +56,8 @@ Algunos archivos mezclan capas **por cohesión de dominio** y NO se fragmentan: 
 
 Archivos diseñados para que el adoptante los **sobreescriba** sin tocar el resto del núcleo (promesa "Customizable", ver [promises.md](promises.md)): [coding-standards.md](coding-standards.md), [git-conventions.md](git-conventions.md), [done-criteria.md](done-criteria.md), [`../general/communication.md`](../general/communication.md) (interacción), [`../general/models.md`](../general/models.md) (modelos), [personal-vs-team.md](personal-vs-team.md). El contrato "el override estrecha o agrega, nunca relaja" los protege de romper el baseline.
 
+Esta es la **lista canónica** (customizable **por diseño**). Tienen su bloque `> Punto de customización` **materializado**: `coding-standards.md`, `git-conventions.md`, `done-criteria.md`, `communication.md`; **pendiente de materializar**: `models.md`. Las sedes que enumeran lo materializado —[promises.md](promises.md) (promesa 5, celda "Dónde se materializa") y [personal-vs-team.md](personal-vs-team.md) (preconfigurados)— espejan ese **subconjunto materializado**, no la lista por diseño. Al agregar un punto, o al materializar uno pendiente, sincroniza las sedes afectadas.
+
 ## Contexto especializado antes de inferir
 
 Ante un tema fuera del antecedente registrado en skills o en la memoria del proyecto, Claude consulta primero los skills aplicables. Si el tema sigue sin cobertura y el impacto del REQ es medio o alto, propone abrir un REQ de research antes de proceder. No infiere desde el vacío en temas especializados.

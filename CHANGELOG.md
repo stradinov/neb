@@ -4,6 +4,23 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.11.0] - 2026-06-25
+
+> **Minor**: los **puntos de customización** se enumeraban en 3 sedes paralelas desincronizadas (follow-up de Fase 9 de v5.10.0). Se designa `methodology/principles.md § "Puntos de customización"` como **lista canónica por diseño**, que declara además el **estado de materialización** de cada punto (con bloque `> Punto de customización` vs pendiente). Las sedes que enumeran lo materializado (`promises.md` p5, `personal-vs-team.md` preconfigurados) espejan ese subconjunto. Hace **visible** el gap "declarado pero no materializado" (lo tiene hoy `models.md`).
+
+### Added
+
+- **`methodology/principles.md § "Puntos de customización"`**: declaración de lista **canónica por diseño** + estado de materialización (materializados: coding-standards, git-conventions, done-criteria, communication; **pendiente**: models) + regla "al agregar un punto o materializar uno pendiente, sincroniza las sedes afectadas".
+
+### Changed
+
+- **`methodology/promises.md`** (promesa 5, celda "Dónde se materializa"): reetiquetada como "Materializado (subconjunto de principles.md)"; lista los puntos con bloque (sin `models`, que está declarado pero no materializado). La prosa de "Criterio verificable" (conceptos customizables por diseño, incluye modelos) se mantiene.
+- **`methodology/personal-vs-team.md`** (puntos preconfigurados): reetiquetada como subconjunto materializado de la canónica; se quita `models` (no preconfigurado); path a `principles.md` corregido a idiomático (intra-`methodology/` sin `../`).
+
+### Fixed
+
+- Desincronía entre las 3 sedes: `models.md` figuraba en la canónica pero faltaba en las otras dos. Reencuadrado como pendiente de materializar (visible en la canónica), no como omisión silenciosa.
+
 ## [5.10.0] - 2026-06-24
 
 > **Minor**: el idioma se vuelve personalizable por niveles (individuo / adoptante / núcleo). El **idioma base del núcleo es español**; la **variedad regional, el registro y la tolerancia a extranjerismos** (mexicano/tuteo/no-voseo para este repo) pasan de baseline duro a **punto de customización** (promesa 5), sustituible en `personal/<usuario>.md` (individuo) o el overlay (adoptante). Respeta la sede única de la política (`communication.md`, REQ 5.6.0): estratifica dentro, no dispersa. Cambio de fuerza normativa (el default deja de imponer variedad) → Minor, no Patch.
