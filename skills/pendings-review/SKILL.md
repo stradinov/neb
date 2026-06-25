@@ -34,7 +34,7 @@ PD() { py "$NEB_SRC/hooks/lib/pendings.py" "$@" 2>/dev/null || python "$NEB_SRC/
    - señal dura (work ligado cerrado) → ya viene auto-archivado con causa por el gancho de A (`on_work_archived`); solo infórmalo.
    - "al recuperarlo" / juicio → **SUGERENCIA CON CONFIRMACIÓN**: propón marcar obsoleto + causa; pide OK antes de `PD archive <id> <causa>` (el verbo CLI es `archive`, que establece `status='obsolete'` con la causa). Nunca auto-archives por juicio en el MVP.
 4. **Agrupación**: muestra los grupos de relacionados (vía `pending_link` + tema compartido) como candidatos a REQ conjunto.
-5. **Soluciones profundas (fan-out top-K)**: solo bajo demanda y solo para los top-K (por defecto K=3) pendings de mayor banda, despacha el subagente `pendings-recommender` (Task) para que proponga abordaje. El triage liviano queda inline; el fan-out es opt-in.
+5. **Soluciones profundas (fan-out top-K)**: solo bajo demanda y solo para los top-K (por defecto K=3) pendings de mayor banda, despacha el subagente `pendings-recommender` (Task) para que proponga abordaje. El triage liviano queda inline; el fan-out es opcional.
 
 ### Priorizar por criterio externo — `priorizar <criterio o roadmap>`
 `PD rank "<criterio>"` (texto libre) o `PD rank --roadmap <proyecto>`. Jerarquía: **prompt > compas.md > señales intrínsecas**. `compas.md` es la fuente única de los pesos persistentes; el criterio del prompt es efímero. Si un objetivo de compas referencia un roadmap, el orden fino sale del roadmap real (`roadmap/<proyecto>`, frontmatter `priority`/`subsystems`).

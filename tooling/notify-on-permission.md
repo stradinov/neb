@@ -1,6 +1,6 @@
 # Notify on permission — hook `Notification`
 
-> Lineamiento del hook `notify-on-permission.{ps1,sh}`. **Opt-in personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
+> Lineamiento del hook `notify-on-permission.{ps1,sh}`. **Opcional personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
 >
 > Artefactos del hook: [`hooks/notify-on-permission.ps1`](../hooks/notify-on-permission.ps1), [`hooks/notify-on-permission.sh`](../hooks/notify-on-permission.sh), [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
 >
@@ -14,7 +14,7 @@ El hook `Stop` (`notify-on-stop`) cubre el cierre de turno, pero hay otro evento
 
 Hook nativo de Claude Code: `Notification` dispara precisamente en esos dos eventos. Reusa la misma arquitectura defensiva de `notify-on-stop`.
 
-Opt-in personal por las mismas razones que `notify-on-stop` (oficina compartida, audífonos, fricción auditiva personal).
+Opcional personal por las mismas razones que `notify-on-stop` (oficina compartida, audífonos, fricción auditiva personal).
 
 ## 2. Pipeline
 

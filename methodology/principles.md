@@ -37,7 +37,7 @@ Cada `.md` vive en la capa cuyo test de pertenencia cumple (mapa de capas en [`.
 | `methodology/` | ¿Define un criterio/vocabulario/catálogo/principio que el proceso CONSULTA, sin prescribir pasos? |
 | `process/` | ¿Prescribe pasos/gates atados a una FASE del ciclo 1–9? |
 | `workflow/` | ¿Describe el ciclo de vida de un ARTEFACTO que se produce/persiste? |
-| `tooling/` | ¿Es hook/recurso opt-in, no lineamiento del baseline? |
+| `tooling/` | ¿Es hook/recurso opcional, no lineamiento del baseline? |
 
 > **Excepción `docs/`**: la carpeta `docs/` (documentación de cara al adoptante — explicación en `how-it-works.md`, guías how-to en `user-guide.md`) **no** se gobierna por este test: es documentación para humanos, no lineamiento que el agente aplique en el flujo. Sus archivos no se clasifican como Metodología/Proceso.
 

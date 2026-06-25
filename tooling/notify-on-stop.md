@@ -1,6 +1,6 @@
 # Notify on stop — hook `Stop`
 
-> Lineamiento del hook `notify-on-stop.{ps1,sh}`. **Opt-in personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
+> Lineamiento del hook `notify-on-stop.{ps1,sh}`. **Opcional personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
 >
 > Artefactos del hook: [`hooks/notify-on-stop.ps1`](../hooks/notify-on-stop.ps1), [`hooks/notify-on-stop.sh`](../hooks/notify-on-stop.sh), [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
 
@@ -10,7 +10,7 @@
 
 El dev hace multitarea: deja un prompt largo corriendo y se va a otra ventana (email, doc, browser). Cuando Claude termina el turno y espera input, el dev no se entera hasta que vuelve a la terminal — pierde minutos a turno. Un aviso sonoro al cierre de turno reduce ese ciclo a segundos.
 
-Opt-in personal porque no todos los devs lo quieren (entorno de oficina compartida, audífonos, preferencia de minimizar fricción auditiva).
+Opcional personal porque no todos los devs lo quieren (entorno de oficina compartida, audífonos, preferencia de minimizar fricción auditiva).
 
 ## 2. Pipeline
 

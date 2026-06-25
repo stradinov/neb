@@ -4,6 +4,17 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [5.9.2] - 2026-06-23
+
+> **Patch**: barrido terminológico repo-wide en los docs **de cara al humano** — traducción de los 4 anglicismos pervasivos (`workspace`/`opt-in`/`tour`/`dry-run`) decididos en v5.9.1. ~70 ediciones en 18 docs; identifiers, flags, filenames, comillas de output y frontmatter conservados. Validado con plan-review (completitud + consistencia).
+
+### Changed
+
+- **Docs de cara al humano** (`README`, `docs/{user-guide,how-it-works}`, `commands/wakeup`, `general/{onboarding,index}`, `skills/wakeup/{SKILL,validation-prompts}`, `skills/pendings-review/SKILL`, `profiles/self-applied/skills`, `server/INSTALL`, `tooling/{index,logbook,notify-on-stop,notify-on-permission,prompt-preprocessing}`, `methodology/{principles,vocabulary}`): `workspace`→"espacio de trabajo", `opt-in`→"opcional" (o "de activación voluntaria por proyecto/perfil" cuando es activación afirmativa, no mera opcionalidad), `tour`→"recorrido", `dry-run` (prosa)→"simulación".
+- **Conservados** (sin tocar): identifier `NEB_WORKSPACE`, archivo `setup-workspace.sh`, dir de ejemplo `neb_workspace/`, flag `--dry-run`, código/inline-code, comillas de output literal del script ("Workspace existente detectado…"), frontmatter `name:`/`description:` de skills/commands y el skill name `wakeup`.
+- **Fuera de alcance** (retienen el inglés por decisión de alcance): docs agent-normativos (`process/`, `workflow/`, `general/profile-detection`, `profiles/self-applied/deployment`), `hooks/`, `bootstrap/`, `CHANGELOG`/`changelog.d`/`changes`/`research`, y scripts `*.py`/`*.sh`/`*.json`/`*.template`.
+- **`tooling/revision-editorial-externa.md`**: la nota de barrido pasó de "pendiente" a "ejecutado en v5.9.2" con el mapeo final y las reglas de conservación.
+
 ## [5.9.1] - 2026-06-23
 
 > **Patch**: revisión editorial de `commands/wakeup.md` (anglicismos de prosa → español) — **1.ª validación en uso de la guía endurecida v5.9.0**: el agente externo NO reportó estructura (la declaró fuera de alcance). Allowlist de la guía ampliada; 4 términos pervasivos (`workspace`/`opt-in`/`tour`/`dry-run`) diferidos a un barrido repo-wide.

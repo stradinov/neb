@@ -2,11 +2,11 @@
 
 ## Positivos (deben disparar el skill)
 
-1. `/wakeup` — invocación directa; debe iniciar el tour sin preámbulo.
+1. `/wakeup` — invocación directa; debe iniciar el recorrido sin preámbulo.
 2. "¿Cómo empiezo con Neb?" — pregunta de usuario nuevo.
 3. "Nunca usé esta metodología. ¿Qué tengo que hacer primero?"
 4. "Dame un tour rápido de cómo funciona esto."
-5. "Quiero montar mi overlay / crear mi primer profile. ¿Cómo lo hago?" — entrada directa a una opción del tour.
+5. "Quiero montar mi overlay / crear mi primer profile. ¿Cómo lo hago?" — entrada directa a una opción del recorrido.
 6. "Acabo de instalar Neb. ¿Por dónde arranco?"
 
 ## Negativos (NO deben disparar el skill)

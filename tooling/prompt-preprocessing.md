@@ -1,6 +1,6 @@
 # Prompt preprocessing — hook `UserPromptSubmit`
 
-> Lineamiento del hook `preprocess-prompt.py`. **Opt-in personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
+> Lineamiento del hook `preprocess-prompt.py`. **Opcional personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
 >
 > Recurso transversal consumido: [`tooling/redaccion-es.md`](redaccion-es.md).
 > Artefactos del hook: [`hooks/preprocess-prompt.py`](../hooks/preprocess-prompt.py), [`commands/preprocess.md`](../commands/preprocess.md), [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).

@@ -138,7 +138,7 @@ Clasificación según la naturaleza del entregable. Los pasos de ejecución de F
 
 - **Con ambiente de revisión** (e-commerce, etc.): el usuario valida el flujo principal en el ambiente de revisión antes de la entrega final.
 - **Con ciclo de revisión cliente** (profiles de análisis): el cliente valida el entregable iterativamente; cada vuelta produce una nueva versión hasta la aprobación final.
-- **Sin ambiente pero con artefactos** (scripts, migraciones, CLI): validación directa — ejecución local, dry-run, o revisión.
+- **Sin ambiente pero con artefactos** (scripts, migraciones, CLI): validación directa — ejecución local, simulación, o revisión.
 - **Sin artefactos** (docs sin proceso, comentarios, typos): validación implícita — el usuario revisa en contexto y confirma.
 
 > Los **profiles de proceso** (`self-applied` y sus overlays `research`/`skill-authoring`/`profile-authoring`) no usan un tipo aparte: validan con el mecanismo **verificable** de su entregable —revisión de roles + coherencia para lineamientos, `fact-check-reviewer` para research, smoke load + `validation-prompts` para skills— y **cierran de inmediato**. La observación en uso posterior (utilidad, triggering, fricción) es **retroalimentación de Fase 9** (ver [`../process/improvement.md`](../process/improvement.md)), no un gate de cierre.

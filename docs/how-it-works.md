@@ -91,7 +91,7 @@ propio. El marcador `<!-- neb: skip -->` en el `CLAUDE.md` de un proyecto
 desactiva la inyección para ese repo.
 
 Dos variables fijan los paths del entorno: `NEB_HOME` (el directorio del plugin
-instalado / checkout de neb) y `NEB_WORKSPACE` (la raíz del workspace, donde
+instalado / checkout de neb) y `NEB_WORKSPACE` (la raíz del espacio de trabajo, donde
 viven el overlay y `personal/`). Cómo establecerlas: [user-guide § Configurar el entorno](user-guide.md).
 
 ---

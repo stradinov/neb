@@ -12,7 +12,7 @@ Transversales **inyectadas al arranque** (vía [`startup.md`](startup.md), garan
 - [Models](models.md) — selección de modelo según contexto.
 - [Profile detection](profile-detection.md) — detección del profile al iniciar y profile activo durante la sesión.
 - [Phase transitions](../process/phase-transitions.md) — enrutamiento del workflow: trigger de formalización, anti-desviación, mapa de fases, gates de cola, conflictos normativos.
-- [Onboarding](onboarding.md) — oferta del tour `/wakeup`.
+- [Onboarding](onboarding.md) — oferta del recorrido `/wakeup`.
 - [Workflow index](../workflow/index.md) — mapa de artefactos + ENUM de estados.
 
 Transversales **on-demand** (su cláusula base viaja espejada en el arranque; el detalle se carga al disparador):
@@ -39,7 +39,7 @@ Referencia (on-demand):
 - [`methodology/`](../methodology/index.md) — criterio, vocabulario y catálogo (principles, roles-catalog, change-control-policy…).
 - [`process/`](../process/index.md) — fases, gates y mecanismos de control (planning → improvement, plan-review, version-control…).
 - [`workflow/`](../workflow/index.md) — artefactos (changes, pendings, approved-plans, metrics, traceability).
-- [`tooling/`](../tooling/index.md) — hooks y recursos opt-in personales.
+- [`tooling/`](../tooling/index.md) — hooks y recursos opcionales personales.
 - [`docs/`](../docs/how-it-works.md) — documentación de cara al adoptante (explicación + guías how-to); **fuera de las capas del flujo** (ver [`../methodology/principles.md`](../methodology/principles.md) § "Capas del repo y test de pertenencia").
 
 ## Flujo

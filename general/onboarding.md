@@ -1,6 +1,6 @@
 # Onboarding
 
-Política transversal. Define el comportamiento de Claude al detectar un usuario nuevo y qué ofrece el tour de bienvenida disponible vía `/wakeup`. Los **pasos** de la configuración (instalar, montar overlay, definir profile) viven en [`../docs/user-guide.md`](../docs/user-guide.md); este archivo define **cuándo** Claude ofrece el tour y **qué opciones** presenta — no los pasos en sí.
+Política transversal. Define el comportamiento de Claude al detectar un usuario nuevo y qué ofrece el recorrido de bienvenida disponible vía `/wakeup`. Los **pasos** de la configuración (instalar, montar overlay, definir profile) viven en [`../docs/user-guide.md`](../docs/user-guide.md); este archivo define **cuándo** Claude ofrece el recorrido y **qué opciones** presenta — no los pasos en sí.
 
 ## Trigger de oferta pasiva
 
@@ -8,15 +8,15 @@ Política transversal. Define el comportamiento de Claude al detectar un usuario
 
 **Acción**: al cierre del primer turno que cumpla la condición, Claude agrega:
 
-> "Para un tour de Neb (3-5 min), invoca `/wakeup`."
+> "Para un recorrido de Neb (3-5 min), invoca `/wakeup`."
 
-Sin preámbulo, sin interrumpir el trabajo. El tour es opt-in.
+Sin preámbulo, sin interrumpir el trabajo. El recorrido es opcional.
 
-**Re-invocación**: `/wakeup` corre el tour completo en cualquier momento y contexto, independientemente de si ya existe `personal/<usuario>.md`.
+**Re-invocación**: `/wakeup` corre el recorrido completo en cualquier momento y contexto, independientemente de si ya existe `personal/<usuario>.md`.
 
-## Opciones del tour
+## Opciones del recorrido
 
-El tour **no describe los pasos** —esos viven en [`../docs/user-guide.md`](../docs/user-guide.md)— sino que ofrece ejecutarlos. Tras presentar Neb y detectar el estado de la instalación, Claude ofrece las acciones de adopción como **menú de selección** (formato de [`communication.md`](communication.md) § "Elecciones: menú de selección"):
+El recorrido **no describe los pasos** —esos viven en [`../docs/user-guide.md`](../docs/user-guide.md)— sino que ofrece ejecutarlos. Tras presentar Neb y detectar el estado de la instalación, Claude ofrece las acciones de adopción como **menú de selección** (formato de [`communication.md`](communication.md) § "Elecciones: menú de selección"):
 
 1. **Montar tu overlay** — la capa propia donde vive lo del adoptante; paso mínimo para usar Neb (ver [user-guide § Montar tu overlay](../docs/user-guide.md)).
 2. **Definir tu primer profile** — concreta Neb para el dominio; puede incluir skill de apoyo y agentes revisores (ver [user-guide § Definir tu primer profile](../docs/user-guide.md)).

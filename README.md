@@ -39,7 +39,7 @@ Luego, ejecuta
 ```
 /wakeup
 ```
-para montar tu *workspace* (directorio donde extiendes la metodología, *overlay* + configuración personal).
+para montar tu *espacio de trabajo* (directorio donde extiendes la metodología, *overlay* + configuración personal).
 
 > El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores.
 
@@ -51,7 +51,7 @@ para montar tu *workspace* (directorio donde extiendes la metodología, *overlay
 * **Aprobación en puntos críticos** — Ningún cambio relevante avanza sin tu validación explícita.
 * **Consistencia entre sesiones y desarrolladores** — El método no varía según quién haya trabajado en la sesión anterior.
 * **Adaptable al profile del proyecto** — Las reglas genéricas aplican a cualquier proyecto; las específicas del equipo se incorporan sin modificar el núcleo.
-* **Adopción guiada** — El tour inicial (`/wakeup`) te lleva por la configuración inicial: montar tu capa propia y definir tu primer profile.
+* **Adopción guiada** — El recorrido inicial (`/wakeup`) te lleva por la configuración inicial: montar tu capa propia y definir tu primer profile.
 * **Trazabilidad completa** — Cada decisión queda documentada para auditorías, incorporación de nuevos integrantes o revisiones futuras.
 * **Reflexivo** — Neb se aplica a sí mismo; cada modificación al framework ha seguido el método que Neb describe.
 

@@ -8,11 +8,11 @@ El servidor es **agnóstico al despliegue**: escucha HTTP en `host:puerto` y asu
 que termina TLS. Estos pasos son el contrato mínimo; el despliegue concreto (vhost, systemd de tu
 infra) lo ajusta cada adoptante.
 
-> **Privacidad — leer antes de montar.** El central es **opt-in por proyecto**: con `NEB_LOGBOOK_ENDPOINT`
+> **Privacidad — leer antes de montar.** El central es **de activación voluntaria por proyecto**: con `NEB_LOGBOOK_ENDPOINT`
 > configurado, un proyecto publica su trabajo al catálogo compartido del equipo **solo si** su `CLAUDE.md`
 > trae el marcador `<!-- neb-logbook: central -->` (works con-REQ **y sesiones exploratorias**: su
 > transcript, sin `tool_result`, queda buscable por el equipo). Sin el marcador la bitácora queda
-> **local-only** (por defecto; la bitácora local ya cubre el relevo del propio dev). (El opt-in por perfil
+> **local-only** (por defecto; la bitácora local ya cubre el relevo del propio dev). (La activación voluntaria por perfil
 > es un follow-up.) Un dev que trabaja solo **no necesita montar el central**.
 
 ## Requisitos
