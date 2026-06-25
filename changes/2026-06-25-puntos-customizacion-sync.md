@@ -51,4 +51,4 @@ Esto resuelve además los 2 hallazgos del qa: la auto-omisión de `personal-vs-t
 
 - **Plan aprobado:** plan-review (`qa-process-engineer`, escalado proporcional a 1 rol) refutó la premisa inicial; diseño recalibrado y aprobado por el dev.
 - **Commits:** esta confirmación (repo `neb`).
-- **Pendientes generados:** **materializar el bloque `> Punto de customización` en `general/models.md`** (declarado customizable por diseño, sin materializar) — mismo patrón que cerró `communication.md` en v5.10.0.
+- **Pendientes generados:** **materializar el bloque `> Punto de customización` en `general/models.md`** (declarado customizable por diseño, sin materializar) — mismo patrón que cerró `communication.md` en v5.10.0. **Superado (v6.0.0):** `models.md` fue **eliminado** (la política de modelos se retiró del kernel); la materialización ya no aplica. Ver [`2026-06-25-eliminar-models-policy.md`](2026-06-25-eliminar-models-policy.md).

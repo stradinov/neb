@@ -24,8 +24,6 @@ Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquit
 
 NO usar para: bug fix de una línea, renombres triviales, tareas exploratorias.
 
-Selección de modelo en plan mode: ver [models.md](../general/models.md).
-
 ## Tareas
 
 Para 3+ pasos discretos, usar `TaskCreate` y `TaskUpdate`. Marcar `in_progress` al iniciar y `completed` al terminar — no batchear.

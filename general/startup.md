@@ -3,7 +3,6 @@
 Punto de entrada de la metodología. Carga, vía `@import` (garantizado y determinista al inicio de cada sesión), las reglas operativas que Claude aplica **desde el primer prompt**, independientes de fase. Reemplaza la antigua sección declarativa "lectura obligatoria al iniciar sesión".
 
 @communication.md
-@models.md
 @profile-detection.md
 @../process/phase-transitions.md
 @onboarding.md

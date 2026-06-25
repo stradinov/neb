@@ -4,6 +4,24 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.0.0] - 2026-06-25
+
+> **Major (ruptura de import):** se elimina la política transversal de modelos (`general/models.md`) del kernel. Razón: el agente del loop principal no puede conmutar su propio modelo (lo fija el dev/config), así que una política always-on que orientara la "selección de modelo según contexto" no aporta lineamiento accionable por el agente; la elección de modelo queda fuera de la metodología, en la configuración de Claude Code del dev. Se retira el `@import` de `general/startup.md` y se depuran todas las referencias vivas. Major porque elimina un archivo importado (cambio incompatible del kernel, ver `CLAUDE.md` § "Versionado SemVer").
+
+### Removed
+
+- **`general/models.md`** — eliminado. Con él se retiran del baseline la guía "mecánico→modelo económico / alto valor→modelo capaz", la nota de riesgo de model lock-in y el puntero a `~/.claude/settings.json`.
+- **`general/startup.md`**: se quita la directiva `@models.md` (la política dejaba de cargarse al arranque).
+
+### Changed
+
+- **`general/index.md`**: se quita el ítem "Models — selección de modelo según contexto" de las transversales inyectadas al arranque.
+- **`methodology/principles.md`**: `models.md` sale de la lista de políticas transversales canónicas (queda solo `communication.md`) y de la lista de puntos de customización (canónica por diseño, ahora toda materializada, sin pendientes).
+- **`methodology/promises.md`**: "modelos" sale de las perillas de personalización enumeradas en la promesa 5.
+- **`process/execution.md`**: se elimina la línea "Selección de modelo en plan mode: ver models.md".
+- **`tooling/revision-editorial-externa.md`**: `models` sale del set "No revises" `general/{…}` (referencia colgante por brace-expansion).
+- **`changes/2026-06-25-puntos-customizacion-sync.md`**: el pendiente "materializar el bloque de models.md" (generado en v5.11.0) se marca **superado** por esta eliminación.
+
 ## [5.11.0] - 2026-06-25
 
 > **Minor**: los **puntos de customización** se enumeraban en 3 sedes paralelas desincronizadas (follow-up de Fase 9 de v5.10.0). Se designa `methodology/principles.md § "Puntos de customización"` como **lista canónica por diseño**, que declara además el **estado de materialización** de cada punto (con bloque `> Punto de customización` vs pendiente). Las sedes que enumeran lo materializado (`promises.md` p5, `personal-vs-team.md` preconfigurados) espejan ese subconjunto. Hace **visible** el gap "declarado pero no materializado" (lo tiene hoy `models.md`).
