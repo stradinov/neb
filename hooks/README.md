@@ -71,7 +71,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 - **Tipo**: `command`. Dos scripts hermanos: `.sh` (Linux/Mac, requiere `jq`) + `.ps1` (Windows).
 - **Requiere**: Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib); `NEB_HOME`.
-- **Central (opcional)**: con `NEB_LOGBOOK_ENDPOINT` + `NEB_LOGBOOK_TOKEN` en el entorno, la captura lanza `logbook.py sync` **detached** (`subprocess.Popen`, cross-OS) que publica al central — los wrappers `.sh`/`.ps1` no cambian. El cliente usa solo stdlib (`urllib`); **PyMySQL es solo del servidor** (`server/`). Ver [`../server/INSTALL.md`](../server/INSTALL.md).
+- **Central (opcional)**: con `NEB_LOGBOOK_ENDPOINT` + `NEB_LOGBOOK_TOKEN` en el entorno, la captura lanza `logbook.py sync` **detached** (`subprocess.Popen`, cross-OS) que publica al central — los wrappers `.sh`/`.ps1` no cambian. El cliente usa solo stdlib (`urllib`); **PyMySQL es solo del servidor** (distribuido en un repositorio dedicado).
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
 - **Windows**: declarar `"shell": "powershell"` con `logbook-sync.ps1` — combina stdin + variables de entorno (ver §Filosofía).
 - **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea.

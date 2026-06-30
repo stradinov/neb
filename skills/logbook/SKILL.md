@@ -34,7 +34,7 @@ Corre `LB show <id>` y actúa según `mode`:
 - `liberar-forzado <id>` → **pide confirmación humana explícita** (le quita el mando a otro dev), y con el OK: `LB forced-release <id>`. Queda auditado (`event forced_release`).
 - `solicitar <id>` → `LB request <id>`.
 - `renombrar <id> <nuevo-slug> [nuevo-project]` → `LB rename <id> <nuevo-slug>` (renombre gobernado: migra la fila preservando `event`/`transcript`; sin esto, un slug nuevo bifurca en otro work).
-- `archivar <id>` → `LB archive <id>` (cierre del REQ: marca el work archivado; se preserva para auditoría, la purga es manual via `server/purge.py`).
+- `archivar <id>` → `LB archive <id>` (cierre del REQ: marca el work archivado; se preserva para auditoría, la purga es manual en el backend central).
 
 ### Buscar — `search <texto>`
 `LB search <texto>` (FULLTEXT sobre el transcript del corpus; requiere central).

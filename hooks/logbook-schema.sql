@@ -1,6 +1,6 @@
 -- Bitácora de relevo — esquema del backend SQLite local (Neb).
 -- Backend por defecto (universal, sin infra) y outbox del cliente cuando hay central.
--- El DDL del backend central (MySQL de referencia) vive con el servidor de referencia (REQ central).
+-- El DDL del backend central (MySQL de referencia) vive en el repositorio dedicado del backend central.
 -- WAL: una escritura interrumpida (corte de luz/kill) se revierte sola al reabrir — por eso SQLite y no archivos planos.
 PRAGMA journal_mode=WAL;
 PRAGMA foreign_keys=ON;

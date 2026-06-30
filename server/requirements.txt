@@ -1,3 +1,0 @@
-# Backend central de la bitácora de relevo (Neb, REQ B). Única dependencia: driver MariaDB pure-python.
-# El cliente (hooks/lib/logbook.py) NO usa esto — corre con solo stdlib.
-PyMySQL>=1.1,<2

@@ -60,7 +60,7 @@ Reglas del contrato:
 Prioriza documentos **de cara al humano**:
 
 - **Tier 1:** `README.md` · `docs/user-guide.md` · `docs/how-it-works.md` · `CONTRIBUTING.md`.
-- **Tier 2:** `methodology/promises.md` · `commands/wakeup.md` · `methodology/principles.md` · `methodology/{profiles,vocabulary,roles-catalog,personal-vs-team}.md` · `general/{communication,index}.md` · `server/INSTALL.md` · `tooling/index.md` · `profiles/*/index.md`.
+- **Tier 2:** `methodology/promises.md` · `commands/wakeup.md` · `methodology/principles.md` · `methodology/{profiles,vocabulary,roles-catalog,personal-vs-team}.md` · `general/{communication,index}.md` · `tooling/index.md` · `profiles/*/index.md`.
 - **No revises:** `changes/`, `changelog.d/`, `CHANGELOG.md`, `research/`, `hooks/`, `bootstrap/`, `*.sql`, `*.json`, `*.template`, `personal/*`; ni los `.md` normativos del agente (`process/`, `workflow/`, `agents/`, `general/{startup,profile-detection,…}`) — su consumidor es Claude, no un humano.
 
 ## Allowlist de anglicismos y protecciones

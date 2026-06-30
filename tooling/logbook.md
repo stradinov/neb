@@ -5,11 +5,11 @@ Recurso del hook que alimenta la [bitácora de relevo](../workflow/logbook.md). 
 ## Backend pluggable
 
 - **`local` (por defecto):** SQLite en `~/.claude/neb.db` (esquema en [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql); WAL — una escritura interrumpida se revierte sola). Universal, sin infra. Es además **outbox** del central. **Resolver dual-mode permanente** (`hooks/lib/_db_shared.resolve_db_path`): prefiere `neb.db` si es usable, y cae a `neb-logbook.db` (nombre legado) en máquinas del equipo sin migrar — el hook opera sin cambios aunque no se corra `bootstrap/migrate-neb-db.py`. La migración del nombre canónico es one-shot del maintainer e idempotente.
-- **`central` (opcional):** servidor de referencia en [`../server/`](../server/logbook_server.py) (stdlib `http.server` + PyMySQL) + API HTTP sobre MariaDB. Autoridad del lock + corpus buscable; habilita el relevo cross-dev real. Instalación y exposición: [`../server/INSTALL.md`](../server/INSTALL.md). Config del cliente: `NEB_LOGBOOK_ENDPOINT` + **`NEB_LOGBOOK_TOKEN`** por env (nunca en `.md` ni en `personal/`).
+- **`central` (opcional):** backend central distribuido en un repositorio dedicado (stdlib `http.server` + PyMySQL) + API HTTP sobre MariaDB. Autoridad del lock + corpus buscable; habilita el relevo cross-dev real. Instalación y exposición: ver el repositorio del backend central. Config del cliente: `NEB_LOGBOOK_ENDPOINT` + **`NEB_LOGBOOK_TOKEN`** por env (nunca en `.md` ni en `personal/`).
 
 ## Backend central — contrato y disparador (opcional)
 
-- **Contrato HTTP** (auth `Authorization: Bearer <NEB_LOGBOOK_TOKEN>`): `publish` (UPSERT por identidad, el lock gobierna la escritura → `409` si el owner entrante no es el vigente; `payload_version` optimista), `claim`/`release`/`request-takeover`/`forced-release` (lock atómico, solo works `req`; `400` sobre exploratory), `rename` (migra `req_slug`/`project` preservando historial), `archive` (cierre del REQ → `archived_at`; no borra), `transcript` (fragmento idempotente por `session_id,byte_from,byte_to`), `search` (FULLTEXT), `work`/`work/{id}`. Detalle: docstring de [`../server/logbook_server.py`](../server/logbook_server.py).
+- **Contrato HTTP** (auth `Authorization: Bearer <NEB_LOGBOOK_TOKEN>`): `publish` (UPSERT por identidad, el lock gobierna la escritura → `409` si el owner entrante no es el vigente; `payload_version` optimista), `claim`/`release`/`request-takeover`/`forced-release` (lock atómico, solo works `req`; `400` sobre exploratory), `rename` (migra `req_slug`/`project` preservando historial), `archive` (cierre del REQ → `archived_at`; no borra), `transcript` (fragmento idempotente por `session_id,byte_from,byte_to`), `search` (FULLTEXT), `work`/`work/{id}`. Detalle: docstring de `logbook_server.py` en el repositorio del backend central.
 - **Disparador determinista (de activación voluntaria por proyecto)**: el cliente publica al central **solo** cuando hay `NEB_LOGBOOK_ENDPOINT` **y** el proyecto lo declara con el marcador `<!-- neb-logbook: central -->` en su `CLAUDE.md` (lectura barata antes de spawnear el sync). Sin marcador → local-only (el comportamiento por defecto; la bitácora local ya cubre el relevo del propio dev). *(Activación voluntaria por perfil: futuro.)*
 - **Reconciliación (409)**: un `publish` rechazado marca el `work` local `conflict=1, dirty=0` (corta el reintento ciego); `/logbook` lo reporta y `claim`/`forzar` lo reconcilia. Nunca last-writer-wins.
 - **`req_slug` rename gobernado**: `/logbook rename <id> <new_slug>` migra la fila en el central (preserva `event`/`transcript`); sin el comando, un slug nuevo bifurca (crea otro work).
@@ -27,7 +27,7 @@ Con solo SQLite local (un dev, una DB): `tomar`/`liberar` son **informativos** (
 
 ## Retención
 
-Un `work` cerrado se **archiva** (`archived_at`), no se borra — preserva el corpus para auditoría futura. El borrado real es purga **intencional y manual** del central: `server/purge.py --before <fecha> [--apply]` (`--dry-run` por defecto; ver [`../server/INSTALL.md`](../server/INSTALL.md) § Retención).
+Un `work` cerrado se **archiva** (`archived_at`), no se borra — preserva el corpus para auditoría futura. El borrado real es purga **intencional y manual** del central: el `purge.py --before <fecha> [--apply]` del backend central (`--dry-run` por defecto; ver la doc de su repositorio § Retención).
 
 ## Activación
 

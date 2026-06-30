@@ -4,6 +4,18 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.2.0] - 2026-06-29
+
+> **Minor**: el backend central de la bitácora de relevo (`server/`) se traslada a un repositorio dedicado. El núcleo conserva el **cliente** (hook `logbook-sync` + `hooks/lib/logbook.py`), que sigue operando contra el central vía `NEB_LOGBOOK_ENDPOINT`/`NEB_LOGBOOK_TOKEN`; la bitácora **local** (SQLite) no cambia. **Migración** para quien auto-hospede el central: el código del servidor vive ahora en su repositorio dedicado; el central ya desplegado no se ve afectado.
+
+### Removed
+
+- **`server/`** (backend central de referencia: `logbook_server.py`, `purge.py`, `schema.sql`, `INSTALL.md`, `requirements.txt`, `.env.example`) — trasladado a un repositorio dedicado.
+
+### Changed
+
+- Referencias a `server/` reapuntadas a "backend central en un repositorio dedicado" en `tooling/logbook.md`, `workflow/logbook.md`, `hooks/logbook-schema.sql`, `hooks/README.md`, `skills/logbook/SKILL.md`, `bootstrap/env.example`, `docs/user-guide.md`, `tooling/revision-editorial-externa.md`.
+
 ## [6.1.0] - 2026-06-25
 
 > **Minor**: documenta la convención (antes implícita) de **finalizar el registro del requerimiento dentro del commit que entrega el entregable**, anotando `**Commits:** esta confirmación` en vez del hash literal. Evita un cierre `.md`-only posterior que dispara el Gate 3 del pre-push (todo `changes/` cuenta como normativo y exige fragment) y obligaría a `--no-verify`. Surge de la Fase 9 del REQ de eliminación de la política de modelos (v6.0.0), donde el cierre tardío del registro requirió bypass.
