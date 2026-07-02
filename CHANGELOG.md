@@ -4,6 +4,17 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.3.0] - 2026-07-02
+
+> **Minor**: endurece la prevención de regresiones por **cambios de configuración global / transversales** — los que alteran cómo se resuelve un comportamiento (resolución de rutas/referencias, codificación, enrutamiento) y cuyos dependientes no son callers de un símbolo sino una clase dispersa de consumidores. Derivado del diagnóstico de un defecto recurrente de esa clase (origen Fase 4 — clasificación de riesgo mal aplicada + loop tardío; 4ª ocurrencia de su familia). Los acoples concretos del dominio viajan en los profiles/overlays correspondientes, no en el núcleo.
+
+### Changed
+
+- **`methodology/vocabulary.md`** § "Niveles de riesgo de regresión": la fila **Alto** nombra explícitamente la **directiva/configuración global que altera cómo se resuelve un comportamiento transversal** (rutas/referencias, codificación, enrutamiento), cuyos dependientes son consumidores dispersos y no se enumeran con grep de callers. La taxonomía ya cubría "refactor transversal" pero sin este caso, por lo que un cambio de una línea de este tipo se auto-clasificaba bajo.
+- **`process/execution.md`** § "Incidencias durante el trabajo": un cambio de **configuración global / alto radio de impacto** NO califica como incidencia — exige volver a Fase 3 aunque el diff sea de una línea y aunque lo dispare un incidente. Cierra el bypass que salta plan-review + enumeración de dependientes.
+- **`agents/context-completeness-reviewer.md`** foco "Dependientes invisibles": nuevo sub-foco **"Dependientes sin símbolo (config global)"** — para cambios sin símbolo grep-eable, enumerar los consumidores de la semántica alterada por inventario, no por grep de callers ("no hay callers" ≠ "no hay dependientes").
+- **`process/improvement.md`** § "Diagnóstico de origen del defecto": nueva sub-sección **"Recurrencia por familia (≥3 similares)"** — marcar ≥3 similares en el Diagnóstico dispara una **revisión-de-familia obligatoria** (consolidar invariante + checklist de regresión reutilizable), independiente del umbral `N=10` de la revisión agregada.
+
 ## [6.2.0] - 2026-06-29
 
 > **Minor**: el backend central de la bitácora de relevo (`server/`) se traslada a un repositorio dedicado. El núcleo conserva el **cliente** (hook `logbook-sync` + `hooks/lib/logbook.py`), que sigue operando contra el central vía `NEB_LOGBOOK_ENDPOINT`/`NEB_LOGBOOK_TOKEN`; la bitácora **local** (SQLite) no cambia. **Migración** para quien auto-hospede el central: el código del servidor vive ahora en su repositorio dedicado; el central ya desplegado no se ve afectado.

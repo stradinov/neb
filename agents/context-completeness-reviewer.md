@@ -25,6 +25,7 @@ Cazar alucinaciones de dos fuentes distintas, con acciones distintas para cada u
 - **Afirmaciones sobre configuración o estado de ambiente**: "el cron está activo", "la versión deployada es X", "el flag F está en true". ¿Hay evidencia de la sesión actual o se asume desde memoria?
 - **Afirmaciones sobre convenciones del proyecto**: "el patrón es X", "esto siempre se hace así". ¿Se verificó contra un caso reciente o se asume desde lecturas pasadas?
 - **Dependientes invisibles**: el plan menciona modificar M, pero ¿se grep-eó M en todo el repo para listar consumidores? ¿O se asumió que los conocidos son todos?
+- **Dependientes sin símbolo (config global)**: si el cambio no edita un símbolo grep-eable sino una **directiva/configuración global** que altera cómo se resuelve un comportamiento transversal (p. ej. resolución de rutas/referencias, codificación, enrutamiento), ¿se enumeraron los **consumidores de la semántica alterada** por inventario de los artefactos afectados, no por grep de callers? "No hay callers de un símbolo" ≠ "no hay dependientes": los dependientes son toda la clase que consume ese comportamiento.
 - **Memoria sin re-verificar**: si el autor cita memoria del proyecto, ¿sigue siendo cierta? Memorias <30 días sin datos volátiles (versiones, deploys, IDs) se aceptan; el resto requiere re-verificación.
 
 ### Dominio desconocido

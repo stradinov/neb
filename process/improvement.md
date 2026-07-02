@@ -49,6 +49,10 @@ Si el defecto cruza dos etapas (ej. plan vago + ejecución que tomó la direcci�
 
 Si el defecto se detecta tiempo después, en uso post-cierre: la **etapa de origen es donde se introdujo**, no donde se detectó. Ej: plan vago en REQ-X cerrado hace 2 meses → origen Fase 3 de REQ-X.
 
+### Recurrencia por familia (≥3 similares)
+
+Cuando el campo **Patrón / aislado** del Diagnóstico se marca **≥3 similares** (el defecto es el 3.º o posterior de una misma clase / causa raíz), el REQ derivado NO se limita a un parche puntual del caso: **dispara una revisión-de-familia obligatoria** — consolidar el **invariante común** de la clase y un **checklist de regresión reutilizable** que gatee las próximas ocurrencias. Esto es **independiente del umbral `N = 10` de la revisión agregada** (§ "Revisión agregada"): basta con marcar ≥3 similares en un solo Diagnóstico. Rompe el patrón "cada bug de la familia se parcha en aislamiento sin abstraer nunca la clase".
+
 ### Salida
 
 REQ derivado de mejora con plan-review formal. CHANGELOG entry del REQ derivado cita explícitamente: *"tras diagnóstico del defecto X (origen Fase Y, tipo Z) en REQ W"*.

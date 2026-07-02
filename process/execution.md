@@ -86,6 +86,8 @@ Cambios menores que surgen durante el trabajo (renombre de columna, archivo SQL 
 
 Claude propone el cambio en una línea y procede con aprobación implícita o explícita. **No vuelve a clarificación ni genera estimado nuevo.**
 
+**No califica como incidencia** un cambio de **configuración global / alto radio de impacto**: uno cuyos dependientes no son los callers de un símbolo sino una **clase dispersa de consumidores** (p. ej. una directiva que altera cómo se resuelve un comportamiento transversal —rutas/referencias, codificación, enrutamiento—). Aunque el diff sea de una línea y lo dispare un incidente, **exige volver a Fase 3** (plan-review + enumeración de dependientes); tramitarlo como incidencia salta esos gates. Cada profile concreta qué patrones cuentan como config global (ver `profiles/<profile>/roles.md` § disparadores de alcance).
+
 Al resolver, documentar de inmediato en la memoria del proyecto (lo duradero en `project_<nombre>.md`; lo propio del REQ en su `active_<proyecto>_<slug>.md`):
 - Qué fue (una línea).
 - Cómo se resolvió (una línea).
