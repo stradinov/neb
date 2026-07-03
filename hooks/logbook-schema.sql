@@ -76,6 +76,24 @@ CREATE TABLE IF NOT EXISTS transcript_cursor (
   PRIMARY KEY (session_id, work_id)
 );
 
+-- Corpus local buscable (SR-1, programa preservación-de-conocimiento).
+-- Persiste el text_plain de las sesiones LOCALMENTE (el central lo tiene en su tabla
+-- `transcript`; el .jsonl es efímero). Habilita al solitario buscar su corpus sin central.
+-- Cursor local = MAX(byte_to) por session_id (no usa transcript_cursor, que es del sync).
+-- El indice FTS5 (transcript_fts) se crea on-demand en logbook.py (SQLite sin FTS5 no rompe).
+CREATE TABLE IF NOT EXISTS transcript_local (
+  id          INTEGER PRIMARY KEY,
+  session_id  TEXT    NOT NULL,
+  work_id     INTEGER NULL,                            -- informativo (una sesion puede tocar varios works)
+  byte_from   INTEGER NOT NULL,
+  byte_to     INTEGER NOT NULL,                        -- MAX(byte_to) por session = cursor de indexado local
+  text_plain  TEXT    NOT NULL,                        -- user/assistant, sin tool_result (via _extract_text_plain)
+  created_at  TEXT    NOT NULL
+);
+-- Idempotencia del tramo: re-indexar la misma sesion no duplica.
+CREATE UNIQUE INDEX IF NOT EXISTS uq_transcript_local ON transcript_local(session_id, byte_from, byte_to);
+CREATE INDEX IF NOT EXISTS idx_transcript_local_session ON transcript_local(session_id);
+
 -- ===========================================================================
 -- Pendings (REQ neb-pendings-sqlite, nucleo). Reusa la infra del logbook.
 -- Enums en INGLES (la capa de presentacion traduce al mostrar).

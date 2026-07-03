@@ -86,6 +86,7 @@ def main():
         else:
             summary = _first_user_prompt(jsonl_path)
             _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd, jsonl_path)
+        _index_local(con, session_id, None, jsonl_path)   # SR-1: persistir el corpus local (siempre)
         con.commit()
     finally:
         con.close()
@@ -366,6 +367,77 @@ def _extract_text_plain(jsonl_text):
     return "\n".join(out)
 
 
+# --------------------------------------------------------------- corpus local (SR-1)
+# Persiste el text_plain de la sesión LOCALMENTE (el .jsonl es efímero) y permite buscarlo
+# sin central. Cursor local = MAX(byte_to) de transcript_local. FTS5 on-demand (fallback LIKE).
+
+def _fts5_available(con):
+    try:
+        con.execute("CREATE VIRTUAL TABLE IF NOT EXISTS temp._tfts_probe USING fts5(x)")
+        con.execute("DROP TABLE IF EXISTS temp._tfts_probe")
+        return True
+    except sqlite3.OperationalError:
+        return False
+
+
+def _ensure_transcript_fts(con):
+    """Crea/sincroniza transcript_fts (FTS5 standalone) desde transcript_local. True si FTS5 hay.
+    Standalone (no external content) + rebuild por INSERT SELECT: robusto y sin triggers."""
+    if not _fts5_available(con):
+        return False
+    con.execute("CREATE VIRTUAL TABLE IF NOT EXISTS transcript_fts USING fts5(session_id UNINDEXED, text_plain)")
+    n_fts = con.execute("SELECT count(*) FROM transcript_fts").fetchone()[0]
+    n_src = con.execute("SELECT count(*) FROM transcript_local WHERE text_plain <> ''").fetchone()[0]
+    if n_fts != n_src:  # (re)poblar desde la tabla local
+        con.execute("DELETE FROM transcript_fts")
+        con.execute("INSERT INTO transcript_fts (session_id, text_plain) "
+                    "SELECT session_id, text_plain FROM transcript_local WHERE text_plain <> ''")
+    return True
+
+
+def _index_local(con, session_id, work_id, jsonl_path):
+    """Persiste el text_plain del tramo NUEVO del .jsonl en transcript_local (idempotente por
+    rango; cursor = MAX(byte_to)). Best-effort: nunca rompe la captura."""
+    try:
+        if not jsonl_path or not os.path.isfile(jsonl_path):
+            return
+        row = con.execute("SELECT COALESCE(MAX(byte_to), 0) FROM transcript_local WHERE session_id=?",
+                          (session_id,)).fetchone()
+        start = row[0] if row else 0
+        size = os.path.getsize(jsonl_path)
+        if size <= start:
+            return
+        with open(jsonl_path, "rb") as f:
+            f.seek(start)
+            chunk = f.read()
+        text_plain = _extract_text_plain(chunk.decode("utf-8", errors="replace"))
+        con.execute(
+            "INSERT OR IGNORE INTO transcript_local "
+            "(session_id, work_id, byte_from, byte_to, text_plain, created_at) VALUES (?,?,?,?,?,?)",
+            (session_id, work_id, start, size, text_plain, now_iso()))
+    except (OSError, sqlite3.Error):
+        return  # best-effort: la captura nunca falla por el indexado local
+
+
+def _search_local(con, query):
+    """Busca en el corpus local. FTS5 si disponible; fallback LIKE. → [(session_id, snippet)]."""
+    if _ensure_transcript_fts(con):
+        # Tratar el query como frase literal (evita que '_', '-', '"' rompan la sintaxis FTS5).
+        phrase = '"' + query.replace('"', '') + '"'
+        try:
+            rows = con.execute(
+                "SELECT session_id, snippet(transcript_fts, 1, '[', ']', ' … ', 12) AS snip "
+                "FROM transcript_fts WHERE transcript_fts MATCH ? LIMIT 50", (phrase,)).fetchall()
+            if rows:
+                return [(r[0], r[1]) for r in rows]
+        except sqlite3.OperationalError:
+            pass  # cae a LIKE
+    rows = con.execute(
+        "SELECT session_id, substr(text_plain, 1, 240) FROM transcript_local "
+        "WHERE text_plain LIKE ? AND text_plain <> '' LIMIT 50", (f"%{query}%",)).fetchall()
+    return [(r[0], r[1]) for r in rows]
+
+
 # =========================================================================== CLI (/logbook)
 # Con NEB_LOGBOOK_ENDPOINT configurado, el CLI opera contra el CENTRAL (autoridad; ids remotos).
 # Sin él, contra el SQLite local (REQ A; lock informativo).
@@ -541,11 +613,23 @@ def cli_archive(args):
 def cli_search(args):
     if not args:
         print("uso: search <texto>"); return
+    query = " ".join(args)
     ep, tok = _central()
     if not ep:
-        print("'search' requiere el backend central (NEB_LOGBOOK_ENDPOINT/NEB_LOGBOOK_TOKEN no configurados)."); return
+        # Local-only (SR-1): busca en el corpus local persistido (sin central).
+        con = _db_for_cli()
+        if con is None:
+            print("no se pudo abrir la bitácora local."); return
+        con.row_factory = sqlite3.Row
+        try:
+            results = _search_local(con, query)
+        finally:
+            con.close()
+        print(json.dumps([{"session_id": s, "snippet": sn} for s, sn in results],
+                         ensure_ascii=False, indent=2, default=str))
+        return
     import urllib.parse
-    code, resp = _http(ep, tok, "/search?q=" + urllib.parse.quote(" ".join(args)))
+    code, resp = _http(ep, tok, "/search?q=" + urllib.parse.quote(query))
     print(json.dumps(resp.get("results", []) if code == 200 else {"error": code, **resp},
                      ensure_ascii=False, indent=2, default=str))
 

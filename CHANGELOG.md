@@ -4,6 +4,20 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.4.0] - 2026-07-03
+
+> **Minor**: la bitácora local ahora **persiste el corpus buscable**. El `text_plain` de las sesiones (user/assistant, sin `tool_result`) queda en la DB local (`transcript_local`), no solo el puntero al `.jsonl` efímero — así el corpus sobrevive al archivado/purga del `.jsonl`. El hook `logbook-sync` lo indexa **incrementalmente** en cada captura (cursor local = `MAX(byte_to)`), y `/logbook search` funciona **sin backend central** (FTS5 si está disponible, con fallback `LIKE`). Antes, buscar el corpus requería el central.
+
+### Added
+
+- **`hooks/logbook-schema.sql`**: tabla `transcript_local` (`text_plain` por tramo, idempotente por rango).
+- **`hooks/lib/logbook.py`**: `_index_local` (indexado incremental en la captura), `_ensure_transcript_fts` + `_search_local` (FTS5 on-demand, fallback `LIKE`).
+- **`hooks/tests/test_transcript_local.py`**: 4 tests (extracción sin `tool_result`, idempotencia, incremental, búsqueda local).
+
+### Changed
+
+- **`hooks/lib/logbook.py`** (`cli_search`): sin `NEB_LOGBOOK_ENDPOINT`, busca en el corpus local en vez de abortar.
+
 ## [6.3.0] - 2026-07-02
 
 > **Minor**: endurece la prevención de regresiones por **cambios de configuración global / transversales** — los que alteran cómo se resuelve un comportamiento (resolución de rutas/referencias, codificación, enrutamiento) y cuyos dependientes no son callers de un símbolo sino una clase dispersa de consumidores. Derivado del diagnóstico de un defecto recurrente de esa clase (origen Fase 4 — clasificación de riesgo mal aplicada + loop tardío; 4ª ocurrencia de su familia). Los acoples concretos del dominio viajan en los profiles/overlays correspondientes, no en el núcleo.
