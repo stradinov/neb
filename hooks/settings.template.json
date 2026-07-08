@@ -61,7 +61,7 @@
         ]
       },
       {
-        "_os_note": "ops-capture — WINDOWS (PowerShell). Opt-in: captura conocimiento operativo a un inbox para /ops-review. Consume stdin → shell:powershell. Para Linux/Mac usar el bloque siguiente (eliminar este).",
+        "_os_note": "ops-capture — WINDOWS (PowerShell). Opt-in: captura conocimiento operativo a un inbox para su revisión gated por el adoptante. Consume stdin → shell:powershell. Para Linux/Mac usar el bloque siguiente (eliminar este).",
         "hooks": [
           {
             "type": "command",

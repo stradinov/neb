@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.4.1] - 2026-07-07
+
+> **Patch**: higiene de wording — el núcleo deja de nombrar un comando concreto de un overlay al describir el destino de los deltas de `ops-capture`. El nombre del comando de aplicación lo define cada adoptante en su overlay; el núcleo solo garantiza que la aplicación es **gated**. Doc/comentarios, sin cambio funcional del hook.
+
+### Changed
+
+- **`hooks/ops-capture.py`** (docstring), **`hooks/README.md`** (§ ops-capture) y **`hooks/settings.template.json`** (`_os_note` de Windows): la referencia al consumidor de los deltas pasa de un comando nombrado a "un comando de revisión definido por el adoptante en su overlay". Alinea el núcleo con su neutralidad de dominio (no presupone artefactos del overlay).
+
 ## [6.4.0] - 2026-07-03
 
 > **Minor**: la bitácora local ahora **persiste el corpus buscable**. El `text_plain` de las sesiones (user/assistant, sin `tool_result`) queda en la DB local (`transcript_local`), no solo el puntero al `.jsonl` efímero — así el corpus sobrevive al archivado/purga del `.jsonl`. El hook `logbook-sync` lo indexa **incrementalmente** en cada captura (cursor local = `MAX(byte_to)`), y `/logbook search` funciona **sin backend central** (FTS5 si está disponible, con fallback `LIKE`). Antes, buscar el corpus requería el central.

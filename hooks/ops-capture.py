@@ -10,7 +10,7 @@ Flujo:
   5. escribir un `*.inbox.md` al inbox efímero (NEB_OPS_INBOX_DIR, default ~/.claude/ops-inbox/).
 
 NO toca la fuente de verdad: la aplicación de los deltas es gated por el comando
-`/ops-review` del overlay. Defensivo: exit 0 siempre — errores a stderr.
+de revisión del adoptante (definido en su overlay). Defensivo: exit 0 siempre — errores a stderr.
 
 Opt-in por proyecto (settings.json). Mecanismo genérico; el overlay especializa el
 prompt de detección (NEB_OPS_CAPTURE_PROMPT_FILE) y el vocabulario (NEB_OPS_SIGNALS_EXTRA).
