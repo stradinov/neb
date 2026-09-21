@@ -26,7 +26,7 @@ Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estru
 - **Nombre:** <slug del requerimiento>
 - **Path del proyecto:** <path absoluto local>
 - **Draft changes MD:** changes/YYYY-MM-DD-<req>.md
-- **Estado:** En progreso | En validación | Listo para aprobación | Cerrado (ver [`workflow/index.md`](index.md) "Estados del requerimiento")
+- **Estado:** En progreso | En validación | Listo para aprobación | Cerrado (ver [`workflow/index.md`](index.md) "Estados del requerimiento"). Puede llevar una nota después del valor (`En validación (pend. QA)`); al publicar al catálogo central el cliente manda solo el ENUM y la nota completa aparte (`req_state_note`)
 - **Plan resumido:** <3-5 líneas del plan aprobado>
 - **Archivos modificados hasta ahora:** lista
 - **Próximos pasos:** lista

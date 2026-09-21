@@ -4,6 +4,20 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.6.0] - 2026-09-21
+
+> **Minor**: el cliente de la bitácora publica `req_state` **normalizado al ENUM** del requerimiento. El backend central declara esa columna como ENUM (`VARCHAR(64)`, modo estricto: rechaza en vez de truncar), pero la memoria del proyecto redacta el `Estado:` como *ENUM + nota en prosa*, y publicarlo crudo hacía que el central rechazara el work en **cada** sync — desde 6.5.0 visible en `sync-status`, antes mudo. Ahora solo el payload se normaliza: la bitácora local conserva el texto completo y la prosa viaja aparte, así que el catálogo no pierde información y los works atascados se publican solos en el siguiente sync.
+
+### Added
+
+- **`hooks/lib/logbook.py`**: `_normalize_req_state` — reconoce al inicio del `Estado:` uno de los 4 valores canónicos de `methodology/vocabulary.md` § "Estados del requerimiento" (sin distinguir mayúsculas ni acentos, tolerando envoltorios markdown y el alias documentado `Listo para producción`); conserva el sufijo `(bloqueado …)` como `(bloqueado)`; devuelve `NULL` si el texto no empieza por ninguno. Todo valor publicado mide ≤ 64. `_payload_json_with_note` agrega la prosa a la copia saliente de `payload_json` como **`req_state_note`** (`LONGTEXT` en el central); si el `payload_json` local no es un objeto JSON, se manda tal cual y el publish no se pierde.
+- **`hooks/tests/test_logbook_req_state_enum.py`**: 20 tests (valores exactos, mayúsculas/acentos, markdown, bloqueado en dos formas, alias, sin prefijo, frontera de palabra, vacío, propiedad ≤ 64, payload normalizado con la fila local intacta, `payload_json` inválido, exploratory sin estado, E2E contra un central que rechaza > 64).
+
+### Changed
+
+- **`hooks/lib/logbook.py`** (`_drain_works`): el payload de `/work/publish` manda `req_state` normalizado y `payload_json` con `req_state_note` cuando hay prosa. **La fila local no cambia** (`work.req_state` y `work.payload_json` conservan lo capturado).
+- **`tooling/logbook.md`** (contrato HTTP) y **`workflow/memory.md`** (campo `Estado:`): documentan qué viaja al central y dónde queda la nota.
+
 ## [6.5.0] - 2026-09-21
 
 > **Minor**: los fallos de sync al backend central dejan de ser **mudos**. Hasta ahora el drenaje del outbox solo distinguía `200` y `409`: cualquier otro resultado (sin respuesta, `4xx`, `5xx`) dejaba el work en `dirty=1` sin registrar nada, y como el `stderr` del sync detached y del hook se descarta, un rechazo **permanente** del central era indistinguible de un corte de red y podía reintentarse indefinidamente sin que nadie lo supiera. Ahora el fallo vigente se **persiste por canal** en el `work` local y un verbo nuevo lo expone. **El reintento no cambia**: `dirty` se conserva (solo el `409` lo corta, como antes), de modo que cuando la causa se corrige en el central el work se publica solo.

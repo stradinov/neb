@@ -355,16 +355,73 @@ def _clear_sync_error(con, work_id, col, prev):
         print(f"[logbook] aviso: no se pudo limpiar {col} del work {work_id}: {e}", file=sys.stderr)
 
 
+# --- req_state: ENUM hacia el central -----------------------------------------------------------
+# El central declara `req_state` como ENUM del requerimiento (vocabulary.md § "Estados del requerimiento",
+# VARCHAR(64) en modo estricto). La memoria del proyecto redacta el `Estado:` como ENUM + prosa, y publicar
+# esa prosa cruda hacía que el central rechazara el work en cada sync. Solo el payload se normaliza: la
+# bitácora local conserva el texto completo, y la prosa viaja en `payload_json.req_state_note`.
+
+_REQ_STATES = ("En progreso", "En validación", "Listo para aprobación", "Cerrado")
+_REQ_STATE_ALIASES = {"listo para produccion": "Listo para aprobación"}   # término anterior, documentado
+_REQ_STATE_MAX = 64
+
+
+def _fold(text):
+    """Minúsculas sin acentos ni espacios repetidos, para comparar."""
+    import unicodedata
+    t = unicodedata.normalize("NFD", text)
+    t = "".join(ch for ch in t if not unicodedata.combining(ch))
+    return " ".join(t.lower().split())
+
+
+def _normalize_req_state(raw):
+    """(enum | None, note | None). `enum` es el valor canónico que se publica; `note` es el texto original
+    completo cuando trae algo más que el ENUM (o cuando no empieza por ninguno), para que la prosa no se pierda.
+    Reconoce el ENUM al INICIO del texto sin distinguir mayúsculas ni acentos, tolera envoltorios markdown
+    y el alias `Listo para producción`; el sufijo documentado `(bloqueado …)` se conserva como `(bloqueado)`."""
+    raw = (raw or "").strip()
+    if not raw:
+        return None, None
+    text = raw.strip("*_` \t")
+    folded = _fold(text)
+    candidates = [(_fold(s), s) for s in _REQ_STATES] + [(k, v) for k, v in _REQ_STATE_ALIASES.items()]
+    for key, canon in sorted(candidates, key=lambda kv: -len(kv[0])):      # el más largo primero
+        # prefijo + frontera de palabra: "en progreso — nota" sí, "en progresos" no
+        if folded == key or (folded.startswith(key) and not folded[len(key)].isalnum()):
+            rest = folded[len(key):]
+            enum = canon + (" (bloqueado)" if re.search(r"\(\s*bloquead", rest) else "")
+            note = None if folded == key else raw
+            return enum[:_REQ_STATE_MAX], note
+    return None, raw
+
+
+def _payload_json_with_note(payload_json, note):
+    """Copia saliente de payload_json con `req_state_note`. Si no hay nota, o el JSON no es un objeto,
+    se manda tal cual (nunca se pierde el publish por esto). No modifica el valor local."""
+    if not note:
+        return payload_json
+    try:
+        d = json.loads(payload_json) if payload_json else {}
+    except (TypeError, ValueError):
+        return payload_json
+    if not isinstance(d, dict):
+        return payload_json
+    d["req_state_note"] = note
+    return json.dumps(d, ensure_ascii=False)
+
+
 def _drain_works(con, endpoint, token):
     rows = con.execute("SELECT * FROM work WHERE dirty=1").fetchall()
     for w in rows:
         # Lista EXPLÍCITA de campos: las columnas del outbox (dirty, conflict, last_error…) son solo locales
         # y no viajan al central. No sustituir por dict(w).
+        req_state, note = _normalize_req_state(w["req_state"])
         payload = {
             "mode": w["mode"], "project": w["project"], "req_slug": w["req_slug"],
-            "owner": w["owner"], "req_state": w["req_state"], "branch": w["branch"],
+            "owner": w["owner"], "req_state": req_state, "branch": w["branch"],
             "head_commit": w["head_commit"], "repo_path": w["repo_path"], "change_md": w["change_md"],
-            "payload_json": w["payload_json"], "payload_version": w["payload_version"],
+            "payload_json": _payload_json_with_note(w["payload_json"], note),
+            "payload_version": w["payload_version"],
             "origin_dev": w["origin_dev"], "origin_machine": w["origin_machine"],
             "claude_session_id": w["claude_session_id"],
             "transcript_path": w["transcript_path"],
