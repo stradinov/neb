@@ -295,12 +295,36 @@ def _connect(db_path, schema_path, timeout=5.0):
     return con
 
 
+# Columnas agregadas a `work` después del esquema inicial. CREATE TABLE IF NOT EXISTS no altera una
+# tabla existente, así que cada una se agrega aquí si falta. Mantener en sincronía con logbook-schema.sql.
+_WORK_MIGRATIONS = (
+    ("conflict",            "ALTER TABLE work ADD COLUMN conflict INTEGER NOT NULL DEFAULT 0"),
+    ("last_error",          "ALTER TABLE work ADD COLUMN last_error TEXT"),
+    ("last_error_at",       "ALTER TABLE work ADD COLUMN last_error_at TEXT"),
+    ("transcript_error",    "ALTER TABLE work ADD COLUMN transcript_error TEXT"),
+    ("transcript_error_at", "ALTER TABLE work ADD COLUMN transcript_error_at TEXT"),
+)
+
+
 def _migrate(con):
-    """Migraciones idempotentes para DBs de REQ A ya existentes (CREATE TABLE IF NOT EXISTS no altera)."""
-    cols = [r[1] for r in con.execute("PRAGMA table_info(work)").fetchall()]
-    if cols and "conflict" not in cols:
-        con.execute("ALTER TABLE work ADD COLUMN conflict INTEGER NOT NULL DEFAULT 0")
-        con.commit()
+    """Migraciones idempotentes para DBs ya existentes (CREATE TABLE IF NOT EXISTS no altera).
+    Chequeo POR columna: una migración parcial (proceso interrumpido) se completa en el siguiente connect.
+    El chequeo y el ALTER no son atómicos entre procesos (el DDL se autoconfirma fuera de transacción):
+    si otro proceso agregó la columna en medio, SQLite responde 'duplicate column name' — se tolera,
+    porque la columna ya existe, que es el objetivo. Cualquier otro error (p. ej. 'database is locked')
+    se propaga: _connect devuelve None y se conserva el invariante 'conexión devuelta = esquema completo'."""
+    cols = {r[1] for r in con.execute("PRAGMA table_info(work)").fetchall()}
+    if not cols:
+        return
+    for name, ddl in _WORK_MIGRATIONS:
+        if name in cols:
+            continue
+        try:
+            con.execute(ddl)
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                raise
+    con.commit()
 
 
 # --------------------------------------------------------------------------- transacciones

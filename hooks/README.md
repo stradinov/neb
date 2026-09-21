@@ -75,6 +75,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
 - **Windows**: declarar `"shell": "powershell"` con `logbook-sync.ps1` — combina stdin + variables de entorno (ver §Filosofía).
 - **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea.
+- **Fallos del sync, visibles**: el wrapper descarta `stderr` y el sync corre detached, así que un rechazo del central no se ve en pantalla. Se persiste en el `work` local (`last_error` / `transcript_error`) sin cortar el reintento, y lo lista `logbook.py sync-status` (`/logbook estado-sync`). Detalle en [`tooling/logbook.md`](../tooling/logbook.md).
 - **Opt-in por proyecto** (no auto-registrado por el plugin), como `usage-tracker`.
 - **Subsesión interna del corrector**: si `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), `exit 0` — no escribe la subsesión Haiku a la bitácora. Ver `hooks/lib/subsession.py`.
 - **Lógica completa**: `hooks/lib/logbook.py` (modo hook de captura + CLI del comando `/logbook`).

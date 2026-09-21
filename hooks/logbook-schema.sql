@@ -39,7 +39,14 @@ CREATE TABLE IF NOT EXISTS work (
   dirty           INTEGER NOT NULL DEFAULT 1,         -- pendiente de push
   synced_at       TEXT,
   remote_id       INTEGER,
-  conflict        INTEGER NOT NULL DEFAULT 0          -- 1 = publish rechazado por el central (409); reconciliar (claim/forzar) antes de re-publicar. Corta el reintento ciego del outbox
+  conflict        INTEGER NOT NULL DEFAULT 0,         -- 1 = publish rechazado por el central (409); reconciliar (claim/forzar) antes de re-publicar. Corta el reintento ciego del outbox
+  -- Último fallo de sync vigente, por canal (rechazo del central o sin respuesta HTTP). INFORMATIVO: no altera
+  -- el reintento (dirty se conserva; solo el 409 lo corta). Cada drenaje escribe y limpia SOLO su par.
+  -- *_at = desde cuándo está vigente ese error (no se reescribe si el texto no cambia). Lo lee `logbook.py sync-status`.
+  last_error          TEXT,                           -- canal /work/publish; NULL = sin fallo vigente
+  last_error_at       TEXT,
+  transcript_error    TEXT,                           -- canal /transcript; NULL = sin fallo vigente
+  transcript_error_at TEXT
 );
 
 -- Identidad por modo: índices únicos parciales (un solo work por REQ / por sesión exploratoria).

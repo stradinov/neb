@@ -8,12 +8,16 @@ Tres modos (dispatch en __main__):
       central (NEB_LOGBOOK_ENDPOINT y opt-in por proyecto vía marcador `<!-- neb-logbook: central -->`),
       lanza el modo `sync` detached.
   • sync <guide_dir> <home_dir>     — drena el outbox (works dirty) al central + sube el transcript
-      incremental. Best-effort, defensivo (REQ B).
+      incremental. Best-effort, defensivo (REQ B). Un fallo NO corta el reintento (salvo el 409), pero
+      queda VISIBLE en work.last_error / work.transcript_error (ver `sync-status`).
   • CLI (list/show/claim/...)       — lo invoca el comando/skill `/logbook`. Con NEB_LOGBOOK_ENDPOINT
       configurado opera contra el CENTRAL (la autoridad: ids remotos); sin él, contra el SQLite local.
+      Excepción: `sync-status` lee SIEMPRE el SQLite local (el estado del outbox no existe en el central)
+      y reporta ids LOCALES (`local_id`), que no son válidos para los demás verbos cuando hay central.
 
 Backend local = default + outbox. Backend central (REQ B) = autoridad del lock + corpus buscable.
-Filosofía: defensivo — exit 0 siempre; errores a stderr, nunca bloquean al dev.
+Filosofía: defensivo — exit 0 siempre; errores a stderr, nunca bloquean al dev. El stderr del sync
+detached y del hook se descarta, por eso los fallos de sync se PERSISTEN además de imprimirse.
 
 Args posicionales del modo captura (los arma el wrapper desde el stdin JSON del hook):
   1 session_id  2 cwd  3 transcript_path  4 event_name  5 guide_dir (NEB_HOME)  6 home_dir
@@ -195,7 +199,7 @@ def _first_user_prompt(jsonl_path, limit=120):
 def _central():
     """(endpoint, token) del central si ambos están en el entorno; (None, None) si no."""
     ep = os.environ.get("NEB_LOGBOOK_ENDPOINT")
-    tok = os.environ.get("NEB_LOGBOOK_TOKEN")
+    tok = (os.environ.get("NEB_LOGBOOK_TOKEN") or "").strip()
     return (ep, tok) if ep and tok else (None, None)
 
 
@@ -235,6 +239,7 @@ def _maybe_spawn_sync(cwd, guide_dir, home_dir):
 
 def _http(endpoint, token, path, method="GET", payload=None):
     """Request JSON al central. Devuelve (status_code|None, dict). Defensivo (timeouts cortos)."""
+    import http.client
     import urllib.request
     import urllib.error
     url = endpoint.rstrip("/") + path
@@ -242,8 +247,9 @@ def _http(endpoint, token, path, method="GET", payload=None):
     headers = {"Authorization": "Bearer " + token}
     if data is not None:
         headers["Content-Type"] = "application/json"
-    req = urllib.request.Request(url, data=data, method=method, headers=headers)
     try:
+        # El Request va DENTRO del try: un endpoint sin esquema ("host/ruta") lanza ValueError al construirlo.
+        req = urllib.request.Request(url, data=data, method=method, headers=headers)
         with urllib.request.urlopen(req, timeout=5) as r:
             body = r.read().decode("utf-8")
             return r.status, (json.loads(body) if body else {})
@@ -252,8 +258,16 @@ def _http(endpoint, token, path, method="GET", payload=None):
             return e.code, json.loads(e.read().decode("utf-8"))
         except Exception:
             return e.code, {}
-    except (urllib.error.URLError, OSError, ValueError):
-        return None, {}
+    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException) as e:
+        # Sin código HTTP utilizable: DNS/conexión/TLS (URLError), timeout (OSError), respuesta truncada o
+        # línea de estado inválida (HTTPException), URL mal formada o un 2xx con cuerpo no-JSON (ValueError:
+        # portal cautivo, WAF). Se conserva el motivo para que el fallo sea diagnosticable. El token viaja
+        # en el header, pero un token con CR/LF lo hace aparecer en el ValueError de http.client: se enmascara.
+        detail = str(e)
+        for secret in {token, token.strip()}:
+            if secret:
+                detail = detail.replace(secret, "***")
+        return None, {"error": type(e).__name__, "detail": detail[:200]}
 
 
 def sync_main(args):
@@ -261,6 +275,10 @@ def sync_main(args):
     home  = posix_to_win(args[1]) if len(args) >= 2 else os.path.expanduser("~")
     endpoint, token = _central()
     if not endpoint or not token:
+        # El sync detached tiene stderr en DEVNULL: este aviso solo se ve en un `sync` manual,
+        # que de otro modo sería un no-op mudo.
+        print("[logbook] sync: central no configurado (falta NEB_LOGBOOK_ENDPOINT y/o NEB_LOGBOOK_TOKEN); "
+              "nada que drenar", file=sys.stderr)
         return
 #    db_path     = os.path.join(home, ".claude", "neb-logbook.db")
     db_path     = resolve_db_path(home)
@@ -276,9 +294,72 @@ def sync_main(args):
         con.close()
 
 
+# --- fallos de sync visibles -------------------------------------------------------------------
+# Un fallo que no sea 200 NO corta el reintento (salvo el 409, que ya lo cortaba), pero deja de ser
+# mudo: se persiste por canal en work.last_error (publish) / work.transcript_error (transcript).
+# Dos pares y no uno porque ambos drenajes pueden tocar la misma fila en el mismo sync: con un solo
+# slot el segundo pisaría la causa del primero. Cada drenaje escribe y limpia SOLO su par.
+
+_SYNC_ERR_MAX = 500
+
+
+def _sync_error_text(channel, code, resp, token=None):
+    """'<canal> <código|sin respuesta HTTP> <error>: <detail>', omitiendo las partes vacías.
+    `resp` viene de _http: puede ser {} (cuerpo no-JSON) o no ser dict (JSON válido que no es objeto)."""
+    resp = resp if isinstance(resp, dict) else {}
+    head = f"{channel} {code if code is not None else 'sin respuesta HTTP'}"
+    parts = [str(resp.get(k) or "").strip() for k in ("error", "detail")]
+    body = ": ".join(p for p in parts if p) or "(sin cuerpo JSON)"
+    text = f"{head} {body}"
+    if token:
+        text = text.replace(token, "***")      # defensa en profundidad: el detail lo redacta el servidor
+    return text[:_SYNC_ERR_MAX]
+
+
+def _quiet_rollback(con):
+    try:
+        if getattr(con, "in_transaction", False):
+            con.rollback()
+    except Exception:
+        pass
+
+
+def _record_sync_error(con, work_id, col, text, prev, only_if_dirty=False):
+    """Persiste el fallo vigente de un canal en work.<col> / work.<col>_at. NUNCA propaga: registrar el
+    error no puede tumbar el drenaje de los demás works (antes esta rama no hacía nada y no podía fallar).
+    No reescribe si el texto no cambió: en régimen estable son 0 escrituras y <col>_at responde
+    'desde cuándo falla', no 'cuándo fue el último reintento'.
+    `col` es una constante interna ('last_error' | 'transcript_error'), nunca entrada externa.
+    only_if_dirty: no registrar si otro sync ya publicó este work mientras este POST estaba en vuelo."""
+    print(f"[logbook] sync work {work_id}: {text}", file=sys.stderr)
+    if text == prev:
+        return
+    sql = f"UPDATE work SET {col}=?, {col}_at=? WHERE id=?" + (" AND dirty=1" if only_if_dirty else "")
+    try:
+        con.execute(sql, (text, now_iso(), work_id))
+        con.commit()
+    except Exception as e:
+        _quiet_rollback(con)
+        print(f"[logbook] aviso: no se pudo registrar el fallo de sync del work {work_id}: {e}", file=sys.stderr)
+
+
+def _clear_sync_error(con, work_id, col, prev):
+    """Limpia el par <col>/<col>_at solo si había algo (evita un UPDATE+commit por fila sana). Nunca propaga."""
+    if prev is None:
+        return
+    try:
+        con.execute(f"UPDATE work SET {col}=NULL, {col}_at=NULL WHERE id=?", (work_id,))
+        con.commit()
+    except Exception as e:
+        _quiet_rollback(con)
+        print(f"[logbook] aviso: no se pudo limpiar {col} del work {work_id}: {e}", file=sys.stderr)
+
+
 def _drain_works(con, endpoint, token):
     rows = con.execute("SELECT * FROM work WHERE dirty=1").fetchall()
     for w in rows:
+        # Lista EXPLÍCITA de campos: las columnas del outbox (dirty, conflict, last_error…) son solo locales
+        # y no viajan al central. No sustituir por dict(w).
         payload = {
             "mode": w["mode"], "project": w["project"], "req_slug": w["req_slug"],
             "owner": w["owner"], "req_state": w["req_state"], "branch": w["branch"],
@@ -288,25 +369,53 @@ def _drain_works(con, endpoint, token):
             "claude_session_id": w["claude_session_id"],
             "transcript_path": w["transcript_path"],
         }
-        code, resp = _http(endpoint, token, "/work/publish", "POST", payload)
-        if code == 200:
-            con.execute("UPDATE work SET dirty=0, synced_at=?, remote_id=?, conflict=0 WHERE id=?",
-                        (now_iso(), resp.get("remote_id"), w["id"]))
-            con.commit()
-        elif code == 409:
-            con.execute("UPDATE work SET dirty=0, conflict=1 WHERE id=?", (w["id"],))
-            con.commit()
-        # None/5xx: dejar dirty=1 → reintenta el próximo turno
+        try:
+            code, resp = _http(endpoint, token, "/work/publish", "POST", payload)
+            remote_id = resp.get("remote_id") if isinstance(resp, dict) else None
+            if code == 200 and remote_id is None:
+                # Un 200 sin remote_id no es una publicación (cuerpo vacío, JSON ajeno de un proxy/portal):
+                # darlo por publicado dejaría dirty=0 sin remote_id, invisible para sync-status y fuera del
+                # drenaje de transcripts. Se trata como fallo y se conserva el reintento.
+                code = "200-sin-remote_id"
+            if code == 200:
+                # Guard de versión: si el work se re-capturó durante el POST, lo publicado es una versión
+                # vieja; no hay que bajar dirty ni borrar un last_error que otro sync registró para la nueva.
+                cur = con.execute("UPDATE work SET dirty=0, synced_at=?, remote_id=?, conflict=0, "
+                                  "last_error=NULL, last_error_at=NULL WHERE id=? AND payload_version=? AND updated_at=?",
+                                  (now_iso(), remote_id, w["id"], w["payload_version"], w["updated_at"]))
+                if cur.rowcount == 0:
+                    con.execute("UPDATE work SET remote_id=?, synced_at=? WHERE id=?",
+                                (remote_id, now_iso(), w["id"]))
+                con.commit()
+            elif code == 409:
+                # Conflicto: corta el reintento (dirty=0) y deja el motivo, en un solo UPDATE.
+                text = _sync_error_text("publish", code, resp, token)
+                since = w["last_error_at"] if (text == w["last_error"] and w["last_error_at"]) else now_iso()
+                con.execute("UPDATE work SET dirty=0, conflict=1, last_error=?, last_error_at=? WHERE id=? "
+                            "AND payload_version=? AND updated_at=?",
+                            (text, since, w["id"], w["payload_version"], w["updated_at"]))
+                con.commit()
+            else:
+                # Sin respuesta, 4xx≠409 o 5xx: dirty se conserva (reintenta el próximo sync) y el fallo queda VISIBLE.
+                _record_sync_error(con, w["id"], "last_error", _sync_error_text("publish", code, resp, token),
+                                   w["last_error"], only_if_dirty=True)
+        except sqlite3.OperationalError as e:
+            _quiet_rollback(con)
+            print(f"[logbook] aviso: sync work {w['id']}: {e}", file=sys.stderr)
+            continue
 
 
 def _drain_transcripts(con, endpoint, token):
     works = con.execute(
-        "SELECT id, remote_id, claude_session_id, transcript_path FROM work "
+        "SELECT id, remote_id, claude_session_id, transcript_path, transcript_error FROM work "
         "WHERE remote_id IS NOT NULL AND transcript_path IS NOT NULL").fetchall()
     for w in works:
         sid = w["claude_session_id"]
         path = posix_to_win(w["transcript_path"] or "")
         if not sid or not path or not os.path.isfile(path):
+            # Ya no hay nada que reintentar (el .jsonl es efímero): un fallo previo dejaría un aviso
+            # permanente y sin acción posible. Decisión de diseño: se limpia.
+            _clear_sync_error(con, w["id"], "transcript_error", w["transcript_error"])
             continue
         cur = con.execute("SELECT synced_byte FROM transcript_cursor WHERE session_id=? AND work_id=?",
                           (sid, w["id"])).fetchone()
@@ -316,6 +425,7 @@ def _drain_transcripts(con, endpoint, token):
         except OSError:
             continue
         if size <= start:
+            _clear_sync_error(con, w["id"], "transcript_error", w["transcript_error"])   # al día
             continue
         try:
             with open(path, "rb") as f:
@@ -325,18 +435,35 @@ def _drain_transcripts(con, endpoint, token):
             continue
         content = chunk.decode("utf-8", errors="replace")
         text_plain = _extract_text_plain(content)
-        code, _ = _http(endpoint, token, "/transcript", "POST", {
-            "session_id": sid, "work_id": w["remote_id"],
-            "byte_from": start, "byte_to": size,
-            "content": content, "text_plain": text_plain,
-        })
-        if code == 200:
-            con.execute(
-                "INSERT INTO transcript_cursor (session_id, work_id, synced_byte, updated_at) "
-                "VALUES (?,?,?,?) ON CONFLICT(session_id, work_id) DO UPDATE SET "
-                "synced_byte=excluded.synced_byte, updated_at=excluded.updated_at",
-                (sid, w["id"], size, now_iso()))
-            con.commit()
+        try:
+            code, resp = _http(endpoint, token, "/transcript", "POST", {
+                "session_id": sid, "work_id": w["remote_id"],
+                "byte_from": start, "byte_to": size,
+                "content": content, "text_plain": text_plain,
+            })
+            if code == 200:
+                con.execute(
+                    "INSERT INTO transcript_cursor (session_id, work_id, synced_byte, updated_at) "
+                    "VALUES (?,?,?,?) ON CONFLICT(session_id, work_id) DO UPDATE SET "
+                    "synced_byte=excluded.synced_byte, updated_at=excluded.updated_at",
+                    (sid, w["id"], size, now_iso()))
+                con.execute("UPDATE work SET transcript_error=NULL, transcript_error_at=NULL "
+                            "WHERE id=? AND transcript_error IS NOT NULL", (w["id"],))
+                con.commit()
+            else:
+                # Si otro sync ya subió este tramo mientras el POST estaba en vuelo, el fallo está rancio.
+                now = con.execute("SELECT synced_byte FROM transcript_cursor WHERE session_id=? AND work_id=?",
+                                  (sid, w["id"])).fetchone()
+                if (now["synced_byte"] if now else 0) != start:
+                    continue
+                # El texto NO lleva el tamaño pendiente: en una sesión viva cambia en cada sync y reescribiría
+                # transcript_error_at siempre. `sync-status` lo calcula al vuelo (transcript_pending_bytes).
+                _record_sync_error(con, w["id"], "transcript_error",
+                                   _sync_error_text("transcript", code, resp, token), w["transcript_error"])
+        except sqlite3.OperationalError as e:
+            _quiet_rollback(con)
+            print(f"[logbook] aviso: sync transcript work {w['id']}: {e}", file=sys.stderr)
+            continue
 
 
 def _extract_text_plain(jsonl_text):
@@ -442,7 +569,8 @@ def _search_local(con, query):
 # Con NEB_LOGBOOK_ENDPOINT configurado, el CLI opera contra el CENTRAL (autoridad; ids remotos).
 # Sin él, contra el SQLite local (REQ A; lock informativo).
 
-CLI_CMDS = {"list", "show", "claim", "release", "forced-release", "request", "rename", "archive", "search"}
+CLI_CMDS = {"list", "show", "claim", "release", "forced-release", "request", "rename", "archive", "search",
+            "sync-status"}
 
 
 def _db_for_cli():
@@ -634,10 +762,84 @@ def cli_search(args):
                      ensure_ascii=False, indent=2, default=str))
 
 
+def _transcript_pending_bytes(con, work_id, session_id, transcript_path):
+    """Bytes del transcript aún no subidos al central (archivo − cursor). None si el archivo ya no existe."""
+    path = posix_to_win(transcript_path or "")
+    try:
+        if not session_id or not path or not os.path.isfile(path):
+            return None
+        cur = con.execute("SELECT synced_byte FROM transcript_cursor WHERE session_id=? AND work_id=?",
+                          (session_id, work_id)).fetchone()
+        return max(0, os.path.getsize(path) - (cur[0] if cur else 0))
+    except (OSError, sqlite3.Error):
+        return None
+
+
+def _sync_status_rows(con, central=True):
+    """Works locales que requieren atención: pendientes de publicar, en conflicto o con un fallo de sync
+    vigente. Función pura sobre la conexión (la comparten el CLI y los tests).
+    Sin central configurado `dirty` nace en 1 y nada lo baja: listar por dirty devolvería toda la
+    bitácora, así que ahí solo cuentan conflicto y fallos.
+    La clave es `local_id`, nunca `id`: con central los demás verbos interpretan ids REMOTOS."""
+    where = "conflict=1 OR last_error IS NOT NULL OR transcript_error IS NOT NULL"
+    if central:
+        where = "dirty=1 OR " + where
+    rows = con.execute(
+        "SELECT id, mode, project, req_slug, dirty, conflict, remote_id, synced_at, last_error, last_error_at, "
+        "transcript_error, transcript_error_at, updated_at, archived_at, claude_session_id, transcript_path "
+        f"FROM work WHERE {where} ORDER BY id").fetchall()
+    out = []
+    for r in rows:
+        item = {"local_id": r[0], "mode": r[1], "project": r[2], "req_slug": r[3], "dirty": r[4],
+                "conflict": r[5], "remote_id": r[6], "synced_at": r[7], "last_error": r[8],
+                "last_error_at": r[9], "transcript_error": r[10], "transcript_error_at": r[11],
+                "updated_at": r[12], "archived_at": r[13]}
+        if r[10] is not None:
+            item["transcript_pending_bytes"] = _transcript_pending_bytes(con, r[0], r[14], r[15])
+        out.append(item)
+    return out
+
+
+def cli_sync_status(_args):
+    """Estado del outbox. SIEMPRE lee el SQLite local (este estado no existe en el central) y nunca
+    hace red. Sale por STDOUT: el wrapper del skill descarta stderr. ensure_ascii=True a propósito:
+    en un pipe cp1252 de Windows un carácter fuera de la página produciría salida VACÍA con rc=0,
+    que se leería como 'nada atascado' — justo el falso negativo que este verbo existe para evitar."""
+    endpoint_set = bool(os.environ.get("NEB_LOGBOOK_ENDPOINT"))
+    token_set = bool(os.environ.get("NEB_LOGBOOK_TOKEN"))
+    con = _db_for_cli()
+    if con is None:
+        print(json.dumps({"error": "no se pudo abrir la bitacora local"}, ensure_ascii=True)); return
+    try:
+        works = _sync_status_rows(con, central=endpoint_set)
+    except Exception as e:
+        print(json.dumps({"error": "no se pudo leer el estado del sync: " + str(e)[:200]}, ensure_ascii=True)); return
+    finally:
+        con.close()
+    notes = ["local_id es el id LOCAL: no usarlo con show/claim/release/archive cuando hay central "
+             "(esos verbos interpretan ids remotos; usar remote_id)."]
+    if endpoint_set and not token_set:
+        notes.append("Hay endpoint pero falta NEB_LOGBOOK_TOKEN en este entorno: el sync no corre y no deja "
+                     "rastro; los works dirty de abajo no se estan publicando.")
+    if not endpoint_set:
+        notes.append("Sin central configurado: solo se listan conflictos y fallos (dirty no aplica).")
+    if any(w["remote_id"] is None for w in works):
+        notes.append("remote_id null = este cliente nunca lo publico con exito. Con un 409 el work existe en el "
+                     "central a nombre de otro (ubicarlo en `list` por project + req_slug); con un 5xx no existe "
+                     "y solo queda corregir la causa que muestra last_error.")
+    print(json.dumps({
+        "scope": "local", "endpoint_set": endpoint_set, "token_set": token_set,
+        "attention": sum(1 for w in works if w["conflict"] or w["last_error"] or w["transcript_error"]),
+        "notes": notes, "works": works,
+    }, ensure_ascii=True, indent=2, default=str))
+
+
 def cli_main(argv):
     cmd, rest = argv[0], argv[1:]
     if cmd == "list":
         cli_list(rest)
+    elif cmd == "sync-status":
+        cli_sync_status(rest)
     elif cmd == "show":
         cli_show(rest)
     elif cmd in ("claim", "release", "forced-release"):
