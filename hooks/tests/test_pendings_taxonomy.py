@@ -339,6 +339,17 @@ class TestClassifyCurated(unittest.TestCase):
         pendings.curate(self.con, pid, band="media"); self.con.commit()  # solo banda sobre lo curado
         self.assertEqual(_rows(self.con, pid)["alpha"][3], 1)
 
+    def test_keyword_stopwords_and_short_tokens_do_not_score(self):
+        """Observado en dogfooding: 'aviso al cliente, confirmar con' aportaba 'al'/'con'/'a', que
+        matchean cualquier texto y hacían ganar a ese tema en casi todos los pendientes."""
+        self.assertEqual(pendings._topic_tokens("aviso al cliente, confirmar con, p1, ux"), {"aviso", "cliente", "confirmar"})
+        self.assertEqual(pendings._match_tokens("Comunicacion con el cliente"), {"comunicacion", "cliente"})
+        ruido = _topic(self.con, "ruido", "Ruido con el de la", "aviso al, con, de, por, a", parent=self.ids["topico"])
+        pid = _pending(self.con, "el token de la api se filtro con el log")
+        out = pendings.classify(self.con, pid)
+        self.assertIn(self.ids["seguridad"], out)
+        self.assertNotIn(ruido, out)                                   # solo stopwords: no matchea
+
     def test_roots_only_text_falls_to_sentinel(self):
         pid = _pending(self.con, "cliente topico cliente")
         out = pendings.classify(self.con, pid)
@@ -456,6 +467,30 @@ class TestCompasV2(unittest.TestCase):
         r2 = pendings.recommend_priority(self.con, only_client, home=self.home)
         self.assertEqual(r2["source"], "compas")                       # bonus 15 > 0 -> compas
         self.assertLess(r2["score"], 34)                               # sin peso de tópico: baja
+
+    def test_uncurated_uses_best_suggestion_per_axis_not_max_over_noise(self):
+        """Observado en dogfooding: un texto largo matchea decenas de temas; tomar el máximo inflaba a
+        'alta' a cualquier pendiente sin curar que rozara 'seguridad'. Cuenta solo la mejor
+        sugerencia por eje (por score del matching)."""
+        pendings.write_compas(self.home, [("Seg", 95, ["seguridad"], None), ("Tool", 35, ["tooling"], None,
+                                                                              {"alpha": 15, "beta": 3})])
+        pid = _pending(self.con, "hook script tooling roto en beta; de paso un token de alpha")
+        pendings.classify(self.con, pid)                     # tooling: 3 tokens · seguridad: 1 · alpha/beta: 1
+        ax = pendings.pending_axes(self.con, pid)
+        self.assertEqual(ax["suggested_topico"], "tooling")
+        self.assertIn(ax["suggested_cliente"], ("alpha", "beta"))   # empate a 1 token: cualquiera, pero uno solo
+        self.assertLessEqual(len(ax["suggestions"]), 2 * pendings.SUGGESTIONS_PER_AXIS)
+        sug = pendings._suggested_by_axis(self.con, pid)
+        self.assertEqual(sug["topico"][0][0], "tooling")           # ordenadas por score dentro del eje
+        self.assertLess(ax["suggestions"].index("tooling"), ax["suggestions"].index("seguridad"))
+        eff = {t[0] for t in pendings._effective_topics(self.con, pid)}
+        self.assertIn("tooling", eff); self.assertNotIn("seguridad", eff)
+        r = pendings.recommend_priority(self.con, pid, home=self.home)
+        self.assertEqual(r["source"], "compas")
+        self.assertLess(r["score"], 67)                             # 35 + bonus, no 95: no es 'alta'
+        # tras curar, los temas efectivos son los curados
+        pendings.curate(self.con, pid, cliente="alpha", topico="seguridad"); self.con.commit()
+        self.assertEqual({t[0] for t in pendings._effective_topics(self.con, pid)}, {"alpha", "seguridad"})
 
     def test_curated_band_wins_over_compas(self):
         pendings.write_compas(self.home, [("Todo", 10, ["seguridad", "tooling"], None)])
@@ -739,6 +774,27 @@ class TestSeed(unittest.TestCase):
         self._run(apply=True, force=True)
         con = _db_shared._connect(self.db, SCHEMA)
         self.assertIn("alpha", _rows(con, self.p1)); self.assertNotIn("beta", _rows(con, self.p1))
+        con.close()
+
+    def test_catalog_change_resets_uncurated_suggestions_only(self):
+        self._pre_curate_p6()
+        self._run(apply=True)
+        con = _db_shared._connect(self.db, SCHEMA)
+        pendings.triage_pass(con); con.commit()                        # p7 (sin curar) recibe sugerencias
+        self.assertTrue(_rows(con, self.p7))
+        con.close()
+        res, _ = self._run(apply=True)                                 # mismo catálogo: nada cambia
+        self.assertEqual(res["counts"]["suggestions_reset"], 0); self.assertFalse(res["changed"])
+        cat = json.load(open(self.catalog, encoding="utf-8"))
+        cat["topico"][1]["keywords"] = "hook, script, fuera"        # cambia keywords de tooling
+        json.dump(cat, open(self.catalog, "w", encoding="utf-8"))
+        res, _ = self._run(apply=True)
+        self.assertGreater(res["counts"]["suggestions_reset"], 0); self.assertTrue(res["changed"])
+        con = _db_shared._connect(self.db, SCHEMA)
+        self.assertEqual(_rows(con, self.p7), {})                      # sugerencias borradas
+        self.assertEqual(_rows(con, self.p1)["seguridad"][3], 1)      # lo curado intacto
+        self.assertEqual(con.execute("SELECT keywords FROM topic WHERE slug='tooling'").fetchone()[0], "hook, script, fuera")
+        self.assertIn(self.p7, pendings.triage_pass(con)["suggested"] + pendings.triage_pass(con)["unclassified"])
         con.close()
 
     def test_rollback_restores_seeded_tables_including_topic_link_and_last_reviewed(self):

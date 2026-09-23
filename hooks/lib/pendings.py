@@ -175,12 +175,29 @@ def _tokens(text):
     return set(_TOKEN_RE.findall(normalize(text)))
 
 
+# Palabras vacías que una keyword multi-palabra ('aviso al cliente', 'confirmar con') aportaría como
+# tokens sueltos y que matchean cualquier texto. Se filtran del lado del TEMA (keywords + name); el
+# texto del pendiente no se filtra: la intersección ya no las cuenta.
+_STOPWORDS = frozenset(
+    "a al ante bajo con contra de del desde en entre hacia hasta para por segun sin sobre tras "
+    "el la los las un una unos unas y o u e que se su sus lo le les es son fue ser hay "
+    "the of and or to in on for with by at".split())
+_MIN_TOKEN_LEN = 3
+
+
+def _match_tokens(text):
+    """Tokens de un texto del lado del tema (keywords o name) con los que se puntúa el matching:
+    sin stopwords ni tokens de menos de _MIN_TOKEN_LEN caracteres ('p1', 'ux', '7')."""
+    return {t for t in _tokens(text) if len(t) >= _MIN_TOKEN_LEN and t not in _STOPWORDS}
+
+
 def _topic_tokens(keywords_csv):
     """Tokens de la columna keywords (CSV). 'catálogo, Pedidos' -> {'catalogo','pedidos'}.
-    Multi-palabra por celda ('pedido por catalogo') -> aporta cada token suelto."""
+    Multi-palabra por celda ('pedido por catalogo') -> aporta cada token útil ('pedido', 'catalogo';
+    'por' es stopword y no cuenta)."""
     out = set()
     for cell in (keywords_csv or "").split(","):
-        out |= _tokens(cell)
+        out |= _match_tokens(cell)
     return out
 
 
@@ -261,7 +278,7 @@ def _candidate_topics_fts(con, pending_text):
         (match_expr,) + AXIS_ROOTS).fetchall()
     out = []
     for tid, kw, name in rows:
-        score = len(toks & (_topic_tokens(kw) | _tokens(name)))
+        score = len(toks & (_topic_tokens(kw) | _match_tokens(name)))
         if score > 0:
             out.append((tid, score))
     return out
@@ -287,7 +304,7 @@ def _candidate_topics_like(con, pending_text):
     # Verificación exacta por token (evita falsos positivos de substring: 'pedido' vs 'expedido').
     out = []
     for tid, kw, name in rows:
-        if toks & (_topic_tokens(kw) | _tokens(name)):
+        if toks & (_topic_tokens(kw) | _match_tokens(name)):
             out.append((tid, kw, name))
     return out
 
@@ -387,7 +404,7 @@ def classify(con, pending_id, replace=True, manage_tx=True, use_fts=None):
     else:
         cands = _candidate_topics_like(con, context_origin)    # [(topic_id, kw, name)]
         toks = _tokens(context_origin)
-        matches = [(tid, len(toks & (_topic_tokens(kw) | _tokens(nm))))
+        matches = [(tid, len(toks & (_topic_tokens(kw) | _match_tokens(nm))))
                    for (tid, kw, nm) in cands]
 
     # excluir el sentinel de los matches reales (su name sí matchea; se excluye por id)
@@ -654,6 +671,40 @@ def _curated_band(con, pending_id):
 
 _CURATED_SCORE = {"high": 80.0, "medium": 50.0, "low": 20.0}   # score por defecto de una banda curada sin score
 
+SUGGESTIONS_PER_AXIS = 3   # cuántas sugerencias por eje expone triage (ordenadas por score)
+
+
+def _suggested_by_axis(con, pending_id):
+    """Sugerencias del matching (curated=0, temas activos, sin sentinel/raíces) ordenadas por score
+    (nº de tokens coincidentes) desc y agrupadas por eje: {'cliente': [(slug, score)...],
+    'topico': [...], None: [...]} — None = temas sin eje (legado)."""
+    out = {"cliente": [], "topico": [], None: []}
+    for slug, axis, score in con.execute(
+            "SELECT t.slug, r.slug, pt.priority_score FROM pending_topic pt "
+            "JOIN topic t ON t.id = pt.topic_id LEFT JOIN topic r ON r.id = t.parent_id "
+            "WHERE pt.pending_id=? AND pt.curated=0 AND t.status='active' "
+            "ORDER BY pt.priority_score DESC, t.slug", (pending_id,)).fetchall():
+        if slug == SENTINEL_SLUG or slug in AXIS_ROOTS:
+            continue
+        out[axis if axis in AXIS_ROOTS else None].append((slug, score))
+    return out
+
+
+def _effective_topics(con, pending_id):
+    """Temas que CUENTAN para priorizar: los curados (activos) si los hay; si no, la MEJOR sugerencia
+    por eje (por score del matching) más los temas sin eje (legado) y el sentinel. Un texto largo
+    matchea decenas de temas por ruido; tomar el máximo de todos inflaba a 'alta' a cualquier
+    pendiente sin curar que rozara un tópico de peso alto."""
+    topics = _pending_topics(con, pending_id)        # (slug, is_primary, axis) activos
+    cur_slugs = {r[0] for r in con.execute(
+        "SELECT t.slug FROM pending_topic pt JOIN topic t ON t.id = pt.topic_id "
+        "WHERE pt.pending_id=? AND pt.curated=1 AND t.status='active'", (pending_id,))}
+    if cur_slugs:
+        return [t for t in topics if t[0] in cur_slugs]
+    sug = _suggested_by_axis(con, pending_id)
+    keep = {sug[a][0][0] for a in AXIS_ROOTS if sug[a]} | {s for s, _ in sug[None]} | {SENTINEL_SLUG}
+    return [t for t in topics if t[0] in keep]
+
 
 def _roadmap_for_topics(compas, topics):
     """Si algún objetivo que cubre uno de los temas del pending declara roadmap, devuelve
@@ -755,7 +806,7 @@ def recommend_priority(con, pending_id, prompt_criterion=None, home=None):
        'source' ('prompt'|'curated'|'compas'|'intrinsic'|'unclassified'),
        'by_topic' {slug: {'band','score'}}, 'rationale'}"""
     _scores_by_topic._home = home          # inyecta el home para el desglose por tema
-    topics = _pending_topics(con, pending_id)
+    topics = _effective_topics(con, pending_id)
     if prompt_criterion:
         ext = rank_by_external_criterion(con, [pending_id], prompt_criterion, home=home)
         base = ext["scores"].get(pending_id, 0.0)
@@ -807,7 +858,7 @@ def rank_by_external_criterion(con, pending_ids, criterion, home=None):
         project = _detect_roadmap_project(criterion, home)
     scores = {}
     for pid in pending_ids:
-        topics = _pending_topics(con, pid)
+        topics = _effective_topics(con, pid)
         if project:
             base = _roadmap_fine_order(con, pid, project, 50.0, home)
         else:
@@ -954,7 +1005,7 @@ def _roadmap_fine_order(con, pending_id, project, base_score, home=None):
     inits = _read_roadmap_initiatives(os.path.join(roadmap_dir, project))
     if not inits:
         return base_score
-    p_tokens = {normalize(t[0]) for t in _pending_topics(con, pending_id)}
+    p_tokens = {normalize(t[0]) for t in _effective_topics(con, pending_id)}
     best = None
     for it in inits:                              # ya ordenadas: alta>media>baja, luego id
         sub_tokens = {normalize(s) for s in it["subsystems"]}
@@ -1001,7 +1052,7 @@ def infer_objectives(con, home=None):
                 if _curated_band(con, pid):
                     covered += 1
                     continue
-                tps = _pending_topics(con, pid)
+                tps = _effective_topics(con, pid)
                 if any(compas["topic_weight"].get(t[0], 0) > 0 for t in tps if t[2] != "cliente"):
                     covered += 1
         uncovered = total - covered
@@ -1182,21 +1233,27 @@ def cli_show(args):
 
 
 def pending_axes(con, pending_id):
-    """Ejes del pending para presentación: {'cliente': slug|None, 'topico': slug|None,
-    'curated': bool, 'suggestions': [slug...]}. cliente/topico salen de las filas curadas;
-    suggestions = temas sugeridos por el matching (curated=0, activos, sin sentinel/raíces)."""
-    out = {"cliente": None, "topico": None, "curated": False, "suggestions": []}
-    for slug, axis, curated in con.execute(
-            "SELECT t.slug, r.slug, pt.curated FROM pending_topic pt "
-            "JOIN topic t ON t.id = pt.topic_id LEFT JOIN topic r ON r.id = t.parent_id "
-            "WHERE pt.pending_id=? AND t.status='active' ORDER BY pt.curated DESC, t.slug",
-            (pending_id,)).fetchall():
-        if curated:
-            out["curated"] = True
-            if axis in AXIS_ROOTS:
-                out[axis] = slug
-        elif slug != SENTINEL_SLUG and slug not in AXIS_ROOTS:
-            out["suggestions"].append(slug)
+    """Ejes del pending para presentación: {'cliente': slug|None, 'topico': slug|None, 'curated': bool,
+    'suggested_cliente': slug|None, 'suggested_topico': slug|None, 'suggestions': [slug...]}.
+    cliente/topico salen de las filas curadas (activas); para un pendiente sin curar,
+    suggested_* es la MEJOR sugerencia del matching por eje (por score) y suggestions trae hasta
+    SUGGESTIONS_PER_AXIS por eje (más las de temas sin eje), ordenadas por score."""
+    out = {"cliente": None, "topico": None, "curated": False,
+           "suggested_cliente": None, "suggested_topico": None, "suggestions": []}
+    for slug, axis in con.execute(
+            "SELECT t.slug, r.slug FROM pending_topic pt JOIN topic t ON t.id = pt.topic_id "
+            "LEFT JOIN topic r ON r.id = t.parent_id "
+            "WHERE pt.pending_id=? AND pt.curated=1 AND t.status='active'", (pending_id,)).fetchall():
+        out["curated"] = True
+        if axis in AXIS_ROOTS:
+            out[axis] = slug
+    if not out["curated"]:
+        sug = _suggested_by_axis(con, pending_id)
+        for axis in AXIS_ROOTS:
+            if sug[axis]:
+                out[f"suggested_{axis}"] = sug[axis][0][0]
+            out["suggestions"] += [s for s, _ in sug[axis][:SUGGESTIONS_PER_AXIS]]
+        out["suggestions"] += [s for s, _ in sug[None][:SUGGESTIONS_PER_AXIS]]
     return out
 
 
@@ -1286,6 +1343,7 @@ def cli_triage(args):
         rec = recommend_priority(con, pid)
         items.append({"id": pid, "slug": slug, "type": ptype, "status": status,
                       "cliente": ax["cliente"], "topico": ax["topico"], "curated": ax["curated"],
+                      "suggested_cliente": ax["suggested_cliente"], "suggested_topico": ax["suggested_topico"],
                       "suggestions": ax["suggestions"],
                       "context_origin": ctx, "band": rec["band"], "score": rec["score"],
                       "source": rec["source"], "rationale": rec["rationale"],

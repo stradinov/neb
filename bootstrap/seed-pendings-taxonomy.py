@@ -22,6 +22,9 @@ calcula DENTRO de la transacción, así una curaduría hecha por otra sesión un
      su status solo cambia a 'active' con --force (sin --force, los items que usan un tema del catálogo
      archivado se saltan y se reportan). Todo tema activo que no sea sentinel/raíz/hijo del catálogo
      pasa a status='archived' (sus filas pending_topic se conservan; las lecturas filtran active).
+     Si el catálogo cambió (keywords, nombres, ejes), las sugerencias del matching (curated=0) de los
+     pendientes abiertos sin curar se borran para que el siguiente `PD triage` las recalcule con el
+     catálogo nuevo; lo curado no se toca. Así, afinar keywords = editar taxonomy.json + --apply.
   2. Por cada item vivo del dataset cuyo id exista con status='open' y SIN curaduría previa (o con
      --force): filas curated=1 vía pendings.curate (cliente is_primary=0, tópico is_primary=1) con
      banda P0/P1->high, P2->medium, P3->low; el score se HEREDA de la fila primaria previa cuando su
@@ -283,10 +286,11 @@ def _previous_primary(con, pid):
 def apply_plan(con, catalog, dataset, plan, force=False):
     """Ejecuta el plan DENTRO de la transacción del caller (with_write_tx). NO commitea.
     Devuelve conteos reales."""
-    counts = {"topics_upserted": 0, "topics_archived": 0, "curated": 0, "sin_banda": 0,
-              "slugs_set": 0, "slugs_collided": len(plan["slugs_collide"]),
+    counts = {"topics_upserted": 0, "topics_archived": 0, "suggestions_reset": 0, "curated": 0,
+              "sin_banda": 0, "slugs_set": 0, "slugs_collided": len(plan["slugs_collide"]),
               "slugs_invalid": len(plan["slugs_invalid"]), "links_new": 0, "backfilled": 0}
     pendings._ensure_sentinel(con)
+    catalog_before = sorted(con.execute("SELECT slug, name, keywords, status, parent_id FROM topic").fetchall())
     # 1. raíces + hijos + archivo de lo que sobra
     root_ids = {}
     for axis in pendings.AXIS_ROOTS:
@@ -310,6 +314,16 @@ def apply_plan(con, catalog, dataset, plan, force=False):
     counts["topics_archived"] = con.execute(
         f"UPDATE topic SET status='archived' WHERE status='active' AND slug NOT IN ({','.join('?' * len(keep))})",
         keep).rowcount
+    if sorted(con.execute("SELECT slug, name, keywords, status, parent_id FROM topic").fetchall()) != catalog_before:
+        # el catálogo cambió (keywords/nombres/ejes): las sugerencias del matching sobre pendientes
+        # abiertos sin curar quedan obsoletas -> se borran para que el siguiente triage las recalcule
+        # (reclassify solo re-sugiere a quien no tiene sugerencia vigente). Las filas curadas no se tocan.
+        counts["suggestions_reset"] = con.execute(
+            "DELETE FROM pending_topic WHERE curated=0 AND pending_id IN "
+            "(SELECT p.id FROM pending p WHERE p.status='open' AND p.archived_at IS NULL "
+            " AND NOT EXISTS (SELECT 1 FROM pending_topic q JOIN topic t ON t.id = q.topic_id "
+            "                 WHERE q.pending_id = p.id AND q.curated=1 AND t.status='active')) "
+            "AND topic_id IN (SELECT id FROM topic WHERE status='active')").rowcount
     # 2. curaduría por item
     by_id = {it["id"]: it for it in dataset}
     slug_for = dict(plan["slugs_set"])

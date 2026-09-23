@@ -12,7 +12,7 @@ Glosario (el vocabulario abstracto de la metodología no lo fija; es propio de e
 | **eje** | Una de las dos raíces de la jerarquía `topic.parent_id`: `cliente` (quién / para quién) y `topico` (de qué trata). Son contenedores: nunca se sugieren ni se curan. |
 | **cliente / tópico** | Un hijo de la raíz correspondiente. Un pendiente curado tiene **hasta uno por eje** (el skill cura ambos; uno curado a medias sigue apareciendo en el paso de curación). El catálogo vive en la DB (lo siembra `bootstrap/seed-pendings-taxonomy.py` desde un `taxonomy.json` del adoptante) y se lee en el JSON de `PD triage` (`catalog`); el núcleo no trae valores. |
 | **curaduría** | `pending_topic.curated = 1` sobre un tema **activo**: clasificación decidida (pase del dev, `curate`). La vigente. Si el tema se archiva, esa fila queda como historial y el pendiente vuelve al flujo de curación. |
-| **sugerencia** | `pending_topic.curated = 0`: lo que escribe el matching por keywords (`classify`). Solo para pendientes **sin** curaduría; el matching nunca pisa una fila curada ni escribe sobre un pendiente curado. |
+| **sugerencia** | `pending_topic.curated = 0`: lo que escribe el matching por keywords (`classify`), con `priority_score` = nº de tokens coincidentes. Solo para pendientes **sin** curaduría; el matching nunca pisa una fila curada ni escribe sobre un pendiente curado. Un texto largo matchea decenas de temas: para priorizar y para proponer la curaduría cuenta solo la **mejor sugerencia por eje** (`triage` la expone como `suggested_cliente`/`suggested_topico`), nunca el máximo de todas. |
 
 Las filas sobre temas **archivados** se conservan como historial (bandas incluidas) y las lecturas las ignoran (`_pending_topics` filtra `status='active'`).
 
