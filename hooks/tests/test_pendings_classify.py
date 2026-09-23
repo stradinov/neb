@@ -216,19 +216,24 @@ class TestReclassifyDelta(_Base):
 # --------------------------------------------------------------------------- T8 triage_pass agrupa (NO O(N²))
 
 class TestTriageGrouping(_Base):
-    def test_groups_by_shared_topic_and_sentinel_excluded(self):
+    def test_groups_by_link_and_sentinel_excluded(self):
         _new_topic(self.con, "catalogo", "Catálogo", "catalogo, pedidos")
         pa = _new_pending(self.con, "catalogo roto")
         pb = _new_pending(self.con, "pedidos del catalogo")
+        pc = _new_pending(self.con, "catalogo viejo sin vinculo")   # comparte tema pero NO link
+        # la agrupación es por pending_link (REQ pendings-taxonomia): pa <-> pb vinculados
+        self.con.execute("INSERT INTO pending_link (a, b, relation) VALUES (?,?,'related')", (pb, pa))
+        self.con.commit()
         # 3 pendings sin match -> todos al sentinel; NO deben formar grupo entre sí
         s1 = _new_pending(self.con, "backup correo")
         s2 = _new_pending(self.con, "rotar llaves ssh")
         s3 = _new_pending(self.con, "actualizar firmware router")
         out = pendings.triage_pass(self.con)
-        # pa y pb comparten topic -> un grupo
-        self.assertTrue(any(set(g) == {pa, pb} for g in out["groups"]))
-        # los del sentinel van a unclassified, NO a groups
+        # pa y pb están vinculados -> un grupo; pc comparte tema pero no vínculo -> fuera
+        self.assertEqual(out["groups"], [[pa, pb]])
+        # los del sentinel van a unclassified, NO a groups; los con sugerencia van a suggested
         self.assertEqual(set(out["unclassified"]), {s1, s2, s3})
+        self.assertEqual(set(out["suggested"]), {pa, pb, pc})
         for g in out["groups"]:
             self.assertFalse({s1, s2, s3} & set(g))  # sentinel nunca agrupa
 
@@ -259,12 +264,14 @@ class TestTriageEndToEnd(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="neb-triage-")
         os.makedirs(os.path.join(self.tmp, ".claude"), exist_ok=True)
         self.db = _db_shared.resolve_db_path(self.tmp)
-        # siembra: 2 pendings que comparten tema + 1 sin clasificar
+        # siembra: 2 pendings vinculados (grupo) que comparten tema + 1 sin clasificar
         con = _db_shared._connect(self.db, SCHEMA)
         _new_topic(con, "catalogo", "Catálogo", "catalogo, pedidos")
-        _new_pending(con, "catalogo roto en alpha")
-        _new_pending(con, "pedidos atrasados del catalogo")
+        pa = _new_pending(con, "catalogo roto en alpha")
+        pb = _new_pending(con, "pedidos atrasados del catalogo")
         _new_pending(con, "rotar llaves ssh del bastion")
+        con.execute("INSERT INTO pending_link (a, b, relation) VALUES (?,?,'related')", (pb, pa))
+        con.commit()
         con.close()
 
     def tearDown(self):
@@ -285,7 +292,7 @@ class TestTriageEndToEnd(unittest.TestCase):
             pendings.cli_triage([])           # NO debe lanzar (antes: OperationalError en ROLLBACK)
         out = json.loads(buf.getvalue())      # salida útil = JSON parseable
         self.assertGreaterEqual(out["classified"], 2)            # los 2 con tema fueron clasificados
-        # los dos del mismo tema forman un grupo
+        # los dos vinculados por pending_link forman un grupo
         self.assertTrue(any(len(g) == 2 for g in out["groups"]),
                         f"esperaba un grupo de 2; groups={out['groups']}")
         # el ssh cae a sin-clasificar (sentinel)

@@ -10,6 +10,9 @@ Pendings persistidos en la misma DB SQLite del logbook (reusa la infra de _db_sh
 Enums en INGLES (la capa de presentacion, Sub-entrega C, traduce al mostrar):
   pending.status         : 'open' | 'obsolete'
   pending.obsolete_cause : 'no-longer-applies' | 'resolved-otherwise'  (NULL si status='open')
+  pending.slug           : cita canonica persistida (NULL = resuelve por el tag [slug] de context_origin)
+  pending_topic.curated  : 0 = sugerencia del matching | 1 = curado (seed / curate). El matching nunca pisa 1.
+  topic.parent_id        : ejes curados = raices AXIS_ROOTS ('cliente', 'topico') y sus hijos.
 
 Filosofía defensiva (igual que logbook.py): el __main__ traga excepciones y sale 0.
 Contrato transaccional: las funciones de logica NO commitean — el caller controla la
@@ -31,6 +34,11 @@ from _db_shared import (
 
 
 _OBSOLETE_CAUSES = ("no-longer-applies", "resolved-otherwise")
+
+# Raíces de los ejes curados (topic.parent_id). Son contenedores, NO temas: nunca se sugieren por
+# matching (su `name` tokenizable matchearía "cliente"/"tópico" en medio corpus) ni se curan.
+AXIS_ROOTS = ("cliente", "topico")
+_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
 
 
 # --------------------------------------------------------------------------- conexión CLI
@@ -139,8 +147,9 @@ def resolve_session_context(con, pending_id):
 
 # =========================================================================== Sub-entrega B: temas y matching
 # FTS5 on-demand (fuera del executescript del hook) + fallback LIKE con la misma
-# interfaz; classify/reclassify (keyword-match context_origin ↔ topic.keywords);
-# triage_pass (pre-filtro determinista + agrupación por topic compartido, NO O(N²)).
+# interfaz; classify/reclassify (keyword-match context_origin ↔ topic.keywords = SUGERENCIA
+# para lo no curado); triage_pass (pre-filtro determinista + agrupación por pending_link
+# entre abiertos con Union-Find, NO O(N²)).
 # Enums SIEMPRE en INGLES: topic.status='active', pending.status='open'.
 
 # --------------------------------------------------------------------------- normalización + tokenización
@@ -248,8 +257,8 @@ def _candidate_topics_fts(con, pending_text):
     rows = con.execute(
         "SELECT f.ref_id, t.keywords, t.name "
         "FROM neb_fts f JOIN topic t ON t.id = f.ref_id "
-        "WHERE f.kind='topic' AND f.body MATCH ? AND t.status='active'",
-        (match_expr,)).fetchall()
+        "WHERE f.kind='topic' AND f.body MATCH ? AND t.status='active' AND t.slug NOT IN (?,?)",
+        (match_expr,) + AXIS_ROOTS).fetchall()
     out = []
     for tid, kw, name in rows:
         score = len(toks & (_topic_tokens(kw) | _tokens(name)))
@@ -273,7 +282,8 @@ def _candidate_topics_like(con, pending_text):
         params += [like, like]
     rows = con.execute(
         f"SELECT id, keywords, name FROM topic "
-        f"WHERE status='active' AND ({clauses})", params).fetchall()
+        f"WHERE status='active' AND slug NOT IN (?,?) AND ({clauses})",
+        list(AXIS_ROOTS) + params).fetchall()
     # Verificación exacta por token (evita falsos positivos de substring: 'pedido' vs 'expedido').
     out = []
     for tid, kw, name in rows:
@@ -290,8 +300,9 @@ SENTINEL_SLUG = "sin-clasificar"
 def _ensure_sentinel(con):
     """Crea el topic sentinel 'sin-clasificar' (status='active') si no existe. Idempotente.
     Devuelve su topic_id. status en INGLES por la decisión de enums; slug/name en español (dominio).
-    El sentinel nunca matchea (keywords vacías -> _topic_tokens('') = ∅): es destino explícito
-    solo en la rama 'sin match' de classify."""
+    Sus keywords son vacías, pero su `name` sí participa del matching (FTS indexa keywords+name):
+    por eso classify lo EXCLUYE por id de los matches — es destino explícito solo en la rama
+    'sin match'. (Las raíces de AXIS_ROOTS se excluyen por slug en las rutas de candidatos.)"""
     con.execute(
         "INSERT OR IGNORE INTO topic (slug, name, description, keywords, status) "
         "VALUES (?, 'Sin clasificar', 'Pendientes sin tema inferido (fallback de matching)', '', 'active')",
@@ -318,21 +329,57 @@ def _derive_priority(con, topic_id, match_score):
 
 # --------------------------------------------------------------------------- classify / reclassify
 
-def classify(con, pending_id, replace=True, manage_tx=True):
-    """Asocia un pending a topics por keyword-match. Sin match -> sentinel 'sin-clasificar'.
-    Queries de topic SIEMPRE con status='active' (INGLES). Devuelve los topic_id asignados.
+def _curated_topic_ids(con, pending_id):
+    """topic_ids de las filas curadas (curated=1) sobre temas ACTIVOS del pending; [] si no está
+    curado. Una curaduría que quedó sobre un tema archivado no cuenta: el pendiente vuelve al
+    flujo de curación (mismo predicado que _HAS_CURATED_SQL)."""
+    return [r[0] for r in con.execute(
+        "SELECT pt.topic_id FROM pending_topic pt JOIN topic t ON t.id = pt.topic_id "
+        "WHERE pt.pending_id=? AND pt.curated=1 AND t.status='active'", (pending_id,))]
+
+
+# Sugerencia vigente = fila curated=0 sobre un tema activo que no sea el sentinel ni una raíz.
+_HAS_SUGGESTION_SQL = (
+    "EXISTS (SELECT 1 FROM pending_topic pt JOIN topic t ON t.id = pt.topic_id "
+    "        WHERE pt.pending_id = p.id AND pt.curated = 0 AND t.status = 'active' "
+    "          AND t.slug NOT IN (?,?,?))"
+)
+# Curado = ≥1 fila curated=1 sobre un tema ACTIVO (ver _curated_topic_ids).
+_HAS_CURATED_SQL = (
+    "EXISTS (SELECT 1 FROM pending_topic pt JOIN topic t ON t.id = pt.topic_id "
+    "        WHERE pt.pending_id = p.id AND pt.curated = 1 AND t.status = 'active')"
+)
+_NOT_ROOT_PARAMS = (SENTINEL_SLUG,) + AXIS_ROOTS
+
+
+def classify(con, pending_id, replace=True, manage_tx=True, use_fts=None):
+    """SUGIERE temas a un pending por keyword-match (filas curated=0). Sin match -> sentinel
+    'sin-clasificar'. Queries de topic SIEMPRE con status='active' (INGLES). Devuelve los topic_id
+    asignados.
+
+    Curaduría: si el pending ya tiene ≥1 fila curated=1, classify NO escribe nada y devuelve esas
+    filas — la clasificación vigente es la curada (seed / curate), el matching es solo sugerencia
+    para lo no curado. Con replace=True borra únicamente sus propias filas (curated=0) sobre temas
+    ACTIVOS — las filas sobre temas archivados se conservan como historial, igual que en el seed;
+    el upsert lleva `WHERE curated=0` para no pisar una fila curada sobre el mismo tema.
 
     manage_tx=True (default, modo CLI): abre begin_immediate + commit/rollback propios.
     manage_tx=False (gancho de A): el caller controla la transacción (p.ej. cli_archive con
     su SAVEPOINT) — classify NO abre BEGIN IMMEDIATE ni commitea (evita 'transaction within a
-    transaction')."""
+    transaction').
+    use_fts: resultado de _ensure_fts ya calculado por el caller (reclassify lo hace UNA vez por
+    pase: el rebuild de neb_fts es por corpus completo, no por pendiente); None -> se calcula aquí."""
     row = con.execute(
         "SELECT context_origin, status FROM pending WHERE id=?", (pending_id,)).fetchone()
     if not row:
         return []
     context_origin, _pstatus = row
+    curated = _curated_topic_ids(con, pending_id)
+    if curated:
+        return curated                      # curado: la sugerencia no aplica, no se toca nada
     # (no clasificamos obsoletos; el caller normalmente filtra, pero guardamos por robustez)
-    use_fts = _ensure_fts(con)
+    if use_fts is None:
+        use_fts = _ensure_fts(con)
     sentinel_id = _ensure_sentinel(con)
 
     if use_fts:
@@ -343,32 +390,34 @@ def classify(con, pending_id, replace=True, manage_tx=True):
         matches = [(tid, len(toks & (_topic_tokens(kw) | _tokens(nm))))
                    for (tid, kw, nm) in cands]
 
-    # excluir el sentinel de los matches reales (sus keywords son vacías, no debería aparecer)
+    # excluir el sentinel de los matches reales (su name sí matchea; se excluye por id)
     matches = [(tid, sc) for (tid, sc) in matches if tid != sentinel_id and sc > 0]
 
     if manage_tx:
         begin_immediate(con)
     try:
         if replace:
-            con.execute("DELETE FROM pending_topic WHERE pending_id=?", (pending_id,))
+            con.execute(
+                "DELETE FROM pending_topic WHERE pending_id=? AND curated=0 "
+                "AND topic_id IN (SELECT id FROM topic WHERE status='active')", (pending_id,))
         assigned = []
         if matches:
             best_tid = max(matches, key=lambda m: m[1])[0]
             for tid, score in matches:
                 band, pscore = _derive_priority(con, tid, score)
                 con.execute(
-                    "INSERT INTO pending_topic (pending_id, topic_id, priority_band, priority_score, is_primary) "
-                    "VALUES (?,?,?,?,?) "
+                    "INSERT INTO pending_topic (pending_id, topic_id, priority_band, priority_score, is_primary, curated) "
+                    "VALUES (?,?,?,?,?,0) "
                     "ON CONFLICT(pending_id, topic_id) DO UPDATE SET "
                     "priority_band=excluded.priority_band, priority_score=excluded.priority_score, "
-                    "is_primary=excluded.is_primary",
+                    "is_primary=excluded.is_primary WHERE curated=0",
                     (pending_id, tid, band, pscore, 1 if tid == best_tid else 0))
                 assigned.append(tid)
         else:
             con.execute(
-                "INSERT INTO pending_topic (pending_id, topic_id, priority_band, priority_score, is_primary) "
-                "VALUES (?,?,?,?,1) "
-                "ON CONFLICT(pending_id, topic_id) DO UPDATE SET is_primary=1",
+                "INSERT INTO pending_topic (pending_id, topic_id, priority_band, priority_score, is_primary, curated) "
+                "VALUES (?,?,?,?,1,0) "
+                "ON CONFLICT(pending_id, topic_id) DO UPDATE SET is_primary=1 WHERE curated=0",
                 (pending_id, sentinel_id, _DEFAULT_BAND, _DEFAULT_SCORE))
             assigned.append(sentinel_id)
         con.execute("UPDATE pending SET last_reviewed_at=? WHERE id=?", (now_iso(), pending_id))
@@ -382,43 +431,52 @@ def classify(con, pending_id, replace=True, manage_tx=True):
 
 
 def reclassify(con, since=None, manage_tx=True):
-    """Re-clasifica solo el delta (pendings open nunca revisados o revisados antes de `since`).
-    since=None -> delta = pendings con last_reviewed_at IS NULL (nuevos)."""
-    if since is None:
-        rows = con.execute(
-            "SELECT id FROM pending WHERE status='open' AND archived_at IS NULL "
-            "AND last_reviewed_at IS NULL").fetchall()
-    else:
-        rows = con.execute(
-            "SELECT id FROM pending WHERE status='open' AND archived_at IS NULL "
-            "AND (last_reviewed_at IS NULL OR last_reviewed_at < ?)", (since,)).fetchall()
+    """Re-sugiere solo el delta: pendings open SIN curaduría que (a) nunca fueron revisados,
+    (b) no tienen sugerencia vigente (sus filas quedaron sobre temas archivados o solo en el
+    sentinel — así un catálogo nuevo o keywords nuevas sí les llegan), o (c) fueron revisados
+    antes de `since`. Los curados nunca entran al delta."""
+    sql = ("SELECT p.id FROM pending p WHERE p.status='open' AND p.archived_at IS NULL "
+           f"AND NOT {_HAS_CURATED_SQL} "
+           f"AND (p.last_reviewed_at IS NULL OR NOT {_HAS_SUGGESTION_SQL}")
+    params = list(_NOT_ROOT_PARAMS)
+    if since is not None:
+        sql += " OR p.last_reviewed_at < ?"
+        params.append(since)
+    sql += ") ORDER BY p.id"
+    rows = con.execute(sql, params).fetchall()
     result = {}
+    use_fts = _ensure_fts(con) if rows else False   # un solo rebuild del índice por pase
     for (pid,) in rows:
-        result[pid] = classify(con, pid, replace=True, manage_tx=manage_tx)
+        result[pid] = classify(con, pid, replace=True, manage_tx=manage_tx, use_fts=use_fts)
     return result
 
 
 # --------------------------------------------------------------------------- triage_pass (agrupación NO O(N²))
 
 def triage_pass(con):
-    """Pase de triage: reclassify del delta + agrupar por topic compartido (no O(N^2)) +
-    listar sin clasificar. Pre-filtro 100% SQL; el LLM (skill, C) solo ve los grupos resultantes.
-    Devuelve {'classified': int, 'groups': [[pending_id,...]], 'unclassified': [pending_id,...]}.
+    """Pase de triage: reclassify del delta + agrupar por `pending_link` (no O(N^2)) + listar
+    los que esperan curaduría. Pre-filtro 100% SQL; el LLM (skill, C) solo ve el resultado.
+    Devuelve {'classified': int, 'groups': [[pending_id,...]], 'suggested': [...], 'unclassified': [...]}:
+      • groups       — componentes conexas del grafo pending_link (cualquier relation) SOLO entre
+                       pendings open; con pocos valores por eje un tema compartido volvería a dar
+                       un componente gigante, así que la agrupación es por vínculo explícito.
+      • suggested    — open sin curaduría con ≥1 sugerencia vigente (curated=0 sobre tema activo
+                       distinto del sentinel/raíces): el skill la presenta y cura con OK del dev.
+      • unclassified — open sin curaduría y sin sugerencia (solo sentinel o sin filas).
+      suggested ∩ unclassified = ∅ ; suggested ∪ unclassified = open sin curar.
 
     SIEMPRE corre dentro de _with_write_tx (cli_triage abre la tx), así que fuerza
     manage_tx=False en reclassify/classify para NO anidar otro BEGIN IMMEDIATE
     ('cannot start a transaction within a transaction')."""
-    sentinel_id = _ensure_sentinel(con)
+    _ensure_sentinel(con)
     reclass = reclassify(con, manage_tx=False)   # delta; la tx la maneja el caller (_with_write_tx)
     classified = len(reclass)
 
-    # Agrupación por topic compartido. SQL self-join acotado por topic_id (indexado),
-    # excluyendo el sentinel -> NO genera el producto cartesiano de todos los pendings.
+    # Aristas del grafo explícito, acotadas a pendings open en ambos extremos (un obsoleto no agrupa).
     rows = con.execute(
-        "SELECT a.pending_id, b.pending_id "
-        "FROM pending_topic a "
-        "JOIN pending_topic b ON a.topic_id = b.topic_id AND a.pending_id < b.pending_id "
-        "WHERE a.topic_id != ?", (sentinel_id,)).fetchall()
+        "SELECT l.a, l.b FROM pending_link l "
+        "JOIN pending pa ON pa.id = l.a AND pa.status='open' AND pa.archived_at IS NULL "
+        "JOIN pending pb ON pb.id = l.b AND pb.status='open' AND pb.archived_at IS NULL").fetchall()
 
     # Union-Find sobre las aristas (pending_id <-> pending_id) -> componentes conexas = grupos.
     parent = {}
@@ -438,19 +496,23 @@ def triage_pass(con):
     groups_map = {}
     for node in list(parent):
         groups_map.setdefault(find(node), []).append(node)
-    groups = [sorted(g) for g in groups_map.values() if len(g) > 1]
+    groups = sorted((sorted(g) for g in groups_map.values() if len(g) > 1), key=lambda g: g[0])
 
-    unclassified = [r[0] for r in con.execute(
-        "SELECT pending_id FROM pending_topic WHERE topic_id=?", (sentinel_id,)).fetchall()]
-    return {"classified": classified, "groups": groups, "unclassified": unclassified}
+    uncurated = ("SELECT p.id FROM pending p WHERE p.status='open' AND p.archived_at IS NULL "
+                 f"AND NOT {_HAS_CURATED_SQL} AND {{cond}} {_HAS_SUGGESTION_SQL} ORDER BY p.id")
+    suggested = [r[0] for r in con.execute(uncurated.format(cond=""), _NOT_ROOT_PARAMS)]
+    unclassified = [r[0] for r in con.execute(uncurated.format(cond="NOT"), _NOT_ROOT_PARAMS)]
+    return {"classified": classified, "groups": groups,
+            "suggested": suggested, "unclassified": unclassified}
 
 
 # =========================================================================== Sub-entrega C: recomendador + priorización
 # Jerarquía de fuentes de prioridad (mayor a menor):
 #   1. Criterio explícito del prompt (efímero) -> rank_by_external_criterion
-#   2. compas.md (peso por tema vía objetivos; FUENTE ÚNICA del peso) -> parse_compas
-#   3. Señales intrínsecas del pending (work/fase, bloqueo, urgencia, recencia)
-#   4. Si insuficiente -> infer_objectives (propone, el skill pregunta, write_compas escribe)
+#   2. Banda CURADA persistida (pending_topic.curated=1 con priority_band: pase del dev / curate)
+#   3. compas.md (peso por TÓPICO vía objetivos + bonus por CLIENTE; FUENTE ÚNICA del peso) -> parse_compas
+#   4. Señales intrínsecas del pending (work/fase, bloqueo, urgencia, recencia)
+#   5. Si insuficiente -> infer_objectives (propone, el skill pregunta, write_compas escribe)
 # PERSISTENCIA en INGLES (high|medium|low); el español (alta|media|baja) es SOLO presentación.
 # Reusa normalize() de B (NO la redefine).
 
@@ -482,9 +544,13 @@ def _band(score):
 # --------------------------------------------------------------------------- parse_compas (fuente única de pesos)
 
 def _field_value(body, label):
-    """Valor de una línea '- **Label:** valor' dentro de un bloque. Espejo de logbook._field
-    (no se importa logbook para no acoplar el módulo)."""
-    pat = re.compile(r"^[\s\-*]*" + re.escape(label) + r"\s*:\s*\**\s*(.+?)\s*$", re.MULTILINE)
+    """Valor de una línea '- **Label:** valor' dentro de un bloque. Variante de `_db_shared._field`
+    (no se importa para no acoplar el módulo). El valor va en la MISMA línea: los separadores son
+    `[ \\t]*` (no `\\s*`) para que una línea con valor vacío devuelva '' en vez de capturar la
+    línea siguiente. `_db_shared._field` (parser de la memoria del REQ activo, hot path del hook)
+    conserva el `\\s*` original: se atiende en un pendiente aparte, no aquí."""
+    pat = re.compile(r"^[ \t\-*]*" + re.escape(label) + r"[ \t]*:[ \t]*\**[ \t]*(.+?)[ \t]*$",
+                     re.MULTILINE)
     m = pat.search(body or "")
     return m.group(1).strip() if m else ""
 
@@ -498,22 +564,42 @@ def _compas_int(raw, default=0):
     return max(0, min(100, v))
 
 
+_EMPTY_COMPAS = {"objectives": [], "topic_weight": {}, "client_bonus": {}, "exists": False}
+
+
+def _parse_client_bonus(raw):
+    """'alpha=+15, beta=10' -> {'alpha': 15, 'beta': 10} (slugs normalizados, clamp 0..100).
+    Entradas sin '=' o no numéricas se ignoran (defensivo, igual que _compas_int)."""
+    out = {}
+    for cell in (raw or "").split(","):
+        if "=" not in cell:
+            continue
+        slug, val = cell.split("=", 1)
+        slug = normalize(slug.strip())
+        if slug:
+            out[slug] = max(out.get(slug, 0), _compas_int(val, default=0))
+    return out
+
+
 def parse_compas(home=None):
     """Parsea ~/.claude/compas.md (fuente única del peso de cada tema). Defensivo:
-    archivo ausente/ilegible -> {'objectives': [], 'topic_weight': {}, 'exists': False}.
+    archivo ausente/ilegible -> {'objectives': [], 'topic_weight': {}, 'client_bonus': {}, 'exists': False}.
+    Acepta `version: 1` (sin `Clientes:`) y `version: 2` (con la línea opcional por objetivo
+    `- **Clientes:** alpha=+15, beta=+10`, bonus aditivo por cliente).
     Salida:
-      {'objectives': [{'name','weight','topics':[slug...],'roadmap':str|None}...],
-       'topic_weight': {slug: int},   # max sobre los objetivos que cubren el tema
+      {'objectives': [{'name','weight','topics':[slug...],'roadmap':str|None,'clients':{slug:int}}...],
+       'topic_weight': {slug: int},   # max sobre los objetivos que cubren el tema (eje tópico)
+       'client_bonus': {slug: int},   # max sobre los objetivos que bonifican al cliente (eje cliente)
        'exists': bool}"""
     home = home or os.path.expanduser("~")
     path = os.path.join(home, ".claude", COMPAS_NAME)
     if not os.path.isfile(path):
-        return {"objectives": [], "topic_weight": {}, "exists": False}
+        return dict(_EMPTY_COMPAS)
     try:
         with open(path, encoding="utf-8") as f:
             txt = f.read()
     except OSError:
-        return {"objectives": [], "topic_weight": {}, "exists": False}
+        return dict(_EMPTY_COMPAS)
     objectives = []
     # secciones "## Objetivo: <nombre>" hasta el próximo "## " o EOF
     for m in re.finditer(r"^##\s+Objetivo:\s*(.+?)\s*$(.*?)(?=^##\s|\Z)",
@@ -522,24 +608,51 @@ def parse_compas(home=None):
         body = m.group(2)
         weight = _compas_int(_field_value(body, "Peso"), default=0)
         temas_raw = _field_value(body, "Temas")
-        topics = [normalize(t) for t in temas_raw.split(",") if t.strip()] if temas_raw else []
+        # strip ANTES de normalize (normalize no recorta espacios): sin él, del 2º tema en adelante
+        # quedaban como ' beta' y nunca ponderaban.
+        topics = [normalize(t.strip()) for t in temas_raw.split(",") if t.strip()] if temas_raw else []
         roadmap = _field_value(body, "Roadmap")
         roadmap = None if (not roadmap or roadmap.strip() in ("—", "-", "")) else roadmap.strip()
-        objectives.append({"name": name, "weight": weight, "topics": topics, "roadmap": roadmap})
-    topic_weight = {}
+        clients = _parse_client_bonus(_field_value(body, "Clientes"))
+        objectives.append({"name": name, "weight": weight, "topics": topics,
+                           "roadmap": roadmap, "clients": clients})
+    topic_weight, client_bonus = {}, {}
     for o in objectives:
         for t in o["topics"]:
             topic_weight[t] = max(topic_weight.get(t, 0), o["weight"])
-    return {"objectives": objectives, "topic_weight": topic_weight, "exists": True}
+        for c, b in o["clients"].items():
+            client_bonus[c] = max(client_bonus.get(c, 0), b)
+    return {"objectives": objectives, "topic_weight": topic_weight,
+            "client_bonus": client_bonus, "exists": True}
 
 
 # --------------------------------------------------------------------------- helpers de recomendación
 
 def _pending_topics(con, pending_id):
-    """[(slug, is_primary), ...] de los temas del pending (pending_topic JOIN topic)."""
-    return [(r[0], r[1]) for r in con.execute(
-        "SELECT t.slug, pt.is_primary FROM pending_topic pt "
-        "JOIN topic t ON t.id = pt.topic_id WHERE pt.pending_id=?", (pending_id,)).fetchall()]
+    """[(slug, is_primary, axis), ...] de los temas ACTIVOS del pending (pending_topic JOIN topic).
+    axis = slug de la raíz ('cliente' | 'topico') cuando el tema cuelga de un eje curado; None para
+    temas sin raíz (legado, tests). Los temas archivados no se devuelven: quedan como historial."""
+    return [(r[0], r[1], (r[2] if r[2] in AXIS_ROOTS else None)) for r in con.execute(
+        "SELECT t.slug, pt.is_primary, r.slug FROM pending_topic pt "
+        "JOIN topic t ON t.id = pt.topic_id "
+        "LEFT JOIN topic r ON r.id = t.parent_id "
+        "WHERE pt.pending_id=? AND t.status='active' ORDER BY pt.is_primary DESC, t.slug",
+        (pending_id,)).fetchall()]
+
+
+def _curated_band(con, pending_id):
+    """(priority_band EN, priority_score) de la banda curada del pending: la fila curated=1 con
+    banda, prefiriendo is_primary=1 (el tópico). None si el pending no tiene banda curada
+    (sin curar, o curado sin banda -> compas aplica)."""
+    row = con.execute(
+        "SELECT pt.priority_band, pt.priority_score FROM pending_topic pt "
+        "JOIN topic t ON t.id = pt.topic_id "
+        "WHERE pt.pending_id=? AND pt.curated=1 AND pt.priority_band IS NOT NULL "
+        "AND t.status='active' ORDER BY pt.is_primary DESC LIMIT 1", (pending_id,)).fetchone()
+    return (row[0], row[1]) if row else None
+
+
+_CURATED_SCORE = {"high": 80.0, "medium": 50.0, "low": 20.0}   # score por defecto de una banda curada sin score
 
 
 def _roadmap_for_topics(compas, topics):
@@ -554,10 +667,11 @@ def _roadmap_for_topics(compas, topics):
     return best[1] if best else None
 
 
-def _compas_rationale(compas, topics, base):
+def _compas_rationale(compas, topics, base, bonus=0):
     p_slugs = [t[0] for t in topics]
     if base > 0:
-        return f"compas.md: peso {base} para tema(s) {', '.join(p_slugs)}."
+        extra = f" (incluye bonus por cliente +{bonus})" if bonus else ""
+        return f"compas.md: peso {base} para tema(s) {', '.join(p_slugs)}{extra}."
     return f"Sin peso en compas.md para {', '.join(p_slugs) or '(sin tema)'}; señales intrínsecas."
 
 
@@ -606,8 +720,9 @@ def _scores_by_topic(con, pending_id, topics, score):
     puedan rankear distinto)."""
     out = {}
     compas = parse_compas(_scores_by_topic._home)
-    for slug, _is_primary in topics:
-        tw = compas["topic_weight"].get(slug, 0)
+    for slug, _is_primary, axis in topics:
+        # el peso compas es por TÓPICO; un tema del eje cliente (bonus) hereda el score global
+        tw = compas["topic_weight"].get(slug, 0) if axis != "cliente" else 0
         # el tema con su propio peso compas (si existe) modula su sub-score; sin peso usa el score global
         sub = float(tw) if tw > 0 else float(score)
         out[slug] = {"band": _band(sub), "score": sub}
@@ -627,11 +742,17 @@ def _unclassified_result(pending_id):
 
 def recommend_priority(con, pending_id, prompt_criterion=None, home=None):
     """Recomienda la prioridad de UN pending aplicando la jerarquía
-    prompt > compas.md > señales intrínsecas. NO escribe pending_topic: devuelve el
-    resultado para que el caller persista (traduciendo band a inglés vía band_to_db).
+    prompt > banda curada > compas.md > señales intrínsecas. NO escribe pending_topic: devuelve
+    el resultado para que el caller persista (traduciendo band a inglés vía band_to_db).
+
+    Banda curada: si el pending tiene una fila curated=1 con priority_band (pase del dev o
+    `curate --band`), esa banda ES la recomendación (source='curated'): se devuelve tal cual, sin
+    compas ni señales intrínsecas, para que ningún pase automático la pise. compas.md aplica a los
+    pendings sin banda curada, con el peso del eje TÓPICO + el bonus del eje CLIENTE (nunca un peso
+    de `Temas:` sobre un cliente, ni doble conteo).
     Salida:
       {'pending_id', 'band' (alta|media|baja, SOLO presentación), 'score' (0..100),
-       'source' ('prompt'|'compas'|'intrinsic'|'unclassified'),
+       'source' ('prompt'|'curated'|'compas'|'intrinsic'|'unclassified'),
        'by_topic' {slug: {'band','score'}}, 'rationale'}"""
     _scores_by_topic._home = home          # inyecta el home para el desglose por tema
     topics = _pending_topics(con, pending_id)
@@ -641,12 +762,25 @@ def recommend_priority(con, pending_id, prompt_criterion=None, home=None):
         source = "prompt"
         rationale = f"Criterio del prompt: {ext['rationale']}"
     else:
+        cur = _curated_band(con, pending_id)
+        if cur:
+            band_en, pscore = cur
+            band_es = _BAND_EN_TO_ES.get(band_en, "baja")
+            score = float(pscore) if pscore is not None else _CURATED_SCORE.get(band_en, 0.0)
+            by_topic = {slug: {"band": band_es, "score": score} for slug, _p, _ax in topics}
+            return {"pending_id": pending_id, "band": band_es, "score": score,
+                    "source": "curated", "by_topic": by_topic,
+                    "rationale": "Banda curada (pase del dev / curate); compas.md no aplica."}
         if not topics or all(t[0] == SENTINEL_SLUG for t in topics):
             return _unclassified_result(pending_id)
         compas = parse_compas(home)
-        base = max((compas["topic_weight"].get(t[0], 0) for t in topics), default=0)
+        base = max((compas["topic_weight"].get(s, 0) for s, _p, ax in topics if ax != "cliente"),
+                   default=0)
+        bonus = max((compas["client_bonus"].get(s, 0) for s, _p, ax in topics if ax == "cliente"),
+                    default=0)
+        base = min(100, base + bonus)
         source = "compas" if base > 0 else "intrinsic"
-        rationale = _compas_rationale(compas, topics, base)
+        rationale = _compas_rationale(compas, topics, base, bonus)
         rm = _roadmap_for_topics(compas, topics)        # proyecto o None
         if rm:
             base = _roadmap_fine_order(con, pending_id, rm, base, home)
@@ -712,7 +846,7 @@ def _criterion_text_score(con, pending_id, crit_tokens, topics):
     if not crit_tokens:
         return 0.0
     topic_toks = set()
-    for slug, _ in topics:
+    for slug, *_rest in topics:
         topic_toks |= _tokens(slug)
     ctx = con.execute("SELECT context_origin FROM pending WHERE id=?", (pending_id,)).fetchone()
     body_toks = _tokens(ctx[0]) if ctx else set()
@@ -842,15 +976,18 @@ def infer_objectives(con, home=None):
     propuesta para que el skill la presente al dev (AskUserQuestion) y, con OK, write_compas.
     Salida: {'proposed': [{'name','topics':[...],'suggested_weight'}...], 'reason': str}."""
     compas = parse_compas(home)
-    # temas distintos de los pendings activos (excluye el sentinel)
+    # temas ACTIVOS distintos de los pendings activos, excluyendo el sentinel, las raíces y el eje
+    # cliente (los clientes van como bonus, no como objetivo). Temas sin raíz (legado) sí se proponen.
     rows = con.execute(
         "SELECT DISTINCT t.slug FROM pending p "
         "JOIN pending_topic pt ON pt.pending_id = p.id "
         "JOIN topic t ON t.id = pt.topic_id "
-        "WHERE p.status='open' AND p.archived_at IS NULL AND t.slug != ?",
-        (SENTINEL_SLUG,)).fetchall()
+        "LEFT JOIN topic r ON r.id = t.parent_id "
+        "WHERE p.status='open' AND p.archived_at IS NULL AND t.status='active' "
+        "AND t.slug NOT IN (?,?,?) AND COALESCE(r.slug,'') != 'cliente'",
+        _NOT_ROOT_PARAMS).fetchall()
     slugs = sorted({r[0] for r in rows})
-    # razón: ausencia o cobertura insuficiente
+    # razón: ausencia o cobertura insuficiente (un pending con banda curada no necesita compas)
     if not compas["exists"]:
         reason = "compas.md ausente"
     else:
@@ -861,8 +998,11 @@ def infer_objectives(con, home=None):
         if total:
             for (pid,) in con.execute(
                     "SELECT id FROM pending WHERE status='open' AND archived_at IS NULL").fetchall():
+                if _curated_band(con, pid):
+                    covered += 1
+                    continue
                 tps = _pending_topics(con, pid)
-                if any(compas["topic_weight"].get(t[0], 0) > 0 for t in tps):
+                if any(compas["topic_weight"].get(t[0], 0) > 0 for t in tps if t[2] != "cliente"):
                     covered += 1
         uncovered = total - covered
         reason = f"cobertura insuficiente ({uncovered}/{total} sin peso)"
@@ -872,8 +1012,10 @@ def infer_objectives(con, home=None):
 
 
 def write_compas(home, objectives):
-    """Materializa ~/.claude/compas.md con los objetivos confirmados por el dev.
-    objectives = [(name, weight, [topics], roadmap_or_None), ...].
+    """Materializa ~/.claude/compas.md (formato v2) con los objetivos confirmados por el dev.
+    objectives = [(name, weight, [topics], roadmap_or_None[, {cliente: bonus}]), ...] — el 5º
+    elemento es opcional (bonus aditivo por cliente, eje `cliente`); sin él, la línea `Clientes:`
+    no se escribe y el archivo parsea igual que en v1.
     SOLO se invoca tras OK explícito del dev (lo dispara el skill, no un test ni el núcleo
     autónomamente). Devuelve el path escrito."""
     home = home or os.path.expanduser("~")
@@ -889,24 +1031,29 @@ def write_compas(home, objectives):
         "     El recomendador parsea este archivo en CADA pase de /pendings-review.",
         "     Jerarquía de fuentes de prioridad (mayor a menor):",
         "       1. Criterio explícito del prompt (efímero, no se escribe aquí)",
-        "       2. Este compas.md (peso por tema vía objetivos)",
-        "       3. Señales intrínsecas del pending (work/fase, bloqueo, urgencia, recencia)",
-        "       4. Si insuficiente: Claude infiere objetivos, pregunta y ESCRIBE aquí.",
+        "       2. Banda curada del pendiente (pase del dev / curate) — este archivo no la pisa",
+        "       3. Este compas.md (peso por tópico vía objetivos + bonus por cliente)",
+        "       4. Señales intrínsecas del pending (work/fase, bloqueo, urgencia, recencia)",
+        "       5. Si insuficiente: Claude infiere objetivos, pregunta y ESCRIBE aquí.",
+        "     `Temas:` = slugs del eje tópico; `Clientes:` = slug=+bonus del eje cliente (opcional).",
         "     Editar a mano es válido; Claude respeta lo que encuentre y solo propone deltas. -->",
         "",
         "---",
-        "version: 1",
+        "version: 2",
         f"updated_at: {today}",
         f"owner: {_whoami()}",
         "---",
         "",
     ]
     for obj in objectives:
-        name, weight, topics, roadmap = (list(obj) + [None, None, None, None])[:4]
+        name, weight, topics, roadmap, clients = (list(obj) + [None] * 5)[:5]
         lines.append(f"## Objetivo: {name}")
         lines.append(f"- **Peso:** {int(weight) if weight is not None else 0}")
         lines.append(f"- **Temas:** {', '.join(topics or [])}")
         lines.append(f"- **Roadmap:** {roadmap or '—'}")
+        if clients:
+            cells = [f"{normalize(str(c))}=+{int(b)}" for c, b in dict(clients).items()]
+            lines.append(f"- **Clientes:** {', '.join(cells)}")
         lines.append("")
     with open(path, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -979,16 +1126,19 @@ def resolve_pending_ref(con, ref):
     """Resuelve una cita de pendiente a fila(s) de la DB.
 
     `ref` numérico (`183`, `#183`, `PD-183`) → resuelve por id (rowid) — cita canónica.
-    `ref` no numérico → trata como SLUG/substring del `context_origin`:
-    primero el tag exacto `[slug]`, si no hay match degrada a substring libre.
-    Devuelve (kind, rows) donde kind ∈ {'id','slug-exact','slug-loose'} y rows es
-    lista de sqlite3.Row. La cita por slug es la robusta: el id markdown histórico
-    NO es clave (colisiona y se reasignó en la migración a neb.db)."""
+    `ref` no numérico → 1º la columna `pending.slug` (kind 'slug', única por índice);
+    2º el tag exacto `[slug]` en `context_origin` (citas históricas de pendings sin columna);
+    3º substring libre. Devuelve (kind, rows) donde kind ∈ {'id','slug','slug-exact','slug-loose'}
+    y rows es lista de sqlite3.Row. El id markdown histórico NO es clave (colisiona y se
+    reasignó en la migración a neb.db)."""
     m = _ID_RE.match(str(ref).strip())
     if m:
         rows = con.execute("SELECT * FROM pending WHERE id=?", (int(m.group(1)),)).fetchall()
         return ("id", rows)
     slug = str(ref).strip().lstrip("[").rstrip("]")
+    rows = con.execute("SELECT * FROM pending WHERE slug=?", (slug,)).fetchall()
+    if rows:
+        return ("slug", rows)
     rows = con.execute("SELECT * FROM pending WHERE context_origin LIKE ? ORDER BY id",
                        ("%[" + slug + "]%",)).fetchall()
     if rows:
@@ -1031,41 +1181,122 @@ def cli_show(args):
                      ensure_ascii=False, indent=2, default=str))
 
 
+def pending_axes(con, pending_id):
+    """Ejes del pending para presentación: {'cliente': slug|None, 'topico': slug|None,
+    'curated': bool, 'suggestions': [slug...]}. cliente/topico salen de las filas curadas;
+    suggestions = temas sugeridos por el matching (curated=0, activos, sin sentinel/raíces)."""
+    out = {"cliente": None, "topico": None, "curated": False, "suggestions": []}
+    for slug, axis, curated in con.execute(
+            "SELECT t.slug, r.slug, pt.curated FROM pending_topic pt "
+            "JOIN topic t ON t.id = pt.topic_id LEFT JOIN topic r ON r.id = t.parent_id "
+            "WHERE pt.pending_id=? AND t.status='active' ORDER BY pt.curated DESC, t.slug",
+            (pending_id,)).fetchall():
+        if curated:
+            out["curated"] = True
+            if axis in AXIS_ROOTS:
+                out[axis] = slug
+        elif slug != SENTINEL_SLUG and slug not in AXIS_ROOTS:
+            out["suggestions"].append(slug)
+    return out
+
+
+def axis_catalog(con):
+    """{'cliente': [slug...], 'topico': [slug...]} — hijos ACTIVOS de cada raíz, ordenados. Es la
+    vía de lectura del catálogo para el skill (qué valores admite `curate` / los filtros de `triage`)."""
+    out = {axis: [] for axis in AXIS_ROOTS}
+    for slug, axis in con.execute(
+            "SELECT t.slug, r.slug FROM topic t JOIN topic r ON r.id = t.parent_id "
+            "WHERE t.status='active' AND r.slug IN (?,?) ORDER BY t.slug", AXIS_ROOTS).fetchall():
+        out[axis].append(slug)
+    return out
+
+
 def cli_list(_args):
+    """Volcado plano de los pendings open (bajo nivel / debug). Sin filtros: los filtros por eje
+    viven en `triage`, que es lo que consume el skill."""
     con = _db_for_cli()
     if con is None:
         print("[]"); return
     rows = con.execute(
-        "SELECT id, type, context_origin, status, work_ref, session_ref, created_at "
+        "SELECT id, type, context_origin, status, work_ref, session_ref, created_at, slug "
         "FROM pending WHERE status='open' AND archived_at IS NULL "
         "ORDER BY created_at DESC").fetchall()
+    items = []
+    for r in rows:
+        ax = pending_axes(con, r[0])
+        items.append({"id": r[0], "slug": r[7], "type": r[1], "context_origin": r[2], "status": r[3],
+                      "cliente": ax["cliente"], "topico": ax["topico"], "curated": ax["curated"],
+                      "work_ref": r[4], "session_ref": r[5], "created_at": r[6]})
     con.close()
-    print(json.dumps([
-        {"id": r[0], "type": r[1], "context_origin": r[2], "status": r[3],
-         "work_ref": r[4], "session_ref": r[5], "created_at": r[6]} for r in rows
-    ], ensure_ascii=False, indent=2))
+    print(json.dumps(items, ensure_ascii=False, indent=2))
 
 
-def cli_triage(_args):
-    """Pase de triage: reclassify del delta + agrupación por tema + recomendación de prioridad
-    por pending (presentación en español). El skill traduce los enums al mostrar."""
+def _parse_flags(args, flags):
+    """Parser mínimo de `--flag valor` (repetible). Devuelve ({flag: [valores]}, [posicionales])."""
+    values = {f: [] for f in flags}
+    positional = []
+    i = 0
+    while i < len(args):
+        a = args[i]
+        if a in flags:
+            if i + 1 >= len(args):
+                raise ValueError(f"falta el valor de {a}")
+            values[a].append(args[i + 1])
+            i += 2
+        elif a.startswith("--"):
+            raise ValueError(f"flag desconocido: {a}")
+        else:
+            positional.append(a)
+            i += 1
+    return values, positional
+
+
+def cli_triage(args):
+    """Pase de triage: reclassify del delta + agrupación por pending_link + recomendación de
+    prioridad por pending (presentación en español). Filtros opcionales `--cliente <slug>` /
+    `--topico <slug>` (por ejes curados) acotan items, groups, suggested y unclassified al
+    subconjunto filtrado. El skill traduce los enums al mostrar."""
+    try:
+        flags, _pos = _parse_flags(args, ("--cliente", "--topico"))
+    except ValueError as e:
+        print(json.dumps({"ok": False, "error": str(e)})); return
+    want_c = set(flags["--cliente"]); want_t = set(flags["--topico"])
     con = _db_for_cli()
     if con is None:
         print("{}"); return
+    catalog = axis_catalog(con)
+    unknown = sorted((want_c - set(catalog["cliente"])) | (want_t - set(catalog["topico"])))
+    if unknown:
+        # un filtro que no es hijo activo del eje es error (no "sin pendientes"): JSON explícito
+        con.close()
+        print(json.dumps({"ok": False, "error": f"filtro desconocido: {unknown}", "catalog": catalog},
+                         ensure_ascii=False)); return
     tp = _with_write_tx(con, lambda c: triage_pass(c))
     # recomendación por pending activo (lectura, no escribe)
-    items = []
-    for (pid, ptype, ctx, status) in con.execute(
-            "SELECT id, type, context_origin, status FROM pending "
+    items, keep = [], set()
+    for (pid, ptype, ctx, status, slug) in con.execute(
+            "SELECT id, type, context_origin, status, slug FROM pending "
             "WHERE status='open' AND archived_at IS NULL ORDER BY created_at DESC").fetchall():
+        ax = pending_axes(con, pid)
+        if want_c and ax["cliente"] not in want_c:
+            continue
+        if want_t and ax["topico"] not in want_t:
+            continue
+        keep.add(pid)
         rec = recommend_priority(con, pid)
-        items.append({"id": pid, "type": ptype, "status": status,
+        items.append({"id": pid, "slug": slug, "type": ptype, "status": status,
+                      "cliente": ax["cliente"], "topico": ax["topico"], "curated": ax["curated"],
+                      "suggestions": ax["suggestions"],
                       "context_origin": ctx, "band": rec["band"], "score": rec["score"],
                       "source": rec["source"], "rationale": rec["rationale"],
                       "by_topic": rec["by_topic"]})
     con.close()
-    print(json.dumps({"classified": tp["classified"], "groups": tp["groups"],
-                      "unclassified": tp["unclassified"], "items": items},
+    filtered = bool(want_c or want_t)
+    groups = [g for g in tp["groups"] if not filtered or (set(g) & keep)]
+    print(json.dumps({"classified": tp["classified"], "groups": groups,
+                      "suggested": [p for p in tp["suggested"] if not filtered or p in keep],
+                      "unclassified": [p for p in tp["unclassified"] if not filtered or p in keep],
+                      "catalog": catalog, "items": items},
                      ensure_ascii=False, indent=2, default=str))
 
 
@@ -1084,6 +1315,9 @@ def cli_rank(args):
     pids = [r[0] for r in con.execute(
         "SELECT id FROM pending WHERE status='open' AND archived_at IS NULL").fetchall()]
     res = rank_by_external_criterion(con, pids, criterion)
+    # cita canónica por id para el skill (si el slug es NULL, se cita PD-<id>)
+    res["slugs"] = {str(r[0]): r[1] for r in con.execute(
+        "SELECT id, slug FROM pending WHERE status='open' AND archived_at IS NULL").fetchall()}
     con.close()
     print(json.dumps(res, ensure_ascii=False, indent=2, default=str))
 
@@ -1099,16 +1333,18 @@ def cli_infer_objectives(_args):
 
 
 def cli_write_compas(args):
-    """write-compas <json>  — escribe ~/.claude/compas.md con los objetivos confirmados.
-    <json> = [["nombre", peso, ["tema",...], "roadmap|null"], ...]. Lo invoca el skill
-    SOLO tras OK explícito del dev (no se autoejecuta)."""
+    """write-compas <json>  — escribe ~/.claude/compas.md (v2) con los objetivos confirmados.
+    <json> = [["nombre", peso, ["topico",...], "roadmap|null", {"cliente": bonus, ...}], ...]
+    (el 5º elemento es opcional). Lo invoca el skill SOLO tras OK explícito del dev (no se
+    autoejecuta)."""
     if not args:
-        print('uso: write-compas \'[["nombre",90,["alpha"],null], ...]\''); return
+        print('uso: write-compas \'[["nombre",90,["alpha"],null,{"beta":10}], ...]\''); return
     try:
         raw = json.loads(" ".join(args))
     except ValueError as e:
         print(f"JSON inválido: {e}"); return
-    objectives = [(o[0], o[1], o[2], (o[3] if len(o) > 3 else None)) for o in raw]
+    objectives = [(o[0], o[1], o[2], (o[3] if len(o) > 3 else None),
+                   (o[4] if len(o) > 4 else None)) for o in raw]
     path = write_compas(None, objectives)
     print(f"compas.md escrito: {path}")
 
@@ -1130,6 +1366,207 @@ def cli_remember_session(args):
     pid = _with_write_tx(con, lambda c: create(c, "session", context, session_ref=sref))
     con.close()
     print(pid)
+
+
+# =========================================================================== curaduría (ejes) + backfill de slug
+# (el score por defecto de una banda curada es _CURATED_SCORE, compartido con recommend_priority)
+
+
+def _axis_topic_id(con, axis, slug):
+    """id del tema <slug> ACTIVO que cuelga de la raíz <axis>. ValueError si no existe (o si se
+    intenta curar una raíz / el sentinel)."""
+    if slug in AXIS_ROOTS or slug == SENTINEL_SLUG:
+        raise ValueError(f"{slug!r} no es un tema curable")
+    row = con.execute(
+        "SELECT t.id FROM topic t JOIN topic r ON r.id = t.parent_id "
+        "WHERE t.slug=? AND t.status='active' AND r.slug=?", (slug, axis)).fetchone()
+    if not row:
+        raise ValueError(f"{axis} desconocido o archivado: {slug!r}")
+    return row[0]
+
+
+def _resolve_one(con, ref):
+    """id único de una cita EXACTA (id | PD-id | slug de la columna | tag [slug] exacto) para una
+    ESCRITURA. ValueError si no resuelve, es ambigua o solo resuelve por substring (`slug-loose`):
+    una cita parcial o mal tecleada no debe curar ni vincular al pendiente equivocado (eso lo
+    admite solo `show`, que es lectura)."""
+    kind, rows = resolve_pending_ref(con, ref)
+    if not rows:
+        raise ValueError(f"pendiente no encontrado: {ref!r}")
+    if kind == "slug-loose":
+        raise ValueError(f"cita no exacta: {ref!r} (usa PD-<id> o el slug completo)")
+    if len(rows) > 1:
+        raise ValueError(f"cita ambigua ({kind}): {ref!r} -> {[r[0] for r in rows]}")
+    return rows[0][0]
+
+
+def curate(con, pending_id, cliente=None, topico=None, slug=None, band=None, related=None, score=None):
+    """Escribe la clasificación CURADA de un pending (la que manda sobre el matching):
+      • cliente / topico: exactamente UNA fila curated=1 por eje (reemplaza la fila curada previa
+        del mismo eje; borra las sugerencias curated=0 sobre temas activos); is_primary=1 solo en
+        el tópico.
+      • band ('alta'|'media'|'baja', presentación): se persiste en inglés en las filas curadas del
+        pending; sin band, se conserva la banda curada previa si la había (NULL si no: compas aplica).
+        score: priority_score explícito (p.ej. el del pase); sin él, 80/50/20 según la banda.
+      • slug: cita canónica (kebab-case, única entre todos los pendings).
+      • related: citas (id|slug) a vincular como pending_link 'related' (agrupación en triage).
+    NO toca context_origin. NO commitea: el caller controla la transacción. Devuelve el estado final.
+    Lanza ValueError con mensaje legible ante cualquier entrada inválida (el CLI lo emite como JSON)."""
+    row = con.execute("SELECT id, slug FROM pending WHERE id=?", (pending_id,)).fetchone()
+    if not row:
+        raise ValueError(f"pendiente no encontrado: {pending_id}")
+    if band is not None and band not in _BAND_ES_TO_EN:
+        raise ValueError(f"banda inválida: {band!r} (alta|media|baja)")
+    if slug is not None:
+        if not _SLUG_RE.match(slug):
+            raise ValueError(f"slug inválido: {slug!r} (kebab-case: a-z, 0-9, guiones)")
+        taken = con.execute("SELECT id FROM pending WHERE slug=? AND id!=?", (slug, pending_id)).fetchone()
+        if taken:
+            raise ValueError(f"slug ya usado por PD-{taken[0]}: {slug!r}")
+    axes = {}
+    if cliente is not None:
+        axes["cliente"] = _axis_topic_id(con, "cliente", cliente)
+    if topico is not None:
+        axes["topico"] = _axis_topic_id(con, "topico", topico)
+
+    prev = _curated_band(con, pending_id)
+    band_en = _BAND_ES_TO_EN[band] if band else (prev[0] if prev else None)
+    if score is None:
+        score = (_CURATED_SCORE.get(band_en) if band else (prev[1] if prev else None))
+        if band_en and score is None:
+            score = _CURATED_SCORE.get(band_en)
+
+    for axis, tid in axes.items():
+        # reemplazo por eje: fuera la fila curada previa del mismo eje (si es otro tema)
+        con.execute(
+            "DELETE FROM pending_topic WHERE pending_id=? AND curated=1 AND topic_id != ? AND topic_id IN "
+            "(SELECT t.id FROM topic t JOIN topic r ON r.id = t.parent_id WHERE r.slug=?)",
+            (pending_id, tid, axis))
+        con.execute(
+            "INSERT INTO pending_topic (pending_id, topic_id, priority_band, priority_score, is_primary, curated) "
+            "VALUES (?,?,?,?,?,1) "
+            "ON CONFLICT(pending_id, topic_id) DO UPDATE SET priority_band=excluded.priority_band, "
+            "priority_score=excluded.priority_score, is_primary=excluded.is_primary, curated=1",
+            (pending_id, tid, band_en, score, 1 if axis == "topico" else 0))
+    if band is not None:
+        # la banda es del PENDIENTE: se aplica a TODAS sus filas curadas (ambos ejes), no solo a
+        # la del eje que se acaba de escribir — si no, la fila primaria (tópico) conservaría la
+        # banda vieja y _curated_band la devolvería.
+        n = con.execute("UPDATE pending_topic SET priority_band=?, priority_score=? "
+                        "WHERE pending_id=? AND curated=1", (band_en, score, pending_id)).rowcount
+        if n == 0:
+            raise ValueError(f"PD-{pending_id} no está curado: indica --cliente/--topico junto con --band")
+    if axes:
+        # las sugerencias del matching sobre temas activos quedan superadas por la curaduría
+        con.execute(
+            "DELETE FROM pending_topic WHERE pending_id=? AND curated=0 AND topic_id IN "
+            "(SELECT id FROM topic WHERE status='active')", (pending_id,))
+    if slug is not None:
+        con.execute("UPDATE pending SET slug=? WHERE id=?", (slug, pending_id))
+    links_added = 0
+    for ref in (related or []):
+        other = _resolve_one(con, ref)
+        if other == pending_id:
+            raise ValueError("un pendiente no se relaciona consigo mismo")
+        links_added += con.execute(
+            "INSERT OR IGNORE INTO pending_link (a, b, relation) VALUES (?,?,'related')",
+            (pending_id, other)).rowcount
+    con.execute("UPDATE pending SET last_reviewed_at=? WHERE id=?", (now_iso(), pending_id))
+    ax = pending_axes(con, pending_id)
+    cur = _curated_band(con, pending_id)
+    return {"pending_id": pending_id,
+            "slug": con.execute("SELECT slug FROM pending WHERE id=?", (pending_id,)).fetchone()[0],
+            "cliente": ax["cliente"], "topico": ax["topico"],
+            "band": (_BAND_EN_TO_ES.get(cur[0]) if cur else None), "links_added": links_added}
+
+
+_TAG_RE = re.compile(r"^\s*(?:\d+\.\s*)?\**\s*\[([a-z0-9][a-z0-9\-]*)\]")
+
+
+def _leading_tag(context_origin):
+    """Tag `[slug]` al inicio del context_origin (tolera el prefijo `NN. ` y `**` del markdown
+    migrado). None si no hay tag inicial."""
+    m = _TAG_RE.match(context_origin or "")
+    return m.group(1) if m else None
+
+
+def backfill_slugs(con, dry_run=False, skip_ids=(), reserved=()):
+    """Rellena pending.slug desde el tag `[slug]` inicial de context_origin para las filas sin slug,
+    SOLO cuando ese tag es único en toda la tabla y no lo usa ya otro pendiente (los tags repetidos
+    quedan NULL y siguen resolviendo por el fallback de resolve_pending_ref). Idempotente: una
+    segunda corrida no cambia nada. NO commitea. Devuelve el nº de filas actualizadas.
+    dry_run=True: solo cuenta (sirve para el DRY-RUN del seed, incluso en una DB sin migrar donde
+    `slug` aún no existe); skip_ids / reserved: pendientes y slugs que otro paso va a asignar."""
+    has_slug = "slug" in {r[1] for r in con.execute("PRAGMA table_info(pending)").fetchall()}
+    if not has_slug and not dry_run:
+        raise RuntimeError("pending.slug no existe: la DB no está migrada (abrir con _connect)")
+    rows = con.execute(
+        f"SELECT id, context_origin, {'slug' if has_slug else 'NULL'} FROM pending ORDER BY id").fetchall()
+    counts = {}
+    for _pid, ctx, _slug in rows:
+        t = _leading_tag(ctx)
+        if t:
+            counts[t] = counts.get(t, 0) + 1
+    taken = {s for _pid, _ctx, s in rows if s} | set(reserved)
+    skip = set(skip_ids)
+    n = 0
+    for pid, ctx, slug in rows:
+        if slug or pid in skip:
+            continue
+        t = _leading_tag(ctx)
+        if not t or counts.get(t, 0) != 1 or t in taken:
+            continue
+        if dry_run:
+            n += 1
+        else:
+            n += con.execute("UPDATE pending SET slug=? WHERE id=? AND slug IS NULL", (t, pid)).rowcount
+        taken.add(t)
+    return n
+
+
+def cli_curate(args):
+    """curate <id|PD-id|slug> [--cliente <slug>] [--topico <slug>] [--slug <slug>]
+    [--band alta|media|baja] [--relacionado <id|slug>]...  — SIEMPRE imprime JSON a stdout
+    ({"ok": true, ...} | {"ok": false, "error": ...}) porque el wrapper del skill descarta stderr."""
+    try:
+        flags, pos = _parse_flags(args, ("--cliente", "--topico", "--slug", "--band", "--relacionado"))
+        if len(pos) != 1:
+            raise ValueError("uso: curate <id|slug> [--cliente c] [--topico t] [--slug s] "
+                             "[--band alta|media|baja] [--relacionado ref]...")
+        for f in ("--cliente", "--topico", "--slug", "--band"):
+            if len(flags[f]) > 1:
+                raise ValueError(f"{f} solo admite un valor")
+    except ValueError as e:
+        print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False)); return
+    con = _db_for_cli()
+    if con is None:
+        print(json.dumps({"ok": False, "error": "DB inaccesible"})); return
+    try:
+        def _do(c):
+            pid = _resolve_one(c, pos[0])
+            return curate(c, pid,
+                          cliente=(flags["--cliente"] or [None])[0],
+                          topico=(flags["--topico"] or [None])[0],
+                          slug=(flags["--slug"] or [None])[0],
+                          band=(flags["--band"] or [None])[0],
+                          related=flags["--relacionado"])
+        out = _with_write_tx(con, _do)
+        print(json.dumps({"ok": True, **out}, ensure_ascii=False))
+    except ValueError as e:
+        _safe_rollback(con)   # with_write_tx solo revierte OperationalError; aquí cerramos la tx abierta
+        print(json.dumps({"ok": False, "error": str(e)}, ensure_ascii=False))
+    finally:
+        con.close()
+
+
+def cli_backfill_slugs(_args):
+    """backfill-slugs — rellena pending.slug desde el tag [slug] inicial (solo tags únicos). JSON a stdout."""
+    con = _db_for_cli()
+    if con is None:
+        print(json.dumps({"ok": False, "error": "DB inaccesible"})); return
+    n = _with_write_tx(con, backfill_slugs)
+    con.close()
+    print(json.dumps({"ok": True, "backfilled": n}))
 
 
 def cli_main(argv):
@@ -1163,12 +1600,16 @@ def cli_main(argv):
         cli_write_compas(rest)
     elif cmd == "remember-session":
         cli_remember_session(rest)
+    elif cmd == "curate":
+        cli_curate(rest)
+    elif cmd == "backfill-slugs":
+        cli_backfill_slugs(rest)
     else:
         print(f"subcomando desconocido: {cmd}")
 
 
 _USAGE = ("uso: pendings.py <create|note|archive|revive|show|list|"
-          "triage|rank|infer-objectives|write-compas|remember-session> ...")
+          "triage|rank|infer-objectives|write-compas|remember-session|curate|backfill-slugs> ...")
 
 
 if __name__ == "__main__":

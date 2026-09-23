@@ -4,7 +4,9 @@ Archivo global del dev con ítems de seguimiento que no bloquean el cierre pero 
 
 > **Backend migrado a `neb.db` (2026-06-15, REQ `neb-pendings-sqlite`).** Los pendientes viven en SQLite; el `pendings.md` plano quedó como puntero/histórico. Las secciones "Formato", "Asignación de IDs" y la numeración `NNN.` de abajo describen el **modelo plano obsoleto** y se conservan solo como referencia del histórico — no se asignan números nuevos a mano. La creación/consulta va por el skill [`pendings-review`](../skills/pendings-review/SKILL.md) sobre `neb.db` (backend en [`../tooling/pendings.md`](../tooling/pendings.md)).
 >
-> **Cita canónica de un pendiente: su `[slug]`** (no `#NNN`). El número, si se usa, es el `id` de `neb.db` como `PD-<id>`. El `#NNN` del markdown histórico **no resuelve** contra `neb.db` (colisiona; numeración muerta). Contrato de resolución en [`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente".
+> **Cita canónica de un pendiente: su `[slug]`** (no `#NNN`), persistido en `pending.slug` desde el REQ `pendings-taxonomia-cliente-topico` (2026-09-22; el tag en `context_origin` queda como fallback histórico). El número, si se usa, es el `id` de `neb.db` como `PD-<id>`. El `#NNN` del markdown histórico **no resuelve** contra `neb.db` (colisiona; numeración muerta). Contrato de resolución en [`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente".
+>
+> **Clasificación en dos ejes curados** — cada pendiente abierto **curado** lleva un `cliente` y un `tópico` (jerarquía `topic.parent_id`), decididos por el dev (`PD curate`); los que faltan por curar los propone el skill en cada pase y el matching por keywords solo sugiere para lo no curado. La banda curada manda sobre la brújula `compas.md`. Ver [`../tooling/pendings.md`](../tooling/pendings.md) § "Ejes curados".
 
 ## Path
 

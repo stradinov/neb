@@ -75,18 +75,18 @@ La prioridad sí tiene dónde vivir y ya se usó: `pending_topic.priority_band` 
 
 | # | Flujo | Resultado |
 |---|-------|-----------|
-| 1 | `[crítico]` Migración idempotente sobre copia, datos intactos | |
-| 2 | `[crítico]` `logbook-sync` captura tras la migración (suite + Stop real) | |
-| 3 | `[crítico]` Respaldos verificados + rollback lógico sobre copia | |
-| 4 | Seed sobre copia (conteos, invariante de bandas, idempotencia, no pisa curaduría) | |
-| 5 | Resolución por slug (columna + fallback histórico) | |
-| 6 | `triage`: grupos por link, conjuntos disjuntos, raíces excluidas | |
-| 7 | `recommend_priority`: curada > compas v2 | |
-| 8 | Suite completa verde | |
-| 9 | Dogfooding del skill + escaneo de términos vetados | |
+| 1 | `[crítico]` Migración idempotente sobre copia, datos intactos | ✅ `_connect` ×2: columnas + `uq_pending_slug`, 2,728 filas con banda intactas, 0 backfill en la migración, `pending_note` intacta |
+| 2 | `[crítico]` `logbook-sync` captura tras la migración (suite + Stop real) | ✅ suite (`test_logbook_sync_regression`, `test_logbook_sync_errors.TestMigrate` sin cambios) · ⏳ Stop real tras el merge |
+| 3 | `[crítico]` Respaldos verificados + rollback lógico sobre copia | ✅ respaldo pre-siembra con `integrity_check=ok` e idéntico al digest pre-seed; `--rollback` devuelve las tablas sembradas al digest pre-seed sin tocar `work`; test de rollback desde respaldo pre-migración |
+| 4 | Seed sobre copia (conteos, invariante de bandas, idempotencia, no pisa curaduría) | ✅ 2 raíces + 35 hijos, 24 archivados, 7 reusados; 327 sembrados con exactamente 1 cliente + 1 tópico iguales al dataset; banda **y score** curados == fila primaria previa 327/327; obsoletos idénticos; 0 sin slug, 0 colisiones; 70 grupos en estrella completos (152 vínculos = plan); backfill 107 = estimado del dry-run; 2ª corrida `changed=False`; un `curate` posterior no se pisa (test) |
+| 5 | Resolución por slug (columna + fallback histórico) | ✅ `PD show <slug>` kind `slug`; 10 slugs históricos (memorias + dataset) resuelven a los mismos ids o a un subconjunto (la columna acota un tag repetido al vivo) |
+| 6 | `triage`: grupos por link, conjuntos disjuntos, raíces excluidas | ✅ CLI real: grupos = plan, máx 8; `suggested ∩ unclassified = ∅` con los 12 posteriores al pase sin curar; `classified` = solo no curados; `catalog` 18/17 y filtro desconocido → error JSON |
+| 7 | `recommend_priority`: curada > compas v2 | ✅ 327/327 `source=curated`; los 11 P0 → alta; compas v2 borrador (17 tópicos + 12 bonus) parsea tras el fix |
+| 8 | Suite completa verde | ✅ 222/222 (187 previos + 35 nuevos) |
+| 9 | Dogfooding del skill + escaneo de términos vetados | ✅ escaneo limpio sobre el árbol exportado del worktree · ⏳ dogfooding `/pendings-review` tras la siembra real |
 
-**Fecha:** —
-**Validador:** dev
+**Fecha:** 2026-09-22
+**Validador:** Claude (sandbox sobre copia de la DB real, `scratchpad/seed/validate_sandbox.py`); las filas ⏳ las valida el dev tras el merge
 
 ## Plan de elaboración
 
@@ -107,7 +107,15 @@ Mecánica: commit local del registro → worktree (rama desde HEAD) → implemen
 
 ## Avances realizados
 
+- 2026-09-22 — Plan-review orquestado (5 revisores: `qa-process-engineer`, `process-improvement-analyst`, `context-completeness-reviewer` + lentes de código y BD; 39 hallazgos → 23 tras dedup → 16 confirmados por ≥2 de 3 lentes, 1 refutado, 6 menores incorporados). Plan v2 aprobado por el dev; registro commiteado temprano (local, `10f6ca3`).
+- 2026-09-22 — Implementación en el worktree `wip/pendings-taxonomia`: los 14 elementos. Decisiones tomadas en implementación (fuera del plan, declaradas): `pending_axes()`/`axis_catalog()`/`_parse_flags()`; `curate(score=)` para que el seed persista el score del pase; `classify(replace=True)` borra sugerencias solo sobre temas activos (las filas sobre archivados quedan como historial, igual que el seed); `reclassify` toma como delta a los abiertos sin curar sin sugerencia vigente y reconstruye el índice FTS una vez por pase; el índice `uq_pending_slug` tolera `IntegrityError` con aviso (no tumba el hook); "curado" = fila `curated=1` sobre tema **activo**.
+- 2026-09-22 — Gate de cierre de Fase 4 (revisión adversarial del artefacto: `qa-process-engineer`, `context-completeness-reviewer`, `process-improvement-analyst` + lentes código/BD; 31 hallazgos → 27 tras dedup → 6 mayores confirmados, 18 menores, 2 refutados). Corregidos los 6 mayores: banda con un solo eje se aplica a todas las filas curadas (H1); `--band` sobre un pendiente sin curar es error, no no-op (H2); la cita de escritura debe ser exacta —un substring no cura ni vincula— (H3); un tema del catálogo archivado sin `--force` salta sus items en vez de abortar la transacción (H4); predicado "curado" con tema activo en `classify`/`reclassify`/`triage_pass`/seed (H6); `triage` expone `catalog` y rechaza filtros fuera de él (H8). De los 18 menores se aplicaron 17 (respaldo con `--db` inexistente = error; prioridad desconocida cura sin banda y slugs inválidos se reportan; verificación del respaldo estricta solo en tablas de pendings; plan calculado dentro de la transacción; rollback restaura también `topic_link` y `last_reviewed_at`, incluso desde un respaldo pre-migración; score heredado del pase; una sola constante de score; glosario y wording de docs; test de slugs duplicados; comentario de cabecera; "18/17" fuera de archivos públicos; formato de la confirmación única del skill; cita `PD-<id>` cuando no hay slug y `rank` con `slugs`; estimado de backfill vía `backfill_slugs(dry_run=True)` también en DB sin migrar; tests de rollback pre-migración y de rollback transaccional del CLI; FTS una vez por pase) y 1 quedó como derivado (H18, ver Trazabilidad). H5 y H7 refutados.
+- 2026-09-22 — Validación en sandbox sobre copia de la DB real (`USERPROFILE=<scratch>`, `NEB_HOME=<worktree>`; 37 comprobaciones, todas OK; DB real intacta por mtime + conteos): ver `### Resultado`.
+
 ## Incidencias
+
+- **Bug preexistente en `parse_compas` (desde 4.3.0)**, destapado al validar el compás v2 en el sandbox: `normalize()` no recorta espacios, así que de cada objetivo solo el primer tema ponderaba (los demás quedaban como `' beta'`), y con una línea `Temas:` vacía el `\s*` de `_field_value` cruzaba el salto de línea y capturaba la línea siguiente como tema. Corregido en `pendings.py` (`_field_value` con separadores `[ \t]*`; `strip()` antes de `normalize()`), con test de regresión y declarado en `Fixed`. Explica en parte por qué el compás v1 ordenaba raro: de sus 14 temas de "Metodología Neb" solo `neb` pesaba.
+- **La DB cambió durante el REQ**: entre el pase (22-sep, 463 abiertos) y la siembra en sandbox hubo cierres (PD-509 pasó a obsoleto) y altas (PD-512…516). Por eso el seed no fija conteos: reporta los del día y la validación compara contra el plan calculado (70 grupos / 152 vínculos en la última corrida, 327 sembrados).
 
 ## Entregas
 
@@ -137,8 +145,8 @@ Mecánica: commit local del registro → worktree (rama desde HEAD) → implemen
 - **Memoria:** `project_pendings_triage_20260922.md`.
 - **Modelo de datos vigente:** `2026-06-14-neb-pendings-sqlite-nucleo.md` en `methodology/changes` (REQ `neb-pendings-sqlite`) y `tooling/pendings.md`.
 - **Pendientes relacionados:** PD-286 (ENUM de `obsolete_cause`: "resuelto por el REQ que lo tomó").
-- **Commits:** —
-- **Pendientes generados:** ninguno por ahora.
+- **Commits:** `10f6ca3` (registro, entrega temprana) · `esta confirmación` (entregable + cierre)
+- **Pendientes generados:** `[db-shared-field-regex-salto-de-linea]` — `_db_shared._field` (parser de la memoria del REQ activo que corre en cada Stop) conserva el `\s*` que cruza el salto de línea: una línea `- **Estado:**` vacía captura la siguiente. Mismo defecto corregido aquí en `pendings._field_value`; se atiende aparte por su radio de impacto (hot path del hook). Derivado del gate de Fase 4 (H18).
 - **Tema radar:** —
 
 ## Métricas

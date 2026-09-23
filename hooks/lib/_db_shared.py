@@ -306,13 +306,55 @@ _WORK_MIGRATIONS = (
 )
 
 
+# Columnas agregadas a las tablas de pendings después de su esquema inicial (REQ pendings-taxonomia).
+# Mismo contrato que _WORK_MIGRATIONS. Solo DDL: el backfill de `pending.slug` (DML dependiente de
+# datos) NO vive aquí — lo hace pendings.backfill_slugs (seed / `PD backfill-slugs`), fuera del hot
+# path del hook y sin heredar el modo de fallo de _connect.
+_PENDING_MIGRATIONS = (
+    ("slug", "ALTER TABLE pending ADD COLUMN slug TEXT"),
+)
+_PENDING_TOPIC_MIGRATIONS = (
+    ("curated", "ALTER TABLE pending_topic ADD COLUMN curated INTEGER NOT NULL DEFAULT 0"),
+)
+# Índices que dependen de columnas migradas: no pueden ir en logbook-schema.sql (en una DB existente el
+# executescript corre ANTES de estos ALTER). IF NOT EXISTS -> idempotente y barato en cada connect.
+_PENDING_INDEX_DDL = (
+    "CREATE UNIQUE INDEX IF NOT EXISTS uq_pending_slug ON pending(slug) WHERE slug IS NOT NULL",
+)
+
+
+def _table_exists(con, name):
+    """Existencia REAL de la tabla vía el catálogo. PRAGMA table_info devuelve vacío para una tabla
+    ausente, pero el chequeo por sqlite_master es el que sobrevive a conexiones envueltas en tests
+    (delegan las consultas normales a la conexión real)."""
+    return con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
+
+
+def _add_missing_columns(con, table, migrations):
+    """Aplica las migraciones de columnas que falten en <table>. Tolera 'duplicate column name'
+    (carrera entre procesos); cualquier otro error se propaga (ver _migrate)."""
+    cols = {r[1] for r in con.execute(f"PRAGMA table_info({table})").fetchall()}
+    for name, ddl in migrations:
+        if name in cols:
+            continue
+        try:
+            con.execute(ddl)
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                raise
+
+
 def _migrate(con):
     """Migraciones idempotentes para DBs ya existentes (CREATE TABLE IF NOT EXISTS no altera).
     Chequeo POR columna: una migración parcial (proceso interrumpido) se completa en el siguiente connect.
     El chequeo y el ALTER no son atómicos entre procesos (el DDL se autoconfirma fuera de transacción):
     si otro proceso agregó la columna en medio, SQLite responde 'duplicate column name' — se tolera,
     porque la columna ya existe, que es el objetivo. Cualquier otro error (p. ej. 'database is locked')
-    se propaga: _connect devuelve None y se conserva el invariante 'conexión devuelta = esquema completo'."""
+    se propaga: _connect devuelve None y se conserva el invariante 'conexión devuelta = esquema completo'.
+
+    Orden: `work` primero (siempre), luego las tablas de pendings SOLO si existen de verdad (una DB
+    solo-logbook, sin pendings, no debe romper). Solo DDL: sin UPDATEs dependientes de datos."""
     cols = {r[1] for r in con.execute("PRAGMA table_info(work)").fetchall()}
     if not cols:
         return
@@ -324,6 +366,20 @@ def _migrate(con):
         except sqlite3.OperationalError as e:
             if "duplicate column name" not in str(e).lower():
                 raise
+    if _table_exists(con, "pending"):
+        _add_missing_columns(con, "pending", _PENDING_MIGRATIONS)
+    if _table_exists(con, "pending_topic"):
+        _add_missing_columns(con, "pending_topic", _PENDING_TOPIC_MIGRATIONS)
+    if _table_exists(con, "pending"):
+        for ddl in _PENDING_INDEX_DDL:
+            try:
+                con.execute(ddl)
+            except sqlite3.IntegrityError as e:
+                # Duplicados pre-existentes en `slug` (solo posible por escritura cruda): el índice no se
+                # crea, pero la conexión sigue siendo usable — los escritores (seed/curate/backfill)
+                # verifican unicidad por su cuenta. No tumbar el hook por esto.
+                print(f"[logbook] aviso: uq_pending_slug no creado ({e}); saneá los slugs duplicados",
+                      file=sys.stderr)
     con.commit()
 
 
