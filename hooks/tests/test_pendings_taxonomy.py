@@ -453,6 +453,23 @@ class TestCompasV2(unittest.TestCase):
         self.assertEqual(c["client_bonus"], {"beta": 10})
         self.assertEqual(c["objectives"][1]["topics"], [])          # nada de '- **roadmap:** —' como tema
 
+    def test_hand_edited_empty_temas_line_without_trailing_space(self):
+        """Regresión PD-517 (6.7.1): un compas editado a mano con '- **Temas:**' SIN espacio final
+        (write_compas siempre deja uno, por eso el test de 6.7.0 pasaba) devolvía '*' como tema:
+        con `(.+?)` el `\\**` retrocedía un asterisco. Ahora: sin temas, y la línea siguiente
+        (`Roadmap:`) no se captura como valor."""
+        path = os.path.join(self.home, ".claude", pendings.COMPAS_NAME)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8") as fh:
+            fh.write("---\nversion: 2\n---\n\n## Objetivo: Solo clientes\n- **Peso:** 40\n"
+                     "- **Temas:**\n- **Roadmap:** —\n- **Clientes:** beta=+10\n")
+        c = pendings.parse_compas(self.home)
+        self.assertEqual(c["objectives"][0]["topics"], [])
+        self.assertEqual(c["topic_weight"], {})
+        self.assertEqual(c["client_bonus"], {"beta": 10})
+        self.assertEqual(pendings._field_value("- **Temas:**\n- **Roadmap:** x\n", "Temas"), "")
+        self.assertEqual(pendings._field_value("- **Temas:**", "Temas"), "")
+
     def test_weight_by_topico_plus_client_bonus_axis_aware(self):
         pendings.write_compas(self.home, [("Seg", 60, ["seguridad", "alpha"], None, {"alpha": 15})])
         pid = _pending(self.con, "x")

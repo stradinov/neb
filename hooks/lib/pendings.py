@@ -561,12 +561,12 @@ def _band(score):
 # --------------------------------------------------------------------------- parse_compas (fuente única de pesos)
 
 def _field_value(body, label):
-    """Valor de una línea '- **Label:** valor' dentro de un bloque. Variante de `_db_shared._field`
-    (no se importa para no acoplar el módulo). El valor va en la MISMA línea: los separadores son
-    `[ \\t]*` (no `\\s*`) para que una línea con valor vacío devuelva '' en vez de capturar la
-    línea siguiente. `_db_shared._field` (parser de la memoria del REQ activo, hot path del hook)
-    conserva el `\\s*` original: se atiende en un pendiente aparte, no aquí."""
-    pat = re.compile(r"^[ \t\-*]*" + re.escape(label) + r"[ \t]*:[ \t]*\**[ \t]*(.+?)[ \t]*$",
+    """Valor de una línea '- **Label:** valor' dentro de un bloque. Misma variante que
+    `_db_shared._field` (no se importa para no acoplar el módulo; desde 6.7.1 ambas son idénticas).
+    El valor va en la MISMA línea: los separadores son `[ \\t]*` (no `\\s*`) para que una línea con
+    valor vacío devuelva '' en vez de capturar la línea siguiente, y la captura es `(.*?)` (no
+    `(.+?)`: ante '- **Temas:**' sin espacio final, `\\**` retrocedía un asterisco y salía '*')."""
+    pat = re.compile(r"^[ \t\-*]*" + re.escape(label) + r"[ \t]*:[ \t]*\**[ \t]*(.*?)[ \t]*$",
                      re.MULTILINE)
     m = pat.search(body or "")
     return m.group(1).strip() if m else ""

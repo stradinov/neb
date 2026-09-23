@@ -2,6 +2,8 @@
 """
 test_active_reqs.py — cobertura de los helpers de memoria en _db_shared.py:
   • find_active_reqs   — N REQ activos por proyecto (estructura active_*.md) + compat legacy.
+  • _field / _parse_active_block — parser '- **Label:** valor' (regresión PD-517, 6.7.1: un campo
+    vacío devuelve '' — no la línea siguiente ni '*').
   • resolve_memory_dir — respeta autoMemoryDirectory (precedencia Local > Project > User).
 
 Correr:  py -m unittest discover -s hooks/tests -p "test_*.py" -v
@@ -115,12 +117,81 @@ class TestFindActiveReqs(unittest.TestCase):
         reqs = _db_shared.find_active_reqs(self.mem)
         self.assertIn("ok", {r["name"] for r in reqs})  # el bueno se captura pese al malo
 
+    # ----------------------------------------------------------------- regresión PD-517 (6.7.1)
+    def test_empty_state_field_yields_empty_state(self):
+        """Un REQ con '- **Estado:**' vacío se encuentra (Nombre + Path presentes) con state == ''
+        — no con el texto del campo siguiente, que el hook logbook-sync publicaría al catálogo."""
+        self._write("active_foo_x.md",
+                    "- **Nombre:** x\n- **Path del proyecto:** /repo/foo\n"
+                    "- **Estado:**\n- **Plan resumido:** plan corto\n")
+        reqs = _db_shared.find_active_reqs(self.mem)
+        self.assertEqual(len(reqs), 1)
+        self.assertEqual(reqs[0]["state"], "")
+        self.assertEqual(reqs[0]["plan"], "plan corto")
+
+    def test_template_parses_with_placeholders(self):
+        """El template real (templates/active-req.md.template) copiado como active_*.md se encuentra
+        con sus placeholders — contrato template ↔ parser (no cambia con el fix del regex)."""
+        tpl = os.path.join(HERE, "..", "..", "templates", "active-req.md.template")
+        with open(tpl, encoding="utf-8") as fh:
+            self._write("active_tpl.md", fh.read())
+        reqs = _db_shared.find_active_reqs(self.mem)
+        self.assertEqual(len(reqs), 1)
+        r = reqs[0]
+        self.assertEqual(r["name"], "<slug del requerimiento>")
+        self.assertEqual(r["project_path"], "<path absoluto local>")
+        self.assertEqual(r["draft"], "changes/YYYY-MM-DD-<req>.md")
+        self.assertTrue(r["state"].startswith("En progreso | En validación | Listo para aprobación | Cerrado"))
+        self.assertEqual(r["plan"], "<3-5 líneas del plan aprobado>")
+        self.assertEqual(r["files"], "lista")
+        self.assertEqual(r["next_steps"], "lista")
+        self.assertEqual(r["pending_delivery"], "")   # '## Pendiente de entrega' es sección, no campo
+
 
 class TestFieldParser(unittest.TestCase):
     def test_field_bold_and_plain(self):
         self.assertEqual(_db_shared._field("- **Nombre:** valor", "Nombre"), "valor")
         self.assertEqual(_db_shared._field("Nombre: valor2", "Nombre"), "valor2")
         self.assertEqual(_db_shared._field("nada aqui", "Nombre"), "")
+
+    # ----------------------------------------------------------------- regresión PD-517 (6.7.1)
+    def test_empty_field_does_not_capture_next_line(self):
+        """Regresión (bug previo a 6.7.1): el `\\s*` cruzaba el salto de línea y una línea
+        '- **Estado:**' vacía devolvía la línea SIGUIENTE ('- **Plan resumido:** X') como valor."""
+        block = "- **Estado:**\n- **Plan resumido:** X\n"
+        self.assertEqual(_db_shared._field(block, "Estado"), "")
+        d = _db_shared._parse_active_block(block)
+        self.assertEqual(d["state"], "")
+        self.assertEqual(d["plan"], "X")                 # el campo siguiente conserva su valor
+
+    def test_empty_field_variants_return_empty(self):
+        """Vacía sin espacio final (con `(.+?)` el `\\**` retrocedía un asterisco y salía '*'),
+        con espacio final, con CRLF y como última línea sin salto: todas → ''."""
+        for block in ("- **Estado:**\n- **Plan resumido:** X\n",
+                      "- **Estado:** \n- **Plan resumido:** X\n",
+                      "- **Estado:**\r\n- **Plan resumido:** X\r\n",
+                      "- **Estado:**"):
+            with self.subTest(block=block):
+                self.assertEqual(_db_shared._field(block, "Estado"), "")
+
+    def test_value_on_same_line_unchanged(self):
+        """Los valores en la misma línea siguen igual (LF, CRLF, negritas, sin cierre de negrita,
+        espacios extra)."""
+        cases = {
+            "- **Estado:** En progreso\n- **Plan resumido:** X\n": "En progreso",
+            "- **Estado:** En progreso\r\n- **Plan resumido:** X\r\n": "En progreso",
+            "- **Estado: En progreso\n": "En progreso",
+            "- **Estado:** **Cerrado**\n": "**Cerrado**",
+            "  - **Estado:**   En validación   \n": "En validación",
+        }
+        for block, expected in cases.items():
+            with self.subTest(block=block):
+                self.assertEqual(_db_shared._field(block, "Estado"), expected)
+
+    def test_label_must_be_followed_by_colon(self):
+        """'- **Estado (2026-08-26):** ...' (nota de formato libre) no es el campo 'Estado' — igual
+        que antes del fix."""
+        self.assertEqual(_db_shared._field("- **Estado (2026-08-26):** hecho\n", "Estado"), "")
 
 
 class TestResolveMemoryDir(unittest.TestCase):

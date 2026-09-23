@@ -111,9 +111,14 @@ def _normalize_remote(url):
 # --------------------------------------------------------------------------- memoria del proyecto (REQ activos)
 
 def _field(text, label):
-    """Valor de una línea tipo '- **Label:** value' o 'Label: value'. '' si no está.
-    El prefijo opcional [\\s\\-*]* tolera viñetas markdown y negritas (formato del template)."""
-    pat = re.compile(r"^[\s\-*]*" + re.escape(label) + r"\s*:\s*\**\s*(.+?)\s*$", re.MULTILINE)
+    """Valor de una línea tipo '- **Label:** value' o 'Label: value'. '' si no está o está vacía.
+    El prefijo opcional [ \\t\\-*]* tolera viñetas markdown y negritas (formato del template).
+    El valor va en la MISMA línea: los separadores son `[ \\t]*` (no `\\s*`, que cruzaba el salto de
+    línea y hacía que una línea '- **Estado:**' vacía capturara la línea SIGUIENTE como valor) y la
+    captura es `(.*?)` (no `(.+?)`: ante una línea vacía sin espacio final, `\\**` retrocedía un
+    asterisco y el valor salía '*'). Misma variante que `pendings._field_value` (6.7.1, PD-517)."""
+    pat = re.compile(r"^[ \t\-*]*" + re.escape(label) + r"[ \t]*:[ \t]*\**[ \t]*(.*?)[ \t]*$",
+                     re.MULTILINE)
     m = pat.search(text)
     return m.group(1).strip() if m else ""
 
