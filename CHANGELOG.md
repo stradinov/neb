@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.7.2] - 2026-09-29
+
+> **Patch**: aclaración de alcance. Los gates de Fase 4 y Fase 7 detectan dimensiones sobre los archivos del entregable aunque no haya habido plan-review. Si esa detección no activa ningún subagente, el piso lo cubre el revisor default del profile, o un override explícito del dev si el profile no define uno para esa fase. Antes, la regla del paso 2 de plan-review («invocar solo si su dimensión fue detectada en el paso 0») se extendía a F4/F7 por «la misma mecánica», y con el plan-review opcional en complejidad baja eso se leía como «sin paso 0, sin subagente». La lectura contradecía el piso de ≥1 subagente de `roles-invocation.md` § "Cobertura mínima por fase". Sin cambio de contrato: `execution.md` y `delivery.md` ya exigían ese piso sin condición, y la matriz de cobertura ya nombraba al Code Reviewer como default de F4/F7 en profiles de software.
+
+### Changed
+
+- **`process/plan-review.md` § "Nota de alcance"**: dos oraciones nuevas. En F4/F7 el paso 0 se corre sobre los archivos del entregable, haya habido plan-review o no. Si no activa ningún subagente, el piso se cubre con el revisor default del profile (u override del dev si el profile no define uno). Origen: un adoptante cerró F4 y F7 de un fix de complejidad baja sin ningún subagente revisor ni override del dev; su profile de software había copiado la condición «solo si se detectó en el paso 0 del plan-review».
+
 ## [6.7.1] - 2026-09-22
 
 > **Patch**: el parser de campos `- **Label:** valor` de la memoria del REQ activo (`_db_shared._field`, hot path del hook `logbook-sync` en cada Stop) deja de capturar la línea siguiente cuando el campo está vacío. Es el mismo defecto corregido en `pendings._field_value` en 6.7.0 (H18 del REQ `pendings-taxonomia-cliente-topico`), ahora con una sola variante en ambas funciones y un borde adicional cerrado. Sin cambio de contrato: los valores en la misma línea parsean igual (verificado además contra los `active_*.md` y `project_*.md` reales del dev — salida de `find_active_reqs` idéntica antes y después).
