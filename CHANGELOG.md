@@ -4,6 +4,15 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.9.0] - 2026-09-30
+
+> **Minor**: en la correspondencia a terceros (`general/communication.md`), la vía de copia por defecto pasa del portapapeles al **archivo adjunto que se abre renderizado**, y el contrato del archivo pasa de fragmento a **documento con `<meta charset="utf-8">`** cuyo `<body>` es solo el cuerpo del correo. **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): el charset pasa a ser obligatorio y un fragmento suelto deja de cumplir el contrato (no es compatible con 6.8.0); repetir el cuerpo en el chat pasa de exigido a prohibido; el portapapeles pasa de vía principal a vía a pedido. Origen: retroalimentación en uso de 6.8.0 — el dev copia desde el render del adjunto en la app de escritorio de Claude Code; cargar solo el portapapeles no le deja ver el correo antes de pegarlo, y un archivo sin charset expone los acentos a la heurística del visor.
+
+### Changed
+
+- **`general/communication.md` § "Correspondencia a terceros"**: el archivo es un documento con `<meta charset="utf-8">` y solo el cuerpo del correo en `<body>` (destinatarios, CC, asunto y notas para el dev van en el chat, no en el `<body>`); por defecto se adjunta a la respuesta para abrirlo renderizado y copiar desde la vista, con la ruta para el navegador si el entorno no muestra adjuntos; el portapapeles queda como vía adicional a pedido o declarada por el entorno; el chat reporta una línea de qué es o qué cambió, destinatarios/CC/asunto y el adjunto (o su ruta), sin repetir el cuerpo; cada corrección regenera y vuelve a adjuntar el archivo (y recarga el portapapeles, si se usó). El bloque **Punto de customización** nombra la vía de copia (antes, «recurso de copia al portapapeles»).
+- **Sedes de customización**: `methodology/promises.md` (promesa 5) y `templates/personal.md.template` alineadas a «vía de copia».
+
 ## [6.8.0] - 2026-09-29
 
 > **Minor**: norma de correspondencia a terceros en `general/communication.md`. El primer párrafo del correo lleva la petición, la decisión o el cambio y la acción esperada del destinatario, sin rotular la técnica («BLUF», «TL;DR», «Resumen:») ni usar jerga del método; el cuerpo se genera como fragmento HTML con estilos inline y se copia desde el render (portapapeles o navegador), nunca desde el código. **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): la conclusión primero se extiende del chat a los correos, y la exclusión de la forma queda acotada a la conversación dev↔Claude. Origen: borradores reales abrían con el rótulo literal de la técnica en el cuerpo, y la vía de copia con formato se reinventaba en cada sesión.

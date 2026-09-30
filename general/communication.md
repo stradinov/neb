@@ -86,14 +86,14 @@ Aplica cuando Claude redacta un correo que el dev enviará a otra persona (clien
 
 **Formato del cuerpo (HTML)**:
 
-- El cuerpo se genera como archivo `.html` que contiene **solo el cuerpo**: un fragmento con un `<div>` contenedor, sin `<html>`, `<head>` ni `<body>`. Destinatarios, CC y asunto van en la respuesta del chat, fuera del archivo; dentro se pegarían como texto del cuerpo.
+- El cuerpo se genera como documento `.html` con `<meta charset="utf-8">` cuyo `<body>` contiene **solo el cuerpo del correo**, dentro de un `<div>` contenedor. Destinatarios, CC, asunto y notas para el dev van en la respuesta del chat, no en el `<body>`: ahí se copiarían como texto del cuerpo. Sin la declaración de charset, el visor puede romper los acentos.
 - Estilos **inline** en cada elemento; sin `<style>`, `<script>`, atributos `class`/`id` ni recursos externos (hojas de estilo, fuentes, imágenes remotas): el cliente de correo puede descartarlos al pegar y el formato se pierde.
-- La copia sale **del render, nunca del código**: Claude carga el fragmento al portapapeles en formato HTML con el recurso que declare el entorno (overlay o `personal/<usuario>.md`); sin recurso, da la ruta del `.html` para abrirlo en el navegador y copiar la vista renderizada. El HTML crudo no se ofrece en el chat para copiarse: pegado en un cliente de correo llega como código.
-- En el chat se reporta: destinatarios/CC/asunto, el cuerpo legible para revisión, la ruta del `.html` y, si se cargó, que el portapapeles quedó sustituido. Cada corrección regenera el `.html` (y recarga el portapapeles) en el mismo turno.
+- La copia sale **del render, nunca del código**. Por defecto, Claude **adjunta el `.html` a su respuesta** como archivo que el dev abre renderizado y copia desde esa vista (en la app de escritorio de Claude Code, la tarjeta del archivo abre el render en un panel); si el entorno no muestra adjuntos (terminal), da la ruta del `.html` para abrirlo en el navegador. Cargar el cuerpo al portapapeles en formato HTML es una vía adicional, solo a pedido del dev o si el entorno la declara. El HTML crudo no se ofrece en el chat para copiarse: pegado en un cliente de correo llega como código.
+- En el chat se reporta: una línea de qué es el correo o qué cambió, destinatarios/CC/asunto y el archivo adjunto (o su ruta); el cuerpo no se repite en el chat. Si se usó el portapapeles, se avisa que quedó sustituido. Cada corrección regenera el `.html` y lo vuelve a adjuntar (y recarga el portapapeles, si se usó) en el mismo turno.
 - Una respuesta de una o dos líneas sin formato (acuse, confirmación) va como texto en el chat, sin `.html`.
 - Si la redacción se delega (subagente, workflow, script generador), el encargo incluye esta sección: el contexto de arranque no se da por heredado.
 
-> **Punto de customización** (promesa 5): el recurso de copia al portapapeles y la tipografía del contenedor se **sustituyen** desde el overlay (adoptante) o `personal/<usuario>.md` § "Preferencias de comunicación" (individuo); las restricciones del cliente de correo del adoptante (qué descarta al pegar) se **agregan** ahí. El resto de la sección es regla de proceso: un override la estrecha o agrega, nunca la relaja.
+> **Punto de customización** (promesa 5): la vía de copia (adjunto renderizado por defecto; portapapeles o navegador) y la tipografía del contenedor se **sustituyen** desde el overlay (adoptante) o `personal/<usuario>.md` § "Preferencias de comunicación" (individuo); las restricciones del cliente de correo del adoptante (qué descarta al pegar) se **agregan** ahí. El resto de la sección es regla de proceso: un override la estrecha o agrega, nunca la relaja.
 
 ## Idioma
 
