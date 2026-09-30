@@ -16,7 +16,8 @@ type: personal
 
 <!-- Idioma/variedad/registro: SUSTITUYEN el default del equipo (ver tooling/redaccion-es.md).
      ej: variedad: rioplatense, permitir_voseo: true, registro: informal
-     Formato de salida: "respuestas <100 palabras", "tablas cuando hay 5+ ítems" -->
+     Formato de salida: "respuestas <100 palabras", "tablas cuando hay 5+ ítems"
+     Correos (general/communication.md § Correspondencia a terceros): recurso de copia HTML al portapapeles, tipografía del contenedor -->
 
 ## Convenciones individuales
 

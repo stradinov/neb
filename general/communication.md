@@ -2,7 +2,7 @@
 
 Política transversal: aplica siempre, no es una fase.
 
-Esta política norma **el fondo** de la comunicación (qué se comunica), no la **forma**. El estilo —longitud, tono, formato— queda a libertad del dev y no se norma aquí.
+Esta política norma **el fondo** de la comunicación (qué se comunica), no la **forma**. En la conversación dev↔Claude el estilo —longitud, tono, formato— queda a libertad del dev y no se norma aquí. Excepción acotada: en la **correspondencia a terceros** se norman la estructura y el formato del cuerpo (§ "Correspondencia a terceros"), porque el texto sale del chat hacia un destinatario que no comparte el contexto de la sesión.
 
 ## Principio rector
 
@@ -73,12 +73,35 @@ Cuando el dev anuncia que pausará el trabajo para continuar después en otra se
 
 El procedimiento completo (nombrado en kebab-case, `/rename`, registro en `pendings.md` bajo `## Sesiones pausadas`, comandos de reanudación, retomar una sesión interrumpida) vive en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)". La capa de comunicación solo carga el contrato comunicativo: confirmar en una línea.
 
+## Correspondencia a terceros
+
+Aplica cuando Claude redacta un correo que el dev enviará a otra persona (cliente, colega, proveedor), incluida la respuesta en un hilo. El destinatario no comparte el contexto de la sesión: el correo se sostiene solo.
+
+**Estructura** — el principio rector (§ "Principio rector") medido desde el destinatario:
+
+- El **primer párrafo** tras el saludo dice qué se pide, qué se decidió o qué cambió, y la **acción concreta que se espera del destinatario** (con fecha, si la hay); si el correo solo informa, da la conclusión y aclara que no requiere acción. Si la conclusión depende de algo sin confirmar, se dice ahí en lenguaje llano («falta confirmar …»), no con los marcadores `[asumido]` / `[dominio sin research]`.
+- Después van el porqué, el contexto y la evidencia, en orden de relevancia para el destinatario.
+- **Sin rótulos de la técnica**: ni el asunto ni el cuerpo nombran la técnica de estructura («BLUF», «TL;DR», «Bottom line») ni rotulan el primer párrafo («Resumen:», «Resumen ejecutivo:», «Conclusión:», «Summary:»); el primer párrafo abre con su contenido. Un rótulo así expone jerga interna al destinatario. Los encabezados que nombran contenido («Cómo se reproduce», «Qué necesito de ti») sí se permiten.
+- **Sin jerga del método que el destinatario no usa** (fases, estados, IDs o slugs de pendientes, «REQ», «gate», «change MD»): se sustituye por su equivalente llano. Las preferencias de presentación del chat declaradas en el overlay o en `personal/<usuario>.md` no se trasladan al cuerpo.
+
+**Formato del cuerpo (HTML)**:
+
+- El cuerpo se genera como archivo `.html` que contiene **solo el cuerpo**: un fragmento con un `<div>` contenedor, sin `<html>`, `<head>` ni `<body>`. Destinatarios, CC y asunto van en la respuesta del chat, fuera del archivo; dentro se pegarían como texto del cuerpo.
+- Estilos **inline** en cada elemento; sin `<style>`, `<script>`, atributos `class`/`id` ni recursos externos (hojas de estilo, fuentes, imágenes remotas): el cliente de correo puede descartarlos al pegar y el formato se pierde.
+- La copia sale **del render, nunca del código**: Claude carga el fragmento al portapapeles en formato HTML con el recurso que declare el entorno (overlay o `personal/<usuario>.md`); sin recurso, da la ruta del `.html` para abrirlo en el navegador y copiar la vista renderizada. El HTML crudo no se ofrece en el chat para copiarse: pegado en un cliente de correo llega como código.
+- En el chat se reporta: destinatarios/CC/asunto, el cuerpo legible para revisión, la ruta del `.html` y, si se cargó, que el portapapeles quedó sustituido. Cada corrección regenera el `.html` (y recarga el portapapeles) en el mismo turno.
+- Una respuesta de una o dos líneas sin formato (acuse, confirmación) va como texto en el chat, sin `.html`.
+- Si la redacción se delega (subagente, workflow, script generador), el encargo incluye esta sección: el contexto de arranque no se da por heredado.
+
+> **Punto de customización** (promesa 5): el recurso de copia al portapapeles y la tipografía del contenedor se **sustituyen** desde el overlay (adoptante) o `personal/<usuario>.md` § "Preferencias de comunicación" (individuo); las restricciones del cliente de correo del adoptante (qué descarta al pegar) se **agregan** ahí. El resto de la sección es regla de proceso: un override la estrecha o agrega, nunca la relaja.
+
 ## Idioma
 
 El **idioma base es español** en todo lo que el agente produce para el dev y el repo. La **variedad regional, el registro y la tolerancia a extranjerismos** son punto de customización (promesa 5), no baseline del núcleo.
 
 - **Conversación dev↔Claude** y **mensajes de error Claude→dev**: español; variedad y registro según el punto de customización.
 - **Prosa de los `.md`**: español; la variedad la fija la convención del repo/adoptante.
+- **Correspondencia a terceros**: el idioma y el registro los fija el destinatario o el hilo; sin indicación, español.
 - **Commits, código, identifiers, comandos, paths y términos tecnológicos** (commit, prompt, hook, plugin, deploy…): inglés. El resto de anglicismos de prosa se traducen.
 
 > **Punto de customización** (promesa 5): variedad regional, registro y extranjerismos se ajustan sin tocar el núcleo. Un **individuo** los declara en `personal/<usuario>.md` § "Preferencias de comunicación" (o, solo para un proyecto, en `<proyecto>/.claude/personal.md`); un **adoptante**, en su overlay. Esquema y perillas (variedad, `permitir_voseo`, registro, extranjerismos): [`../tooling/redaccion-es.md`](../tooling/redaccion-es.md). Variedad de este repo: `variedad: mexico`, `permitir_voseo: false`, tuteo.

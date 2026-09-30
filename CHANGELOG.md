@@ -4,6 +4,21 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.8.0] - 2026-09-29
+
+> **Minor**: norma de correspondencia a terceros en `general/communication.md`. El primer párrafo del correo lleva la petición, la decisión o el cambio y la acción esperada del destinatario, sin rotular la técnica («BLUF», «TL;DR», «Resumen:») ni usar jerga del método; el cuerpo se genera como fragmento HTML con estilos inline y se copia desde el render (portapapeles o navegador), nunca desde el código. **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): la conclusión primero se extiende del chat a los correos, y la exclusión de la forma queda acotada a la conversación dev↔Claude. Origen: borradores reales abrían con el rótulo literal de la técnica en el cuerpo, y la vía de copia con formato se reinventaba en cada sesión.
+
+### Added
+
+- **`general/communication.md` § "Correspondencia a terceros"**: estructura (primer párrafo = qué se pide/decidió/cambió + acción esperada; lo sin confirmar en lenguaje llano, no con marcadores), sin rótulos de la técnica ni jerga del método, formato del cuerpo (solo el cuerpo en un `.html`, estilos inline, sin `<style>`/`<script>`/`class`/`id`/recursos externos, destinatarios y asunto fuera del archivo, copia por render, regeneración en cada corrección), excepción para respuestas de una o dos líneas, encargo explícito al delegar la redacción; bloque **Punto de customización** (el recurso de copia y la tipografía se sustituyen; las restricciones del cliente de correo se agregan).
+
+### Changed
+
+- **`general/communication.md`** párrafo inicial (l.5): la exclusión de la forma se acota a la conversación dev↔Claude.
+- **`general/communication.md`** § "Idioma": el idioma y el registro de un correo a terceros los fija el destinatario o el hilo; sin indicación, español.
+- **`general/index.md`**: descriptor de Communication.
+- **Puntos de customización** sincronizados: `methodology/personal-vs-team.md` (preconfigurados), `methodology/promises.md` (promesa 5: recurso de copia y tipografía de correos), `templates/personal.md.template` (ejemplo).
+
 ## [6.7.2] - 2026-09-29
 
 > **Patch**: aclaración de alcance. Los gates de Fase 4 y Fase 7 detectan dimensiones sobre los archivos del entregable aunque no haya habido plan-review. Si esa detección no activa ningún subagente, el piso lo cubre el revisor default del profile, o un override explícito del dev si el profile no define uno para esa fase. Antes, la regla del paso 2 de plan-review («invocar solo si su dimensión fue detectada en el paso 0») se extendía a F4/F7 por «la misma mecánica», y con el plan-review opcional en complejidad baja eso se leía como «sin paso 0, sin subagente». La lectura contradecía el piso de ≥1 subagente de `roles-invocation.md` § "Cobertura mínima por fase". Sin cambio de contrato: `execution.md` y `delivery.md` ya exigían ese piso sin condición, y la matriz de cobertura ya nombraba al Code Reviewer como default de F4/F7 en profiles de software.
