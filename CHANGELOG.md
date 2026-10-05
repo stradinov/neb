@@ -4,6 +4,21 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.10.0] - 2026-10-05
+
+> **Minor**: la premisa de una pregunta o menú al dev se verifica con fuentes locales de solo lectura **antes** de preguntar, y cuando la premisa atribuye intención a un estado existente, el estado real es su motivo **reconstruido** (a quién sirve, para qué, si sigue vivo), no el mensaje de la confirmación del cambio (`general/communication.md` § "Elecciones: menú de selección"). El hallazgo de un rol delegado (subagente o paso de workflow) que sostiene una pregunta u opción al dev lleva la fuente leída por el rol principal o va `[asumido]` (`methodology/principles.md` § "Suposiciones explícitas antes de afirmar"). **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): la verificación local pasa de opción («verifico X primero») a obligación previa al menú; la suficiencia del motivo y la cita propia de un hallazgo heredado son obligaciones nuevas. Origen: tras diagnóstico del defecto «pregunta al dev con el motivo de un estado deliberado a medio reconstruir» (origen Fase 3, tipo plan, ≥3 similares) en un REQ de software del adoptante; la revisión-de-familia (invariante + checklist) queda en su repo de metodología.
+
+### Added
+
+- **`general/communication.md` § "Elecciones: menú de selección"**: sub-bullet «Motivo de un estado que parece deliberado» (condición, criterio «reconstruido», fuentes, línea de premisa, consecuencia).
+- **`agents/context-completeness-reviewer.md` § "Brecha de contexto"**: foco «Afirmaciones sobre el motivo de un estado» (puntero).
+
+### Changed
+
+- **`general/communication.md`**: el bullet «Opciones ancladas al estado real, no a hipótesis» fija la verificación local antes del menú y declara sin verificar la premisa heredada de un rol delegado; § "Hilo conductor y captura de tangentes": el «menú ahora» de bloqueo/seguridad lleva la premisa de § "Elecciones".
+- **`methodology/principles.md` § "Suposiciones explícitas antes de afirmar"**: define evidencia del turno y «rol delegado»; «el motivo de un estado existente» entra en la clase «Estado concreto sin verificar»; cuarto output «Pregunta o menú al dev» (puntero).
+- **`process/plan-review.md` § "Flujo" paso 3** y **`process/planning.md` § "Clarificación"**: punteros de una línea.
+
 ## [6.9.0] - 2026-09-30
 
 > **Minor**: en la correspondencia a terceros (`general/communication.md`), la vía de copia por defecto pasa del portapapeles al **archivo adjunto que se abre renderizado**, y el contrato del archivo pasa de fragmento a **documento con `<meta charset="utf-8">`** cuyo `<body>` es solo el cuerpo del correo. **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): el charset pasa a ser obligatorio y un fragmento suelto deja de cumplir el contrato (no es compatible con 6.8.0); repetir el cuerpo en el chat pasa de exigido a prohibido; el portapapeles pasa de vía principal a vía a pedido. Origen: retroalimentación en uso de 6.8.0 — el dev copia desde el render del adjunto en la app de escritorio de Claude Code; cargar solo el portapapeles no le deja ver el correo antes de pegarlo, y un archivo sin charset expone los acentos a la heurística del visor.

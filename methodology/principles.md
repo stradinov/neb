@@ -66,9 +66,9 @@ Jerarquía: skills disponibles → research vigente → inferencia de Claude.
 
 ## Suposiciones explícitas antes de afirmar
 
-Toda afirmación se respalda en evidencia del turno actual o se declara como suposición. Hay dos clases de suposición a vigilar:
+Toda afirmación se respalda en evidencia del turno actual o se declara como suposición. Evidencia del turno es la fuente que quien afirma leyó y cita; el hallazgo de un **rol delegado** (un subagente o un paso de workflow) es una afirmación a respaldar, no evidencia propia: cuando sostiene una pregunta o una opción al dev («deliberado», «decisión de negocio», «no corre»), lleva la fuente que el rol principal leyó o va marcado `[asumido]`. Hay dos clases de suposición a vigilar:
 
-- **Estado concreto sin verificar** (brecha de contexto): afirmar sobre un archivo, dato, dependiente o configuración cuya fuente existe localmente pero no fue consultada en el turno actual. Acción: verificar (lectura, grep, LSP, consulta a memoria/skill vigente).
+- **Estado concreto sin verificar** (brecha de contexto): afirmar sobre un archivo, dato, dependiente, configuración o el motivo de un estado existente, cuya fuente existe localmente pero no fue consultada en el turno actual. Acción: verificar (lectura, grep, LSP, consulta a memoria/skill vigente).
 - **Dominio sin antecedente** (dominio desconocido): inferir sobre un dominio sin cobertura en skills, memoria del proyecto o research vigente. Acción: aplicar "Contexto especializado antes de inferir" — proponer abrir REQ de research si el impacto es medio/alto (ver [`../profiles/research/conventions.md`](../profiles/research/conventions.md) "Modos de disparo").
 
 Output esperado:
@@ -76,6 +76,7 @@ Output esperado:
 - Plan (Fase 3): el plan separa dependientes/datos **verificados** (con la fuente: grep `X`, lectura de `Y:Z-W`, LSP, skill `<nombre>`, memoria `<archivo>`) de los **asumidos sin verificar** (con la razón y la acción pendiente).
 - Cierre de edit (Fase 4): Claude menciona qué fuentes consultó vs cuáles dio por entendidas por contexto previo.
 - Respuesta exploratoria (cualquier fase): si un hecho citado no se verificó en el turno actual, marcarlo `[asumido]`, `[memoria sin re-verificar]` o `[dominio sin research]`.
+- Pregunta o menú al dev (cualquier fase): la premisa se verifica antes del menú o se marca; contrato, y caso del motivo de un estado que parece deliberado, en [`../general/communication.md`](../general/communication.md) § "Elecciones: menú de selección".
 
 Aplica a todos los profiles. Cubre dos huecos: (a) incluso con skill cargado y memoria vigente, una sesión puede asumir el estado concreto de un archivo sin haberlo abierto; (b) Claude puede confundir analogías superficiales del entrenamiento con conocimiento real del dominio.
 

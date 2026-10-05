@@ -30,7 +30,7 @@ Output: tabla "Suposición | Tipo (`contexto` / `dominio`) | Cómo se resuelve |
    - **Subagente** (rol tiene `.md` en `agents/`): invocar **solo si su dimensión de activación fue detectada en el paso 0**. Invocar vía `Agent(subagent_type=<nombre>, prompt=<briefing>)` usando la plantilla de briefing de la sección siguiente. Correr en paralelo cuando haya más de un subagente que aplique.
    - **Persona** (rol sin `.md` en `agents/`): simular inline cambiando de sombrero dentro de la misma respuesta.
    - **Nota de anidamiento**: los subagentes son invocados siempre por el rol principal en persona — nunca desde dentro de otro subagente. No hay riesgo de anidamiento en el flujo normal de plan-review.
-3. **Rol principal** consolida hallazgos (subagentes + personas) y presenta el plan revisado en la misma respuesta.
+3. **Rol principal** consolida hallazgos (subagentes + personas) y presenta el plan revisado en la misma respuesta. Los hallazgos que pasen al dev como premisa de una pregunta o de una opción siguen [`../methodology/principles.md`](../methodology/principles.md) § "Suposiciones explícitas antes de afirmar".
 4. Pide OK al dev.
 
 ## Plantilla de briefing para subagentes

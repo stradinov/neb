@@ -18,7 +18,7 @@ Gate de entrada al workflow. Contenido canónico en [`phase-transitions.md`](pha
 > Aplica cuando el prompt es un requerimiento formal (ver § "Trigger de formalización" arriba). Para observaciones, preguntas de diseño o propuestas exploratorias sin trigger, responder en prosa breve sin generar plan estructurado.
 
 - Reformular el requerimiento con palabras propias.
-- Máximo 3 preguntas si algo es ambiguo.
+- Máximo 3 preguntas si algo es ambiguo. Si lo ambiguo es el porqué de un comportamiento existente que parece deliberado, las fuentes locales van antes que la pregunta ([`../general/communication.md`](../general/communication.md) § "Elecciones: menú de selección", bullet «Opciones ancladas al estado real»).
 - No proceder sin confirmación.
 - Excepción: cambios triviales (una línea, un texto) → ir directo a propuesta.
 
