@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.11.0] - 2026-10-09
+
+> **Minor**: un plan con riesgo medio o alto que lee o escribe registros con un campo de estado lista todos los valores del estado y declara qué hace el flujo con cada uno, incluidos los que no toca y si un registro ya procesado puede volver a entrar o seguir cambiando (`process/planning.md` § "Riesgo de regresión"). **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): es una obligación nueva antes de aprobar el plan, hermana de la enumeración de dependientes; un estado que el plan no menciona cuenta como dependiente sin enumerar. Origen: diagnóstico de Fase 9 de un REQ del adoptante (pipeline por lotes sobre filas con estado). Dos defectos de origen Fase 3, tipo plan defectuoso, y dos hallazgos de diseño compartían la misma causa: el plan solo contemplaba dos de los estados que el flujo encontraba en operación.
+
+### Added
+
+- **`process/planning.md` § "Riesgo de regresión"**: viñeta «registros con un campo de estado» (listar valores, qué hace el flujo con cada uno, re-entrada).
+
 ## [6.10.0] - 2026-10-05
 
 > **Minor**: la premisa de una pregunta o menú al dev se verifica con fuentes locales de solo lectura **antes** de preguntar, y cuando la premisa atribuye intención a un estado existente, el estado real es su motivo **reconstruido** (a quién sirve, para qué, si sigue vivo), no el mensaje de la confirmación del cambio (`general/communication.md` § "Elecciones: menú de selección"). El hallazgo de un rol delegado (subagente o paso de workflow) que sostiene una pregunta u opción al dev lleva la fuente leída por el rol principal o va `[asumido]` (`methodology/principles.md` § "Suposiciones explícitas antes de afirmar"). **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): la verificación local pasa de opción («verifico X primero») a obligación previa al menú; la suficiencia del motivo y la cita propia de un hallazgo heredado son obligaciones nuevas. Origen: tras diagnóstico del defecto «pregunta al dev con el motivo de un estado deliberado a medio reconstruir» (origen Fase 3, tipo plan, ≥3 similares) en un REQ de software del adoptante; la revisión-de-familia (invariante + checklist) queda en su repo de metodología.

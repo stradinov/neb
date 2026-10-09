@@ -53,6 +53,7 @@ El catálogo de niveles (Bajo/Medio/Alto con criterios y ejemplos) vive en [`../
 - Riesgo `bajo` no requiere flujo crítico identificado.
 - Riesgo `medio`/`alto` exige ≥1 fila con prefijo `[crítico]` en la tabla `### Resultado` del [`change.md.template`](../templates/change.md.template). Una fila `[crítico]` con ❌ bloquea el cierre (ver [`../methodology/done-criteria.md`](../methodology/done-criteria.md)).
 - Antes de aprobar el plan con riesgo medio/alto: enumerar dependientes (escritura/procesamiento y lectura/display) — vía grep, LSP, lectura directa o inferencia de contexto conocido.
+- Si el plan lee o escribe registros con un campo de estado (columna `status`, ENUM, bandera como `dirty`): listar todos los valores del estado y declarar qué hace el flujo con cada uno, incluidos los que no toca. Declarar también si un registro ya procesado puede volver a entrar o seguir cambiando. Un estado que el plan no menciona es un dependiente sin enumerar.
 
 El plan de pruebas incluye: flujos a validar, criterios de éxito, orden, y quién ejecuta cada uno. El usuario valida directamente o delega a Claude (Claude solicita los datos necesarios — ver [delivery.md](delivery.md)).
 
