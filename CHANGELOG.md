@@ -4,6 +4,40 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.12.0] - 2026-10-09
+
+> **Minor**: el transcript sube al central con un **cursor por sesión** (`session_sync`) en vez de un cursor por par (sesión, work). Antes, el drenaje subía solo la sesión que cada work apuntaba en ese momento. Como cada captura reapunta todos los REQ activos del directorio, una sesión que otra pisaba antes de un sync perdía su cola para siempre, y una sesión que tocaba N REQ subía N veces, más un re-envío completo cada vez que un work nuevo arrancaba en el byte 0. Ahora cada sesión sube una vez, atribuida a un solo work. Se agregan además un candado de sync por máquina, un tope por envío y un presupuesto por sync, para que destrabar las colas atascadas no sature el backend central. Sin cambios en el servidor. Origen: medición en la máquina de un adoptante, con decenas de sesiones cuya cola nunca subió.
+
+### Added
+
+- **`hooks/logbook-schema.sql`**: tabla `session_sync`: cursor monótono, ruta del `.jsonl`, work atribuido y fallo vigente del canal `/transcript`, todo por sesión.
+- **`hooks/lib/logbook.py`** (captura): la fila de la sesión se registra en la misma transacción. Nace sembrada con lo ya subido según `transcript_cursor`. La atribución prefiere un work publicado y se fija; solo cambia si ese work no es publicable.
+- **`hooks/lib/logbook.py`** (sync):
+  - Backfill idempotente desde el estado heredado: punteros de `work` y pares de `transcript_cursor`, con `MAX` sobre todas las filas, sin bajar nunca un cursor.
+  - **Adopción** de sesiones del corpus local que quedaron sin work: reciben un exploratorio propio, marcado `adopted`, y suben en el mismo sync.
+  - Si la ruta guardada del `.jsonl` ya no existe, se busca por nombre en `~/.claude/projects/*/`.
+  - **Candado de instancia única**, `neb-logbook-sync.lock` junto a la DB; uno de más de 10 min se considera rancio.
+- **`sync-status`**: lista `sessions`, con `status` `error` / `esperando-work` / `jsonl-ausente` (la pérdida queda visible) y `pending_bytes`.
+
+### Changed
+
+- **`_drain_transcripts`**:
+  - Recorre sesiones, no works, de menor a mayor pendiente.
+  - Lee exactamente el tramo medido.
+  - Tope de **6 MiB de cuerpo serializado** por envío. Lo que no cabe espera con un error de texto fijo, para que `*_at` siga diciendo desde cuándo.
+  - Presupuesto de **32 MiB por sync**.
+  - Timeout de **30 s** para `/transcript`; el resto sigue en 5 s.
+  - Ninguna transacción queda abierta durante la red.
+  - Cada `200` escribe también `transcript_cursor`, así que volver a un cliente anterior no re-envía lo ya subido.
+- **Canal `/transcript` de sync-status**: pasa de `work.transcript_error` (heredado; el sync lo limpia) a `session_sync.transcript_error`. Los `works` de `sync-status` ya no traen campos de transcript.
+- **`_http`**: acepta `body=` (cuerpo ya serializado) y `timeout=`.
+- **`_upsert_req` / `_upsert_exploratory`**: devuelven el id local del work.
+- **Documentación**: `hooks/README.md`, `tooling/logbook.md`, `skills/logbook/SKILL.md` y `commands/logbook.md`.
+
+### Removed
+
+- La cuarentena manual de una sesión con `work.transcript_path = NULL` deja de tener efecto: el drenaje ya no lee esa columna. Una sesión demasiado grande para un envío la retiene el tope, visible en `sync-status`, hasta que exista la subida fragmentada.
+
 ## [6.11.0] - 2026-10-09
 
 > **Minor**: un plan con riesgo medio o alto que lee o escribe registros con un campo de estado lista todos los valores del estado y declara qué hace el flujo con cada uno, incluidos los que no toca y si un registro ya procesado puede volver a entrar o seguir cambiando (`process/planning.md` § "Riesgo de regresión"). **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): es una obligación nueva antes de aprobar el plan, hermana de la enumeración de dependientes; un estado que el plan no menciona cuenta como dependiente sin enumerar. Origen: diagnóstico de Fase 9 de un REQ del adoptante (pipeline por lotes sobre filas con estado). Dos defectos de origen Fase 3, tipo plan defectuoso, y dos hallazgos de diseño compartían la misma causa: el plan solo contemplaba dos de los estados que el flujo encontraba en operación.

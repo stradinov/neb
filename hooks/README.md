@@ -75,7 +75,12 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
 - **Windows**: declarar `"shell": "powershell"` con `logbook-sync.ps1` — combina stdin + variables de entorno (ver §Filosofía).
 - **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea.
-- **Fallos del sync, visibles**: el wrapper descarta `stderr` y el sync corre detached, así que un rechazo del central no se ve en pantalla. Se persiste en el `work` local (`last_error` / `transcript_error`) sin cortar el reintento, y lo lista `logbook.py sync-status` (`/logbook estado-sync`). Detalle en [`tooling/logbook.md`](../tooling/logbook.md).
+- **Fallos del sync, visibles**: el wrapper descarta `stderr` y el sync corre detached, así que un rechazo del central no se ve en pantalla. Se persiste sin cortar el reintento: el de publicación en el `work` local (`last_error`) y el del transcript en la sesión (`session_sync.transcript_error`). Lo lista `logbook.py sync-status` (`/logbook estado-sync`). Detalle en [`tooling/logbook.md`](../tooling/logbook.md).
+- **Subida del transcript por sesión** (desde 6.12): cada sesión tiene su propio cursor (`session_sync`) y sube **una sola vez**, atribuida a un work, aunque toque varios REQ. Ninguna captura le quita la cola a otra sesión.
+  - **Un sync a la vez:** usa un candado `neb-logbook-sync.lock` junto a la DB; uno de más de 10 min se considera rancio.
+  - **Tope y presupuesto:** cada envío pesa como máximo 6 MiB de cuerpo serializado, y cada sync manda como máximo 32 MiB, de menor a mayor pendiente. Una sesión que no cabe espera, visible en `estado-sync`.
+  - **Adopción:** una sesión que quedó sin work recibe un exploratorio propio (`payload_json.adopted`).
+  - **Búsqueda por nombre:** si la ruta guardada del `.jsonl` ya no existe, se busca por nombre en `~/.claude/projects/*/`.
 - **Opt-in por proyecto** (no auto-registrado por el plugin), como `usage-tracker`.
 - **Subsesión interna del corrector**: si `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), `exit 0` — no escribe la subsesión Haiku a la bitácora. Ver `hooks/lib/subsession.py`.
 - **Lógica completa**: `hooks/lib/logbook.py` (modo hook de captura + CLI del comando `/logbook`).

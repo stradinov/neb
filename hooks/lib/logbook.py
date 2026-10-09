@@ -8,8 +8,9 @@ Tres modos (dispatch en __main__):
       central (NEB_LOGBOOK_ENDPOINT y opt-in por proyecto vía marcador `<!-- neb-logbook: central -->`),
       lanza el modo `sync` detached.
   • sync <guide_dir> <home_dir>     — drena el outbox (works dirty) al central + sube el transcript
-      incremental. Best-effort, defensivo (REQ B). Un fallo NO corta el reintento (salvo el 409), pero
-      queda VISIBLE en work.last_error / work.transcript_error (ver `sync-status`).
+      incremental POR SESIÓN (session_sync; un sync a la vez). Best-effort, defensivo (REQ B). Un fallo
+      NO corta el reintento (salvo el 409), pero queda VISIBLE en work.last_error (publicación) /
+      session_sync.transcript_error (transcript de esa sesión) — ver `sync-status`.
   • CLI (list/show/claim/...)       — lo invoca el comando/skill `/logbook`. Con NEB_LOGBOOK_ENDPOINT
       configurado opera contra el CENTRAL (la autoridad: ids remotos); sin él, contra el SQLite local.
       Excepción: `sync-status` lee SIEMPRE el SQLite local (el estado del outbox no existe en el central)
@@ -29,6 +30,7 @@ import re
 import sqlite3
 import subprocess
 import sys
+import time
 from datetime import datetime, timezone
 
 # Infra compartida de la DB (resolver dual-mode + conexión net-new + helpers puros movidos).
@@ -74,8 +76,9 @@ def main():
     if con is None:
         return
     try:
+        work_ids = []                                 # works de esta captura, en orden de preferencia
         if active_reqs:
-            for active in active_reqs:                # N REQ activos (incluye varios del mismo proyecto)
+            for active in active_reqs:                # N REQ activos (incluye varios del mismo proyecto), mtime desc
                 project  = _project_id(active.get("project_path") or cwd)
                 req_slug = active.get("name") or "sin-nombre"
                 payload  = json.dumps({
@@ -84,12 +87,14 @@ def main():
                     "files": active.get("files", ""),
                     "pending_delivery": active.get("pending_delivery", ""),
                 }, ensure_ascii=False)
-                _upsert_req(con, project, req_slug, owner, machine, active.get("state", ""),
-                            branch, head, active.get("project_path", ""), active.get("draft", ""),
-                            payload, session_id, jsonl_path)
+                work_ids.append(_upsert_req(con, project, req_slug, owner, machine, active.get("state", ""),
+                                            branch, head, active.get("project_path", ""), active.get("draft", ""),
+                                            payload, session_id, jsonl_path))
         else:
             summary = _first_user_prompt(jsonl_path)
-            _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd, jsonl_path)
+            work_ids.append(_upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd,
+                                                jsonl_path))
+        _register_session(con, session_id, jsonl_path, work_ids)   # cursor de subida propio de la sesión
         _index_local(con, session_id, None, jsonl_path)   # SR-1: persistir el corpus local (siempre)
         con.commit()
     finally:
@@ -105,6 +110,7 @@ def main():
 
 def _upsert_req(con, project, req_slug, owner, machine, state, branch, head,
                 repo_path, change_md, payload, session_id, transcript_path):
+    """Upsert del work del REQ. Devuelve su id local."""
     ts = now_iso()
     row = con.execute(
         "SELECT id FROM work WHERE mode='req' AND project=? AND req_slug=?",
@@ -115,20 +121,28 @@ def _upsert_req(con, project, req_slug, owner, machine, state, branch, head,
             "payload_json=?, payload_version=payload_version+1, claude_session_id=?, "
             "transcript_path=?, updated_at=?, dirty=1 WHERE id=?",
             (state, branch, head, change_md, payload, session_id, transcript_path, ts, row[0]))
-    else:
-        cur = con.execute(
-            "INSERT INTO work (mode, project, req_slug, owner, lock_state, req_state, branch, "
-            "head_commit, repo_path, change_md, payload_json, origin_dev, origin_machine, "
-            "claude_session_id, transcript_path, created_at, updated_at) "
-            "VALUES ('req',?,?,?,'owned',?,?,?,?,?,?,?,?,?,?,?,?)",
-            (project, req_slug, owner, state, branch, head, repo_path, change_md, payload,
-             owner, machine, session_id, transcript_path, ts, ts))
-        _event(con, cur.lastrowid, owner, machine, "publish")
+        return row[0]
+    cur = con.execute(
+        "INSERT INTO work (mode, project, req_slug, owner, lock_state, req_state, branch, "
+        "head_commit, repo_path, change_md, payload_json, origin_dev, origin_machine, "
+        "claude_session_id, transcript_path, created_at, updated_at) "
+        "VALUES ('req',?,?,?,'owned',?,?,?,?,?,?,?,?,?,?,?,?)",
+        (project, req_slug, owner, state, branch, head, repo_path, change_md, payload,
+         owner, machine, session_id, transcript_path, ts, ts))
+    _event(con, cur.lastrowid, owner, machine, "publish")
+    return cur.lastrowid
 
 
-def _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd, transcript_path):
+def _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd, transcript_path,
+                        adopted=False):
+    """Upsert del work exploratorio de la sesión. Devuelve su id local.
+    adopted=True: lo crea el sync para una sesión que quedó sin work (ver _adopt_orphans); se marca en el
+    payload para distinguirlo en el catálogo de los exploratorios nacidos de una captura."""
     ts = now_iso()
-    payload = json.dumps({"summary": summary}, ensure_ascii=False)
+    data = {"summary": summary}
+    if adopted:
+        data["adopted"] = True
+    payload = json.dumps(data, ensure_ascii=False)
     row = con.execute(
         "SELECT id FROM work WHERE mode='exploratory' AND claude_session_id=?",
         (session_id,)).fetchone()
@@ -137,13 +151,76 @@ def _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, 
             "UPDATE work SET payload_json=?, branch=?, head_commit=?, transcript_path=?, "
             "updated_at=?, dirty=1 WHERE id=?",
             (payload, branch, head, transcript_path, ts, row[0]))
-    else:
-        cur = con.execute(
-            "INSERT INTO work (mode, owner, lock_state, branch, head_commit, repo_path, "
-            "payload_json, origin_dev, origin_machine, claude_session_id, transcript_path, "
-            "created_at, updated_at) VALUES ('exploratory',?,'owned',?,?,?,?,?,?,?,?,?,?)",
-            (owner, branch, head, cwd, payload, owner, machine, session_id, transcript_path, ts, ts))
-        _event(con, cur.lastrowid, owner, machine, "publish")
+        return row[0]
+    cur = con.execute(
+        "INSERT INTO work (mode, owner, lock_state, branch, head_commit, repo_path, "
+        "payload_json, origin_dev, origin_machine, claude_session_id, transcript_path, "
+        "created_at, updated_at) VALUES ('exploratory',?,'owned',?,?,?,?,?,?,?,?,?,?)",
+        (owner, branch, head, cwd, payload, owner, machine, session_id, transcript_path, ts, ts))
+    _event(con, cur.lastrowid, owner, machine, "publish")
+    return cur.lastrowid
+
+
+# --------------------------------------------------------------------------- cursor por sesión
+# Antes de 6.12 el cursor de subida era por (sesión, work) y el drenaje recorría los works: subía solo la
+# sesión que cada work apuntaba EN ESE MOMENTO. Como cada captura reapunta todos los REQ activos del cwd,
+# una sesión que otra pisaba antes de un sync perdía su cola para siempre (y la del home subía N veces,
+# una por REQ). Ahora cada sesión tiene su fila en session_sync y sube una sola vez.
+
+def _work_rank(con, work_id):
+    """Orden de preferencia para atribuir una sesión (menor = mejor): con remote_id antes que sin él (sin
+    remote_id no puede recibir nada) y, entre esos, sin conflicto antes que en conflicto. (False, 0) es el
+    ideal: publicado y sin 409. None si el work no existe."""
+    r = con.execute("SELECT remote_id, conflict FROM work WHERE id=?", (work_id,)).fetchone()
+    if r is None:
+        return None
+    return (r[0] is None, r[1] or 0)
+
+
+def _attribution(con, candidates):
+    """El mejor candidato según _work_rank; entre iguales gana el primero (el REQ de mtime más reciente)."""
+    best = None
+    for wid in candidates:
+        if wid is None:
+            continue
+        rank = _work_rank(con, wid)
+        if rank is not None and (best is None or rank < best[0]):
+            best = (rank, wid)
+    return best[1] if best else None
+
+
+def _cursor_seed(con, session_id):
+    """Lo que el central ya tiene de la sesión según el cursor heredado: los pares solo avanzan con un 200
+    y todos arrancan en 0, así que la unión subida es [0, MAX]."""
+    return con.execute("SELECT COALESCE(MAX(synced_byte), 0) FROM transcript_cursor WHERE session_id=?",
+                       (session_id,)).fetchone()[0]
+
+
+def _register_session(con, session_id, transcript_path, work_ids):
+    """Alta o actualización de la fila de subida de la sesión, en la misma transacción de la captura.
+    Nace con el cursor sembrado desde transcript_cursor: la captura que estrena 6.12 corre ANTES que
+    cualquier sync y sin la siembra re-enviaría la sesión desde el byte 0. La atribución es fija: solo se
+    reasigna si uno de los works de esta captura es estrictamente mejor según _work_rank (el actual no
+    está publicado, está en conflicto o ya no existe). Best-effort."""
+    try:
+        ts = now_iso()
+        row = con.execute("SELECT work_id FROM session_sync WHERE session_id=?", (session_id,)).fetchone()
+        if row is None:
+            con.execute(
+                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
+                "VALUES (?,?,?,?,?)",
+                (session_id, _attribution(con, work_ids), transcript_path, _cursor_seed(con, session_id), ts))
+            return
+        wid = row[0]
+        current = _work_rank(con, wid) if wid is not None else None
+        if current != (False, 0):
+            alt = _attribution(con, work_ids)
+            if alt is not None and (current is None or _work_rank(con, alt) < current):
+                wid = alt
+        con.execute("UPDATE session_sync SET work_id=?, transcript_path=?, updated_at=? WHERE session_id=?",
+                    (wid, transcript_path, ts, session_id))
+    except sqlite3.Error as e:
+        print(f"[logbook] aviso: no se pudo registrar la sesión {session_id}: {e}", file=sys.stderr)
 
 
 def _event(con, work_id, dev, machine, action, prev_owner=None, note=None):
@@ -237,20 +314,22 @@ def _maybe_spawn_sync(cwd, guide_dir, home_dir):
         pass
 
 
-def _http(endpoint, token, path, method="GET", payload=None):
-    """Request JSON al central. Devuelve (status_code|None, dict). Defensivo (timeouts cortos)."""
+def _http(endpoint, token, path, method="GET", payload=None, body=None, timeout=5):
+    """Request JSON al central. Devuelve (status_code|None, dict). Defensivo (timeouts cortos).
+    body: cuerpo ya serializado (bytes); evita serializar dos veces un transcript que ya se midió.
+    timeout: por operación de socket; /transcript usa uno mayor porque manda cuerpos de varios MiB."""
     import http.client
     import urllib.request
     import urllib.error
     url = endpoint.rstrip("/") + path
-    data = json.dumps(payload).encode("utf-8") if payload is not None else None
+    data = body if body is not None else (json.dumps(payload).encode("utf-8") if payload is not None else None)
     headers = {"Authorization": "Bearer " + token}
     if data is not None:
         headers["Content-Type"] = "application/json"
     try:
         # El Request va DENTRO del try: un endpoint sin esquema ("host/ruta") lanza ValueError al construirlo.
         req = urllib.request.Request(url, data=data, method=method, headers=headers)
-        with urllib.request.urlopen(req, timeout=5) as r:
+        with urllib.request.urlopen(req, timeout=timeout) as r:
             body = r.read().decode("utf-8")
             return r.status, (json.loads(body) if body else {})
     except urllib.error.HTTPError as e:
@@ -283,22 +362,103 @@ def sync_main(args):
 #    db_path     = os.path.join(home, ".claude", "neb-logbook.db")
     db_path     = resolve_db_path(home)
     schema_path = os.path.join(guide, "hooks", "logbook-schema.sql") if guide else ""
-    con = _connect(db_path, schema_path)
-    if con is None:
+    lock = _acquire_sync_lock(os.path.dirname(db_path))
+    if lock is False:
+        print("[logbook] sync: otro sync de esta máquina está en curso; nada que hacer", file=sys.stderr)
         return
-    con.row_factory = sqlite3.Row
     try:
-        _drain_works(con, endpoint, token)
-        _drain_transcripts(con, endpoint, token)
+        con = _connect(db_path, schema_path)
+        if con is None:
+            return
+        con.row_factory = sqlite3.Row
+        try:
+            index = _JsonlIndex(home)
+            # Backfill ANTES de publicar works: un exploratorio recién adoptado se publica y sube su
+            # transcript en este mismo sync.
+            _backfill_sessions(con, index)
+            _drain_works(con, endpoint, token)
+            _drain_transcripts(con, endpoint, token, index)
+        finally:
+            con.close()
     finally:
-        con.close()
+        _release_sync_lock(lock)
+
+
+# --- un sync a la vez ---------------------------------------------------------------------------
+# Cada Stop/SessionEnd/PreCompact en un cwd compartido lanza un sync detached. Sin candado, varios
+# mandarían en paralelo el mismo tramo pendiente a un central que se cae por memoria. El perdedor sale:
+# el siguiente Stop vuelve a disparar. El dueño refresca el mtime del candado antes de cada POST
+# (_touch_sync_lock), así que «rancio» (más viejo que _SYNC_LOCK_STALE_S) significa un proceso muerto, no
+# uno lento con el central colgado. Al terminar, solo borra el candado si sigue siendo suyo (pid).
+# Dos procesos que lo declaran rancio a la vez pueden quedar ambos dentro: carrera residual aceptada;
+# el central deduplica rangos idénticos.
+
+_SYNC_LOCK_NAME = "neb-logbook-sync.lock"
+_SYNC_LOCK_STALE_S = 600
+_SYNC_LOCK_HELD = None                                # ruta del candado de ESTE proceso, si lo tiene
+
+
+def _acquire_sync_lock(lock_dir):
+    """Ruta del candado si se tomó; False si otro sync lo tiene; None si no se pudo crear por una causa
+    ajena al candado (se sincroniza sin candado, como antes de 6.12, en vez de dejar de subir)."""
+    global _SYNC_LOCK_HELD
+    path = os.path.join(lock_dir or ".", _SYNC_LOCK_NAME)
+    for attempt in range(2):
+        try:
+            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+            try:
+                os.write(fd, f"{os.getpid()} {now_iso()}\n".encode("ascii"))
+            finally:
+                os.close(fd)
+            _SYNC_LOCK_HELD = path
+            return path
+        except FileExistsError:
+            try:
+                age = time.time() - os.path.getmtime(path)
+            except OSError:
+                continue                              # lo liberaron entre medio: reintentar
+            if age < _SYNC_LOCK_STALE_S or attempt:
+                return False
+            try:
+                os.remove(path)                       # rancio: el proceso que lo tomó ya no existe
+            except OSError:
+                return False
+        except PermissionError:
+            return False                              # Windows: el archivo existe y se está borrando
+        except OSError as e:
+            print(f"[logbook] aviso: sin candado de sync ({e}); se sincroniza igual", file=sys.stderr)
+            return None
+    return False
+
+
+def _touch_sync_lock():
+    """Latido: el dueño refresca el mtime antes de cada POST para que nadie lo dé por rancio."""
+    if _SYNC_LOCK_HELD:
+        try:
+            os.utime(_SYNC_LOCK_HELD, None)
+        except OSError:
+            pass
+
+
+def _release_sync_lock(lock):
+    """Borra el candado solo si sigue siendo de este proceso: si otro lo tomó por rancio, es suyo."""
+    global _SYNC_LOCK_HELD
+    if lock:
+        try:
+            with open(lock, encoding="ascii", errors="replace") as fh:
+                mine = fh.read().split(" ", 1)[0] == str(os.getpid())
+            if mine:
+                os.remove(lock)
+        except OSError:
+            pass
+    _SYNC_LOCK_HELD = None
 
 
 # --- fallos de sync visibles -------------------------------------------------------------------
 # Un fallo que no sea 200 NO corta el reintento (salvo el 409, que ya lo cortaba), pero deja de ser
-# mudo: se persiste por canal en work.last_error (publish) / work.transcript_error (transcript).
-# Dos pares y no uno porque ambos drenajes pueden tocar la misma fila en el mismo sync: con un solo
-# slot el segundo pisaría la causa del primero. Cada drenaje escribe y limpia SOLO su par.
+# mudo: se persiste por canal. La publicación del work va en work.last_error; el transcript, desde 6.12,
+# en session_sync.transcript_error de cada sesión (work.transcript_error queda heredado y el sync lo
+# limpia). Cada drenaje escribe y limpia SOLO su canal.
 
 _SYNC_ERR_MAX = 500
 
@@ -329,7 +489,7 @@ def _record_sync_error(con, work_id, col, text, prev, only_if_dirty=False):
     error no puede tumbar el drenaje de los demás works (antes esta rama no hacía nada y no podía fallar).
     No reescribe si el texto no cambió: en régimen estable son 0 escrituras y <col>_at responde
     'desde cuándo falla', no 'cuándo fue el último reintento'.
-    `col` es una constante interna ('last_error' | 'transcript_error'), nunca entrada externa.
+    `col` es una constante interna ('last_error'; el transcript usa _record_session_error), nunca entrada externa.
     only_if_dirty: no registrar si otro sync ya publicó este work mientras este POST estaba en vuelo."""
     print(f"[logbook] sync work {work_id}: {text}", file=sys.stderr)
     if text == prev:
@@ -427,6 +587,7 @@ def _drain_works(con, endpoint, token):
             "transcript_path": w["transcript_path"],
         }
         try:
+            _touch_sync_lock()
             code, resp = _http(endpoint, token, "/work/publish", "POST", payload)
             remote_id = resp.get("remote_id") if isinstance(resp, dict) else None
             if code == 200 and remote_id is None:
@@ -462,64 +623,288 @@ def _drain_works(con, endpoint, token):
             continue
 
 
-def _drain_transcripts(con, endpoint, token):
-    works = con.execute(
-        "SELECT id, remote_id, claude_session_id, transcript_path, transcript_error FROM work "
-        "WHERE remote_id IS NOT NULL AND transcript_path IS NOT NULL").fetchall()
-    for w in works:
-        sid = w["claude_session_id"]
-        path = posix_to_win(w["transcript_path"] or "")
-        if not sid or not path or not os.path.isfile(path):
-            # Ya no hay nada que reintentar (el .jsonl es efímero): un fallo previo dejaría un aviso
-            # permanente y sin acción posible. Decisión de diseño: se limpia.
-            _clear_sync_error(con, w["id"], "transcript_error", w["transcript_error"])
+# --- transcripts: backfill, adopción y drenaje por sesión ---------------------------------------
+# Tope por envío y presupuesto por sync: mientras el cliente no fragmente, una sesión cuyo tramo
+# pendiente no cabe en un envío espera, visible, en vez de mandar un cuerpo de decenas de MiB a un
+# central que se cae por memoria. Los números son los del cliente fragmentado previsto: 6 MiB de cuerpo
+# (75 % del tope del servidor) y 32 MiB por sync. Se mide el cuerpo serializado, no los bytes crudos:
+# el JSON escapa comillas y no-ASCII, y el envío lleva además el text_plain.
+
+_TRANSCRIPT_BODY_MAX = 6 * 1024 * 1024
+_TRANSCRIPT_SYNC_BUDGET = 32 * 1024 * 1024
+_TRANSCRIPT_TIMEOUT = 30
+# Texto FIJO (sin el tamaño): *_at debe decir desde cuándo espera, no reescribirse en cada sync.
+_TRANSCRIPT_TOO_BIG = "transcript: el tramo pendiente excede el tope por envío; espera la subida fragmentada"
+# Respuestas que indican un central caído o colgado (no un problema de ESTA sesión): cortan el envío del sync.
+# Un 500 no está: puede venir del contenido de una sesión concreta y no debe frenar a las demás.
+_CENTRAL_DOWN = (None, 502, 503, 504)
+
+
+class _JsonlIndex:
+    """session_id -> ruta del .jsonl bajo <home>/.claude/projects/*/. Se arma una vez por sync y solo si
+    hace falta (una ruta guardada que ya no existe, o una sesión sin ruta). Si un id aparece en varios
+    directorios, gana el archivo más grande."""
+
+    def __init__(self, home):
+        self._root = os.path.join(home or os.path.expanduser("~"), ".claude", "projects")
+        self._idx = None
+
+    def get(self, session_id):
+        if self._idx is None:
+            self._idx = {}
+            try:
+                for d in os.scandir(self._root):
+                    if not d.is_dir():
+                        continue
+                    try:
+                        for f in os.scandir(d.path):
+                            if f.is_file() and f.name.endswith(".jsonl"):
+                                sid = f.name[:-6]
+                                prev = self._idx.get(sid)
+                                if prev is None or f.stat().st_size > os.path.getsize(prev):
+                                    self._idx[sid] = f.path
+                    except OSError:
+                        continue
+            except OSError:
+                pass
+        return self._idx.get(session_id)
+
+
+def _session_path(stored, session_id, index):
+    """Ruta utilizable del .jsonl: la guardada si existe; si no, la del índice; None si no hay archivo."""
+    path = posix_to_win(stored or "")
+    if path and os.path.isfile(path):
+        return path
+    return index.get(session_id) if index is not None else None
+
+
+def _jsonl_cwd(path, max_lines=50):
+    """cwd de la sesión según su .jsonl (las entradas user/assistant lo traen). None si no aparece."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as fh:
+            for i, line in enumerate(fh):
+                if i >= max_lines:
+                    break
+                try:
+                    cwd = (json.loads(line) or {}).get("cwd")
+                except (json.JSONDecodeError, AttributeError):
+                    continue
+                if cwd:
+                    return cwd
+    except OSError:
+        pass
+    return None
+
+
+def _backfill_sessions(con, index):
+    """Completa session_sync desde el estado heredado. Idempotente y sin red. Ningún cursor baja nunca.
+    1. Sesiones apuntadas por un work y sin fila: atribución como en la captura (prefiere publicable),
+       ruta del work (NULL o inexistente se resuelve por nombre al drenar).
+    2. Sesiones con pares en transcript_cursor y sin fila (las que otra sesión pisó): atribuidas al par
+       más avanzado que sea publicable.
+    3. Para TODAS las filas: synced_byte = MAX(synced_byte, MAX de sus pares).
+    4. Limpia work.transcript_error heredado: el canal vive en session_sync.
+    5. Adopción de huérfanas (ver _adopt_orphans), fuera de la transacción anterior y SOLO si 1-4 se
+       confirmaron: con el backfill a medias, una sesión con pares parecería huérfana."""
+    ts = now_iso()
+    try:
+        pointed = {}
+        for r in con.execute(
+                "SELECT claude_session_id AS sid, id, transcript_path FROM work "
+                "WHERE claude_session_id IS NOT NULL "
+                "AND claude_session_id NOT IN (SELECT session_id FROM session_sync) "
+                "ORDER BY updated_at DESC, id DESC").fetchall():
+            pointed.setdefault(r["sid"], []).append((r["id"], r["transcript_path"]))
+        for sid, items in pointed.items():
+            path = next((p for _, p in items if p), None)
+            con.execute(
+                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
+                "VALUES (?,?,?,?,?)",
+                (sid, _attribution(con, [w for w, _ in items]), path, _cursor_seed(con, sid), ts))
+        pairs = {}
+        for r in con.execute(
+                "SELECT session_id AS sid, work_id, synced_byte FROM transcript_cursor "
+                "WHERE session_id NOT IN (SELECT session_id FROM session_sync) "
+                "ORDER BY session_id, synced_byte DESC, work_id").fetchall():
+            pairs.setdefault(r["sid"], []).append((r["work_id"], r["synced_byte"]))
+        for sid, items in pairs.items():
+            con.execute(
+                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
+                "VALUES (?,?,NULL,?,?)",
+                (sid, _attribution(con, [w for w, _ in items]), items[0][1], ts))
+        con.execute(
+            "UPDATE session_sync SET synced_byte = (SELECT MAX(tc.synced_byte) FROM transcript_cursor tc "
+            "WHERE tc.session_id = session_sync.session_id) "
+            "WHERE synced_byte < (SELECT COALESCE(MAX(tc.synced_byte), 0) FROM transcript_cursor tc "
+            "WHERE tc.session_id = session_sync.session_id)")
+        con.execute("UPDATE work SET transcript_error=NULL, transcript_error_at=NULL WHERE transcript_error IS NOT NULL")
+        con.commit()
+    except sqlite3.Error as e:
+        _quiet_rollback(con)
+        print(f"[logbook] aviso: backfill de session_sync: {e}", file=sys.stderr)
+        return
+    _adopt_orphans(con, index)
+
+
+_ORPHANS_SQL = (
+    "SELECT DISTINCT session_id FROM transcript_local "
+    "WHERE session_id NOT IN (SELECT session_id FROM session_sync) "
+    "AND session_id NOT IN (SELECT session_id FROM transcript_cursor) "
+    "AND session_id NOT IN (SELECT claude_session_id FROM work WHERE claude_session_id IS NOT NULL)")
+
+
+def _adopt_orphans(con, index):
+    """Sesiones del corpus local (transcript_local) sin fila en session_sync, sin pares heredados y sin work
+    que las apunte: las que otra captura pisó antes de su primer sync. Reciben un exploratorio propio
+    (marcado `adopted`) y su fila, y suben en este mismo sync. Sin .jsonl en disco no hay qué subir: se
+    saltan (sync-status las reporta como pérdida si el corpus local registró bytes)."""
+    try:
+        orphans = [r[0] for r in con.execute(_ORPHANS_SQL)]
+    except sqlite3.Error as e:
+        print(f"[logbook] aviso: adopción de sesiones: {e}", file=sys.stderr)
+        return
+    if not orphans:
+        return
+    owner, machine = _whoami(), _hostname()
+    for sid in orphans:
+        path = index.get(sid) if index is not None else None
+        if not path:
             continue
-        cur = con.execute("SELECT synced_byte FROM transcript_cursor WHERE session_id=? AND work_id=?",
-                          (sid, w["id"])).fetchone()
-        start = cur["synced_byte"] if cur else 0
+        summary, cwd = _first_user_prompt(path), _jsonl_cwd(path)   # lecturas de disco fuera de la transacción
+        try:
+            wid = _upsert_exploratory(con, sid, owner, machine, summary, None, None, cwd, path, adopted=True)
+            con.execute(
+                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
+                "VALUES (?,?,?,?,?)", (sid, wid, path, _cursor_seed(con, sid), now_iso()))
+            con.commit()
+        except sqlite3.IntegrityError:
+            _quiet_rollback(con)                      # otro proceso creó su exploratorio entre medio
+        except sqlite3.Error as e:
+            _quiet_rollback(con)
+            print(f"[logbook] aviso: no se pudo adoptar la sesión {sid}: {e}", file=sys.stderr)
+
+
+def _record_session_error(con, session_id, text, prev):
+    """Fallo vigente del transcript de una sesión. Misma semántica que _record_sync_error: no reescribe si
+    el texto no cambió (transcript_error_at = desde cuándo) y nunca propaga."""
+    print(f"[logbook] sync sesión {session_id}: {text}", file=sys.stderr)
+    if text == prev:
+        return
+    try:
+        con.execute("UPDATE session_sync SET transcript_error=?, transcript_error_at=? WHERE session_id=?",
+                    (text, now_iso(), session_id))
+        con.commit()
+    except Exception as e:
+        _quiet_rollback(con)
+        print(f"[logbook] aviso: no se pudo registrar el fallo de la sesión {session_id}: {e}", file=sys.stderr)
+
+
+def _clear_session_error(con, session_id, prev):
+    if prev is None:
+        return
+    try:
+        con.execute("UPDATE session_sync SET transcript_error=NULL, transcript_error_at=NULL WHERE session_id=?",
+                    (session_id,))
+        con.commit()
+    except Exception as e:
+        _quiet_rollback(con)
+        print(f"[logbook] aviso: no se pudo limpiar el fallo de la sesión {session_id}: {e}", file=sys.stderr)
+
+
+def _drain_transcripts(con, endpoint, token, index=None):
+    """Sube el tramo pendiente de CADA sesión de session_sync cuyo work atribuido ya está publicado.
+    Orden: menor pendiente primero (una sesión grande no detiene a las chicas). Un envío por sesión,
+    acotado por _TRANSCRIPT_BODY_MAX; el sync se detiene al agotar _TRANSCRIPT_SYNC_BUDGET."""
+    rows = con.execute(
+        "SELECT s.session_id, s.work_id, s.transcript_path, s.synced_byte, s.transcript_error, w.remote_id "
+        "FROM session_sync s JOIN work w ON w.id = s.work_id WHERE w.remote_id IS NOT NULL").fetchall()
+    todo = []
+    for r in rows:
+        sid = r["session_id"]
+        path = _session_path(r["transcript_path"], sid, index)
+        if not path:
+            # Sin .jsonl no hay nada que reintentar: un fallo previo dejaría un aviso sin acción posible.
+            # La pérdida (si había cola) la reporta sync-status a partir de transcript_local.
+            _clear_session_error(con, sid, r["transcript_error"])
+            continue
+        if path != posix_to_win(r["transcript_path"] or ""):
+            try:
+                con.execute("UPDATE session_sync SET transcript_path=? WHERE session_id=?", (path, sid))
+                con.commit()
+            except sqlite3.Error:
+                _quiet_rollback(con)
         try:
             size = os.path.getsize(path)
         except OSError:
             continue
+        start = r["synced_byte"]
         if size <= start:
-            _clear_sync_error(con, w["id"], "transcript_error", w["transcript_error"])   # al día
+            _clear_session_error(con, sid, r["transcript_error"])   # al día
+            continue
+        todo.append((size - start, sid, r, path, start, size))
+    todo.sort(key=lambda t: (t[0], t[1]))
+
+    spent = 0
+    stop_sending = False                              # presupuesto agotado o central caído
+    for pending, sid, r, path, start, size in todo:
+        if pending > _TRANSCRIPT_BODY_MAX:
+            # Si los bytes crudos ya no caben, el cuerpo serializado tampoco: no se lee el archivo. Se sigue
+            # marcando aunque ya no se envíe nada en este sync, para que sync-status lo muestre.
+            _record_session_error(con, sid, _TRANSCRIPT_TOO_BIG, r["transcript_error"])
+            continue
+        if stop_sending:
             continue
         try:
             with open(path, "rb") as f:
                 f.seek(start)
-                chunk = f.read()
+                chunk = f.read(pending)               # exactamente el tramo medido: byte_to = start + len
         except OSError:
             continue
+        end = start + len(chunk)
+        if end <= start:
+            continue
         content = chunk.decode("utf-8", errors="replace")
-        text_plain = _extract_text_plain(content)
+        body = json.dumps({
+            "session_id": sid, "work_id": r["remote_id"],
+            "byte_from": start, "byte_to": end,
+            "content": content, "text_plain": _extract_text_plain(content),
+        }).encode("utf-8")
+        if len(body) > _TRANSCRIPT_BODY_MAX:
+            _record_session_error(con, sid, _TRANSCRIPT_TOO_BIG, r["transcript_error"])
+            continue
+        if spent + len(body) > _TRANSCRIPT_SYNC_BUDGET:
+            stop_sending = True                       # el resto, en el siguiente sync
+            continue
+        spent += len(body)
         try:
-            code, resp = _http(endpoint, token, "/transcript", "POST", {
-                "session_id": sid, "work_id": w["remote_id"],
-                "byte_from": start, "byte_to": size,
-                "content": content, "text_plain": text_plain,
-            })
+            con.commit()                              # ninguna transacción abierta durante la red
+            _touch_sync_lock()
+            code, resp = _http(endpoint, token, "/transcript", "POST", body=body, timeout=_TRANSCRIPT_TIMEOUT)
+            if code in _CENTRAL_DOWN:
+                # Sin respuesta o el proxy sin backend: seguir solo alarga el sync y golpea a un central que se
+                # está cayendo. El resto espera al siguiente sync (el fallo de esta sesión sí se registra).
+                stop_sending = True
             if code == 200:
+                ts = now_iso()
+                con.execute("UPDATE session_sync SET synced_byte=MAX(synced_byte, ?), transcript_error=NULL, "
+                            "transcript_error_at=NULL, updated_at=? WHERE session_id=?", (end, ts, sid))
+                # Cursor heredado: volver a un cliente anterior no re-envía lo ya subido.
                 con.execute(
-                    "INSERT INTO transcript_cursor (session_id, work_id, synced_byte, updated_at) "
-                    "VALUES (?,?,?,?) ON CONFLICT(session_id, work_id) DO UPDATE SET "
-                    "synced_byte=excluded.synced_byte, updated_at=excluded.updated_at",
-                    (sid, w["id"], size, now_iso()))
-                con.execute("UPDATE work SET transcript_error=NULL, transcript_error_at=NULL "
-                            "WHERE id=? AND transcript_error IS NOT NULL", (w["id"],))
+                    "INSERT INTO transcript_cursor (session_id, work_id, synced_byte, updated_at) VALUES (?,?,?,?) "
+                    "ON CONFLICT(session_id, work_id) DO UPDATE SET "
+                    "synced_byte=MAX(synced_byte, excluded.synced_byte), updated_at=excluded.updated_at",
+                    (sid, r["work_id"], end, ts))
                 con.commit()
             else:
-                # Si otro sync ya subió este tramo mientras el POST estaba en vuelo, el fallo está rancio.
-                now = con.execute("SELECT synced_byte FROM transcript_cursor WHERE session_id=? AND work_id=?",
-                                  (sid, w["id"])).fetchone()
-                if (now["synced_byte"] if now else 0) != start:
+                # Si otro sync subió este tramo mientras el POST estaba en vuelo, el fallo está rancio.
+                now = con.execute("SELECT synced_byte FROM session_sync WHERE session_id=?", (sid,)).fetchone()
+                if (now[0] if now else 0) != start:
                     continue
-                # El texto NO lleva el tamaño pendiente: en una sesión viva cambia en cada sync y reescribiría
-                # transcript_error_at siempre. `sync-status` lo calcula al vuelo (transcript_pending_bytes).
-                _record_sync_error(con, w["id"], "transcript_error",
-                                   _sync_error_text("transcript", code, resp, token), w["transcript_error"])
+                _record_session_error(con, sid, _sync_error_text("transcript", code, resp, token),
+                                      r["transcript_error"])
         except sqlite3.OperationalError as e:
             _quiet_rollback(con)
-            print(f"[logbook] aviso: sync transcript work {w['id']}: {e}", file=sys.stderr)
+            print(f"[logbook] aviso: sync transcript de la sesión {sid}: {e}", file=sys.stderr)
             continue
 
 
@@ -819,41 +1204,79 @@ def cli_search(args):
                      ensure_ascii=False, indent=2, default=str))
 
 
-def _transcript_pending_bytes(con, work_id, session_id, transcript_path):
-    """Bytes del transcript aún no subidos al central (archivo − cursor). None si el archivo ya no existe."""
-    path = posix_to_win(transcript_path or "")
-    try:
-        if not session_id or not path or not os.path.isfile(path):
-            return None
-        cur = con.execute("SELECT synced_byte FROM transcript_cursor WHERE session_id=? AND work_id=?",
-                          (session_id, work_id)).fetchone()
-        return max(0, os.path.getsize(path) - (cur[0] if cur else 0))
-    except (OSError, sqlite3.Error):
-        return None
-
-
 def _sync_status_rows(con, central=True):
-    """Works locales que requieren atención: pendientes de publicar, en conflicto o con un fallo de sync
-    vigente. Función pura sobre la conexión (la comparten el CLI y los tests).
+    """Works locales que requieren atención: pendientes de publicar, en conflicto o con un fallo de
+    publicación vigente. Función pura sobre la conexión (la comparten el CLI y los tests).
     Sin central configurado `dirty` nace en 1 y nada lo baja: listar por dirty devolvería toda la
-    bitácora, así que ahí solo cuentan conflicto y fallos.
+    bitácora, así que ahí solo cuentan conflicto y fallos. El transcript se reporta por sesión
+    (_sync_status_sessions), no por work.
     La clave es `local_id`, nunca `id`: con central los demás verbos interpretan ids REMOTOS."""
-    where = "conflict=1 OR last_error IS NOT NULL OR transcript_error IS NOT NULL"
+    where = "conflict=1 OR last_error IS NOT NULL"
     if central:
         where = "dirty=1 OR " + where
     rows = con.execute(
         "SELECT id, mode, project, req_slug, dirty, conflict, remote_id, synced_at, last_error, last_error_at, "
-        "transcript_error, transcript_error_at, updated_at, archived_at, claude_session_id, transcript_path "
+        "updated_at, archived_at "
         f"FROM work WHERE {where} ORDER BY id").fetchall()
+    return [{"local_id": r[0], "mode": r[1], "project": r[2], "req_slug": r[3], "dirty": r[4],
+             "conflict": r[5], "remote_id": r[6], "synced_at": r[7], "last_error": r[8],
+             "last_error_at": r[9], "updated_at": r[10], "archived_at": r[11]} for r in rows]
+
+
+def _sync_status_sessions(con, index=None, central=True):
+    """Sesiones cuyo transcript requiere atención. `status`:
+      error          — fallo vigente del envío (incluye «excede el tope por envío»).
+      esperando-work — tiene cola, pero su work atribuido no está publicado (sin remote_id).
+      jsonl-ausente  — el .jsonl ya no existe y el corpus local registra bytes que nunca subieron:
+                       pérdida visible, sin acción posible. Incluye las huérfanas (sin fila ni work).
+    Una sesión al día, o con cola y work publicado (sube en el siguiente sync), no se lista.
+    Sin central nada sube nunca: solo se listan los fallos (mismo criterio que _sync_status_rows)."""
+    rows = con.execute(
+        "SELECT s.session_id, s.work_id, w.remote_id, s.transcript_path, s.synced_byte, s.transcript_error, "
+        "s.transcript_error_at FROM session_sync s LEFT JOIN work w ON w.id = s.work_id "
+        "ORDER BY s.session_id").fetchall()
     out = []
     for r in rows:
-        item = {"local_id": r[0], "mode": r[1], "project": r[2], "req_slug": r[3], "dirty": r[4],
-                "conflict": r[5], "remote_id": r[6], "synced_at": r[7], "last_error": r[8],
-                "last_error_at": r[9], "transcript_error": r[10], "transcript_error_at": r[11],
-                "updated_at": r[12], "archived_at": r[13]}
-        if r[10] is not None:
-            item["transcript_pending_bytes"] = _transcript_pending_bytes(con, r[0], r[14], r[15])
-        out.append(item)
+        sid, synced = r[0], r[4]
+        path = _session_path(r[3], sid, index)
+        pending = None
+        if path:
+            try:
+                pending = max(0, os.path.getsize(path) - synced)
+            except OSError:
+                path = None
+        status = None
+        if r[5] is not None:
+            status = "error"
+        elif path is None:
+            local = con.execute("SELECT COALESCE(MAX(byte_to), 0) FROM transcript_local WHERE session_id=?",
+                                (sid,)).fetchone()[0]
+            if local > synced:
+                status, pending = "jsonl-ausente", local - synced
+        elif pending and r[2] is None:
+            status = "esperando-work"
+        if status and (central or status == "error"):
+            out.append({"session_id": sid, "status": status, "work_local_id": r[1], "work_remote_id": r[2],
+                        "synced_byte": synced, "pending_bytes": pending,
+                        "transcript_error": r[5], "transcript_error_at": r[6]})
+    if not central:
+        return out
+    # Huérfanas sin fila ni work (otra captura las pisó) cuyo .jsonl ya no existe: el sync no puede
+    # adoptarlas, así que lo único posible es dejar visible la pérdida.
+    for (sid,) in con.execute(
+            "SELECT DISTINCT session_id FROM transcript_local "
+            "WHERE session_id NOT IN (SELECT session_id FROM session_sync) "
+            "AND session_id NOT IN (SELECT claude_session_id FROM work WHERE claude_session_id IS NOT NULL) "
+            "ORDER BY session_id").fetchall():
+        if _session_path(None, sid, index):
+            continue                                  # el próximo sync la adopta y la sube
+        local = con.execute("SELECT COALESCE(MAX(byte_to), 0) FROM transcript_local WHERE session_id=?",
+                            (sid,)).fetchone()[0]
+        synced = _cursor_seed(con, sid)
+        if local > synced:
+            out.append({"session_id": sid, "status": "jsonl-ausente", "work_local_id": None,
+                        "work_remote_id": None, "synced_byte": synced, "pending_bytes": local - synced,
+                        "transcript_error": None, "transcript_error_at": None})
     return out
 
 
@@ -869,6 +1292,7 @@ def cli_sync_status(_args):
         print(json.dumps({"error": "no se pudo abrir la bitacora local"}, ensure_ascii=True)); return
     try:
         works = _sync_status_rows(con, central=endpoint_set)
+        sessions = _sync_status_sessions(con, _JsonlIndex(os.path.expanduser("~")), central=endpoint_set)
     except Exception as e:
         print(json.dumps({"error": "no se pudo leer el estado del sync: " + str(e)[:200]}, ensure_ascii=True)); return
     finally:
@@ -884,10 +1308,17 @@ def cli_sync_status(_args):
         notes.append("remote_id null = este cliente nunca lo publico con exito. Con un 409 el work existe en el "
                      "central a nombre de otro (ubicarlo en `list` por project + req_slug); con un 5xx no existe "
                      "y solo queda corregir la causa que muestra last_error.")
+    if any(s["status"] == "jsonl-ausente" for s in sessions):
+        notes.append("jsonl-ausente = el archivo de la sesion ya no existe y pending_bytes nunca llego al central: "
+                     "es una perdida, no hay reintento posible (el corpus local conserva su text_plain).")
+    if any(s["transcript_error"] == _TRANSCRIPT_TOO_BIG for s in sessions):
+        notes.append("Las sesiones que exceden el tope por envio esperan a la subida fragmentada; pending_bytes "
+                     "dice cuanto falta.")
     print(json.dumps({
         "scope": "local", "endpoint_set": endpoint_set, "token_set": token_set,
-        "attention": sum(1 for w in works if w["conflict"] or w["last_error"] or w["transcript_error"]),
-        "notes": notes, "works": works,
+        "attention": (sum(1 for w in works if w["conflict"] or w["last_error"])
+                      + sum(1 for s in sessions if s["status"] == "error")),
+        "notes": notes, "works": works, "sessions": sessions,
     }, ensure_ascii=True, indent=2, default=str))
 
 

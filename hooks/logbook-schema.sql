@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS work (
   -- *_at = desde cuándo está vigente ese error (no se reescribe si el texto no cambia). Lo lee `logbook.py sync-status`.
   last_error          TEXT,                           -- canal /work/publish; NULL = sin fallo vigente
   last_error_at       TEXT,
-  transcript_error    TEXT,                           -- canal /transcript; NULL = sin fallo vigente
+  transcript_error    TEXT,                           -- HEREDADO (≤ 6.11): el canal /transcript vive en session_sync; el sync lo limpia
   transcript_error_at TEXT
 );
 
@@ -72,9 +72,10 @@ CREATE TABLE IF NOT EXISTS event (
 );
 CREATE INDEX IF NOT EXISTS idx_event_work ON event(work_id, ts);
 
--- Cursor de captura incremental del transcript, POR (sesión, work) para soportar N:M
--- (una sesión toca varios works; un work, varias sesiones). Vive en SQLite, no en archivo .offset:
--- el avance del cursor se confirma en la misma transacción que el delta → no se corrompe ante corte.
+-- Cursor de subida HEREDADO, por (sesión, work). Hasta 6.11 era la fuente del drenaje: subía solo la
+-- sesión apuntada por cada work, y una sesión que otra pisaba en los works REQ perdía su cola. Desde 6.12
+-- el drenaje usa `session_sync`; esta tabla la siembra (MAX por sesión) y se sigue escribiendo en cada 200
+-- para que volver a un cliente anterior no re-envíe lo ya subido.
 CREATE TABLE IF NOT EXISTS transcript_cursor (
   session_id  TEXT NOT NULL,
   work_id     INTEGER NOT NULL REFERENCES work(id) ON DELETE CASCADE,
@@ -83,10 +84,26 @@ CREATE TABLE IF NOT EXISTS transcript_cursor (
   PRIMARY KEY (session_id, work_id)
 );
 
+-- Cursor de subida POR SESIÓN (fuente del drenaje de transcripts desde 6.12). Una fila por sesión: la
+-- sesión sube UNA vez, atribuida a un solo work, aunque toque varios REQ. Ninguna captura le borra la
+-- cola a otra sesión. La atribución se fija al crear la fila y solo cambia si aparece un work mejor
+-- (el actual no está publicado, está en conflicto o ya no existe). synced_byte es monótono: solo sube (MAX).
+CREATE TABLE IF NOT EXISTS session_sync (
+  session_id          TEXT PRIMARY KEY,
+  work_id             INTEGER REFERENCES work(id) ON DELETE SET NULL,  -- work local al que se atribuye la subida
+  transcript_path     TEXT,                           -- última ruta conocida del .jsonl (NULL = buscar por nombre)
+  synced_byte         INTEGER NOT NULL DEFAULT 0,     -- hasta qué byte llegó al central
+  transcript_error    TEXT,                           -- fallo vigente del canal /transcript de esta sesión
+  transcript_error_at TEXT,                           -- desde cuándo (no se reescribe si el texto no cambia)
+  updated_at          TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_session_sync_work ON session_sync(work_id);
+
 -- Corpus local buscable (SR-1, programa preservación-de-conocimiento).
 -- Persiste el text_plain de las sesiones LOCALMENTE (el central lo tiene en su tabla
 -- `transcript`; el .jsonl es efímero). Habilita al solitario buscar su corpus sin central.
--- Cursor local = MAX(byte_to) por session_id (no usa transcript_cursor, que es del sync).
+-- Cursor local = MAX(byte_to) por session_id (no usa session_sync ni transcript_cursor, que son del sync).
+-- Como lo llena toda captura, también es la lista de sesiones que el sync adopta si quedaron sin work.
 -- El indice FTS5 (transcript_fts) se crea on-demand en logbook.py (SQLite sin FTS5 no rompe).
 CREATE TABLE IF NOT EXISTS transcript_local (
   id          INTEGER PRIMARY KEY,

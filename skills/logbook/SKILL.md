@@ -23,14 +23,21 @@ LB() { py "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python "$NEB_SRC/h
 ### Listar (default, sin args)
 `LB list` → JSON de los trabajos activos. Presenta una tabla: **id · proyecto/req (o "exploratoria") · owner · lock · estado · antigüedad**. Separa los **con-REQ** (relevables cross-dev) de las **sesiones exploratorias** (reanudables con `--resume` por su dueño).
 
-**Siempre** corre además `LB sync-status` y, **antes** de la tabla, antepón un aviso cuando su salida traiga `attention > 0` (works en conflicto o con un fallo de sync vigente) o `endpoint_set: true` con `token_set: false` (el sync no está corriendo y no deja rastro). Una línea por work afectado: `local_id` · req · canal (`publish`/`transcript`) · el texto del fallo · desde cuándo (`*_at`). Sin este aviso un rechazo permanente del central es invisible: el dev solo se entera si pregunta. Si no hay nada que avisar, no digas nada. **Pero si la salida de `LB sync-status` viene vacía, no es JSON o no trae `attention`, antepón una línea: «no se pudo verificar el estado del sync (¿`NEB_HOME` desactualizado respecto al plugin?)»** — una salida vacía no significa «nada atascado».
+**Siempre** corre además `LB sync-status` y, **antes** de la tabla, antepón un aviso cuando su salida traiga `attention > 0` (works en conflicto o con un fallo de publicación, o sesiones con un fallo de subida del transcript) o `endpoint_set: true` con `token_set: false` (el sync no está corriendo y no deja rastro). Una línea por work afectado (`local_id` · req · `last_error` · desde cuándo) y una por sesión con `status: error` (`session_id` · `transcript_error` · desde cuándo · `pending_bytes`). Sin este aviso un rechazo permanente del central es invisible: el dev solo se entera si pregunta. Si no hay nada que avisar, no digas nada. **Pero si la salida de `LB sync-status` viene vacía, no es JSON o no trae `attention`, antepón una línea: «no se pudo verificar el estado del sync (¿`NEB_HOME` desactualizado respecto al plugin?)»** — una salida vacía no significa «nada atascado».
 
 ### Estado del sync — `estado-sync`
-`LB sync-status` → estado del outbox hacia el central: works pendientes de publicar (`dirty`), en conflicto (`conflict`) o con un fallo vigente por canal — `last_error` (publicación del work) y `transcript_error` (subida del transcript), cada uno con su `*_at` = **desde cuándo** falla (no se reescribe mientras el error sea el mismo). `transcript_pending_bytes` dice cuánto transcript falta por subir. Lee **siempre** la DB local y nunca hace red: ese estado no existe en el central.
+`LB sync-status` → estado del outbox hacia el central. Lee **siempre** la DB local y nunca hace red: ese estado no existe en el central.
+- **`works`:** works pendientes de publicar (`dirty`), en conflicto (`conflict`) o con un fallo de publicación (`last_error`).
+- **`sessions`:** sesiones cuyo transcript requiere atención, según `status`:
+  - `error`: hay un fallo vigente. Incluye «excede el tope por envío», que espera la subida fragmentada.
+  - `esperando-work`: tiene cola, pero su work no está publicado.
+  - `jsonl-ausente`: el archivo ya no existe y `pending_bytes` nunca llegó al central. Es una pérdida sin reintento posible.
+
+Cada fallo trae su `*_at` = **desde cuándo** falla; no se reescribe mientras el error sea el mismo. `pending_bytes` dice cuánto falta por subir.
 
 Un fallo de sync es **informativo**: el cliente sigue reintentando en cada sync, y cuando la causa se corrige el work se publica solo. Solo el conflicto (`409`) corta el reintento y exige reconciliar (`tomar`/`liberar-forzado`) antes de volver a publicar; con `conflict=1`, `last_error` guarda el motivo del 409. El aviso de un conflicto se apaga cuando una **captura posterior** (siguiente Stop en ese REQ) vuelve a publicar con éxito; reconciliar por sí solo no toca la fila local.
 
-`transcript_error` describe **solo a la última sesión que capturó el work**: con varias sesiones alternando sobre el mismo REQ, el aviso puede aparecer y desaparecer y su `*_at` reiniciarse en cada alternancia.
+El fallo del transcript es **por sesión** (desde 6.12): varias sesiones alternando sobre el mismo REQ ya no se pisan el aviso ni la cola.
 
 ### Retomar — `retomar <id>`
 Corre `LB show <id>` y actúa según `mode`:
