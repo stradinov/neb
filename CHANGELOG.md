@@ -4,6 +4,14 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.12.1] - 2026-10-19
+
+> **Patch**: el `description` del subagente `context-completeness-reviewer` se entrecomilla. El valor sin comillas contenía `: ` ("Complementario a otros revisores: ellos auditan…"), lo que lo vuelve YAML inválido (`mapping values are not allowed here`). Hoy cargaba solo porque el fallback de Claude Code lo rescata en archivos LF; en un checkout CRLF (`core.autocrlf=true` en Windows) el frontmatter se leía vacío y el agente desaparecía sin error. Mismo defecto que el PR #3 de `methodology` corrige en los agentes de `onibex/agents/`. Sin cambio de texto ni de contrato.
+
+### Fixed
+
+- **`agents/context-completeness-reviewer.md`**: `description` entre comillas dobles, texto idéntico (el valor no contiene comillas dobles ni backslashes que escapar). Verificado: el frontmatter de los 9 `agents/*.md` y `skills/*/SKILL.md` pasa `yaml.safe_load` con LF y con CRLF y trae `name` + `description`.
+
 ## [6.12.0] - 2026-10-09
 
 > **Minor**: el transcript sube al central con un **cursor por sesión** (`session_sync`) en vez de un cursor por par (sesión, work). Antes, el drenaje subía solo la sesión que cada work apuntaba en ese momento. Como cada captura reapunta todos los REQ activos del directorio, una sesión que otra pisaba antes de un sync perdía su cola para siempre, y una sesión que tocaba N REQ subía N veces, más un re-envío completo cada vez que un work nuevo arrancaba en el byte 0. Ahora cada sesión sube una vez, atribuida a un solo work. Se agregan además un candado de sync por máquina, un tope por envío y un presupuesto por sync, para que destrabar las colas atascadas no sature el backend central. Sin cambios en el servidor. Origen: medición en la máquina de un adoptante, con decenas de sesiones cuya cola nunca subió.
@@ -11,7 +19,7 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 ### Added
 
 - **`hooks/logbook-schema.sql`**: tabla `session_sync`: cursor monótono, ruta del `.jsonl`, work atribuido y fallo vigente del canal `/transcript`, todo por sesión.
-- **`hooks/lib/logbook.py`** (captura): la fila de la sesión se registra en la misma transacción. Nace sembrada con lo ya subido según `transcript_cursor`. La atribución prefiere un work publicado y se fija; solo cambia si ese work no es publicable.
+- **`hooks/lib/logbook.py`** (captura): la fila de la sesión se registra en la misma transacción. Nace sembrada con lo ya subido según `transcript_cursor`. La atribución prefiere un work publicado y sin conflicto (`409`) y se fija; solo cambia si aparece uno estrictamente mejor (el actual no está publicado, está en conflicto o ya no existe).
 - **`hooks/lib/logbook.py`** (sync):
   - Backfill idempotente desde el estado heredado: punteros de `work` y pares de `transcript_cursor`, con `MAX` sobre todas las filas, sin bajar nunca un cursor.
   - **Adopción** de sesiones del corpus local que quedaron sin work: reciben un exploratorio propio, marcado `adopted`, y suben en el mismo sync.
@@ -28,7 +36,8 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
   - Presupuesto de **32 MiB por sync**.
   - Timeout de **30 s** para `/transcript`; el resto sigue en 5 s.
   - Ninguna transacción queda abierta durante la red.
-  - Cada `200` escribe también `transcript_cursor`, así que volver a un cliente anterior no re-envía lo ya subido.
+  - Cada `200` escribe también `transcript_cursor` para el work atribuido: volver a un cliente anterior no re-envía lo ya subido por ese work (los otros works que apunten a la sesión se comportan como antes de 6.12).
+  - Un central caído (sin respuesta, `502`/`503`/`504`) corta los envíos de ese sync; el dueño del candado refresca su mtime antes de cada envío y al terminar solo borra el candado si sigue siendo suyo.
 - **Canal `/transcript` de sync-status**: pasa de `work.transcript_error` (heredado; el sync lo limpia) a `session_sync.transcript_error`. Los `works` de `sync-status` ya no traen campos de transcript.
 - **`_http`**: acepta `body=` (cuerpo ya serializado) y `timeout=`.
 - **`_upsert_req` / `_upsert_exploratory`**: devuelven el id local del work.
