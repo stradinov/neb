@@ -21,8 +21,8 @@ Al entrar a un directorio de proyecto, Claude detecta el profile:
 |---|---|
 | **Profile disponible** y CLAUDE.md ya importa | Continúa sin aviso |
 | **Profile disponible** y CLAUDE.md no importa | Aviso: *"Detecté profile `<X>`. CLAUDE.md no lo importa. Sugerencia: instalar/activar el plugin de Neb (`/plugin install neb@neb` + `/reload-plugins`) y agregar el `@import` del profile al CLAUDE.md del proyecto."* |
-| **Profile pendiente** (listado sin `profiles/<X>/`) | Aviso: *"Detecté profile `<X>` (Pendiente). Sin convenciones específicas. ¿Crear el profile siguiendo el patrón de `profiles/self-applied/` (ver [CLAUDE.md interno del repo](../CLAUDE.md) "Agregar un profile nuevo") o continuar genérico?"* |
-| **Profile desconocido** (ningún indicador match) | Aviso: *"No detecté profile conocido. ¿Continuamos genérico, agregamos heurística + nuevo profile, o marco este dir como sin-profile (`neb-profile: none`) para no volver a sugerirlo?"* |
+| **Profile pendiente** (listado sin `profiles/<X>/`) | Aviso: *"Se detectó el profile `<X>` (Pendiente). Sin convenciones específicas. ¿Crear el profile siguiendo el patrón de `profiles/self-applied/` (ver [CLAUDE.md interno del repo](../CLAUDE.md) "Agregar un profile nuevo") o continuar genérico?"* |
+| **Profile desconocido** (ningún indicador match) | Aviso: *"No se detectó un profile conocido. ¿Seguir genérico, agregar heurística + nuevo profile, o marcar este dir como sin-profile (`neb-profile: none`) para no volver a sugerirlo?"* |
 
 Heurísticas y prioridad: orden de tabla en [`profiles/index.md`](../profiles/index.md).
 

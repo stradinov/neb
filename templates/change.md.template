@@ -119,7 +119,7 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 
 ## Reporte de cierre
 
-<!-- Completar al cerrar en Fase 8. Claude presenta este bloque al dev antes de "¿Damos por terminado?". -->
+<!-- Completar al cerrar en Fase 8. Claude presenta este bloque al dev antes de preguntar si el requerimiento se da por terminado. -->
 
 | Señal | Valor |
 |---|---|

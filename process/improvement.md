@@ -93,7 +93,7 @@ Adicionalmente, la revisión agregada:
 
 1. Aplica el Δ "−0.1 cada 10 changes sin disparar" a las métricas que no se activaron en el período.
 2. Identifica métricas con score `< -1` sostenido por **2 ajustes consecutivos** (no rebote a 0 entre medio).
-3. Para cada una, propone explícitamente: *"La métrica `<X>` tiene utilidad sostenida bajo umbral. ¿Deprecamos, revisamos umbral, o redefinimos?"* Tres opciones equivalentes; el dev decide.
+3. Para cada una, propone explícitamente: *"La métrica `<X>` tiene utilidad sostenida bajo umbral. ¿Se depreca, se revisa el umbral o se redefine?"* Tres opciones equivalentes; el dev decide.
 
 Las métricas con score `≥ +3` se marcan como **core** — no se deprecan ni se ajusta su umbral sin justificación fuerte.
 
@@ -102,7 +102,7 @@ Las métricas con score `≥ +3` se marcan como **core** — no se deprecan ni s
 Análogo al de métricas, aplicado a la tabla "Resumen de utilidad" de [`process/roles-invocation.md`](roles-invocation.md):
 
 1. Aplica Δ −0.5 a roles no invocados en 5 plan-reviews consecutivos donde habrían aplicado.
-2. Identifica roles con score `< -1` sostenido por **2 evaluaciones consecutivas** y propone: *"El rol `<X>` no aporta hallazgos sostenidos. ¿Deprecamos, ajustamos foco, o redefinimos su pertinencia?"*
+2. Identifica roles con score `< -1` sostenido por **2 evaluaciones consecutivas** y propone: *"El rol `<X>` no aporta hallazgos sostenidos. ¿Se depreca, se ajusta su foco o se redefine su pertinencia?"*
 3. Roles con score `≥ +3` se marcan core — no se deprecan ni se reformulan sin justificación fuerte.
 
 ### Trazabilidad
@@ -111,7 +111,7 @@ El CHANGELOG entry del REQ derivado menciona explícitamente "tras revisión agr
 
 Si Claude identifica un ajuste:
 
-1. Lo propone en una línea: *"Sugiero actualizar la metodología: [cambio concreto]. ¿Lo aplico?"*
+1. Lo propone en una línea: *"Mejora sugerida a la metodología: [cambio concreto]. ¿Se aplica?"*
 2. Con confirmación, edita el archivo correspondiente del repo `methodology`.
 3. Confirma y entrega el cambio según el mecanismo del profile (en `self-applied`/git, commit + push):
    ```

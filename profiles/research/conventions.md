@@ -12,7 +12,7 @@ Claude abre el REQ de research sin preguntar.
 
 Output esperado de Claude ante pregunta sobre tema especializado sin antecedente en skills/memoria del proyecto y complejidad media o alta (ver `process/planning.md` tabla de Riesgo de regresión):
 
-> "¿Abro un REQ de research sobre `<tema>` antes de proceder?"
+> "¿Se abre un REQ de research sobre `<tema>` antes de proceder?"
 
 El dev puede rechazar; Claude procede sin research.
 
@@ -25,7 +25,7 @@ Claude propone abrir REQ de research sin que el dev pregunte cuando:
 
 Output esperado:
 
-> "Antes de planear, propongo abrir un REQ de research sobre `<tema>` — sin antecedente en skills/memoria y el impacto es medio/alto. ¿Procedo?"
+> "Antes de planear, conviene abrir un REQ de research sobre `<tema>` — sin antecedente en skills/memoria y el impacto es medio/alto. ¿Se abre?"
 
 El dev puede rechazar.
 

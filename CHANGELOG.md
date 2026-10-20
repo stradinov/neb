@@ -4,6 +4,21 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.13.0] - 2026-10-19
+
+> **Minor**: en toda pregunta al dev —también la que cierra un turno en prosa— y en todo menú (el menú de selección, la lista numerada a la que degrada y los botones de respuesta del entorno, p. ej. la caja de cierre de turno de la app de escritorio), «yo» es el dev y Claude se nombra «Claude» (`general/communication.md` § "Elecciones: menú de selección", bullet «Quién actúa»). Lo que el dev solo lee va sin primera persona y con «Claude» como sujeto de sus acciones; la etiqueta es la respuesta del dev (su 1.ª persona del singular es el dev; una orden en ella va a Claude; fuera de la orden, sin segunda persona); una etiqueta sin actor corresponde a quien nombre la pregunta o a Claude, y toda etiqueta con otro actor lo deja explícito. **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): quién actúa en preguntas y opciones pasa de implícito a obligatorio —es fondo, porque elegir autoriza una rama—, y el ejemplo «verifico X primero» y las plantillas de pregunta del núcleo se reescriben porque modelaban el defecto. Origen: queja del dev de un adoptante («no sé si "yo" se refiere a mí o a Claude»); en 60 días de sus sesiones, 449 textos con «yo» en preguntas y botones: 308 eran Claude, 111 el dev y 30 ambiguos, con 44 menús de voces mezcladas.
+
+### Added
+
+- **`general/communication.md` § "Elecciones: menú de selección"**: bullet «Quién actúa: "yo" es el dev; Claude se nombra "Claude"» (alcance, lo que se lee, la etiqueta, actor de cada opción, fuera de alcance, ejemplo).
+
+### Changed
+
+- **`general/communication.md`**, bullet «Opciones ancladas al estado real, no a hipótesis»: el ejemplo de opción pasa de «verifico X primero» a «Claude verifica X primero».
+- **Plantillas de pregunta sin primera persona**: `process/phase-transitions.md` § "Trigger de formalización", `general/profile-detection.md` (avisos de profile pendiente y desconocido), `process/delivery.md` (cierre), `profiles/research/conventions.md` (sugerencia de research), `process/improvement.md` (métricas, roles y mejora sugerida), `templates/change.md.template` (reporte de cierre).
+- **`general/onboarding.md` § "Opciones del recorrido"** y **`skills/wakeup/SKILL.md` § 3**: opciones del recorrido en forma impersonal («Montar el overlay», «Definir el primer profile», «Versionar la configuración personal»).
+- **`skills/pendings-review/SKILL.md`** paso 3: opciones entre comillas; «aplicar con los ajustes que indique el dev» pasa a «Aplicar con mis ajustes».
+
 ## [6.12.1] - 2026-10-19
 
 > **Patch**: el `description` del subagente `context-completeness-reviewer` se entrecomilla. El valor sin comillas contenía `: ` ("Complementario a otros revisores: ellos auditan…"), lo que lo vuelve YAML inválido (`mapping values are not allowed here`). Hoy cargaba solo porque el fallback de Claude Code lo rescata en archivos LF; en un checkout CRLF (`core.autocrlf=true` en Windows) el frontmatter se leía vacío y el agente desaparecía sin error. Mismo defecto que el PR #3 de `methodology` corrige en los agentes de `onibex/agents/`. Sin cambio de texto ni de contrato.

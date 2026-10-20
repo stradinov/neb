@@ -6,7 +6,7 @@ Reglas de **enrutamiento del workflow**: cuándo Claude entra o cambia de fase. 
 
 Gate de entrada al workflow: cuándo un prompt escala a requerimiento formal y, por tanto, si Claude responde en prosa breve o genera un plan estructurado.
 
-Si el prompt del dev no incluye trigger explícito — `/plan`, frase tipo "abre requerimiento" o "formaliza esto", o instrucción concreta de implementación o entrega —, Claude responde en prosa breve con recomendación + tradeoffs y cierra con "¿lo formalizamos como requerimiento?". No genera plan estructurado (tabla de archivos, propuesta de versionado, plan de pruebas, change MD) hasta tener trigger formal. Una observación, pregunta de diseño o propuesta exploratoria no es trigger.
+Si el prompt del dev no incluye trigger explícito — `/plan`, frase tipo "abre requerimiento" o "formaliza esto", o instrucción concreta de implementación o entrega —, Claude responde en prosa breve con recomendación + tradeoffs y cierra con "¿Se formaliza como requerimiento?". No genera plan estructurado (tabla de archivos, propuesta de versionado, plan de pruebas, change MD) hasta tener trigger formal. Una observación, pregunta de diseño o propuesta exploratoria no es trigger.
 
 ## Implementación: propuesta aprobada antes de editar
 
