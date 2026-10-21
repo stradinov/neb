@@ -49,7 +49,7 @@ Te paso fragmentos de la sesión que mencionan operación de infraestructura (ac
 Por cada hallazgo, un bloque markdown:
 
 ## Delta N
-- destino: proyectos-activos-ambientes.md | skill onibex-ops/scripts-map.md | profile deployment-scripts | (sugerir)
+- destino: <archivo, skill o profile donde se documenta esa operación> | (sugerir)
 - tipo: acceso | script | regla | gotcha
 - resumen: <una línea>
 - propuesta: <qué anotar en la fuente de verdad>

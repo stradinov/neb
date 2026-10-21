@@ -4,6 +4,19 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.14.1] - 2026-10-21
+
+> **Patch**: saneo de privacidad del repo público. Sin cambio normativo ni de contrato.
+
+### Removed
+
+- **`changes/`** sale del repo: los registros de requerimiento de Neb viven en el workspace privado del maintainer y Neb documenta sus cambios en `CHANGELOG.md`. Los 22 registros que quedaban se trasladaron intactos a ese workspace.
+
+### Fixed
+
+- **`hooks/ops-capture.py`** (`GENERIC_PROMPT`): el campo `destino` de cada delta ya no sugiere archivos, skills ni profiles de un adoptante concreto, que en otros proyectos no existen; ahora pide `<archivo, skill o profile donde se documenta esa operación>`. Quien define su propio prompt con `NEB_OPS_CAPTURE_PROMPT_FILE` no ve cambio.
+- **`changelog.d/1.2.0.md`, `3.9.0.md` y `6.12.1.md`** (y `CHANGELOG.md`, regenerado): se quitan el nombre de un proyecto de un adoptante, el hash de un commit de un repo privado y rutas de un overlay privado. La ruta del overlay queda con el placeholder `<neb-parent>/<overlay>/overlays/…`, como en 3.0.0.
+
 ## [6.14.0] - 2026-10-21
 
 > **Minor**: dos excepciones nuevas al OK del dev, que define el núcleo con un piso no relajable y que **solo un adoptante activa** (en su overlay o en el `deployment.md` de un profile). Sin activación, nada cambia. La **confirmación autónoma** (`process/change-control-gate.md`) permite confirmar un commit de código sin OK cuando: el commit está dentro del plan aprobado y persistido (rutas exactas), los gates de cierre de Fase 4 están en verde sobre el contenido exacto, solo lleva cambios propios con procedencia verificable, el delta está íntegro (EOL, codificación, binarios), no toca secretos ni rutas sensibles, cae en la rama del plan sin dependencia pendiente, y el dev ve cada commit autónomo por su SHA en un gate con OK antes de que salga del clon local. La **integración autónoma** (`process/version-control.md` § "Integración a la rama principal") permite publicar en la rama principal remota un cambio ya validado sin OK, por fast-forward exacto al SHA validado, sin crear commits. Los requisitos: validación aprobada con SHA anclado, solo commits del REQ (los autónomos, ya mostrados al dev), sin dependencias pendientes, sin disparar una entrega y sin efectos colaterales en git. **Cambio de fuerza normativa** declarado (`methodology/principles.md` § "Declarar"): dos gates que eran incondicionales —el OK por confirmación de Fase 4 y el OK del push después de validar— pasan a tener una excepción declarable. Origen: un adoptante que integra sin pull requests pidió no pedir autorización para integrar lo ya probado, y luego para el commit dentro del plan aprobado.
@@ -68,7 +81,7 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [6.12.1] - 2026-10-19
 
-> **Patch**: el `description` del subagente `context-completeness-reviewer` se entrecomilla. El valor sin comillas contenía `: ` ("Complementario a otros revisores: ellos auditan…"), lo que lo vuelve YAML inválido (`mapping values are not allowed here`). Hoy cargaba solo porque el fallback de Claude Code lo rescata en archivos LF; en un checkout CRLF (`core.autocrlf=true` en Windows) el frontmatter se leía vacío y el agente desaparecía sin error. Mismo defecto que el PR #3 de `methodology` corrige en los agentes de `onibex/agents/`. Sin cambio de texto ni de contrato.
+> **Patch**: el `description` del subagente `context-completeness-reviewer` se entrecomilla. El valor sin comillas contenía `: ` ("Complementario a otros revisores: ellos auditan…"), lo que lo vuelve YAML inválido (`mapping values are not allowed here`). Hoy cargaba solo porque el fallback de Claude Code lo rescata en archivos LF; en un checkout CRLF (`core.autocrlf=true` en Windows) el frontmatter se leía vacío y el agente desaparecía sin error. Un overlay privado tenía el mismo defecto en sus agentes y lo corrige aparte. Sin cambio de texto ni de contrato.
 
 ### Fixed
 
@@ -715,7 +728,7 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 - Afecta `methodology/change-control-policy.md`, `process/change-control-gate.md`, `process/version-control.md`, `workflow/changes.md`, `profiles/self-applied/deployment.md`, `hooks/preprocess-prompt.py`, `tooling/prompt-preprocessing.md`.
 - Comportamiento neto sin cambio (Aditivo): un `.md` de documentación de producto del cliente sigue siendo autónomo como antes; lo que cambia es el fundamento y, vía el hook, que Claude deja de pedir OK para los registros que Neb ya tenía permitido confirmar.
-- **Fuera de scope** (REQ-patch separados — ver `pendings.md`): (a) relajar el gate de confirmación para "plan aprobado + cambio de bajo riesgo/recuperable" (repasar incidentes terzab2c `653b3551`, PRD); (b) comunicar transiciones de fase por **acción** y no por número de fase desnudo de cara al dev (`general/communication.md` § "Hilo de la metodología").
+- **Fuera de scope** (REQ-patch separados — ver `pendings.md`): (a) relajar el gate de confirmación para "plan aprobado + cambio de bajo riesgo/recuperable" (con antecedentes de incidentes en producción); (b) comunicar transiciones de fase por **acción** y no por número de fase desnudo de cara al dev (`general/communication.md` § "Hilo de la metodología").
 
 ## [3.8.0] - 2026-06-14
 
@@ -983,7 +996,7 @@ Cambio mayor: Neb pasa del modelo "clone" (imports `@import` en cada `CLAUDE.md`
 
 ### Added
 
-- **`link-into-project.sh` overlay hooks** — three stub functions (`detect_stack_local`, `get_private_stack_imports`, `get_framework_imports`) allow adopters to extend stack detection and import generation without modifying the nucleus. The script sources `<neb-parent>/onibex/overlays/detect-stack.local.sh` when present (sibling-dir convention for neb-as-subtree deployments). Implements P8 (Expandible) for `link-into-project.sh`.
+- **`link-into-project.sh` overlay hooks** — three stub functions (`detect_stack_local`, `get_private_stack_imports`, `get_framework_imports`) allow adopters to extend stack detection and import generation without modifying the nucleus. The script sources `<neb-parent>/<overlay>/overlays/detect-stack.local.sh` when present (sibling-dir convention for neb-as-subtree deployments). Implements P8 (Expandible) for `link-into-project.sh`.
 
 ### Fixed
 
