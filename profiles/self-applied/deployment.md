@@ -5,7 +5,7 @@ Cómo se "deploya" un cambio en un proyecto auto-aplicado, y cómo se valida.
 ## Deploy
 
 0. Claude corre `py bootstrap/assemble-changelog.py --check`. Si retorna 1: `py bootstrap/assemble-changelog.py`, `git add CHANGELOG.md`, commit como commit final del REQ.
-1. `git commit` + `git push` al remote. Profile `self-applied` produce casi exclusivamente `.md`: por `methodology/change-control-policy.md` § "Ownership de archivos `.md`" (operaciones git en `process/version-control.md`), commits y pushes `.md`-only son autónomos. Para commits/pushes mixtos `.md` + código (ej. `bootstrap/*.py`, `bootstrap/*.sh`), aplica el gate de OK del componente de código.
+1. `git commit` + `git push` al remote. Profile `self-applied` produce casi exclusivamente `.md`: por `methodology/change-control-policy.md` § "Ownership de archivos `.md`" (operaciones git en `process/version-control.md`), commits y pushes `.md`-only son autónomos. Para commits/pushes mixtos `.md` + código (ej. `bootstrap/*.py`, `bootstrap/*.sh`), aplica el gate del componente de código (OK, o confirmación autónoma si el adoptante la activa y se cumple su piso; ver `process/change-control-gate.md`).
 2. `git pull` en cada proyecto cliente que importe la metodología vía `@~/.claude/neb/...`.
 
 No hay servidor QA ni producción tradicional. La metodología aplica desde el momento en que un dev hace pull en un proyecto cliente.

@@ -43,6 +43,7 @@
 
 **Fecha:** YYYY-MM-DD
 **Validador:** dev (default; nombrar solo si fue Claude o validación delegada)
+**SHA validado:** `<hash>` (commit cuyo contenido se probó; lo usa la integración autónoma, ver `process/version-control.md` § "Integración a la rama principal")
 
 Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/delivery.md) "Definición de done").
 
@@ -91,7 +92,10 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 ## Trazabilidad
 
 - **Plan aprobado:** `~/.claude/approved-plans/<archivo>.md` (media/alta: hook en plan mode, o el path del `Write` conversacional; `—` en trivial/baja/no-formal)
-- **Commits:** `esta confirmación` (si cierras el registro en el mismo commit que el entregable) o `<hash>` / `<hash-inicial>..<hash-final>` (si ya se entregó antes)
+- **Rama:** `<rama>` (la que el dev nombró en el plan aprobado; sin campo = la principal)
+- **Commits:** `esta confirmación` (si cierras el registro en el mismo commit que el entregable) o `<hash>` / `<hash-inicial>..<hash-final>` (si ya se entregó antes). Con confirmación o integración autónoma: un SHA por línea, marcado (autónomo), (OK) o (registro); un rango no sirve
+- **Diff mostrado al dev:** `<sha>`, … (`<gate>`, `<fecha>`) — confirmaciones autónomas que el dev vio antes de que salieran del clon local (ver `process/change-control-gate.md`); una línea por gate
+- **Integración:** `<rama>` `<sha>` (`<fecha>`) — punta remota tras la integración (ver `process/version-control.md` § "Integración a la rama principal")
 - **Pendientes generados:** ver `~/.claude/pendings.md` tag `[<slug>]` (o `ninguno`)
 
 ## Métricas

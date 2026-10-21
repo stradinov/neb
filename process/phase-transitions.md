@@ -27,13 +27,13 @@ Fases del requerimiento: **1** Clarificación · **2** Estimación · **3** Prop
 
 Espejo de las reglas canónicas de [`change-control-gate.md`](change-control-gate.md) y [`delivery.md`](delivery.md) — el detalle vive allá; estas cláusulas garantizan el comportamiento base sin cargarlos:
 
-- **Confirmación**: toda confirmación que toque el entregable del proyecto destino (commit, deploy, migración, config) espera **OK explícito del dev** durante la implementación.
+- **Confirmación**: toda confirmación que toque el entregable del proyecto destino (commit, deploy, migración, config) espera **OK explícito del dev** durante la implementación, salvo las excepciones de [`change-control-gate.md`](change-control-gate.md). Una de ellas, la confirmación autónoma de un commit dentro del plan aprobado, tiene un piso no relajable y solo el adoptante la activa; sin activación, rige el OK. La integración de un cambio ya validado no es una confirmación ([`version-control.md`](version-control.md) § "Integración a la rama principal").
 - **Validación antes de entregar**: no se entrega a producción sin Fase 5 ejecutada — o saltada con OK explícito (transiciones especiales en `delivery.md`).
 - **Cierre**: un REQ no pasa a `Cerrado` sin validación del dev (o el criterio de validación que defina su profile).
 
 ## Conflictos y vacíos normativos (always-on)
 
 - Ante **contradicción entre reglas** o un caso sin regla aplicable: no resolver en silencio — reportar el conflicto con alternativas y esperar decisión (espejo de `methodology/principles.md` § "Detectar y reportar").
-- Un override (personal o de profile) **estrecha o agrega, nunca relaja** el baseline (espejo de [`../methodology/personal-vs-team.md`](../methodology/personal-vs-team.md)).
+- Un override (personal o de profile) **estrecha o agrega, nunca relaja** el baseline (espejo de [`../methodology/personal-vs-team.md`](../methodology/personal-vs-team.md)). Activar una excepción que el núcleo define con piso no relajable (la confirmación o la integración autónoma) no es un override: ver [`change-control-gate.md`](change-control-gate.md).
 
 > **Transiciones especiales de estado** (qué fases se saltan según el tipo de cambio): viven en [`delivery.md`](delivery.md) § "Transiciones especiales de estado" — se consultan al cerrar/entregar, no al arranque, por lo que no se cargan aquí.

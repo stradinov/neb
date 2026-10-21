@@ -32,7 +32,7 @@ Si una tarea se bloquea, mantenerla `in_progress` y crear una nueva describiendo
 
 ## Confirmación del cambio en Fase 4
 
-Antes de cada confirmación del cambio que toque el entregable del proyecto destino, Claude espera OK explícito del dev. La regla canónica (alcance, granularidad, excepciones) vive en [`change-control.md`](change-control-gate.md) § "Autorización de la confirmación del cambio"; su concretización git (qué es un `git commit`, exclusiones de gobernanza) en [`process/version-control.md`](version-control.md).
+Antes de cada confirmación del cambio que toque el entregable del proyecto destino, Claude espera OK explícito del dev, salvo las excepciones declaradas (entre ellas la confirmación autónoma, que solo el adoptante activa). La regla canónica (alcance, granularidad, excepciones) vive en [`change-control.md`](change-control-gate.md) § "Autorización de la confirmación del cambio"; su concretización git (qué es un `git commit`, exclusiones de gobernanza) en [`process/version-control.md`](version-control.md).
 
 ## Cierre de Fase 4 (gate de subagente)
 
