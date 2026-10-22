@@ -1,0 +1,7 @@
+# Archivos con frontmatter YAML que Claude Code parsea al cargar el plugin: LF en el checkout,
+# también en Windows con core.autocrlf=true. Con CRLF, el fallback del cliente que entrecomilla
+# un valor con ': ' no matchea la línea (termina en \r) y el agente/skill/command carga sin
+# description — o, si es un agente de plugin, con todas las tools.
+agents/*.md text eol=lf
+commands/*.md text eol=lf
+skills/*/SKILL.md text eol=lf
