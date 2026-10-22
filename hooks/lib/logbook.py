@@ -10,9 +10,11 @@ Tres modos (dispatch en __main__):
   • sync <guide_dir> <home_dir>     — drena el outbox (works dirty) al central + sube el transcript
       incremental POR SESIÓN (session_sync; un sync a la vez). Best-effort, defensivo (REQ B). Un fallo
       NO corta el reintento (salvo el 409), pero queda VISIBLE en work.last_error (publicación) /
-      session_sync.transcript_error (transcript de esa sesión) — ver `sync-status`.
-  • CLI (list/show/claim/...)       — lo invoca el comando/skill `/logbook`. Con NEB_LOGBOOK_ENDPOINT
-      configurado opera contra el CENTRAL (la autoridad: ids remotos); sin él, contra el SQLite local.
+      session_sync.transcript_error (transcript de esa sesión) — ver `sync-status`. El outbox es de
+      toda la máquina: solo sale lo que tiene opt-in (ver _OptIn).
+  • CLI (list/show/claim/...)       — lo invoca el comando/skill `/logbook`. Con NEB_LOGBOOK_ENDPOINT y
+      NEB_LOGBOOK_TOKEN opera contra el CENTRAL (la autoridad: ids remotos); si falta cualquiera, contra el
+      SQLite local.
       Excepción: `sync-status` lee SIEMPRE el SQLite local (el estado del outbox no existe en el central)
       y reporta ids LOCALES (`local_id`), que no son válidos para los demás verbos cuando hay central.
 
@@ -76,6 +78,14 @@ def main():
     if con is None:
         return
     try:
+        # Con central, la atribución de la sesión prefiere un work con opt-in. Las lecturas de disco que eso
+        # pide (CLAUDE.md de cada repo, cwd de arranque) se hacen aquí, ANTES de abrir la transacción de la
+        # captura: un repo en una unidad de red lenta no debe retener el candado de escritura.
+        optin = _OptIn(con) if _central()[0] else None
+        if optin is not None:
+            optin.session(session_id, jsonl_path)
+            for active in active_reqs:
+                optin.dir(_repo_dir(active.get("project_path", "")))
         work_ids = []                                 # works de esta captura, en orden de preferencia
         if active_reqs:
             for active in active_reqs:                # N REQ activos (incluye varios del mismo proyecto), mtime desc
@@ -94,7 +104,7 @@ def main():
             summary = _first_user_prompt(jsonl_path)
             work_ids.append(_upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd,
                                                 jsonl_path))
-        _register_session(con, session_id, jsonl_path, work_ids)   # cursor de subida propio de la sesión
+        _register_session(con, session_id, jsonl_path, work_ids, optin)   # cursor de subida propio de la sesión
         _index_local(con, session_id, None, jsonl_path)   # SR-1: persistir el corpus local (siempre)
         con.commit()
     finally:
@@ -110,7 +120,9 @@ def main():
 
 def _upsert_req(con, project, req_slug, owner, machine, state, branch, head,
                 repo_path, change_md, payload, session_id, transcript_path):
-    """Upsert del work del REQ. Devuelve su id local."""
+    """Upsert del work del REQ. Devuelve su id local. repo_path se refresca con el «Path del proyecto»
+    vigente, porque de él sale el opt-in al drenar (un REQ que pasa a otro checkout lo sigue); vacío
+    conserva el anterior."""
     ts = now_iso()
     row = con.execute(
         "SELECT id FROM work WHERE mode='req' AND project=? AND req_slug=?",
@@ -119,8 +131,10 @@ def _upsert_req(con, project, req_slug, owner, machine, state, branch, head,
         con.execute(
             "UPDATE work SET req_state=?, branch=?, head_commit=?, change_md=?, "
             "payload_json=?, payload_version=payload_version+1, claude_session_id=?, "
-            "transcript_path=?, updated_at=?, dirty=1 WHERE id=?",
-            (state, branch, head, change_md, payload, session_id, transcript_path, ts, row[0]))
+            "transcript_path=?, repo_path=COALESCE(NULLIF(?, ''), repo_path), updated_at=?, "
+            "dirty=1 WHERE id=?",
+            (state, branch, head, change_md, payload, session_id, transcript_path, repo_path,
+             ts, row[0]))
         return row[0]
     cur = con.execute(
         "INSERT INTO work (mode, project, req_slug, owner, lock_state, req_state, branch, "
@@ -167,23 +181,27 @@ def _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, 
 # una sesión que otra pisaba antes de un sync perdía su cola para siempre (y la del home subía N veces,
 # una por REQ). Ahora cada sesión tiene su fila en session_sync y sube una sola vez.
 
-def _work_rank(con, work_id):
+def _work_rank(con, work_id, optin=None):
     """Orden de preferencia para atribuir una sesión (menor = mejor): con remote_id antes que sin él (sin
     remote_id no puede recibir nada) y, entre esos, sin conflicto antes que en conflicto. (False, 0) es el
-    ideal: publicado y sin 409. None si el work no existe."""
-    r = con.execute("SELECT remote_id, conflict FROM work WHERE id=?", (work_id,)).fetchone()
+    ideal: publicado y sin 409. None si el work no existe.
+    Con `optin` (hay central), un work sin opt-in cuenta como no publicado aunque tenga remote_id: el sync
+    no le sube nada, así que una sesión con opt-in debe preferir otro."""
+    r = con.execute("SELECT remote_id, conflict, mode, repo_path, claude_session_id, transcript_path "
+                    "FROM work WHERE id=?", (work_id,)).fetchone()
     if r is None:
         return None
-    return (r[0] is None, r[1] or 0)
+    unpublished = r[0] is None or (optin is not None and not optin.work(r[2], r[3], r[4], r[5]))
+    return (unpublished, r[1] or 0)
 
 
-def _attribution(con, candidates):
+def _attribution(con, candidates, optin=None):
     """El mejor candidato según _work_rank; entre iguales gana el primero (el REQ de mtime más reciente)."""
     best = None
     for wid in candidates:
         if wid is None:
             continue
-        rank = _work_rank(con, wid)
+        rank = _work_rank(con, wid, optin)
         if rank is not None and (best is None or rank < best[0]):
             best = (rank, wid)
     return best[1] if best else None
@@ -196,29 +214,37 @@ def _cursor_seed(con, session_id):
                        (session_id,)).fetchone()[0]
 
 
-def _register_session(con, session_id, transcript_path, work_ids):
+def _register_session(con, session_id, transcript_path, work_ids, optin=None):
     """Alta o actualización de la fila de subida de la sesión, en la misma transacción de la captura.
     Nace con el cursor sembrado desde transcript_cursor: la captura que estrena 6.12 corre ANTES que
     cualquier sync y sin la siembra re-enviaría la sesión desde el byte 0. La atribución es fija: solo se
     reasigna si uno de los works de esta captura es estrictamente mejor según _work_rank (el actual no
-    está publicado, está en conflicto o ya no existe). Best-effort."""
+    está publicado, no tiene opt-in, está en conflicto o ya no existe). Guarda una sola vez el cwd con el
+    que arrancó la sesión (root_cwd): el .jsonl puede borrarse después y sin él no habría con qué decidir
+    el opt-in. Best-effort."""
+    def _session_root():                              # memo de la captura (leído antes de la transacción)
+        return optin.root(session_id, transcript_path) if optin is not None else _jsonl_cwd(transcript_path)
+
     try:
         ts = now_iso()
-        row = con.execute("SELECT work_id FROM session_sync WHERE session_id=?", (session_id,)).fetchone()
+        row = con.execute("SELECT work_id, root_cwd FROM session_sync WHERE session_id=?",
+                          (session_id,)).fetchone()
         if row is None:
             con.execute(
-                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
-                "VALUES (?,?,?,?,?)",
-                (session_id, _attribution(con, work_ids), transcript_path, _cursor_seed(con, session_id), ts))
+                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, "
+                "root_cwd, updated_at) VALUES (?,?,?,?,?,?)",
+                (session_id, _attribution(con, work_ids, optin), transcript_path, _cursor_seed(con, session_id),
+                 _session_root(), ts))
             return
         wid = row[0]
-        current = _work_rank(con, wid) if wid is not None else None
+        current = _work_rank(con, wid, optin) if wid is not None else None
         if current != (False, 0):
-            alt = _attribution(con, work_ids)
-            if alt is not None and (current is None or _work_rank(con, alt) < current):
+            alt = _attribution(con, work_ids, optin)
+            if alt is not None and (current is None or _work_rank(con, alt, optin) < current):
                 wid = alt
-        con.execute("UPDATE session_sync SET work_id=?, transcript_path=?, updated_at=? WHERE session_id=?",
-                    (wid, transcript_path, ts, session_id))
+        root = row[1] or _session_root()
+        con.execute("UPDATE session_sync SET work_id=?, transcript_path=?, root_cwd=?, updated_at=? "
+                    "WHERE session_id=?", (wid, transcript_path, root, ts, session_id))
     except sqlite3.Error as e:
         print(f"[logbook] aviso: no se pudo registrar la sesión {session_id}: {e}", file=sys.stderr)
 
@@ -288,15 +314,83 @@ def _is_shared(cwd):
     se reserva a los proyectos que deliberadamente lo comparten con el equipo."""
     if not os.environ.get("NEB_LOGBOOK_ENDPOINT"):
         return False
+    if not cwd:   # sin ruta no hay CLAUDE.md que declare el opt-in (no resolver contra el cwd del proceso)
+        return False
     claude_md = os.path.join(cwd, "CLAUDE.md")
     try:
         if os.path.isfile(claude_md):
-            txt = open(claude_md, encoding="utf-8", errors="replace").read()
+            with open(claude_md, encoding="utf-8", errors="replace") as fh:
+                txt = fh.read()
             if re.search(r"<!--\s*neb-logbook:\s*central\s*-->", txt):
                 return True
     except OSError:
         pass
     return False
+
+
+# «Path del proyecto» es texto libre en la memoria: "C:\x\tienda (rama `master`)", "`/c/x/app` + …".
+_PATH_START = r"(?:[A-Za-z]:[\\/]|[\\/]|~)"
+_REPO_PATH_QUOTED_RE = re.compile(r"""^[\s*]*([`'"])(%s[^`'"]*)\1""" % _PATH_START)
+_REPO_PATH_RE = re.compile(r"""^[\s`'"*]*(%s[^\s`'"()*]*)""" % _PATH_START)
+
+
+def _repo_dir(repo_path):
+    """Directorio del repo de un REQ: el primer path absoluto de su «Path del proyecto», sin comillas ni
+    puntuación final. "" si no empieza con uno (una ruta relativa resolvería contra el cwd del proceso
+    sync). Una ruta con espacios solo se reconoce entre comillas o backticks; sin ellas se corta en el
+    primer espacio y queda sin opt-in (falla cerrado)."""
+    m = _REPO_PATH_QUOTED_RE.match(repo_path or "") or _REPO_PATH_RE.match(repo_path or "")
+    if not m:
+        return ""
+    path = posix_to_win(os.path.expanduser(m.group(m.lastindex).strip().rstrip(".,;")))
+    path = os.path.normpath(path)
+    return path if os.path.isabs(path) else ""
+
+
+class _OptIn:
+    """Opt-in al drenar. El sync lo lanza un proyecto con marcador, pero el outbox es de toda la máquina:
+    sin este filtro publicaba los works y subía los transcripts de cualquier repo.
+      • REQ: tiene opt-in si su repo (primer path de «Path del proyecto») trae el marcador.
+      • Exploratorio: si su sesión arrancó en un dir con marcador (cwd raíz; no el cwd del primer Stop,
+        que se mueve con los `cd`).
+      • Transcript de una sesión: si la sesión arrancó en un dir con marcador Y su work atribuido tiene
+        opt-in. Una sesión abierta fuera (p. ej. en un home sin marcador, que toma los REQ activos de su
+        memoria) no sube su conversación aunque el REQ sea de un repo marcado.
+    Solo cuenta el CLAUDE.md del dir exacto (como en el disparador). Sin cwd raíz conocido falla cerrado.
+    Lo ya publicado no se toca: purgarlo es decisión del backend central. Memoiza por sync."""
+
+    def __init__(self, con, index=None):
+        self._con, self._index = con, index
+        self._dirs, self._roots = {}, {}
+        self.hidden = {"works": 0, "sessions": 0}     # lo que sync-status no lista por falta de opt-in
+
+    def dir(self, path):
+        if path not in self._dirs:
+            self._dirs[path] = _is_shared(path)
+        return self._dirs[path]
+
+    def root(self, session_id, stored_path=None):
+        """cwd con el que arrancó la sesión: el guardado en session_sync o, si falta, el de su .jsonl."""
+        if session_id not in self._roots:
+            root = None
+            row = None
+            if session_id:
+                row = self._con.execute("SELECT root_cwd, transcript_path FROM session_sync WHERE session_id=?",
+                                        (session_id,)).fetchone()
+                root = row[0] if row else None
+            if not root:
+                path = _session_path(stored_path or (row[1] if row else None), session_id, self._index)
+                root = _jsonl_cwd(path)
+            self._roots[session_id] = root
+        return self._roots[session_id]
+
+    def session(self, session_id, stored_path=None):
+        return self.dir(self.root(session_id, stored_path))
+
+    def work(self, mode, repo_path, session_id, transcript_path):
+        if mode == "req":
+            return self.dir(_repo_dir(repo_path))
+        return self.session(session_id, transcript_path)
 
 
 def _maybe_spawn_sync(cwd, guide_dir, home_dir):
@@ -373,11 +467,12 @@ def sync_main(args):
         con.row_factory = sqlite3.Row
         try:
             index = _JsonlIndex(home)
+            optin = _OptIn(con, index)
             # Backfill ANTES de publicar works: un exploratorio recién adoptado se publica y sube su
             # transcript en este mismo sync.
-            _backfill_sessions(con, index)
-            _drain_works(con, endpoint, token)
-            _drain_transcripts(con, endpoint, token, index)
+            _backfill_sessions(con, index, optin)
+            _drain_works(con, endpoint, token, optin)
+            _drain_transcripts(con, endpoint, token, index, optin)
         finally:
             con.close()
     finally:
@@ -570,9 +665,12 @@ def _payload_json_with_note(payload_json, note):
     return json.dumps(d, ensure_ascii=False)
 
 
-def _drain_works(con, endpoint, token):
+def _drain_works(con, endpoint, token, optin=None):
+    optin = optin or _OptIn(con)
     rows = con.execute("SELECT * FROM work WHERE dirty=1").fetchall()
     for w in rows:
+        if not optin.work(w["mode"], w["repo_path"], w["claude_session_id"], w["transcript_path"]):
+            continue                                  # sin opt-in: queda local (dirty) hasta que lo tenga
         # Lista EXPLÍCITA de campos: las columnas del outbox (dirty, conflict, last_error…) son solo locales
         # y no viajan al central. No sustituir por dict(w).
         req_state, note = _normalize_req_state(w["req_state"])
@@ -678,8 +776,11 @@ def _session_path(stored, session_id, index):
     return index.get(session_id) if index is not None else None
 
 
-def _jsonl_cwd(path, max_lines=50):
-    """cwd de la sesión según su .jsonl (las entradas user/assistant lo traen). None si no aparece."""
+def _jsonl_cwd(path, max_lines=200):
+    """cwd con el que arrancó la sesión: el primero que registra su .jsonl (las entradas user/assistant lo
+    traen; las primeras líneas pueden ser resúmenes o snapshots sin él). None si no aparece o no hay archivo."""
+    if not path:
+        return None
     try:
         with open(path, encoding="utf-8", errors="replace") as fh:
             for i, line in enumerate(fh):
@@ -696,7 +797,7 @@ def _jsonl_cwd(path, max_lines=50):
     return None
 
 
-def _backfill_sessions(con, index):
+def _backfill_sessions(con, index, optin=None):
     """Completa session_sync desde el estado heredado. Idempotente y sin red. Ningún cursor baja nunca.
     1. Sesiones apuntadas por un work y sin fila: atribución como en la captura (prefiere publicable),
        ruta del work (NULL o inexistente se resuelve por nombre al drenar).
@@ -704,10 +805,13 @@ def _backfill_sessions(con, index):
        más avanzado que sea publicable.
     3. Para TODAS las filas: synced_byte = MAX(synced_byte, MAX de sus pares).
     4. Limpia work.transcript_error heredado: el canal vive en session_sync.
-    5. Adopción de huérfanas (ver _adopt_orphans), fuera de la transacción anterior y SOLO si 1-4 se
+    5. root_cwd de las filas que no lo tienen (ver _fill_root_cwd).
+    6. Adopción de huérfanas (ver _adopt_orphans), fuera de la transacción anterior y SOLO si 1-4 se
        confirmaron: con el backfill a medias, una sesión con pares parecería huérfana."""
     ts = now_iso()
     try:
+        # Lecturas y atribución ANTES del primer INSERT: con opt-in, atribuir lee disco (CLAUDE.md, .jsonl)
+        # y no debe hacerlo con el candado de escritura tomado.
         pointed = {}
         for r in con.execute(
                 "SELECT claude_session_id AS sid, id, transcript_path FROM work "
@@ -715,23 +819,24 @@ def _backfill_sessions(con, index):
                 "AND claude_session_id NOT IN (SELECT session_id FROM session_sync) "
                 "ORDER BY updated_at DESC, id DESC").fetchall():
             pointed.setdefault(r["sid"], []).append((r["id"], r["transcript_path"]))
-        for sid, items in pointed.items():
-            path = next((p for _, p in items if p), None)
-            con.execute(
-                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
-                "VALUES (?,?,?,?,?)",
-                (sid, _attribution(con, [w for w, _ in items]), path, _cursor_seed(con, sid), ts))
         pairs = {}
         for r in con.execute(
                 "SELECT session_id AS sid, work_id, synced_byte FROM transcript_cursor "
                 "WHERE session_id NOT IN (SELECT session_id FROM session_sync) "
                 "ORDER BY session_id, synced_byte DESC, work_id").fetchall():
-            pairs.setdefault(r["sid"], []).append((r["work_id"], r["synced_byte"]))
-        for sid, items in pairs.items():
-            con.execute(
-                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
-                "VALUES (?,?,NULL,?,?)",
-                (sid, _attribution(con, [w for w, _ in items]), items[0][1], ts))
+            if r["sid"] not in pointed:               # las apuntadas por un work ya entran por el paso 1
+                pairs.setdefault(r["sid"], []).append((r["work_id"], r["synced_byte"]))
+        rows_pointed = [(sid, _attribution(con, [w for w, _ in items], optin),
+                         next((p for _, p in items if p), None), _cursor_seed(con, sid), ts)
+                        for sid, items in pointed.items()]
+        rows_pairs = [(sid, _attribution(con, [w for w, _ in items], optin), items[0][1], ts)
+                      for sid, items in pairs.items()]
+        con.executemany(
+            "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
+            "VALUES (?,?,?,?,?)", rows_pointed)
+        con.executemany(
+            "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
+            "VALUES (?,?,NULL,?,?)", rows_pairs)
         con.execute(
             "UPDATE session_sync SET synced_byte = (SELECT MAX(tc.synced_byte) FROM transcript_cursor tc "
             "WHERE tc.session_id = session_sync.session_id) "
@@ -743,7 +848,32 @@ def _backfill_sessions(con, index):
         _quiet_rollback(con)
         print(f"[logbook] aviso: backfill de session_sync: {e}", file=sys.stderr)
         return
-    _adopt_orphans(con, index)
+    _fill_root_cwd(con, index)
+    _adopt_orphans(con, index, optin)
+
+
+def _fill_root_cwd(con, index):
+    """root_cwd de las filas que no lo tienen (anteriores a 6.14.2, o sin .jsonl legible al registrarse). Se
+    lee una sola vez por sesión: el .jsonl puede borrarse después y sin él no habría con qué decidir el
+    opt-in. Lecturas de disco fuera de la transacción; las filas sin .jsonl quedan en NULL (sin opt-in)."""
+    try:
+        rows = con.execute("SELECT session_id, transcript_path FROM session_sync WHERE root_cwd IS NULL").fetchall()
+    except sqlite3.Error as e:
+        print(f"[logbook] aviso: root_cwd de session_sync: {e}", file=sys.stderr)
+        return
+    found = []
+    for r in rows:
+        cwd = _jsonl_cwd(_session_path(r[1], r[0], index))
+        if cwd:
+            found.append((cwd, r[0]))
+    if not found:
+        return
+    try:
+        con.executemany("UPDATE session_sync SET root_cwd=? WHERE session_id=? AND root_cwd IS NULL", found)
+        con.commit()
+    except sqlite3.Error as e:
+        _quiet_rollback(con)
+        print(f"[logbook] aviso: root_cwd de session_sync: {e}", file=sys.stderr)
 
 
 _ORPHANS_SQL = (
@@ -753,11 +883,13 @@ _ORPHANS_SQL = (
     "AND session_id NOT IN (SELECT claude_session_id FROM work WHERE claude_session_id IS NOT NULL)")
 
 
-def _adopt_orphans(con, index):
+def _adopt_orphans(con, index, optin=None):
     """Sesiones del corpus local (transcript_local) sin fila en session_sync, sin pares heredados y sin work
     que las apunte: las que otra captura pisó antes de su primer sync. Reciben un exploratorio propio
     (marcado `adopted`) y su fila, y suben en este mismo sync. Sin .jsonl en disco no hay qué subir: se
-    saltan (sync-status las reporta como pérdida si el corpus local registró bytes)."""
+    saltan (sync-status las reporta como pérdida si el corpus local registró bytes). Una sesión que no
+    arrancó en un dir con marcador tampoco se adopta: la adopción solo existe para subirla."""
+    optin = optin or _OptIn(con, index)
     try:
         orphans = [r[0] for r in con.execute(_ORPHANS_SQL)]
     except sqlite3.Error as e:
@@ -770,12 +902,16 @@ def _adopt_orphans(con, index):
         path = index.get(sid) if index is not None else None
         if not path:
             continue
-        summary, cwd = _first_user_prompt(path), _jsonl_cwd(path)   # lecturas de disco fuera de la transacción
+        cwd = _jsonl_cwd(path)                        # lecturas de disco fuera de la transacción
+        if not optin.dir(cwd):
+            continue
+        summary = _first_user_prompt(path)
         try:
             wid = _upsert_exploratory(con, sid, owner, machine, summary, None, None, cwd, path, adopted=True)
             con.execute(
-                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, updated_at) "
-                "VALUES (?,?,?,?,?)", (sid, wid, path, _cursor_seed(con, sid), now_iso()))
+                "INSERT OR IGNORE INTO session_sync (session_id, work_id, transcript_path, synced_byte, "
+                "root_cwd, updated_at) VALUES (?,?,?,?,?,?)",
+                (sid, wid, path, _cursor_seed(con, sid), cwd, now_iso()))
             con.commit()
         except sqlite3.IntegrityError:
             _quiet_rollback(con)                      # otro proceso creó su exploratorio entre medio
@@ -811,17 +947,25 @@ def _clear_session_error(con, session_id, prev):
         print(f"[logbook] aviso: no se pudo limpiar el fallo de la sesión {session_id}: {e}", file=sys.stderr)
 
 
-def _drain_transcripts(con, endpoint, token, index=None):
-    """Sube el tramo pendiente de CADA sesión de session_sync cuyo work atribuido ya está publicado.
-    Orden: menor pendiente primero (una sesión grande no detiene a las chicas). Un envío por sesión,
-    acotado por _TRANSCRIPT_BODY_MAX; el sync se detiene al agotar _TRANSCRIPT_SYNC_BUDGET."""
+def _drain_transcripts(con, endpoint, token, index=None, optin=None):
+    """Sube el tramo pendiente de CADA sesión de session_sync cuyo work atribuido ya está publicado y que
+    tiene opt-in (ver _OptIn). Orden: menor pendiente primero (una sesión grande no detiene a las chicas).
+    Un envío por sesión, acotado por _TRANSCRIPT_BODY_MAX; el sync se detiene al agotar
+    _TRANSCRIPT_SYNC_BUDGET."""
+    optin = optin or _OptIn(con, index)
     rows = con.execute(
-        "SELECT s.session_id, s.work_id, s.transcript_path, s.synced_byte, s.transcript_error, w.remote_id "
+        "SELECT s.session_id, s.work_id, s.transcript_path, s.synced_byte, s.transcript_error, w.remote_id, "
+        "w.mode, w.repo_path, w.claude_session_id AS work_session_id, w.transcript_path AS work_transcript_path "
         "FROM session_sync s JOIN work w ON w.id = s.work_id WHERE w.remote_id IS NOT NULL").fetchall()
     todo = []
     for r in rows:
         sid = r["session_id"]
         path = _session_path(r["transcript_path"], sid, index)
+        if not (optin.session(sid, path) and optin.work(r["mode"], r["repo_path"], r["work_session_id"],
+                                                         r["work_transcript_path"])):
+            # Sin opt-in: ni sube ni registra fallos (antes del tope por envío, que dejaría un aviso). El
+            # cursor no avanza: si después gana el opt-in, sube todo lo acumulado.
+            continue
         if not path:
             # Sin .jsonl no hay nada que reintentar: un fallo previo dejaría un aviso sin acción posible.
             # La pérdida (si había cola) la reporta sync-status a partir de transcript_local.
@@ -1204,37 +1348,48 @@ def cli_search(args):
                      ensure_ascii=False, indent=2, default=str))
 
 
-def _sync_status_rows(con, central=True):
+def _sync_status_rows(con, central=True, optin=None):
     """Works locales que requieren atención: pendientes de publicar, en conflicto o con un fallo de
     publicación vigente. Función pura sobre la conexión (la comparten el CLI y los tests).
     Sin central configurado `dirty` nace en 1 y nada lo baja: listar por dirty devolvería toda la
     bitácora, así que ahí solo cuentan conflicto y fallos. El transcript se reporta por sesión
     (_sync_status_sessions), no por work.
+    Con central y `optin`, un work sin opt-in no se lista (nunca va a salir): se cuenta en optin.hidden.
     La clave es `local_id`, nunca `id`: con central los demás verbos interpretan ids REMOTOS."""
     where = "conflict=1 OR last_error IS NOT NULL"
     if central:
         where = "dirty=1 OR " + where
     rows = con.execute(
         "SELECT id, mode, project, req_slug, dirty, conflict, remote_id, synced_at, last_error, last_error_at, "
-        "updated_at, archived_at "
+        "updated_at, archived_at, repo_path, claude_session_id, transcript_path "
         f"FROM work WHERE {where} ORDER BY id").fetchall()
-    return [{"local_id": r[0], "mode": r[1], "project": r[2], "req_slug": r[3], "dirty": r[4],
-             "conflict": r[5], "remote_id": r[6], "synced_at": r[7], "last_error": r[8],
-             "last_error_at": r[9], "updated_at": r[10], "archived_at": r[11]} for r in rows]
+    out = []
+    for r in rows:
+        if central and optin is not None and not optin.work(r[1], r[12], r[13], r[14]):
+            optin.hidden["works"] += 1
+            continue
+        out.append({"local_id": r[0], "mode": r[1], "project": r[2], "req_slug": r[3], "dirty": r[4],
+                    "conflict": r[5], "remote_id": r[6], "synced_at": r[7], "last_error": r[8],
+                    "last_error_at": r[9], "updated_at": r[10], "archived_at": r[11]})
+    return out
 
 
-def _sync_status_sessions(con, index=None, central=True):
+def _sync_status_sessions(con, index=None, central=True, optin=None):
     """Sesiones cuyo transcript requiere atención. `status`:
       error          — fallo vigente del envío (incluye «excede el tope por envío»).
       esperando-work — tiene cola, pero su work atribuido no está publicado (sin remote_id).
       jsonl-ausente  — el .jsonl ya no existe y el corpus local registra bytes que nunca subieron:
                        pérdida visible, sin acción posible. Incluye las huérfanas (sin fila ni work).
     Una sesión al día, o con cola y work publicado (sube en el siguiente sync), no se lista.
-    Sin central nada sube nunca: solo se listan los fallos (mismo criterio que _sync_status_rows)."""
+    Sin central nada sube nunca: solo se listan los fallos (mismo criterio que _sync_status_rows).
+    Con central y `optin`, una sesión sin opt-in (o atribuida a un work sin opt-in) no se lista: nunca va a
+    subir. Se cuenta en optin.hidden. Una huérfana sin .jsonl no tiene cwd raíz con qué decidir: se lista
+    como antes (residual aceptado; puede no haber tenido opt-in)."""
+    filtering = central and optin is not None
     rows = con.execute(
         "SELECT s.session_id, s.work_id, w.remote_id, s.transcript_path, s.synced_byte, s.transcript_error, "
-        "s.transcript_error_at FROM session_sync s LEFT JOIN work w ON w.id = s.work_id "
-        "ORDER BY s.session_id").fetchall()
+        "s.transcript_error_at, w.id, w.mode, w.repo_path, w.claude_session_id, w.transcript_path "
+        "FROM session_sync s LEFT JOIN work w ON w.id = s.work_id ORDER BY s.session_id").fetchall()
     out = []
     for r in rows:
         sid, synced = r[0], r[4]
@@ -1256,6 +1411,10 @@ def _sync_status_sessions(con, index=None, central=True):
         elif pending and r[2] is None:
             status = "esperando-work"
         if status and (central or status == "error"):
+            if filtering and not (optin.session(sid, r[3])
+                                  and (r[7] is None or optin.work(r[8], r[9], r[10], r[11]))):
+                optin.hidden["sessions"] += 1
+                continue
             out.append({"session_id": sid, "status": status, "work_local_id": r[1], "work_remote_id": r[2],
                         "synced_byte": synced, "pending_bytes": pending,
                         "transcript_error": r[5], "transcript_error_at": r[6]})
@@ -1291,8 +1450,10 @@ def cli_sync_status(_args):
     if con is None:
         print(json.dumps({"error": "no se pudo abrir la bitacora local"}, ensure_ascii=True)); return
     try:
-        works = _sync_status_rows(con, central=endpoint_set)
-        sessions = _sync_status_sessions(con, _JsonlIndex(os.path.expanduser("~")), central=endpoint_set)
+        index = _JsonlIndex(os.path.expanduser("~"))
+        optin = _OptIn(con, index) if endpoint_set else None
+        works = _sync_status_rows(con, central=endpoint_set, optin=optin)
+        sessions = _sync_status_sessions(con, index, central=endpoint_set, optin=optin)
     except Exception as e:
         print(json.dumps({"error": "no se pudo leer el estado del sync: " + str(e)[:200]}, ensure_ascii=True)); return
     finally:
@@ -1314,6 +1475,10 @@ def cli_sync_status(_args):
     if any(s["transcript_error"] == _TRANSCRIPT_TOO_BIG for s in sessions):
         notes.append("Las sesiones que exceden el tope por envio esperan a la subida fragmentada; pending_bytes "
                      "dice cuanto falta.")
+    if optin is not None and (optin.hidden["works"] or optin.hidden["sessions"]):
+        notes.append(f"No se listan {optin.hidden['works']} works y {optin.hidden['sessions']} sesiones sin opt-in "
+                     "(su repo, o el dir donde arranco la sesion, no trae el marcador neb-logbook: central): "
+                     "se quedan locales y no van a salir mientras no lo tengan.")
     print(json.dumps({
         "scope": "local", "endpoint_set": endpoint_set, "token_set": token_set,
         "attention": (sum(1 for w in works if w["conflict"] or w["last_error"])
@@ -1323,6 +1488,14 @@ def cli_sync_status(_args):
 
 
 def cli_main(argv):
+    # Windows: con stdout entubado en cp1252, un carácter fuera de la página (→, ↔) lanza
+    # UnicodeEncodeError, el except del __main__ lo absorbe y la salida queda vacía con exit 0.
+    # Mismo bloque que pendings.cli_main.
+    for _s in (sys.stdout, sys.stderr):
+        try:
+            _s.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
     cmd, rest = argv[0], argv[1:]
     if cmd == "list":
         cli_list(rest)

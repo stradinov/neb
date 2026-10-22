@@ -31,6 +31,24 @@ sys.path.insert(0, LIB)
 import _db_shared
 import logbook
 
+
+# 6.14.2: el drenaje filtra por opt-in (marcador en el CLAUDE.md del repo o del dir donde arrancó la
+# sesión). Estos tests son anteriores y no prueban eso: aquí todo dir cuenta como marcado. El opt-in se
+# prueba en test_logbook_cli_and_drain.py. Sin _maybe_spawn_sync: una captura no lanza un sync real.
+_OPTIN_PATCHES = (mock.patch.object(logbook, "_is_shared", lambda cwd: True),
+                  mock.patch.object(logbook, "_maybe_spawn_sync", lambda *a, **k: None))
+
+
+def setUpModule():
+    for p in _OPTIN_PATCHES:
+        p.start()
+
+
+def tearDownModule():
+    for p in _OPTIN_PATCHES:
+        p.stop()
+
+
 SCHEMA = os.path.join(HERE, "..", "logbook-schema.sql")
 GUIDE  = os.path.join(HERE, "..", "..")                  # NEB_HOME de esta copia: hooks/logbook-schema.sql
 FAKE_ENV = {"NEB_LOGBOOK_ENDPOINT": "http://central.invalid", "NEB_LOGBOOK_TOKEN": "tok-de-prueba-0123456789"}

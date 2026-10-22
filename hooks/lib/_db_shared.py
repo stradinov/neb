@@ -310,6 +310,11 @@ _WORK_MIGRATIONS = (
     ("transcript_error_at", "ALTER TABLE work ADD COLUMN transcript_error_at TEXT"),
 )
 
+# Columnas agregadas a `session_sync` (6.12) después de su esquema inicial. Mismo contrato.
+_SESSION_SYNC_MIGRATIONS = (
+    ("root_cwd", "ALTER TABLE session_sync ADD COLUMN root_cwd TEXT"),
+)
+
 
 # Columnas agregadas a las tablas de pendings después de su esquema inicial (REQ pendings-taxonomia).
 # Mismo contrato que _WORK_MIGRATIONS. Solo DDL: el backfill de `pending.slug` (DML dependiente de
@@ -358,8 +363,8 @@ def _migrate(con):
     porque la columna ya existe, que es el objetivo. Cualquier otro error (p. ej. 'database is locked')
     se propaga: _connect devuelve None y se conserva el invariante 'conexión devuelta = esquema completo'.
 
-    Orden: `work` primero (siempre), luego las tablas de pendings SOLO si existen de verdad (una DB
-    solo-logbook, sin pendings, no debe romper). Solo DDL: sin UPDATEs dependientes de datos."""
+    Orden: `work` primero (siempre), luego `session_sync` y las tablas de pendings SOLO si existen de verdad
+    (una DB solo-logbook, sin pendings, no debe romper). Solo DDL: sin UPDATEs dependientes de datos."""
     cols = {r[1] for r in con.execute("PRAGMA table_info(work)").fetchall()}
     if not cols:
         return
@@ -371,6 +376,8 @@ def _migrate(con):
         except sqlite3.OperationalError as e:
             if "duplicate column name" not in str(e).lower():
                 raise
+    if _table_exists(con, "session_sync"):
+        _add_missing_columns(con, "session_sync", _SESSION_SYNC_MIGRATIONS)
     if _table_exists(con, "pending"):
         _add_missing_columns(con, "pending", _PENDING_MIGRATIONS)
     if _table_exists(con, "pending_topic"):

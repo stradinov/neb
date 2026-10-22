@@ -95,7 +95,8 @@ CREATE TABLE IF NOT EXISTS session_sync (
   synced_byte         INTEGER NOT NULL DEFAULT 0,     -- hasta qué byte llegó al central
   transcript_error    TEXT,                           -- fallo vigente del canal /transcript de esta sesión
   transcript_error_at TEXT,                           -- desde cuándo (no se reescribe si el texto no cambia)
-  updated_at          TEXT NOT NULL
+  updated_at          TEXT NOT NULL,
+  root_cwd            TEXT                            -- cwd con el que arrancó la sesión (opt-in al drenar; 6.14.2)
 );
 CREATE INDEX IF NOT EXISTS idx_session_sync_work ON session_sync(work_id);
 

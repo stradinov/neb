@@ -100,11 +100,11 @@ Con el comando `/logbook`:
 - **`/logbook`** — lista tus trabajos a medias (con REQ y sesiones exploratorias) con su contexto.
 - **`/logbook retomar <id>`** — reconstruye el contexto: para un REQ, toma el mando y abre una sesión nueva con el transcript; para una exploración, te entrega el `claude --resume`.
 - **`/logbook tomar | liberar | solicitar <id>`** — opera el "mando" del trabajo (un solo dueño a la vez).
-- **`/logbook search <texto>`** — busca en el corpus de transcripts (requiere central).
-- **`/logbook renombrar <id> <nuevo-slug>`** — renombre gobernado del REQ (requiere central).
+- **`/logbook search <texto>`** — busca en el corpus de transcripts (el local; con central, el del equipo).
+- **`/logbook renombrar <id> <nuevo-slug>`** — renombre gobernado del REQ (con central, preserva su historial en el catálogo del equipo).
 - **`/logbook estado-sync`** — qué trabajos siguen sin publicarse al central, cuáles están en conflicto y cuáles tienen un fallo de sync vigente (con su causa y desde cuándo). `/logbook` sin argumentos te avisa si hay conflictos o fallos vigentes. Lee siempre tu bitácora local.
 
-Por defecto la bitácora es **local** (tu máquina) — si trabajas solo, no necesitas nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva, con búsqueda de texto completo del corpus— lo habilita el **backend central** del equipo (servidor opcional, distribuido en un repositorio dedicado). **Privacidad**: la bitácora es **local por defecto** —nada se publica al equipo salvo que lo pidas, aunque tengas el central configurado—. Para que un proyecto comparta su trabajo al catálogo central (works **y sesiones exploratorias**, con su transcript sin las salidas de herramientas), agrega `<!-- neb-logbook: central -->` a su `CLAUDE.md` (**de activación voluntaria por proyecto**). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
+Por defecto la bitácora es **local** (tu máquina) — si trabajas solo, no necesitas nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva, con búsqueda de texto completo del corpus— lo habilita el **backend central** del equipo (servidor opcional, distribuido en un repositorio dedicado). **Privacidad**: la bitácora es **local por defecto** —nada se publica al equipo salvo que lo pidas, aunque tengas el central configurado—. Para que un proyecto comparta su trabajo al catálogo central (works **y sesiones exploratorias**, con el transcript de las sesiones que abras en ese proyecto —el cliente lo envía crudo, salidas de herramientas incluidas; la búsqueda indexa solo el texto sin ellas—), agrega `<!-- neb-logbook: central -->` a su `CLAUDE.md` (**de activación voluntaria por proyecto**). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
 
 ## Contribuir al núcleo (mantenedores)
 
