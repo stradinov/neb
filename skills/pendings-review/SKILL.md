@@ -23,7 +23,9 @@ repite esos lineamientos. Traduce los enums de la DB (inglés) al español al mo
 ## Resolver el módulo
 
 ```bash
-NEB_SRC="${NEB_HOME:-${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/*/neb/*/ 2>/dev/null | sort -V | tail -1)}}"
+NEB_SRC="${NEB_HOME:-}"
+case "$NEB_SRC" in ""|*/plugins/cache/*|*\\plugins\\cache\\*) NEB_SRC="${CLAUDE_PLUGIN_ROOT}" ;; esac
+[ -f "$NEB_SRC/VERSION" ] || echo "Neb: no hay VERSION en '$NEB_SRC'. Si la ruta es la de NEB_HOME, corrígela; si quedó vacía, actualiza Claude Code (sustitución de CLAUDE_PLUGIN_ROOT en skills)" >&2
 PD() { py "$NEB_SRC/hooks/lib/pendings.py" "$@" 2>/dev/null || python "$NEB_SRC/hooks/lib/pendings.py" "$@"; }
 ```
 

@@ -8,10 +8,12 @@ description: Tour de bienvenida de Neb — conecta o monta tu workspace y define
 El usuario invocó `/wakeup`. Ejecuta el **recorrido de bienvenida de Neb** siguiendo el flujo del skill `wakeup` (su definición completa vive en `skills/wakeup/SKILL.md` — no lo dupliques acá):
 
 1. **Presenta** Neb en 2-3 oraciones: qué garantiza (comportamiento explícito, personalizable, expandible) y qué no es (no es un generador de código autónomo).
-2. **Resuelve el script de configuración** con esta ruta de reserva (una instalación reciente no tiene `NEB_HOME`) y corre la simulación:
+2. **Resuelve el script de configuración** (el clon de `NEB_HOME` si lo hay; si no, la raíz del plugin, que Claude Code sustituye al cargar este comando) y corre la simulación:
 
    ```bash
-   NEB_SRC="${NEB_HOME:-${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/*/neb/*/ 2>/dev/null | sort -V | tail -1)}}"
+   NEB_SRC="${NEB_HOME:-}"
+   case "$NEB_SRC" in ""|*/plugins/cache/*|*\\plugins\\cache\\*) NEB_SRC="${CLAUDE_PLUGIN_ROOT}" ;; esac
+   [ -f "$NEB_SRC/VERSION" ] || echo "Neb: no hay VERSION en '$NEB_SRC'. Si la ruta es la de NEB_HOME, corrígela; si quedó vacía, actualiza Claude Code (sustitución de CLAUDE_PLUGIN_ROOT en skills)" >&2
    bash "$NEB_SRC/bootstrap/setup-workspace.sh" --dry-run
    ```
 

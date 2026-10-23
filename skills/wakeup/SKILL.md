@@ -22,10 +22,12 @@ Abrir con 2-3 oraciones:
 
 ### 2. Detectar el estado (vía script, no a mano)
 
-Resuelve el script con fallback (un miembro recién instalado no tiene `NEB_HOME`) y corre la simulación:
+Resuelve el script (el clon de `NEB_HOME` si lo hay; si no, la raíz del plugin, que Claude Code sustituye al cargar este skill) y corre la simulación:
 
 ```bash
-NEB_SRC="${NEB_HOME:-${CLAUDE_PLUGIN_ROOT:-$(ls -d "$HOME"/.claude/plugins/cache/*/neb/*/ 2>/dev/null | sort -V | tail -1)}}"
+NEB_SRC="${NEB_HOME:-}"
+case "$NEB_SRC" in ""|*/plugins/cache/*|*\\plugins\\cache\\*) NEB_SRC="${CLAUDE_PLUGIN_ROOT}" ;; esac
+[ -f "$NEB_SRC/VERSION" ] || echo "Neb: no hay VERSION en '$NEB_SRC'. Si la ruta es la de NEB_HOME, corrígela; si quedó vacía, actualiza Claude Code (sustitución de CLAUDE_PLUGIN_ROOT en skills)" >&2
 bash "$NEB_SRC/bootstrap/setup-workspace.sh" --dry-run
 ```
 
