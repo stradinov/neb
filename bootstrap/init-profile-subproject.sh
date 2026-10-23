@@ -56,8 +56,10 @@ info() { printf "  %s\n" "$*"; }
 ok()   { printf "  \033[32m%s\033[0m\n" "$*"; }
 warn() { printf "  \033[33m%s\033[0m\n" "$*"; }
 
-# Sin NEB_HOME (solo plugin): el árbol de este script, no el git toplevel del cwd (el workspace).
-GUIDE_DIR="${NEB_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+# Sin NEB_HOME (solo plugin), o con NEB_HOME fijado al caché por un /wakeup anterior a 6.14.3: el árbol
+# de este script, no el git toplevel del cwd (el workspace). Mismo criterio que hooks/lib/neb_root.py.
+GUIDE_DIR="${NEB_HOME:-}"
+case "$GUIDE_DIR" in ""|*/plugins/cache/*|*\\plugins\\cache\\*) GUIDE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)" ;; esac
 TEMPLATES_DIR="$GUIDE_DIR/profiles/profile-authoring/templates"
 
 # Desde el caché del plugin no hay destino que derivar: lo que se escriba ahí se pierde con el update.

@@ -8,5 +8,5 @@ Extensiones personales del flujo de trabajo con Claude: hooks automáticos y rec
 2. [Notify on permission](notify-on-permission.md) — hook `Notification` que reproduce un aviso sonoro cuando Claude pide permiso para una herramienta o el prompt input lleva idle > 60 s (scripts PS1 + bash, config personal — opcional personal).
 3. [Prompt preprocessing](prompt-preprocessing.md) — hook `UserPromptSubmit` que corrige prompts antes de pasar a Claude (lineamiento, script Python, slash command — opcional personal).
 4. [Redacción es](redaccion-es.md) — taxonomía de errores de redacción en español + plantilla YAML para correctores (recurso de referencia, no obligatorio).
-5. [Logbook](logbook.md) — backend y captura de la bitácora de relevo (hook `logbook-sync` + SQLite local; de activación voluntaria por proyecto).
+5. [Logbook](logbook.md) — backend y captura de la bitácora de relevo (hook `logbook-sync` + SQLite local; de activación voluntaria con `NEB_HOOKS` / `NEB_PROJECT_HOOKS`).
 6. [Revisión editorial externa](revision-editorial-externa.md) — guía para usar un agente LLM externo (ChatGPT u otro) como consultor editorial de los `.md`: prompts, contrato de salida `[ACTUAL]`/`[PROPUESTO]`, allowlist de anglicismos, protecciones y lecciones aprendidas (recurso de referencia, no obligatorio).

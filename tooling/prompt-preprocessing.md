@@ -3,7 +3,7 @@
 > Lineamiento del hook `preprocess-prompt.py`. **Opcional personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
 >
 > Recurso transversal consumido: [`tooling/redaccion-es.md`](redaccion-es.md).
-> Artefactos del hook: [`hooks/preprocess-prompt.py`](../hooks/preprocess-prompt.py), [`commands/preprocess.md`](../commands/preprocess.md), [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
+> Artefactos del hook: [`hooks/preprocess-prompt.py`](../hooks/preprocess-prompt.py), [`commands/preprocess.md`](../commands/preprocess.md), [`hooks/neb-hook.py`](../hooks/neb-hook.py) (dispatcher del plugin), [`hooks/hooks.json`](../hooks/hooks.json).
 
 ---
 
@@ -83,13 +83,11 @@ Precedencia (primero que aplica gana):
 
 ## 7. Activación
 
-Manual. (El proceso guiado de instalación de `neb` queda como pendiente del repo.)
+Manual. El plugin ya registra el hook (ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb").
 
-1. Copiar el bloque `UserPromptSubmit` de [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template) a `~/.claude/settings.json` del dev. Elegir el bloque OS apropiado (Windows / Linux-Mac).
+1. Agregar `preprocess-prompt` a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json` (en una lista ya existente, va separado por comas y sin espacios). En Windows requiere Git Bash.
 
-   > **Windows — por qué `"shell": "powershell"` y no `cmd /c py ...`**: Claude Code ejecuta el `command` del hook sin shell intermediario, así que `%VAR%` no se expande en tiempo de invocación. El intento previo (`cmd /c py "%NEB_HOME%\..."` en v2.23.2) sí desbloqueaba la sesión y dejaba que `cmd` expandiera `%VAR%`, pero el spawn de cmd en Windows no propaga el JSON de stdin al subprocess `py`: el JSON termina interpretándose como segundo comando para cmd (stderr `"..." no se reconoce como un comando`), y el script Python jamás corre. La forma estable es declarar `"shell": "powershell"` — Claude Code envuelve el comando vía `powershell -NoProfile -Command "..."`, expande `$env:NEB_HOME`, y propaga stdin correctamente al subprocess. El template del repo trae la sintaxis correcta — copy/paste tal cual. En bash (Linux/Mac) la expansión de `$VAR` ocurre nativa, no requiere `shell` ni wrapper.
-
-2. Copiar [`commands/preprocess.md`](../commands/preprocess.md) a `~/.claude/commands/`.
+2. El comando viene con el plugin como `/neb:preprocess`. Para tenerlo también como `/preprocess`, copia [`commands/preprocess.md`](../commands/preprocess.md) a `~/.claude/commands/`.
 3. Crear `~/.claude/preprocess.json` con el esquema completo (ver §5).
 4. Verificar Python 3 en PATH:
    - **Windows**: `py --version` o `python --version`.
@@ -99,11 +97,9 @@ Manual. (El proceso guiado de instalación de `neb` queda como pendiente del rep
 
 > Tras instalar, el hook arranca en modo **`off`** (inerte): no actúa hasta que lo enciendas con `/preprocess full` (o `fast`), o cambies `"mode"` en `preprocess.json`. Deliberado — copiar la instalación no altera el comportamiento de tus prompts hasta que tú lo decidas.
 
-Snippet PowerShell para Windows (copy/paste):
+Snippet PowerShell para Windows (copy/paste; crea `preprocess.json`):
 
 ```powershell
-$env:USERPROFILE | ForEach-Object { New-Item -ItemType Directory -Force -Path "$_\.claude\commands" | Out-Null }
-Copy-Item "$env:NEB_HOME\commands\preprocess.md" "$env:USERPROFILE\.claude\commands\preprocess.md"
 @'
 {"mode": "off", "model": "claude-haiku-4-5-20251001", "prefix": "$$"}
 '@ | Out-File -Encoding utf8 "$env:USERPROFILE\.claude\preprocess.json"
@@ -112,8 +108,6 @@ Copy-Item "$env:NEB_HOME\commands\preprocess.md" "$env:USERPROFILE\.claude\comma
 Snippet bash (Linux/Mac):
 
 ```bash
-mkdir -p ~/.claude/commands
-cp "$NEB_HOME/commands/preprocess.md" ~/.claude/commands/preprocess.md
 echo '{"mode": "off", "model": "claude-haiku-4-5-20251001", "prefix": "$$"}' > ~/.claude/preprocess.json
 ```
 
@@ -160,8 +154,9 @@ Umbral conservador a propósito: ante duda, pasa a Capa B (Haiku decide).
 - **Guard de subsesión interna** (contrato canónico): el hook marca el entorno del subproceso `claude -p` con `NEB_INTERNAL_SUBSESSION=1` (vía `mark_internal_subsession` de [`hooks/lib/subsession.py`](../hooks/lib/subsession.py)) y abandona temprano si la detecta. La subsesión de Haiku hereda el `settings.json` del dev, así que dispararía **todos** los hooks de Neb; cada uno debe ser **inerte** dentro de ella. Consumidores que respetan la bandera (vía `is_internal_subsession` o el snippet shell canónico):
   - `preprocess-prompt.py` (`UserPromptSubmit`) — evita la auto-recursión (cascada de timeouts); fue el motivo original de la bandera.
   - `neb-bootstrap-context.py` (`SessionStart`) — **no inyecta el arranque**; sin esto el Haiku corrector recibe instrucciones de asistente + pendientes y **responde** la pregunta en vez de corregirla.
-  - `usage-tracker.sh` (`Stop`) — no cuenta los tokens de la subsesión contra el REQ activo.
-  - `logbook-sync.{sh,ps1}` (`Stop`/`SessionEnd`/`PreCompact`) — no escribe la subsesión a la bitácora.
+  - `hooks/neb-hook.py` (los hooks opcionales bajo el plugin) — no despacha ninguno en la subsesión.
+  - `usage-tracker.sh` (`Stop`, entrada de settings con clon) — no cuenta los tokens de la subsesión contra el REQ activo.
+  - `logbook-sync.{sh,ps1}` (`Stop`/`SessionEnd`/`PreCompact`, entrada de settings con clon) — no escribe la subsesión a la bitácora.
   - `notify-on-stop` / `notify-on-permission` — evitan el "chime fantasma".
 
   **Alias legacy** `CLAUDE_PREPROCESS_RECURSION` (obsoleto, retiro diferido a un major): `mark_internal_subsession` establece **ambas** y todos los consumidores chequean **ambas**, para tolerar la convivencia de plugins de distinta versión en el equipo durante la transición.
@@ -173,7 +168,7 @@ Umbral conservador a propósito: ante duda, pasa a Capa B (Haiku decide).
 - Conversación pura sin acciones de escritura.
 - Pegando muchos payloads grandes consecutivos (Capa A debería skipear, pero si falsea positivos, `/preprocess off` ahorra latencia).
 
-Desactivación permanente: comentar bloque `UserPromptSubmit` en `~/.claude/settings.json` y reiniciar `claude`.
+Desactivación permanente: quitar `preprocess-prompt` de `NEB_HOOKS` y reiniciar `claude` (con una entrada de settings con clon, quitar esa entrada).
 
 ## 11. Verificación
 
@@ -197,7 +192,7 @@ Escenarios a probar (medibles entre Enter y primer carácter de respuesta de Cla
 | 12 | Pegar email sin petición explícita | Capa B detecta que no es petición conversacional y devuelve idéntico; Claude omite eco/confirmación. |
 | 13 | Prompt en inglés: `add a validation function for the email field` | Auto-detección; corrección + eco en inglés; confirmación esperada en inglés. |
 | 14 | Desconectar red, tipear prompt largo | Timeout interno 30 s; hook abandona; prompt pasa raw. No cuelga la sesión. |
-| 15 | Deshabilitar permanentemente | Comentar bloque `UserPromptSubmit` en `~/.claude/settings.json`, reiniciar `claude`. |
+| 15 | Deshabilitar permanentemente | Quitar `preprocess-prompt` de `NEB_HOOKS`, reiniciar `claude`. |
 
 ## 12. Referencias
 

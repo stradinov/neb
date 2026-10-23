@@ -131,7 +131,7 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 | Re-entregas | — |
 | Complejidad estimada / real | — / — |
 
-**Uso de API** *(auto — `usage-tracker.sh`)*
+**Uso de API** *(auto — hook `usage-tracker`)*
 
 <!-- usage-tracker-start -->
 | Modelo | Tokens (in · out · cache_w · cache_r) | Costo USD |

@@ -4,7 +4,7 @@ Cómo poner Neb a trabajar en tu equipo: instalarlo, montar tu capa propia y def
 
 ## Instalar
 
-Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni correr instaladores. Desde Claude Code:
+Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni correr instaladores. En Windows requiere **Git for Windows (Git Bash)**: Claude Code corre ahí los hooks del plugin, y sin él fallan en cada evento (ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb"). Desde Claude Code:
 
 ```
 /plugin marketplace add stradinov/neb
@@ -49,8 +49,9 @@ El recorrido `/wakeup` ejecuta el script de configuración por ti (idempotente �
 
 | Variable | Apunta a | Para |
 |---|---|---|
-| `NEB_HOME` | el clon de neb (solo si el núcleo viene de un clon) | hooks opcionales (`$NEB_HOME/hooks`), templates y bootstrap del núcleo |
+| `NEB_HOME` | el clon de neb (solo si el núcleo viene de un clon) | arranque, templates y bootstrap del núcleo desde el clon. Se ignora si apunta al caché del plugin |
 | `NEB_WORKSPACE` | la raíz de tu espacio de trabajo de gobernanza | tu overlay, `personal/`, `changes/` |
+| `NEB_HOOKS` / `NEB_PROJECT_HOOKS` | listas de hooks opcionales (las agregas tú; `/wakeup` no las toca) | activar los hooks que registra el plugin (ver [Retomar y relevar trabajo](#retomar-y-relevar-trabajo-bitácora-de-relevo)) |
 
 Abre una **sesión nueva** de Claude Code para que surtan efecto (settings.json se lee por sesión). El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (por defecto `overlay`).
 
@@ -93,7 +94,15 @@ Si quieres versionarla (respaldo, portabilidad entre máquinas), quita la regla 
 
 ## Retomar y relevar trabajo (bitácora de relevo)
 
-Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque otro dev sigue— la **bitácora de relevo** te deja retomarla. Es **opcional**: agrega el hook `logbook-sync` a tu `<proyecto>/.claude/settings.json` (base en `hooks/settings.template.json`; en Windows usa la variante `"shell": "powershell"`). El hook corre desde `$NEB_HOME`, así que requiere un clon de neb con `NEB_HOME` apuntando a él: con solo el plugin esa variable no existe (ver [Configurar el entorno](#configurar-el-entorno)). Con `NEB_HOME` en un clon, el arranque también sale del clon, así que mantenlo al día con `git pull`. El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
+Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque otro dev sigue— la **bitácora de relevo** te deja retomarla. Es **opcional**: el plugin registra el hook `logbook-sync`, y tú lo activas agregándolo a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json`:
+
+```json
+{ "env": { "NEB_HOOKS": "logbook-sync" } }
+```
+
+Con eso aplica a todos tus proyectos, desde la siguiente sesión. Para activarlo solo en un proyecto para todo el equipo, usa `NEB_PROJECT_HOOKS` en su `.claude/settings.json` versionado. Corre con el código del plugin instalado, sin `NEB_HOME`. En Windows requiere Git Bash (Git for Windows). Los demás hooks opcionales (`usage-tracker`, `save-approved-plan`, `notify-on-stop`, `notify-on-permission`, `ops-capture`, `preprocess-prompt`) se activan igual: ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb". Si tu `settings.json` todavía invoca hooks desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esas entradas al activarlos, o correrán dos veces.
+
+El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
 
 Con el comando `/logbook`:
 
@@ -115,7 +124,7 @@ git clone https://github.com/stradinov/neb ~/neb   # o donde prefieras
 cp ~/neb/hooks/pre-push-changelog ~/neb/.git/hooks/pre-push   # gate del CHANGELOG
 ```
 
-Flujo: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo (fork + PR si no tienes write). Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`.
+Flujo: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo (fork + PR si no tienes write). Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`. Los hooks opcionales activados con `NEB_HOOKS` corren siempre el plugin cargado: para probarlos desde el clon, usa `--plugin-dir`.
 
 El clon del núcleo y tu espacio de trabajo son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)
 

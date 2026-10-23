@@ -26,7 +26,8 @@ set -euo pipefail
 # Opciones: --overlay <nombre> (default: overlay) · --dry-run (no escribe)
 #
 # NEB_HOME se determina: ${CLAUDE_PLUGIN_ROOT} (solo invocado con esa variable; /wakeup no la recibe)
-# > $NEB_HOME (env) > el dir padre de este script (el plugin, bajo /wakeup).
+# > $NEB_HOME (env, salvo que caiga en el cache de plugins) > el dir padre de este script (el plugin,
+# bajo /wakeup).
 # NEB_HOME NO se persiste cuando resuelve dentro del cache de plugins (.../plugins/cache/...,
 # path version-specific); un clon si.
 
@@ -66,7 +67,11 @@ neb_python() {
 
 # 1. NEB_HOME (nucleo)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-NEB_HOME_VAL="${CLAUDE_PLUGIN_ROOT:-${NEB_HOME:-$(dirname "$SCRIPT_DIR")}}"
+# Un NEB_HOME en el cache de plugins lo dejo fijado un /wakeup anterior a 6.14.3 y apunta a una
+# version vieja: se ignora (mismo criterio que hooks/lib/neb_root.py).
+NEB_HOME_ENV="${NEB_HOME:-}"
+case "$NEB_HOME_ENV" in */plugins/cache/*|*\\plugins\\cache\\*) NEB_HOME_ENV="" ;; esac
+NEB_HOME_VAL="${CLAUDE_PLUGIN_ROOT:-${NEB_HOME_ENV:-$(dirname "$SCRIPT_DIR")}}"
 NEB_HOME_VAL="$(cd "$NEB_HOME_VAL" 2>/dev/null && pwd || echo "$NEB_HOME_VAL")"
 bold "NEB_HOME (nucleo): $NEB_HOME_VAL"
 

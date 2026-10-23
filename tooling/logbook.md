@@ -1,6 +1,6 @@
 # Bitácora de relevo — backend y captura (opcional)
 
-Recurso del hook que alimenta la [bitácora de relevo](../workflow/logbook.md). De activación voluntaria por proyecto (no se auto-registra). El artefacto y su modelo de ownership viven en [`../workflow/logbook.md`](../workflow/logbook.md); el protocolo de uso en [`../process/execution.md`](../process/execution.md) §"Gestión de sesiones (handoff)"; aquí la mecánica.
+Recurso del hook que alimenta la [bitácora de relevo](../workflow/logbook.md). Lo registra el plugin y es de activación voluntaria (`NEB_HOOKS` / `NEB_PROJECT_HOOKS`, § "Activación"). El artefacto y su modelo de ownership viven en [`../workflow/logbook.md`](../workflow/logbook.md); el protocolo de uso en [`../process/execution.md`](../process/execution.md) §"Gestión de sesiones (handoff)"; aquí la mecánica.
 
 ## Backend pluggable
 
@@ -42,7 +42,7 @@ Un `work` cerrado se **archiva** (`archived_at`), no se borra — preserva el co
 
 ## Activación
 
-De activación voluntaria por proyecto en `<proyecto>/.claude/settings.json` (ver [`../hooks/settings.template.json`](../hooks/settings.template.json) y [`../hooks/README.md`](../hooks/README.md) §logbook-sync). **Windows**: `"shell": "powershell"` con `logbook-sync.ps1` (el hook combina stdin + variables de entorno).
+De activación voluntaria: el plugin registra el hook, y corre si `logbook-sync` está en `NEB_HOOKS` (personal: `env` de `~/.claude/settings.json` o del `settings.local.json` del proyecto) o en `NEB_PROJECT_HOOKS` (`env` del `.claude/settings.json` versionado del proyecto). Ver [`../hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb". En Windows requiere Git Bash. Una entrada de settings con clon (`logbook-sync.ps1` con `"shell": "powershell"`, o `logbook-sync.sh`) sigue funcionando; no la combines con la variable, o corre dos veces.
 
 ## Modos de fallo (defensivo)
 
@@ -54,4 +54,4 @@ De activación voluntaria por proyecto en `<proyecto>/.claude/settings.json` (ve
 
 ## Requisitos
 
-Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib). `NEB_HOME` para localizar el módulo y el esquema.
+Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib). La captura del hook usa el módulo y el esquema del plugin cargado. El CLI (`/logbook`, `/pendings-review`) y los wrappers de una entrada de settings usan el clon de `NEB_HOME` si lo hay (un `NEB_HOME` que apunte al caché del plugin se ignora). Un maintainer que combine `NEB_HOME` en un clon con `logbook-sync` en `NEB_HOOKS` captura con el esquema del plugin; para capturar con el del clon, usa `claude --plugin-dir <clon>`.

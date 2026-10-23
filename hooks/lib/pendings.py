@@ -31,6 +31,7 @@ from _db_shared import (
     now_iso, posix_to_win, _whoami,
     with_write_tx as _with_write_tx, _safe_rollback,
 )
+from neb_root import resolve_neb_root
 
 
 _OBSOLETE_CAUSES = ("no-longer-applies", "resolved-otherwise")
@@ -45,9 +46,10 @@ _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
 
 def _db_for_cli():
     home  = os.path.expanduser("~")
-    # Sin NEB_HOME (solo plugin): el árbol de este módulo, cuyo esquema es el de su misma versión.
-    guide = posix_to_win(os.environ.get("NEB_HOME", "")) \
-        or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+    # Sin NEB_HOME (solo plugin), o con NEB_HOME fijado al caché: el árbol de este módulo,
+    # cuyo esquema es el de su misma versión (neb_root.py).
+    guide = posix_to_win(resolve_neb_root(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
     return _connect(resolve_db_path(home),
                     os.path.join(guide, "hooks", "logbook-schema.sql"))
 

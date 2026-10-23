@@ -42,6 +42,7 @@ from _db_shared import (
     now_iso, posix_to_win, encode_cwd, find_active_reqs, resolve_memory_dir,
     _whoami, _hostname, _git, _git_info, _project_id, _normalize_remote, _basename,
 )
+from neb_root import resolve_neb_root
 
 
 # =========================================================================== captura
@@ -444,7 +445,8 @@ def _http(endpoint, token, path, method="GET", payload=None, body=None, timeout=
 
 
 def sync_main(args):
-    guide = posix_to_win(args[0]) if args else (os.environ.get("NEB_HOME") or "")
+    guide = posix_to_win(args[0]) if args else posix_to_win(
+        resolve_neb_root(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
     home  = posix_to_win(args[1]) if len(args) >= 2 else os.path.expanduser("~")
     endpoint, token = _central()
     if not endpoint or not token:
@@ -1161,9 +1163,10 @@ CLI_CMDS = {"list", "show", "claim", "release", "forced-release", "request", "re
 
 def _db_for_cli():
     home  = os.path.expanduser("~")
-    # Sin NEB_HOME (solo plugin): el árbol de este módulo, cuyo esquema es el de su misma versión.
-    guide = posix_to_win(os.environ.get("NEB_HOME", "")) \
-        or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
+    # Sin NEB_HOME (solo plugin), o con NEB_HOME fijado al caché: el árbol de este módulo,
+    # cuyo esquema es el de su misma versión (neb_root.py).
+    guide = posix_to_win(resolve_neb_root(
+        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
     return _connect(resolve_db_path(home),
 #                    os.path.join(home, ".claude", "neb-logbook.db"),
                     os.path.join(guide, "hooks", "logbook-schema.sql"))

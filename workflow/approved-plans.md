@@ -1,6 +1,6 @@
 # Approved plans
 
-Un plan aprobado puede persistirse como artefacto en `~/.claude/approved-plans/` por **dos vías**: el hook `save-approved-plan.sh` cuando se aprueba en plan mode (`ExitPlanMode`), o un `Write` de Claude cuando se aprueba conversacionalmente (ver § "Persistencia conversacional"). Bitácora cross-proyecto consultable entre sesiones.
+Un plan aprobado puede persistirse como artefacto en `~/.claude/approved-plans/` por **dos vías**: el hook `save-approved-plan` cuando se aprueba en plan mode (`ExitPlanMode`), o un `Write` de Claude cuando se aprueba conversacionalmente (ver § "Persistencia conversacional"). Bitácora cross-proyecto consultable entre sesiones.
 
 ## Path
 
@@ -8,8 +8,8 @@ Un plan aprobado puede persistirse como artefacto en `~/.claude/approved-plans/`
 ~/.claude/approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md
 ```
 
-- `<proyecto>` = `basename` del cwd.
-- `<slug>` = primera línea del plan, normalizada (lowercase, espacios → guiones, máx 50 chars; criterio de `hooks/lib/slugify.sh`).
+- `<proyecto>` = último segmento del cwd; cada `<>:"|?*` → `-`, sin `-` en los extremos; `unknown` si queda vacío.
+- `<slug>` = primera línea del plan, normalizada: sin `#` ni espacios al inicio, minúsculas, sin acentos (`ñ` → `n`), cada tramo que no sea `a-z0-9` → `-`, máx 50 chars, `plan` si queda vacío (criterio de `slugify` en `hooks/lib/approved_plan.py`).
 - Carpeta global, no versionada.
 
 ## Contenido
@@ -22,14 +22,14 @@ Ambas vías producen el **mismo artefacto** (mismo path, naming y formato); difi
 
 | Vía | Disparo | Escribe | Anuncio | Niveles | Conoce el Change MD |
 |---|---|---|---|---|---|
-| **Plan mode** | `ExitPlanMode` | hook `save-approved-plan.sh` (silencioso) | no | los que entren a plan mode | no (corre antes de que nazca el Change MD) |
+| **Plan mode** | `ExitPlanMode` | hook `save-approved-plan` (silencioso) | no | los que entren a plan mode | no (corre antes de que nazca el Change MD) |
 | **Conversacional** | Aprobación explícita en chat ("¿De acuerdo con este plan?" → sí), **sin** plan mode | Claude vía `Write` | 1 línea | media/alta | sí |
 
 ### Persistencia conversacional (sin plan mode)
 
 Cuando un plan de complejidad **media/alta** se aprueba en conversación (sin pasar por plan mode), el artefacto a producir es el mismo archivo `approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md` que generaría el hook. Convenciones de paridad:
 
-- `**Sesión:**` = `unknown` si no hay `session_id` disponible (igual que el hook, `save-approved-plan.sh`).
+- `**Sesión:**` = `unknown` si no hay `session_id` disponible (igual que el hook `save-approved-plan`).
 - El anuncio es una línea: `Plan persistido: approved-plans/<archivo>`.
 - Esta vía además llena el campo `**Plan aprobado:**` del Change MD con el path del archivo escrito (la vía conversacional sí conoce el Change MD; ver [traceability.md](traceability.md)).
 
@@ -42,6 +42,6 @@ Niveles **baja / trivial / no-formal** no persisten artefacto (ver [`process/pla
 
 ## Configuración del hook
 
-El hook `save-approved-plan` **no** se auto-registra por el plugin: es **opt-in por proyecto**, declarado en `settings.template.json` (base para el `settings.json` del proyecto). Detalle en [hooks/README.md](../hooks/README.md). El hook guarda solo planes aprobados **vía plan mode** (`PostToolUse` solo dispara al éxito de `ExitPlanMode`) — es una de las dos vías; la otra es la persistencia conversacional de arriba.
+El plugin registra el hook `save-approved-plan`, de **activación voluntaria**: corre si está en `NEB_PROJECT_HOOKS` (`env` del `settings.json` versionado del proyecto; base en `settings.template.json`) o en `NEB_HOOKS` (personal). Detalle en [hooks/README.md](../hooks/README.md) § "Bajo el plugin de Neb". El hook guarda solo planes aprobados **vía plan mode** (`PostToolUse` solo dispara al éxito de `ExitPlanMode`) — es una de las dos vías; la otra es la persistencia conversacional de arriba.
 
 No es sustituto de la memoria del proyecto ni del Change MD — es bitácora histórica complementaria.

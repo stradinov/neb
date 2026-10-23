@@ -26,7 +26,7 @@ La estructura de la sección Trazabilidad del Change MD es canónica en [`../tem
 
 ### El plan aprobado: persistencia y direccionalidad
 
-**Persistencia.** El artefacto en `~/.claude/approved-plans/` se persiste por **dos vías** (ver [approved-plans.md](approved-plans.md)): el hook `save-approved-plan.sh` al aprobar en plan mode, o un `Write` de Claude al aprobar **conversacionalmente** un plan media/alta. En consecuencia:
+**Persistencia.** El artefacto en `~/.claude/approved-plans/` se persiste por **dos vías** (ver [approved-plans.md](approved-plans.md)): el hook `save-approved-plan` al aprobar en plan mode, o un `Write` de Claude al aprobar **conversacionalmente** un plan media/alta. En consecuencia:
 
 - **No opcional en media/alta**: todo plan de esa complejidad deja artefacto (por hook o por Write).
 - **Ausente** en REQs **triviales** (una línea/texto, van directo a propuesta), **baja** (solo plan de pruebas) o **no-formales** (sin trigger de formalización) — ahí el campo es `**Plan aprobado:** —`. Ver [`../process/planning.md`](../process/planning.md) § "Cuándo aplica cada aprobación".

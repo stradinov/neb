@@ -2,7 +2,7 @@
 
 > Lineamiento del hook `notify-on-stop.{ps1,sh}`. **Opcional personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
 >
-> Artefactos del hook: [`hooks/notify-on-stop.ps1`](../hooks/notify-on-stop.ps1), [`hooks/notify-on-stop.sh`](../hooks/notify-on-stop.sh), [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
+> Artefactos del hook: [`hooks/notify-on-stop.ps1`](../hooks/notify-on-stop.ps1), [`hooks/notify-on-stop.sh`](../hooks/notify-on-stop.sh), [`hooks/neb-hook.py`](../hooks/neb-hook.py) (dispatcher del plugin), [`hooks/hooks.json`](../hooks/hooks.json).
 
 ---
 
@@ -31,7 +31,7 @@ Claude termina turno → Stop hook
                       ├─ Guard de subsesión interna (NEB_INTERNAL_SUBSESSION=1 → exit 0)
                       ├─ Cargar ~/.claude/notify-on-stop.json (defaults si ausente)
                       ├─ Si enabled=false → exit 0
-                      ├─ Resolver WAV (cfg.wav || $NEB_HOME/personal/chimes-loud.wav)
+                      ├─ Resolver WAV (cfg.wav || ${NEB_WORKSPACE:-$NEB_HOME}/personal/chimes-loud.wav)
                       ├─ Leer transcript_path del stdin JSON
                       ├─ Walk-back → último user msg no-toolUseResult → timestamp
                       ├─ duración = now - timestamp
@@ -63,7 +63,7 @@ Claude termina turno → Stop hook
 | Campo | Tipo | Por defecto | Notas |
 |---|---|---|---|
 | `enabled` | bool | `true` | `false` → `exit 0` inmediato sin reproducir. |
-| `wav` | string \| null | `null` (= `$NEB_HOME/personal/chimes-loud.wav`) | Path absoluto. Si no existe → fallback al valor por defecto + warning a stderr. |
+| `wav` | string \| null | `null` (= `personal/chimes-loud.wav` de `$NEB_WORKSPACE`, o de `$NEB_HOME` sin workspace) | Path absoluto. Si no existe → fallback al valor por defecto + warning a stderr. |
 | `min_seconds` | int | `10` | Turnos más cortos → skip silencioso. Útil para que respuestas triviales no suenen. |
 | `max_chimes` | int | `5` | Clamp `[1, 20]`. |
 | `scaling` | `"per-minute"` \| `"fixed"` | `"per-minute"` | Cualquier otro valor cae a `"per-minute"`. |
@@ -72,11 +72,11 @@ Cualquier campo ausente cae al valor por defecto hardcoded en el script. Si el a
 
 ## 6. Activación
 
-Manual. (El proceso guiado de instalación de `neb` queda como pendiente del repo.)
+Manual. El plugin ya registra el hook (ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb").
 
-1. Copiar el bloque `Stop` de [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template) a `~/.claude/settings.json` del dev. Elegir el bloque OS apropiado (Windows / Linux-Mac).
+1. Agregar `notify-on-stop` a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json`, por ejemplo `"NEB_HOOKS": "notify-on-stop"` (en una lista ya existente, va separado por comas y sin espacios). En Windows requiere Git Bash.
 
-2. Verificar que `NEB_HOME` esté establecido al checkout local del repo.
+2. Verificar que el WAV por defecto exista (`personal/chimes-loud.wav` de `$NEB_WORKSPACE`), o fijar `wav` en el config del paso 3.
 
 3. (Opcional) Crear `~/.claude/notify-on-stop.json` con valores explícitos. Si está ausente, los valores por defecto aplican.
 
@@ -100,14 +100,9 @@ Snippet bash (Linux/Mac):
 echo '{"enabled": true, "wav": null, "min_seconds": 10, "max_chimes": 5, "scaling": "per-minute"}' > ~/.claude/notify-on-stop.json
 ```
 
-### Migración desde script local (el dev)
+### Migración desde una entrada de settings
 
-El dev tenía una versión personal de este hook en `~/.claude/hooks/notify-on-stop.ps1` antes de que entrara al repo. Post-merge:
-
-1. Borrar `~/.claude/hooks/notify-on-stop.ps1` (queda obsoleto; ahora vive en `methodology/hooks/`).
-2. Editar `~/.claude/settings.json` → reemplazar la entrada `Stop` actual por el bloque Windows del template (apunta a `$env:NEB_HOME\hooks\notify-on-stop.ps1`).
-3. Opcional: crear `~/.claude/notify-on-stop.json` con valores explícitos; si está ausente, los valores por defecto producen exactamente el comportamiento previo (1 chime + 1/minuto, max 5, skip < 10s).
-4. Reiniciar sesión `claude`.
+Si tu `~/.claude/settings.json` invoca este hook desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esa entrada `Stop` y agrega `notify-on-stop` a `NEB_HOOKS` (§ 6); si conservas las dos, suena dos veces.
 
 ## 7. Guard de subsesión interna
 
@@ -152,9 +147,9 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 
 - **Latencia**: < 100 ms del hook al `exit 0`; el sonido corre async en background process. Cumple la filosofía de hooks.
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0`. Nunca bloquea la sesión.
-- **Cross-OS Windows**: `"shell": "powershell"` + `$env:VAR` (mismo bug de stdin documentado en `preprocess-prompt.py`).
+- **Cross-OS**: bajo el plugin, el hook corre en Git Bash en Windows y el dispatcher elige el `.ps1`; en macOS y Linux, el `.sh`. Una entrada de settings con clon declara `"shell": "powershell"` con `$env:VAR` en Windows.
 - **Linux/Mac**: `jq` es requisito blando — sin `jq`, el script cae a valores por defecto completos y solo puede emitir 1 chime de cortesía (no calcula duración).
-- **Múltiples hooks `Stop`**: Claude Code los ejecuta secuencialmente; convive con otros hooks `Stop` del repo (e.g. `usage-tracker.sh`).
+- **Múltiples hooks `Stop`**: Claude Code los ejecuta en paralelo; convive con otros hooks `Stop` del repo (p. ej. `usage-tracker`).
 - **Coexistencia con `Notification`** (`notify-on-permission`): eventos semánticamente distintos. Si el dev activa ambos, suenan chimes en secuencia (permission → approve → tool corre → cierre de turno). Ver [`tooling/notify-on-permission.md`](notify-on-permission.md) § 5.
 - **Sin secretos**: no lee ni escribe credenciales.
 
@@ -166,7 +161,7 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 
 Desactivación temporal: `"enabled": false` en `~/.claude/notify-on-stop.json` (no requiere reiniciar; surte efecto al siguiente turno).
 
-Desactivación permanente: comentar/quitar el bloque `Stop` en `~/.claude/settings.json` y reiniciar `claude`.
+Desactivación permanente: quitar `notify-on-stop` de `NEB_HOOKS` y reiniciar `claude` (con una entrada de settings con clon, quitar esa entrada).
 
 ## 11. Verificación
 
@@ -187,8 +182,8 @@ Escenarios a probar tras activar:
 | 11 | Transcript inaccesible (path inválido en payload) | 1 chime de cortesía + `exit 0`. |
 | 12 | Linux/Mac sin player instalado | `exit 0` silencioso. |
 | 13 | Windows con WAV en path con espacios | Suena correctamente. |
-| 14 | Coexistencia con `usage-tracker.sh` (otro hook `Stop`) | Ambos corren; ninguno bloquea al otro. |
-| 15 | Desactivación permanente (quitar bloque `Stop` de `settings.json` + reiniciar) | Sin chime. |
+| 14 | Coexistencia con `usage-tracker` (otro hook `Stop`) | Ambos corren; ninguno bloquea al otro. |
+| 15 | Desactivación permanente (quitar `notify-on-stop` de `NEB_HOOKS` + reiniciar) | Sin chime. |
 
 Escenarios 1–4, 6, 9, 10, 13–15 corren en máquina Windows. Escenarios 12 (Linux/Mac sin player) quedan como verificación pendiente cuando otro dev del equipo lo active.
 
