@@ -45,11 +45,11 @@ tu-workspace/
 
 ### Configurar el entorno
 
-El recorrido `/wakeup` ejecuta el script de configuración por ti (idempotente — seguro de repetir, sirve para restablecimiento o migración). El script (`setup-workspace.sh`, viene con el plugin) crea lo que falte (`overlay/`, `personal/`, `changes/`) y establece **dos variables** en `~/.claude/settings.json` (merge no-destructivo):
+El recorrido `/wakeup` ejecuta el script de configuración por ti (idempotente — seguro de repetir, sirve para restablecimiento o migración). El script (`setup-workspace.sh`, viene con el plugin) crea lo que falte (`overlay/`, `personal/`, `changes/`) y establece las variables en `~/.claude/settings.json` (merge no-destructivo). Con solo el plugin establece `NEB_WORKSPACE`: `NEB_HOME` no hace falta, porque el plugin resuelve su propio directorio en cada sesión, y fijar el del caché, que es uno por versión, dejaría a Neb en esa versión después de un update.
 
 | Variable | Apunta a | Para |
 |---|---|---|
-| `NEB_HOME` | el directorio del plugin instalado | hooks (`$NEB_HOME/hooks`), templates y bootstrap del núcleo |
+| `NEB_HOME` | el clon de neb (solo si el núcleo viene de un clon) | hooks opcionales (`$NEB_HOME/hooks`), templates y bootstrap del núcleo |
 | `NEB_WORKSPACE` | la raíz de tu espacio de trabajo de gobernanza | tu overlay, `personal/`, `changes/` |
 
 Abre una **sesión nueva** de Claude Code para que surtan efecto (settings.json se lee por sesión). El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (por defecto `overlay`).
@@ -93,7 +93,7 @@ Si quieres versionarla (respaldo, portabilidad entre máquinas), quita la regla 
 
 ## Retomar y relevar trabajo (bitácora de relevo)
 
-Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque otro dev sigue— la **bitácora de relevo** te deja retomarla. Es **opcional**: agrega el hook `logbook-sync` a tu `<proyecto>/.claude/settings.json` (base en `hooks/settings.template.json`; en Windows usa la variante `"shell": "powershell"`). El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
+Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque otro dev sigue— la **bitácora de relevo** te deja retomarla. Es **opcional**: agrega el hook `logbook-sync` a tu `<proyecto>/.claude/settings.json` (base en `hooks/settings.template.json`; en Windows usa la variante `"shell": "powershell"`). El hook corre desde `$NEB_HOME`, así que requiere un clon de neb con `NEB_HOME` apuntando a él: con solo el plugin esa variable no existe (ver [Configurar el entorno](#configurar-el-entorno)). Con `NEB_HOME` en un clon, el arranque también sale del clon, así que mantenlo al día con `git pull`. El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
 
 Con el comando `/logbook`:
 

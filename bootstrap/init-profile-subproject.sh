@@ -56,8 +56,23 @@ info() { printf "  %s\n" "$*"; }
 ok()   { printf "  \033[32m%s\033[0m\n" "$*"; }
 warn() { printf "  \033[33m%s\033[0m\n" "$*"; }
 
-GUIDE_DIR="${NEB_HOME:-$(git rev-parse --show-toplevel 2>/dev/null || echo "$HOME/.claude/neb")}"
+# Sin NEB_HOME (solo plugin): el árbol de este script, no el git toplevel del cwd (el workspace).
+GUIDE_DIR="${NEB_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 TEMPLATES_DIR="$GUIDE_DIR/profiles/profile-authoring/templates"
+
+# Desde el caché del plugin no hay destino que derivar: lo que se escriba ahí se pierde con el update.
+case "$GUIDE_DIR" in
+  */plugins/cache/*)
+    if [ "$TARGET" = "core" ]; then
+      echo "Error: --core requiere un clon de neb (NEB_HOME apuntando a él); el caché del plugin se reemplaza en cada update."
+      exit 1
+    elif [ -z "${NEB_WORKSPACE:-}" ]; then
+      echo "Error: falta NEB_WORKSPACE; sin ella el destino caería dentro del caché del plugin."
+      echo "  Si recién corriste /wakeup, NEB_WORKSPACE se carga en la próxima sesión; o pásala en la llamada:"
+      echo "  NEB_WORKSPACE=<tu workspace> bash $0 $PROFILE_NAME"
+      exit 1
+    fi ;;
+esac
 
 # Resolver el directorio destino del profile según el TARGET.
 if [ "$TARGET" = "core" ]; then

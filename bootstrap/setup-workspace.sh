@@ -5,7 +5,8 @@ set -euo pipefail
 #
 # El NUCLEO (neb) vive aparte: bajo plugin en ${CLAUDE_PLUGIN_ROOT}; en clone, en $NEB_HOME.
 # Este script crea el workspace del adoptante (overlay + personal + changes + overlay/startup.md)
-# y setea NEB_HOME/NEB_WORKSPACE en ~/.claude/settings.json (via set-neb-env.py) y en el shell profile.
+# y setea NEB_WORKSPACE (y NEB_HOME si el nucleo viene de un clon) en ~/.claude/settings.json
+# (via set-neb-env.py).
 # NEB_HOME y NEB_WORKSPACE son independientes (no se exige que uno contenga al otro).
 #
 # Ubicacion del workspace (carpeta neb_workspace) — 3 modos:
@@ -24,8 +25,10 @@ set -euo pipefail
 #
 # Opciones: --overlay <nombre> (default: overlay) · --dry-run (no escribe)
 #
-# NEB_HOME se determina: ${CLAUDE_PLUGIN_ROOT} (plugin) > $NEB_HOME (env) > el dir padre de este script.
-# NEB_HOME NO se persiste cuando resuelve al cache del plugin (path version-specific).
+# NEB_HOME se determina: ${CLAUDE_PLUGIN_ROOT} (solo invocado con esa variable; /wakeup no la recibe)
+# > $NEB_HOME (env) > el dir padre de este script (el plugin, bajo /wakeup).
+# NEB_HOME NO se persiste cuando resuelve dentro del cache de plugins (.../plugins/cache/...,
+# path version-specific); un clon si.
 
 MODE="create"
 BASE=""
@@ -181,13 +184,15 @@ elif [ -z "$USER_NAME" ]; then
 fi
 
 # 5. Conectar variables en settings.json (helper).
-#    NEB_HOME NO se persiste cuando resuelve al cache del plugin y el usuario no lo tenia
-#    en env: el path del cache es version-specific y, por la precedencia D4
-#    (NEB_HOME > CLAUDE_PLUGIN_ROOT), quedaria sombreando al plugin tras un update.
+#    NEB_HOME NO se persiste cuando resuelve dentro del cache de plugins
+#    (<config>/plugins/cache/<marketplace>/neb/<version>): el path es version-specific y, por la
+#    precedencia D4 (NEB_HOME > CLAUDE_PLUGIN_ROOT), dejaria el arranque fijo en esa version tras
+#    un update. Se decide por el path y no por CLAUDE_PLUGIN_ROOT: /wakeup corre este script con
+#    el Bash tool, cuyos comandos no reciben esa variable.
 PERSIST_NEB_HOME=1
-if [ -n "${CLAUDE_PLUGIN_ROOT:-}" ] && [ -z "${NEB_HOME:-}" ]; then
-  PERSIST_NEB_HOME=0
-fi
+case "$NEB_HOME_VAL" in
+  */plugins/cache/*) PERSIST_NEB_HOME=0 ;;
+esac
 
 bold "Conectando variables en ~/.claude/settings.json"
 ENV_ARGS=("NEB_WORKSPACE=$WS")
@@ -213,7 +218,7 @@ info "Exports opcionales para shells fuera de Claude Code:"
 info "  export NEB_WORKSPACE=\"$WS\""
 
 bold "Listo"
-info "NEB_HOME=$NEB_HOME_VAL"
+if [ "$PERSIST_NEB_HOME" -eq 1 ]; then info "NEB_HOME=$NEB_HOME_VAL"; else info "NEB_HOME: no se persiste"; fi
 info "NEB_WORKSPACE=$WS"
 info "Abri una sesion nueva de Claude Code para que el hook tome el workspace."
 if [ "$DRY_RUN" -eq 1 ]; then info "(dry-run: no se escribio nada)"; fi

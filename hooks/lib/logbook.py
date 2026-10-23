@@ -1161,7 +1161,9 @@ CLI_CMDS = {"list", "show", "claim", "release", "forced-release", "request", "re
 
 def _db_for_cli():
     home  = os.path.expanduser("~")
-    guide = posix_to_win(os.environ.get("NEB_HOME", "")) or os.path.join(home, ".claude", "neb")
+    # Sin NEB_HOME (solo plugin): el árbol de este módulo, cuyo esquema es el de su misma versión.
+    guide = posix_to_win(os.environ.get("NEB_HOME", "")) \
+        or os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")
     return _connect(resolve_db_path(home),
 #                    os.path.join(home, ".claude", "neb-logbook.db"),
                     os.path.join(guide, "hooks", "logbook-schema.sql"))
