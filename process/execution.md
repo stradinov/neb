@@ -17,7 +17,6 @@ Los estándares de código (baseline: sin comentarios salvo WHY no obvio, saniti
 
 - Solo acciones read-only y edición del archivo de plan.
 - Cierra con `ExitPlanMode` (aprobación del usuario).
-- Al ejecutar `ExitPlanMode`, salir también de auto mode si estaba activo.
 - Cada plan aprobado en plan mode se guarda automáticamente vía hook; los aprobados conversacionalmente (media/alta) se persisten vía `Write` (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
 
 Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquitectónicas, o conviene ver el plan antes de gastar tiempo en código.

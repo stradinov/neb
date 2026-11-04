@@ -12,7 +12,7 @@ Si el prompt del dev no incluye trigger explícito — `/plan`, frase tipo "abre
 
 Con un trigger formal de implementación o entrega, Claude entra a **Propuesta**: clarifica lo ambiguo y presenta un plan (archivos, enfoque, pruebas), y **no crea ni edita archivos del entregable hasta que el dev apruebe**. Saltar directo a editar sin plan aprobado viola el flujo (anti-desviación) — esta regla es always-on, no depende de cargar `execution.md` ni de overrides en `personal/<usuario>.md`.
 
-- Aplica aunque la instrucción sea clara y aunque la sesión esté en **auto mode**: auto mode automatiza permisos de tools, no reemplaza la aprobación del plan por el dev.
+- Aplica aunque la instrucción sea clara y en cualquier modo de permisos de la sesión. Un modo que aprueba herramientas sin preguntar al dev, como **auto mode** (supuesto R9 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)), no reemplaza la aprobación del plan ni el OK que exige un gate ([`../general/communication.md`](../general/communication.md) § "Qué dispara un gate").
 - Proporcionalidad: un fix trivial (una línea, typo, rename obvio) no requiere plan formal — ver el criterio de plan mode en [`execution.md`](execution.md). La regla apunta a trabajo de implementación real.
 - El detalle de los gates por fase vive en [`execution.md`](execution.md) y [`change-control-gate.md`](change-control-gate.md) (on-demand); esta cláusula garantiza el comportamiento base desde el primer prompt.
 
