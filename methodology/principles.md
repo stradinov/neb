@@ -50,6 +50,7 @@ Algunos archivos mezclan capas **por cohesión de dominio** y NO se fragmentan: 
 - [`../general/incidents.md`](../general/incidents.md) — protocolo reactivo P1/P2, paralelo al ciclo lineal 1–9; el ciclo de vida del artefacto INCIDENT MD sí vive en `workflow/changes.md`.
 - [`plan-review.md`](../process/plan-review.md) — proceso + plantilla de briefing + criterio de activación, intrínsecos entre sí.
 - [`roles-catalog.md`](roles-catalog.md) — catálogo + tracking de utilidad (scores) + evolución, cohesivos; la invocación (cuándo/cómo) sí vive aparte en `process/roles-invocation.md`.
+- [`platform-assumptions.md`](platform-assumptions.md) — tabla de supuestos de plataforma + su mantenimiento (alta, re-verificación, retiro e ID), cohesivos: el mantenimiento se aplica fila por fila.
 - [`personal-vs-team.md`](personal-vs-team.md) — la regla de convivencia personal/equipo incluye el gate "Claude avisa ante un override que contradice el baseline"; cohesivo con la regla, no se separa a `process/`.
 
 ### Puntos de customización
@@ -86,10 +87,10 @@ Operacionalización: subagente `context-completeness-reviewer` (ver [`../agents/
 
 Una regla del núcleo —una **regla de proceso** o un punto de customización— dice qué se exige: un gate, su condición de paso; otra regla, el output que exige. Un **mecanismo de plataforma** es cómo Claude Code lo cumple hoy: subagentes, workflows, modelo, esfuerzo, hooks, herramientas de la interfaz. Las reglas del núcleo se escriben sobre lo primero:
 
-- **Lo que se exige, primero.** Una regla enuncia su condición de paso o su output. Si nombra un mecanismo de plataforma, lo presenta como el vigente, y el comportamiento del que depende tiene fila en [platform-assumptions.md](platform-assumptions.md), verificada o marcada «sin verificar». Las menciones anteriores a este principio quedan cubiertas por su fila y se reescriben cuando un REQ cambie la regla que las contiene.
+- **Lo que se exige, primero.** Una regla enuncia su condición de paso o su output. Si nombra un mecanismo de plataforma, lo presenta como el vigente, y el comportamiento del que depende tiene fila en [platform-assumptions.md](platform-assumptions.md); cómo entra, se re-verifica, se cita y sale una fila lo define su § "Mantenimiento". Las menciones anteriores a este principio quedan cubiertas por su fila y se reescriben cuando un REQ cambie la regla que las contiene.
 - **No reimplementar lo nativo.** Si la plataforma ya trae la capacidad con su propia guía de uso, Neb no la redefine (ver el último punto de § "Anti-patrones").
 - **El costo es del mecanismo.** Modelo y esfuerzo se eligen en el mecanismo; ninguna regla cambia por ellos. En un gate (plan-review de F3, cierre de F4 y pre-ejecución de F7), bajar el modelo o el esfuerzo del revisor respecto de la sesión pide OK del dev (supuesto R20 de [platform-assumptions.md](platform-assumptions.md)). El número de revisores de un gate no es costo: lo fija la cobertura mínima por fase ([`../process/roles-invocation.md`](../process/roles-invocation.md)).
-- **Si un supuesto cambia, cambia el mecanismo.** Cuando el diseño de un plan se apoya en una fila —un mecanismo nuevo, o una regla que se cambia por cómo se comporta la plataforma—, la fila se verifica en la versión y la interfaz en uso (§ "Suposiciones explícitas antes de afirmar"); usar el mecanismo vigente de un gate no cuenta. La re-verificación actualiza la fila en el repo de Neb y cita su evidencia: un research nuevo o el change MD del REQ; un research cerrado no se edita. Un adoptante que encuentre una fila desmentida lo reporta como retroalimentación (Fase 9). Si el supuesto ya no se cumple, el REQ ajusta el mecanismo y conserva la condición de paso o el output de la regla.
+- **Si un supuesto cambia, cambia el mecanismo.** Si un supuesto ya no se cumple, el REQ que se apoya en él ajusta el mecanismo y conserva la condición de paso o el output de la regla.
 
 Una regla que fija el mecanismo como si fuera lo exigido queda desactualizada con cada versión de la plataforma, o limita a Claude: la regla de no-anidamiento llegó a ser falsa sin que nada lo señalara.
 

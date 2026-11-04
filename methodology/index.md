@@ -15,4 +15,4 @@ Marco teórico/estratégico: principios, vocabulario, criterios, catálogos y EN
 9. [Done criteria](done-criteria.md) — criterios de completitud que definen cuándo un requerimiento está terminado (punto de customización).
 10. [Coding standards](coding-standards.md) — estándares de código baseline que cada profile concreta (punto de customización).
 11. [Git conventions](git-conventions.md) — formato y tipos del mensaje de commit (punto de customización; operaciones git en [`../process/version-control.md`](../process/version-control.md)).
-12. [Platform assumptions](platform-assumptions.md) — registro de los comportamientos de Claude Code de los que dependen reglas del núcleo, con versión, interfaz y fuente donde se verificaron.
+12. [Platform assumptions](platform-assumptions.md) — tabla de los comportamientos de Claude Code de los que depende Neb, con versión, interfaz y fuente donde se verificaron, y su mantenimiento: cuándo entra, se re-verifica, se cita y sale una fila.
