@@ -70,7 +70,7 @@ Si un REQ requiere un revisor no listado (ej. Accessibility Reviewer, Domain Ana
 
 ## Resumen de utilidad
 
-Tracking del valor real de cada rol/sub-foco. Score se ajusta en Fase 9 (ver [`../process/improvement.md`](../process/improvement.md)) según el comportamiento del rol en plan-review.
+Tracking del valor real de cada rol/sub-foco. **Utilidad** es el score a la fecha de **Última act.**: la fila no recibe el Δ de cada REQ, que se anota en el change MD; la revisión agregada calcula el score con esos Δ, sin contar los que ya recibió una tabla propia del overlay, y lo asienta aquí (ver [`../process/improvement.md`](../process/improvement.md) § "Verificación de utilidad de roles").
 
 | Rol | Tipo | Impl. | Profile | Utilidad | Última act. |
 |---|---|---|---|---|---|
@@ -136,7 +136,7 @@ CHANGELOG entry del ajuste menciona explícitamente *"tras detección del defect
 
 ## Utilidad de roles
 
-Heurística de ajuste del score (análoga a [`../workflow/metrics.md`](../workflow/metrics.md) "Heurística de ajuste de utilidad" pero para roles).
+Heurística de ajuste del score de cada rol.
 
 ### Eventos
 

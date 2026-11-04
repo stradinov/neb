@@ -10,7 +10,7 @@ Al cerrar, Claude se hace estas preguntas:
 - ¿Hubo retrabajo que una regla podría haber evitado?
 - ¿Se descubrió un patrón, convención o restricción del proyecto que debería quedar documentado?
 - ¿Hubo errores de implementación o faltas de contexto durante el REQ? (ver definiciones en [`workflow/metrics.md`](../workflow/metrics.md) "Definiciones operativas")
-- ¿Hubo un defecto que ningún rol revisor cazó? Si sí: ¿era responsabilidad de un rol existente cuyo foco debe expandirse, o requiere un rol nuevo? (ver [`process/roles-invocation.md`](roles-invocation.md) "Evolución de roles")
+- ¿Hubo un defecto que ningún rol revisor cazó? Si sí: ¿era responsabilidad de un rol existente cuyo foco debe expandirse, o requiere un rol nuevo? (ver [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) "Evolución de roles")
 
 ## Disparadores cuantitativos
 
@@ -23,9 +23,7 @@ El **Reporte de cierre** (presentado al dev en Fase 8, sección `## Reporte de c
 
 Si la desviación tiene causa documentada (ej. complejidad real más alta por incidencia anotada en el MD), la acción puede saltarse — pero con justificación inline.
 
-**Actualizar utilidad de la métrica disparada**: tras decidir el destino del REQ derivado (aprobado / rechazado / aprobado pero con fricción), aplicar el Δ score correspondiente de [`workflow/metrics.md`](../workflow/metrics.md) "Heurística de ajuste de utilidad" y registrar la fecha. Si ninguna métrica disparó en este cierre, no hay update individual; el contador "10 changes sin disparar" se evalúa en revisión agregada.
-
-**Actualizar utilidad de roles invocados**: tras el plan-review, aplicar Δ score a cada rol según el evento que aplique de [`process/roles-invocation.md`](roles-invocation.md) "Utilidad de roles" — +1 si cazó defecto, -0.1 si no aportó hallazgos, -1 si debió cazar y no lo hizo (descubierto post-cierre). Registrar fecha en la tabla "Resumen de utilidad" de roles.md.
+**Actualizar utilidad de roles invocados**: tras el plan-review, aplicar Δ score a cada rol según el evento que aplique de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) "Utilidad de roles" — +1 si cazó defecto, -0.1 si no aportó hallazgos, -1 si debió cazar y no lo hizo (descubierto post-cierre). El Δ se anota en el change MD bajo **Utilidad de roles** y, si el profile en que se invocó el rol tiene tabla de utilidad propia en el overlay del adoptante con fila de ese rol, también ahí, con la fecha. La tabla "Resumen de utilidad" del núcleo no recibe el Δ de cada REQ.
 
 ## Diagnóstico de origen del defecto
 
@@ -74,7 +72,7 @@ Claude lo propone proactivamente al cumplirse la condición; el dev también pue
 
 ### Qué se revisa
 
-- Métricas agregadas de los últimos N changes contra umbrales de [`workflow/metrics.md`](../workflow/metrics.md): ¿hay una métrica que se dispara repetidamente (ej. 5 de 10 cierran con re-deployments=3)?
+- Métricas agregadas de los últimos N changes contra umbrales de [`workflow/metrics.md`](../workflow/metrics.md): ¿hay una métrica que se dispara repetidamente (ej. 5 de 10 cierran con re-deployments=3), o una que no disparó en el período y ya no aporta?
 - Patrones cualitativos de fricción recurrente: incidencias del mismo tipo, fases que consistentemente exceden turnos, decisiones que se reabren.
 - **Análisis longitudinal de costo por modelo** (si hay datos de uso de API en los change MDs): comparar cost-per-REQ a complejidad constante entre versiones de Claude. Dos señales posibles:
   - Costo baja manteniendo calidad → Claude mejoró o la metodología es más eficiente.
@@ -87,19 +85,9 @@ Claude lo propone proactivamente al cumplirse la condición; el dev también pue
 
 Cada propuesta derivada entra como REQ aparte con plan-review (ver [`process/plan-review.md`](plan-review.md)).
 
-### Verificación de utilidad de métricas
-
-Adicionalmente, la revisión agregada:
-
-1. Aplica el Δ "−0.1 cada 10 changes sin disparar" a las métricas que no se activaron en el período.
-2. Identifica métricas con score `< -1` sostenido por **2 ajustes consecutivos** (no rebote a 0 entre medio).
-3. Para cada una, propone explícitamente: *"La métrica `<X>` tiene utilidad sostenida bajo umbral. ¿Se depreca, se revisa el umbral o se redefine?"* Tres opciones equivalentes; el dev decide.
-
-Las métricas con score `≥ +3` se marcan como **core** — no se deprecan ni se ajusta su umbral sin justificación fuerte.
-
 ### Verificación de utilidad de roles
 
-Análogo al de métricas, aplicado a la tabla "Resumen de utilidad" de [`process/roles-invocation.md`](roles-invocation.md):
+El score de un rol vive en una tabla de utilidad: "Resumen de utilidad" de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md), o la tabla propia de un profile en el overlay del adoptante, que ya recibe el Δ de los roles con fila en ella invocados bajo ese profile. Para una fila del núcleo, la revisión agregada suma al score de la fila los Δ de utilidad de roles anotados en los change MDs de los REQs cerrados desde su **Última act.**, salvo los que ya recibió una tabla propia, y asienta el resultado con su fecha (un adoptante que no mantiene el núcleo lo asienta en una tabla propia de su overlay). Sobre esos scores:
 
 1. Aplica Δ −0.5 a roles no invocados en 5 plan-reviews consecutivos donde habrían aplicado.
 2. Identifica roles con score `< -1` sostenido por **2 evaluaciones consecutivas** y propone: *"El rol `<X>` no aporta hallazgos sostenidos. ¿Se depreca, se ajusta su foco o se redefine su pertinencia?"*

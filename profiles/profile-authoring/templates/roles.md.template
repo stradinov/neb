@@ -10,7 +10,7 @@
 <!-- Hereda revisores de profiles/self-applied/roles.md: qa-process-engineer + process-improvement-analyst. Ver ese archivo para mandato completo. -->
 
 <!-- Opción B: define revisores propios -->
-<!-- Ver process/roles-invocation.md para criterio de cuándo crear subagente propio vs reutilizar existente. -->
+<!-- Ver methodology/roles-catalog.md (§ "Implementación de roles" y § "Evolución de roles") para criterio de cuándo crear subagente propio vs reutilizar existente. -->
 
 ## Subagentes por fase
 

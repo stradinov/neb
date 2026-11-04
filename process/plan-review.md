@@ -30,7 +30,7 @@ Output: tabla "Suposición | Tipo (`contexto` / `dominio`) | Cómo se resuelve |
    - **Subagente** (rol tiene `.md` en `agents/`): invocar **solo si su dimensión de activación fue detectada en el paso 0**. Invocar vía `Agent(subagent_type=<nombre>, prompt=<briefing>)` usando la plantilla de briefing de la sección siguiente. Correr en paralelo cuando haya más de un subagente que aplique. Si el dev pidió un workflow, el mismo subagente puede correr como agente del workflow con `agentType` (supuestos R11, R16 y R18 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). El revisor corre con el modelo y el esfuerzo de la sesión (supuesto R20); bajarlos pide OK del dev.
    - **Persona** (rol sin `.md` en `agents/`): simular inline cambiando de sombrero dentro de la misma respuesta.
    - **Despacho desde el hilo principal**: el rol principal invoca a los revisores porque los hallazgos se consolidan y se le preguntan al dev en el hilo principal. Que la plataforma permita a un subagente lanzar otros (supuesto R13) no cambia este flujo.
-3. **Rol principal** consolida hallazgos (subagentes + personas) y presenta el plan revisado en la misma respuesta. Los hallazgos que pasen al dev como premisa de una pregunta o de una opción siguen [`../methodology/principles.md`](../methodology/principles.md) § "Suposiciones explícitas antes de afirmar".
+3. **Rol principal** consolida hallazgos (subagentes + personas) y presenta el plan revisado en la misma respuesta. Los hallazgos que sostengan una pregunta o una opción al dev, o una corrección del plan, siguen [`../methodology/principles.md`](../methodology/principles.md) § "Suposiciones explícitas antes de afirmar".
 4. Pide OK al dev.
 
 ## Plantilla de briefing para subagentes
@@ -43,7 +43,7 @@ Eres <nombre del rol> en la metodología. Revisa el siguiente plan propuesto por
 ## Plan propuesto
 
 **REQ**: <descripción de una línea del requerimiento>
-**Profile**: <profile activo>
+**Profile**: <profile activo> (con la ruta de su `deployment.md` si no está bajo el directorio de trabajo)
 **Archivos afectados**: <lista: Archivo | Cambio>
 
 **Cambios propuestos**:
@@ -51,11 +51,11 @@ Eres <nombre del rol> en la metodología. Revisa el siguiente plan propuesto por
 
 ## Lo que ya se sabe
 
-<Si hay contexto relevante que el rol debe conocer (decisión del dev, restricción preexistente, antecedente) — resumir en bullets. Si no hay, omitir esta sección.>
+<Si hay contexto relevante que el rol debe conocer (decisión del dev, restricción preexistente, antecedente) — resumir en bullets. En una re-revisión, cada corrección con la fuente que la sostiene; si la fuente es la salida de un comando o un estado que el revisor no puede leer, con su extracto. Si no hay, omitir esta sección.>
 
 ## Tu tarea
 
-Aplica tu mandato completo y reporta hallazgos. Máximo 300 palabras.
+Aplica tu mandato completo y reporta hallazgos. En una re-revisión, coteja cada corrección con su fuente: la que no tenga fuente, cuya fuente no puedas leer y no traiga extracto, o cuya fuente no la sostenga es un hallazgo. Máximo 300 palabras.
 ```
 
 ## Output

@@ -77,13 +77,13 @@ Para profiles que viven como **subproyectos anidados** dentro de otro repo:
 
 ## Agregar un subagente
 
-1. Crear `agents/<nombre>.md` con frontmatter `name`, `description` (cuándo invocarlo) y `tools: [Read, Grep, Glob]` (ampliar solo si el rol necesita una capacidad fuera de ese set — escritura, o lectura de red como `WebFetch` para `fact-check-reviewer` — justificándola en el body). Body = prompt de sistema del rol, que cita o referencia el foco ya definido en `process/roles-invocation.md` o `profiles/<profile>/roles.md` — sin duplicar contenido; la metodología sigue siendo single source of truth. Bajo el plugin, el agente se expone solo por existir en `agents/<nombre>.md` (auto-discovery; no hay registro en un script).
-2. En `process/roles-invocation.md` tabla "Resumen de utilidad": cambiar columna "Impl." de `persona` a `**subagente** (\`<nombre>\`)` para el rol correspondiente.
+1. Crear `agents/<nombre>.md` con frontmatter `name`, `description` (cuándo invocarlo) y `tools: [Read, Grep, Glob]` (ampliar solo si el rol necesita una capacidad fuera de ese set — escritura, o lectura de red como `WebFetch` para `fact-check-reviewer` — justificándola en el body). Body = prompt de sistema del rol, que cita o referencia el foco ya definido en `methodology/roles-catalog.md` o `profiles/<profile>/roles.md` — sin duplicar contenido; la metodología sigue siendo single source of truth. Bajo el plugin, el agente se expone solo por existir en `agents/<nombre>.md` (auto-discovery; no hay registro en un script).
+2. En `methodology/roles-catalog.md` tabla "Resumen de utilidad": cambiar columna "Impl." de `persona` a `**subagente** (\`<nombre>\`)` para el rol correspondiente.
 3. En `profiles/<profile>/roles.md` del profile que usa el subagente: anotar `— \`subagente\` (\`agents/<nombre>.md\`)` junto al nombre del rol.
 4. Verificar que `process/plan-review.md` paso 2 cubra la lógica de despacho para el nuevo subagente (no debería requerir cambio si el algoritmo ya distingue por presencia de `.md` en `agents/`).
 5. Bump minor + nuevo fragmento `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
 
-Ver definición técnica del modelo persona/subagente en [`process/roles-invocation.md`](process/roles-invocation.md) sección "Implementación de roles".
+Ver definición técnica del modelo persona/subagente en [`methodology/roles-catalog.md`](methodology/roles-catalog.md) sección "Implementación de roles".
 
 ## Cambiar paths o nombres de archivos importados
 

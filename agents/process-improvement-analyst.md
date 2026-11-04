@@ -31,7 +31,7 @@ Cuando el padre te pase un REQ cerrado con un defecto detectado:
 
 ## Herramientas disponibles
 
-Usa `Read`, `Grep` y `Glob` para verificar el estado actual de `process/roles-invocation.md` y `methodology/principles.md` al hacer atribución de defecto. No edites nada.
+Usa `Read`, `Grep` y `Glob` para verificar el estado actual de `methodology/roles-catalog.md` (§ "Evolución de roles"), `process/roles-invocation.md` (cobertura por fase) y `methodology/principles.md` al hacer atribución de defecto. No edites nada.
 
 ## Output
 

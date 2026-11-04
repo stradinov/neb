@@ -5,7 +5,7 @@ Claude Code expone dos capas de subagentes, con propósitos distintos:
 | Capa | Definición | Dónde se configura |
 |---|---|---|
 | **Built-in agent types** | Predefinidos por Claude Code. Este documento los cubre. | Internos al harness |
-| **Custom role agents** | Definidos por el equipo en `agents/<nombre>.md`. | [`process/roles-invocation.md`](../process/roles-invocation.md) "Implementación de roles" |
+| **Custom role agents** | Definidos por el equipo en `agents/<nombre>.md`. | [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) "Implementación de roles" |
 
 ## Catálogo de built-in agent types
 

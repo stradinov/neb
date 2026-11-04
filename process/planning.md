@@ -32,7 +32,7 @@ Si el prompt es ambiguo o cumple algún criterio de [execution.md](execution.md)
 
 ## Selección de roles (paso 0 antes del plan inicial)
 
-Si el REQ activa plan-review (ver [process/plan-review.md](plan-review.md) "Cuándo aplica"), Claude analiza el plan de archivos de la propuesta y propone los roles antes de generar el plan inicial. Algoritmo de detección automática y catálogo de dimensiones en [process/roles-invocation.md](roles-invocation.md). Para casos rutinarios usa por defecto sin preguntar; para casos especiales pregunta al dev.
+Si el REQ activa plan-review (ver [process/plan-review.md](plan-review.md) "Cuándo aplica"), Claude analiza el plan de archivos de la propuesta y propone los roles antes de generar el plan inicial. Algoritmo de detección automática en [process/roles-invocation.md](roles-invocation.md); catálogo de dimensiones en [methodology/roles-catalog.md](../methodology/roles-catalog.md) § "Dimensiones del plan". Para casos rutinarios usa por defecto sin preguntar; para casos especiales pregunta al dev.
 
 ## Estimación, plan y plan de pruebas
 

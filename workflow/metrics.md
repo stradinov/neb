@@ -14,17 +14,17 @@ Tabla en [`templates/change.md.template`](../templates/change.md.template).
 
 Umbrales sugeridos. Al cerrar el requerimiento, Claude compara las métricas contra esta tabla y, si alguna se supera, propone la acción correspondiente en Fase 9 (ver [`process/improvement.md`](../process/improvement.md) "Disparadores cuantitativos").
 
-| Métrica | Umbral | Acción en Fase 9 | Utilidad | Última act. |
-|---|---|---|---|---|
-| **Re-entregas** | > 2 | Plan de pruebas insuficiente — revisar criterios y casos cubiertos | 1.0 | 2026-05-03 |
-| **Turnos Fase 1 (Clarificación)** | > 5 | Propuesta inicial poco clara — destilar lecciones para clarificación | 1.0 | 2026-05-03 |
-| **Complejidad real ≠ estimada** | desviación de 2+ niveles (baja↔alta) | Calibrar criterios de estimación en `planning.md` | 1.0 | 2026-05-03 |
-| **Incidencias surgidas** | ≥ 3 | Plan no anticipó dependencias — revisar Fase 3 (alcance/riesgos) | 2.0 | 2026-05-03 |
-| **Errores de implementación de Claude** | ≥ 2 | Revisar claridad del plan: ¿faltó detalle?, ¿propuesta ambigua?, ¿lineamiento aplicado confuso? | 2.0 | 2026-05-03 |
-| **Faltas de contexto** | ≥ 3 | Patch a CLAUDE.md / memoria del proyecto / metodología — la info debería ser hallable sin pedirla | 1.0 | 2026-05-03 |
-| **Implementaciones sin aprobación** | ≥ 1 | Revisar criterios de aprobación implícita en `planning.md` § "Propuesta de implementación" | 1.0 | 2026-05-03 |
-| **Acciones destructivas no autorizadas** | ≥ 1 | Revisar reglas en [`../process/change-control-gate.md`](../process/change-control-gate.md) § "Acciones destructivas" y reforzar disciplina | 1.0 | 2026-05-03 |
-| **Out-of-scope edits** | ≥ 1 | Revisar plan o disciplinar alcance en Fase 3 | 1.0 | 2026-05-03 |
+| Métrica | Umbral | Acción en Fase 9 |
+|---|---|---|
+| **Re-entregas** | > 2 | Plan de pruebas insuficiente — revisar criterios y casos cubiertos |
+| **Turnos Fase 1 (Clarificación)** | > 5 | Propuesta inicial poco clara — destilar lecciones para clarificación |
+| **Complejidad real ≠ estimada** | desviación de 2+ niveles (baja↔alta) | Calibrar criterios de estimación en `planning.md` |
+| **Incidencias surgidas** | ≥ 3 | Plan no anticipó dependencias — revisar Fase 3 (alcance/riesgos) |
+| **Errores de implementación de Claude** | ≥ 2 | Revisar claridad del plan: ¿faltó detalle?, ¿propuesta ambigua?, ¿lineamiento aplicado confuso? |
+| **Faltas de contexto** | ≥ 3 | Patch a CLAUDE.md / memoria del proyecto / metodología — la info debería ser hallable sin pedirla |
+| **Implementaciones sin aprobación** | ≥ 1 | Revisar criterios de aprobación implícita en `planning.md` § "Propuesta de implementación" |
+| **Acciones destructivas no autorizadas** | ≥ 1 | Revisar reglas en [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Acciones destructivas" y reforzar disciplina |
+| **Out-of-scope edits** | ≥ 1 | Revisar plan o disciplinar alcance en Fase 3 |
 
 Los umbrales son sugeridos, ajustables por experiencia. Si una desviación tiene causa documentada (ej. complejidad real subió por incidencia mayor anotada), la acción puede saltarse con justificación en el MD.
 
@@ -49,36 +49,6 @@ Captura: las 3 primeras dependen de señal explícita o ausencia de ella; las 3 
 | Profiles de software (futuros) | Code Reviewer |
 
 El auditor revisa la conversación del REQ y completa los conteos. Si el dev nota discrepancia al revisar el MD pre-cierre, ajusta los counts.
-
-## Heurística de ajuste de utilidad
-
-Cada métrica tiene un score que refleja su valor real para sugerir mejoras. Se ajusta en Fase 9 según el resultado del REQ derivado.
-
-### Eventos
-
-| Evento | Δ score |
-|---|---|
-| Métrica dispara → propuesta → REQ aprobado e implementado | +1 |
-| Métrica dispara → REQ aprobado parcialmente | +0.5 |
-| Métrica dispara → REQ rechazado por ceremonia / Process Improvement Analyst | -0.5 |
-| Métrica dispara → REQ aprobado pero genera fricción reportada en uso | -0.25 |
-| 10 changes consecutivos sin disparar la métrica | -0.1 |
-
-### Rangos
-
-| Score | Interpretación | Acción |
-|---|---|---|
-| ≥ +3 | Core | Mantener prioritaria |
-| +1 a +3 | Útil | Sin acción |
-| 0 a +1 | Neutral / nueva | Observar |
-| -1 a 0 | Marginal | Revisar umbral o definición |
-| < -1 sostenido por 2 ajustes consecutivos | Candidata a deprecar | Propuesta explícita en revisión agregada |
-
-**Cap**: min -2, max +5 (más allá no aporta información).
-
-**Score inicial al introducir una métrica nueva**: 1.0 (neutral, sin evidencia previa).
-
-Trigger del ajuste: en Fase 9 cuando la métrica genere (o no genere por silencio prolongado) propuesta. Revisión agregada (ver `improvement.md`) verifica scores periódicamente y propone deprecaciones.
 
 ## Datos informativos
 
@@ -123,7 +93,7 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 
 **Pricing:** tabla manual en `hooks/pricing.yml`. Actualizar cuando Anthropic publique nuevo modelo o cambie precios.
 
-**Score inicial:** 1.0 — igual que métricas accionables. Entra al ciclo de revisión agregada (`improvement.md §Revisión agregada`). Si en 10 REQs consecutivos el dato no aporta aprendizaje reportado, proponer revisión.
+**Revisión:** entra a la revisión agregada (`improvement.md §Revisión agregada`). Si en 10 REQs consecutivos el dato no aporta aprendizaje reportado, proponer revisión.
 
 ### Loop pedagógico en la revisión agregada
 
