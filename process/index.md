@@ -5,7 +5,7 @@ Pasos prácticos secuenciales: fases (1–9), gates, comandos, convenciones de a
 ## Documentos
 
 1. [Planning](planning.md) — clarificación, estimación, plan, plan de pruebas, propuesta. *(Fases 1–3)*
-2. [Execution](execution.md) — implementación, plan mode, tareas, incidencias. *(Fase 4)*
+2. [Execution](execution.md) — implementación, plan mode, gate de cierre de Fase 4, incidencias. *(Fase 4)*
 3. [Delivery](delivery.md) — validación, entrega, cierre. *(Fases 5–7)*
 4. [Documentation](documentation.md) — qué documentar al cerrar. *(Fase 8)*
 5. [Improvement](improvement.md) — retroalimentación de metodología. *(Fase 9)*

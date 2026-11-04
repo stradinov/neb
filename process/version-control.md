@@ -77,7 +77,7 @@ El principio (Claude es dueño operativo de los **artefactos que Neb genera** y,
 
 ## Comandos de entrega a servidores
 
-`pscp`, `ssh` y similares no son comandos locales — forman parte del proceso de entrega del profile (ver `profiles/<profile>/deployment.md`). Siguen el modelo del contexto activo, no Haiku.
+`pscp`, `ssh` y similares no son comandos locales — forman parte del proceso de entrega del profile (ver `profiles/<profile>/deployment.md`). Se ejecutan en el contexto activo.
 
 ## Rama principal por profile
 

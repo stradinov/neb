@@ -54,7 +54,7 @@ La tabla puede expandirse vía Fase 9 si surge un caso recurrente no cubierto.
 
 ## Agentes funcionales
 
-Además de los revisores de fase (tablas anteriores), existen **agentes funcionales**: subagentes invocados por un **skill** para una tarea acotada, no por la máquina de fases ni por los gates. No participan en la cobertura mínima por fase y no se anuncian en el modo de anuncio de roles. Cumplen la regla de no-anidamiento porque el skill que los despacha corre en el hilo principal.
+Además de los revisores de fase (tablas anteriores), existen **agentes funcionales**: subagentes invocados por un **skill** para una tarea acotada, no por la máquina de fases ni por los gates. No participan en la cobertura mínima por fase y no se anuncian en el modo de anuncio de roles. Los despacha un skill que corre en el hilo principal, donde se consolidan sus resultados (sobre anidamiento, ver el supuesto R13 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)).
 
 | Agente | Invocado por | Propósito | Tools |
 |---|---|---|---|

@@ -46,15 +46,15 @@ Cada rol del catálogo se implementa de una de dos formas:
 | Implementación | Definición | Cuándo usar |
 |---|---|---|
 | **Persona** | Claude asume la identidad del rol dentro del mismo contexto conversacional. Sin llamada API separada. | Rol principal (conduce la sesión); revisores sin isolation crítico; roles ad-hoc no formalizados |
-| **Subagente** | Claude invoca una instancia aislada vía `Agent(subagent_type=<nombre>, prompt=<briefing>)`. El subagente recibe solo lo que el padre le pasa en el `prompt` — no ve la conversación. Definido como `agents/<nombre>.md` en el repo. | Revisores adversariales donde la isolation mejora el rigor (plan-review, diagnóstico de defecto en Fase 9) |
+| **Subagente** | Claude invoca una instancia aislada vía `Agent(subagent_type=<nombre>, prompt=<briefing>)` o como agente de un workflow con `agentType`. El subagente recibe el `prompt` del padre, las instrucciones de `CLAUDE.md` y la memoria automática, no la conversación ni el arranque de la sesión (supuestos R11, R12 y R16 de [platform-assumptions.md](platform-assumptions.md)). Definido como `agents/<nombre>.md` en el repo. | Revisores adversariales donde la isolation mejora el rigor (plan-review, diagnóstico de defecto en Fase 9) |
 
 ### Limitaciones de los subagentes
 
-- **Sin contexto heredado** — requieren briefing explícito en cada invocación (ver plantilla en [`../process/plan-review.md`](../process/plan-review.md)).
-- **Sin anidamiento** — el rol principal no puede invocar subagentes desde dentro de otro subagente.
+- **Sin la conversación** — no ven el contexto conversacional del padre ni el arranque de la sesión (sí las instrucciones de `CLAUDE.md` y la memoria automática, supuesto R12); requieren briefing explícito en cada invocación (ver plantilla en [`../process/plan-review.md`](../process/plan-review.md)).
+- **Anidamiento según cómo se lanzan** — un subagente lanzado con Agent puede lanzar otros; un agente de workflow no (supuesto R13). Los flujos de Neb despachan a los revisores desde el hilo principal.
 - **Costo y latencia** — cada invocación es una llamada API completa; se acumula si hay N revisores por plan.
 - **Stateless** — no recuerdan invocaciones previas.
-- **Disponibilidad por sesión** — los custom role agents instalados en `~/.claude/agents/` durante una sesión no están disponibles hasta la siguiente, o hasta ejecutar `/reload-plugins`.
+- **Disponibilidad por sesión** — un agente agregado o editado durante una sesión no está disponible hasta la siguiente; si es del plugin, `/reload-plugins` lo recarga (supuesto R15; ver [`../general/agents.md`](../general/agents.md) § "Limitación de sesión (custom role agents)").
 
 ### Criterio para promover un rol de persona a subagente
 

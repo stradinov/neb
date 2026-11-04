@@ -24,7 +24,7 @@ Transversales **on-demand** (su cláusula base viaja espejada en el arranque; el
 Fases (secuenciales por requerimiento):
 
 1. [Planning](../process/planning.md) — clarificación, estimación, plan, plan de pruebas, propuesta. *(Fases 1–3)*
-2. [Execution](../process/execution.md) — implementación, plan mode, tareas, incidencias. *(Fase 4)*
+2. [Execution](../process/execution.md) — implementación, plan mode, gate de cierre de Fase 4, incidencias. *(Fase 4)*
 3. [Delivery](../process/delivery.md) — validación, entrega, cierre. *(Fases 5–7)*
 4. [Documentation](../process/documentation.md) — qué documentar al cerrar. *(Fase 8)*
 5. [Improvement](../process/improvement.md) — retroalimentación de metodología. *(Fase 9)*

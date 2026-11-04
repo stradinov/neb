@@ -4,6 +4,36 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.17.0] - 2026-11-04
+
+> **Minor**: las reglas del núcleo se separan de los **mecanismos de plataforma** con que Claude Code las cumple. Nuevo registro `methodology/platform-assumptions.md` (R1–R20): cada comportamiento de la plataforma del que depende una regla, con la versión, la interfaz y la fuente donde se verificó, o «sin verificar». La evidencia es el spike `research/2026-11-04-orquestacion-subagentes-workflows-spike.md` (Claude Code 2.1.309).
+>
+> - **Cambios de fuerza normativa** declarados (`methodology/principles.md` § "Declarar"):
+>   - se **estrecha** el cierre de Fase 4 y la pre-ejecución de Fase 7: la condición de paso explícita es cero hallazgos abiertos (cada uno corregido y re-revisado por un subagente del profile, o descartado con OK del dev), y el rol principal simulando al revisor no cumple el gate;
+>   - se **precisa** el mecanismo de esos gates y del plan-review: el mismo subagente se lanza con la herramienta Agent o, si el dev pidió un workflow, como agente del workflow con `agentType`;
+>   - se **elimina** la regla de no-anidamiento, falsa en 2.1.309: un subagente lanzado con Agent puede lanzar otros, y un agente de workflow no;
+>   - se **elimina** § Tareas de `process/execution.md`: repetía la guía de la herramienta de tareas de cada interfaz, y `TaskCreate` no existe en la app de escritorio;
+>   - se **corrige** lo que recibe un subagente: su briefing, las instrucciones de `CLAUDE.md` y la memoria automática; no la conversación ni el arranque de `SessionStart`;
+>   - se **estrecha** el mecanismo de los gates (plan-review de F3, cierre de F4 y pre-ejecución de F7): bajar el modelo o el esfuerzo del revisor respecto de la sesión pide OK del dev (R20).
+> - **Adoptantes**: los encabezados de los gates no cambian, así que las citas a «gate de subagente» de F4 y F7 siguen válidas.
+
+### Added
+- **`methodology/platform-assumptions.md`**: registro de supuestos de plataforma, uno por comportamiento (R1–R20), con consumidores, término de grep, verificación (versión · interfaz · fecha · fuente) y cómo probarlo.
+- **`methodology/principles.md`** § "Reglas de proceso y mecanismos de plataforma": una regla dice lo que exige; si nombra un mecanismo de plataforma, lo presenta como el vigente y su supuesto tiene fila en el registro; no se reimplementa lo nativo; el costo es del mecanismo; si un supuesto cambia, cambia el mecanismo y no la regla.
+- **`methodology/vocabulary.md`**: «Regla de proceso» (✗ «invariante»), «Mecanismo de plataforma» y «Supuesto de plataforma».
+- **`research/2026-11-04-orquestacion-subagentes-workflows-spike.md`**: spike de modelo, esfuerzo, herramientas, anidamiento y permisos de subagentes y workflows.
+
+### Changed
+- **`process/execution.md`** § "Cierre de Fase 4 (gate de subagente)" y **`process/delivery.md`** § "Pre-ejecución de Fase 7 (gate de subagente)": condición de paso y mecanismo vigente.
+- **`process/plan-review.md`** § Flujo: lanzamiento del revisor con Agent o como agente de workflow; la nota de anidamiento pasa a la razón vigente (los hallazgos se consolidan y se le preguntan al dev en el hilo principal).
+- **`process/roles-invocation.md`** § "Agentes funcionales" y **`methodology/roles-catalog.md`** § "Implementación de roles" y § "Limitaciones de los subagentes": consumen el registro (R11–R13, R15, R16).
+- **`process/version-control.md`** § "Comandos de entrega a servidores": sin la mención de modelo que dejó la política de modelos eliminada.
+- **`general/agents.md`** § Catálogo: `general-purpose` recibe casi todas las herramientas; no las propias del hilo principal, como AskUserQuestion, plan mode y Workflow (R17).
+- **Índices**: `methodology/index.md` (registro), `general/index.md` y `process/index.md` (descriptor de Execution).
+
+### Removed
+- **`process/execution.md`** § "Tareas".
+
 ## [6.16.0] - 2026-11-04
 
 > **Minor**: la correspondencia a terceros sale de `general/communication.md` a un archivo propio, `general/correspondence.md`, que se sigue cargando en toda sesión vía `general/startup.md`. `communication.md` queda para la comunicación dev↔Claude.

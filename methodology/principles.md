@@ -82,6 +82,17 @@ Aplica a todos los profiles. Cubre dos huecos: (a) incluso con skill cargado y m
 
 Operacionalización: subagente `context-completeness-reviewer` (ver [`../agents/context-completeness-reviewer.md`](../agents/context-completeness-reviewer.md)) audita formalmente las suposiciones en plan-review (Fase 3), cierre de implementación (Fase 4) y pre-entrega final (Fase 7).
 
+## Reglas de proceso y mecanismos de plataforma
+
+Una regla del núcleo —una **regla de proceso** o un punto de customización— dice qué se exige: un gate, su condición de paso; otra regla, el output que exige. Un **mecanismo de plataforma** es cómo Claude Code lo cumple hoy: subagentes, workflows, modelo, esfuerzo, hooks, herramientas de la interfaz. Las reglas del núcleo se escriben sobre lo primero:
+
+- **Lo que se exige, primero.** Una regla enuncia su condición de paso o su output. Si nombra un mecanismo de plataforma, lo presenta como el vigente, y el comportamiento del que depende tiene fila en [platform-assumptions.md](platform-assumptions.md), verificada o marcada «sin verificar». Las menciones anteriores a este principio quedan cubiertas por su fila y se reescriben cuando un REQ cambie la regla que las contiene.
+- **No reimplementar lo nativo.** Si la plataforma ya trae la capacidad con su propia guía de uso, Neb no la redefine (ver el último punto de § "Anti-patrones").
+- **El costo es del mecanismo.** Modelo y esfuerzo se eligen en el mecanismo; ninguna regla cambia por ellos. En un gate (plan-review de F3, cierre de F4 y pre-ejecución de F7), bajar el modelo o el esfuerzo del revisor respecto de la sesión pide OK del dev (supuesto R20 de [platform-assumptions.md](platform-assumptions.md)). El número de revisores de un gate no es costo: lo fija la cobertura mínima por fase ([`../process/roles-invocation.md`](../process/roles-invocation.md)).
+- **Si un supuesto cambia, cambia el mecanismo.** Cuando el diseño de un plan se apoya en una fila —un mecanismo nuevo, o una regla que se cambia por cómo se comporta la plataforma—, la fila se verifica en la versión y la interfaz en uso (§ "Suposiciones explícitas antes de afirmar"); usar el mecanismo vigente de un gate no cuenta. La re-verificación actualiza la fila en el repo de Neb y cita su evidencia: un research nuevo o el change MD del REQ; un research cerrado no se edita. Un adoptante que encuentre una fila desmentida lo reporta como retroalimentación (Fase 9). Si el supuesto ya no se cumple, el REQ ajusta el mecanismo y conserva la condición de paso o el output de la regla.
+
+Una regla que fija el mecanismo como si fuera lo exigido queda desactualizada con cada versión de la plataforma, o limita a Claude: la regla de no-anidamiento llegó a ser falsa sin que nada lo señalara.
+
 ## Anti-patrones
 
 - Documentación que repite el código. **No documentar** (criterio para Fase 8, ver [`../process/documentation.md`](../process/documentation.md)): cambios triviales (typo, una línea), listas de archivos modificados (el VCS ya las tiene), estado temporal (ramas, PRs en revisión), decisiones evidentes leyendo el código, logs de "qué hicimos hoy".

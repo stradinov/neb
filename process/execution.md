@@ -1,6 +1,6 @@
 # Execution
 
-Estándares de implementación, plan mode, gestión de tareas, incidencias.
+Estándares de implementación, plan mode, gate de cierre de Fase 4, incidencias.
 
 ## Insumos de contexto (Fase 4)
 
@@ -24,12 +24,6 @@ Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquit
 
 NO usar para: bug fix de una línea, renombres triviales, tareas exploratorias.
 
-## Tareas
-
-Para 3+ pasos discretos, usar `TaskCreate` y `TaskUpdate`. Marcar `in_progress` al iniciar y `completed` al terminar — no batchear.
-
-Si una tarea se bloquea, mantenerla `in_progress` y crear una nueva describiendo el bloqueo. No marcar completada si tests fallan, hay implementación parcial, o errores sin resolver.
-
 ## Confirmación del cambio en Fase 4
 
 Antes de cada confirmación del cambio que toque el entregable del proyecto destino, Claude espera OK explícito del dev, salvo las excepciones declaradas (entre ellas la confirmación autónoma, que solo el adoptante activa). La regla canónica (alcance, granularidad, excepciones) vive en [`change-control.md`](change-control-gate.md) § "Autorización de la confirmación del cambio"; su concretización git (qué es un `git commit`, exclusiones de gobernanza) en [`process/version-control.md`](version-control.md).
@@ -37,6 +31,8 @@ Antes de cada confirmación del cambio que toque el entregable del proyecto dest
 ## Cierre de Fase 4 (gate de subagente)
 
 Antes de declarar Fase 4 terminada y transicionar a Fase 5, el rol principal (persona) invoca al menos un subagente del profile como gate adversarial del **artefacto implementado** — no del plan. El subagente recibe un briefing explícito con el artefacto final usando la misma plantilla que Fase 3 (ver [`process/plan-review.md`](plan-review.md) "Plantilla de briefing"), adaptando la sección "Plan propuesto" para describir el artefacto producido.
+
+**Condición de paso**: cero hallazgos abiertos — cada hallazgo corregido y re-revisado por un subagente del profile, o descartado con OK del dev. **Mecanismo vigente**: el subagente corre en su propio contexto, sin la conversación, y se lanza con la herramienta Agent o, si el dev pidió un workflow, como agente del workflow con `agentType` del mismo subagente (supuestos R11, R12, R16 y R18 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). El revisor corre con el modelo y el esfuerzo de la sesión (supuesto R20); bajarlos pide OK del dev. El rol principal simulando al revisor en su propio contexto (persona) no cumple este gate.
 
 Qué subagente por profile (por defecto + paralelos por dimensión): ver la matriz columna **F4** en [`roles-invocation.md`](roles-invocation.md) § "Cobertura mínima por fase". Si el profile no tiene subagente formalizado, el dev declara override explícito antes de avanzar a Fase 5.
 

@@ -13,7 +13,7 @@ Claude Code expone dos capas de subagentes, con propósitos distintos:
 |---|---|---|---|
 | `Explore` | Búsqueda rápida read-only: localizar archivos por patrón, grep de símbolos, responder "¿dónde está definida X?" | Glob, Grep, Read, WebFetch, WebSearch | Lee excerpts — puede perder contenido fuera de la ventana de lectura. NO usar para revisión de diseño, auditoría cross-file ni análisis abierto. |
 | `Plan` | Diseñar planes de implementación: pasos detallados, archivos críticos, trade-offs arquitectónicos | Todo excepto Agent, ExitPlanMode, Edit, Write, NotebookEdit | Devuelve un plan, no implementa. No busca en el codebase (use `Explore` primero). |
-| `general-purpose` | Investigación compleja, búsqueda multi-step, tareas que cruzan múltiples ubicaciones cuando el scope es incierto | Todos (*) | Más costoso y lento que `Explore` para búsquedas simples. Escalar desde `Explore` solo cuando sea necesario. |
+| `general-purpose` | Investigación compleja, búsqueda multi-step, tareas que cruzan múltiples ubicaciones cuando el scope es incierto | Casi todos (*): no recibe las herramientas propias del hilo principal, como AskUserQuestion, plan mode y Workflow (supuesto R17 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) | Más costoso y lento que `Explore` para búsquedas simples. Escalar desde `Explore` solo cuando sea necesario. |
 
 > Los built-in types `claude-code-guide` y `statusline-setup` son de uso interno del harness y no se prescriben en la metodología.
 
