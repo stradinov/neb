@@ -8,7 +8,7 @@ Pasos:
 
 1. Importa el archivo al final de tu `~/CLAUDE.md` — ver §"Orden de carga".
 2. Cada override en `personal/<usuario>.md` estrecha o agrega sobre `general/`; nunca lo relaja — ver §"Regla central".
-3. Puntos de customización preconfigurados —con bloque listo; subconjunto materializado de [principles.md](principles.md) § "Puntos de customización"—: [coding-standards.md](coding-standards.md), [git-conventions.md](git-conventions.md), [done-criteria.md](done-criteria.md), [communication.md § Idioma y § Correspondencia a terceros](../general/communication.md).
+3. Puntos de customización preconfigurados —con bloque listo; subconjunto materializado de [principles.md](principles.md) § "Puntos de customización"—: [coding-standards.md](coding-standards.md), [git-conventions.md](git-conventions.md), [done-criteria.md](done-criteria.md), [communication.md § Idioma](../general/communication.md), [correspondence.md](../general/correspondence.md).
 
 Criterio verificable: un override en `personal/<usuario>.md` cambia un comportamiento sin editar ningún archivo bajo `general/` ni `methodology/`.
 
@@ -25,7 +25,7 @@ Criterio verificable: un override en `personal/<usuario>.md` cambia un comportam
 
 ## Puntos de customización vs reglas de proceso
 
-La "Regla central" (estrechar/agregar/nunca relajar) gobierna las **reglas de proceso** — las que tienen un eje de severidad (gates, plan de pruebas, firma de commits, revisión). Un **punto de customización** (idioma/variedad/registro, formato de salida, alias) no tiene eje de severidad: el override lo **sustituye**, no lo estrecha.
+La "Regla central" (estrechar/agregar/nunca relajar) gobierna las **reglas de proceso** — las que tienen un eje de severidad (gates, plan de pruebas, firma de commits, revisión). Un **punto de customización** (idioma/variedad/registro, formato de salida, alias) no tiene eje de severidad: el override lo **sustituye**, no lo estrecha. Los datos que una regla consume —restricciones del cliente de correo, fichas de destinatarios— se **agregan**: alimentan la regla sin sustituirla ni relajarla.
 
 | Tipo | Override personal | Ejemplos |
 |------|-------------------|----------|

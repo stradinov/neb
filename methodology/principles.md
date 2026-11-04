@@ -17,7 +17,7 @@ Qué características hacen útil a una metodología de trabajo con un agente de
 ## Fases vs políticas
 
 - **Fases**: lineales y secuenciales (planning → execution → delivery). Orden en `general/index.md`.
-- **Políticas**: transversales, aplican siempre. Canónica: `communication.md`.
+- **Políticas**: transversales, aplican siempre. Canónicas: `communication.md`, `correspondence.md`.
 
 Cuando un archivo crece y mezcla fase + política, separar.
 
@@ -54,9 +54,9 @@ Algunos archivos mezclan capas **por cohesión de dominio** y NO se fragmentan: 
 
 ### Puntos de customización
 
-Archivos diseñados para que el adoptante los **sobreescriba** sin tocar el resto del núcleo (promesa "Customizable", ver [promises.md](promises.md)): [coding-standards.md](coding-standards.md), [git-conventions.md](git-conventions.md), [done-criteria.md](done-criteria.md), [`../general/communication.md`](../general/communication.md) (interacción), [personal-vs-team.md](personal-vs-team.md). El contrato "el override estrecha o agrega, nunca relaja" los protege de romper el baseline.
+Archivos diseñados para que el adoptante los **sobreescriba** sin tocar el resto del núcleo (promesa "Customizable", ver [promises.md](promises.md)): [coding-standards.md](coding-standards.md), [git-conventions.md](git-conventions.md), [done-criteria.md](done-criteria.md), [`../general/communication.md`](../general/communication.md) (interacción), [`../general/correspondence.md`](../general/correspondence.md) (correos a terceros), [personal-vs-team.md](personal-vs-team.md). El contrato "el override estrecha o agrega, nunca relaja" los protege de romper el baseline.
 
-Esta es la **lista canónica** (customizable **por diseño**), toda **materializada** —cada uno con su bloque `> Punto de customización`—: `coding-standards.md`, `git-conventions.md`, `done-criteria.md`, `communication.md`. Las sedes que la enumeran —[promises.md](promises.md) (promesa 5, celda "Dónde se materializa") y [personal-vs-team.md](personal-vs-team.md) (preconfigurados)— la espejan. Al agregar un punto, o al materializar uno pendiente, sincroniza las sedes afectadas.
+Esta es la **lista canónica** (customizable **por diseño**), toda **materializada** —cada uno con su bloque `> Punto de customización`—: `coding-standards.md`, `git-conventions.md`, `done-criteria.md`, `communication.md`, `correspondence.md`. Las sedes que la enumeran —[promises.md](promises.md) (promesa 5, celda "Dónde se materializa") y [personal-vs-team.md](personal-vs-team.md) (preconfigurados)— la espejan. Al agregar un punto, o al materializar uno pendiente, sincroniza las sedes afectadas.
 
 ## Contexto especializado antes de inferir
 
