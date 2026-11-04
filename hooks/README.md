@@ -144,7 +144,14 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 
 ### pre-push-changelog (git hook del repo, no Claude Code)
 
-`.git/hooks/pre-push` — git hook nativo del **clon del maintainer** (`cp hooks/pre-push-changelog .git/hooks/pre-push`). Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX). Encadena 4 gates: integridad de la cadena de imports del arranque (`assemble-startup.py --check`), términos vetados vía extension point del overlay (`$NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh` si existe), fragmento obligatorio para cambios normativos, y sincronía `CHANGELOG.md` ↔ `changelog.d/`. Lineamiento completo en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
+`.git/hooks/pre-push` — git hook nativo del **clon del maintainer** (`cp hooks/pre-push-changelog .git/hooks/pre-push`). Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX). Encadena 6 gates:
+
+1. Integridad de la cadena de imports del arranque (`assemble-startup.py --check`).
+2. Términos vetados vía extension point del overlay (`$NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh`, si existe).
+3. Fragmento obligatorio para cambios normativos.
+4. Sincronía `CHANGELOG.md` ↔ `changelog.d/`. Su detalle está en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
+5. Sincronía `plugin.json.version` ↔ `VERSION`.
+6. El arranque del núcleo cabe en las partes del `SessionStart` (`neb-bootstrap-context.py --check-size --root <clon>`). Mide el working tree del clon, no `NEB_HOME`, con una raíz de instalación larga. Falla si el núcleo ocupa más de 8 de las 12 partes, lo que deja lugar al overlay y a la configuración personal.
 
 ## Activación en un proyecto
 
@@ -160,7 +167,13 @@ Con el plugin de Neb no se copian bloques de hooks: el plugin ya los registra (�
 
 Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` registra:
 
-- **El `SessionStart`** (`bootstrap/neb-bootstrap-context.py`): inyecta el arranque ensamblado. No consume stdin.
+- **El `SessionStart`** (`bootstrap/neb-bootstrap-context.py`): inyecta el arranque ensamblado, en partes.
+  - La plataforma topa cada salida de hook en 10,000 caracteres, y lo que pasa de ahí no llega completo a Claude (supuesto R1 de [`methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)).
+  - Por eso hay 12 entradas por matcher (`startup`, `clear` y `compact`), que corren al iniciar, tras `/clear` y al compactar; `clear` y `compact` están sin verificar en sesión interactiva (R1). Cada entrada corre el script con `--part k`.
+  - El arranque usa tantas partes como necesite, hasta 12, cada una de 9,000 caracteres o menos y con la cabecera «parte k de n · huella». Las entradas que sobran no emiten nada.
+  - Si el arranque no cabe en las 12 partes, la parte 12 termina con un aviso: qué bloques faltan y de qué archivo leerlos.
+  - Costo: cada sesión carga el arranque completo (unos 25–30 k tokens, estimado), y las 12 entradas suman entre 0.6 y 1 s al iniciar.
+  - No consume stdin.
 - **Los hooks opcionales de este README**: `save-approved-plan`, `usage-tracker`, `logbook-sync`, `notify-on-stop`, `notify-on-permission`, `ops-capture` y `preprocess-prompt`. Hay una entrada por hook, y cada entrada abre con un gate en el shell. Si el hook no está activado, la entrada termina ahí, sin arrancar Python (~50 ms por entrada en Windows). Si está activado, llama a `hooks/neb-hook.py <hook>`. Ese dispatcher lee el JSON del evento y corre el hook con el código del propio plugin: la versión instalada, sin `NEB_HOME`.
 
 **Activación voluntaria**, con dos listas separadas por comas y sin espacios, que se suman:
@@ -173,7 +186,7 @@ Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` regi
 - **El valor de proyecto sustituye al de usuario.** En el `env` de Claude Code, una misma variable del proyecto reemplaza a la del usuario. Por eso hay dos variables y el gate evalúa su unión: un proyecto que activa `usage-tracker` no apaga tus `notify-*`.
 - **Para apagar en un proyecto**, redefine la variable en su `settings.local.json`: `"NEB_HOOKS": ""` apaga tus hooks personales ahí, y `"NEB_PROJECT_HOOKS": ""` te excluye de los que activa el proyecto. El marcador `<!-- neb: skip -->` apaga el arranque, no los hooks.
 - **Un cambio en estas variables** aplica desde la siguiente sesión.
-- **Avisos del arranque.** Avisa de un nombre desconocido o con espacios en las variables, y de un `NEB_HOME` que apunte al caché del plugin. Esa variable la dejaba un `/wakeup` anterior a 6.14.3, y se ignora.
+- **Avisos del arranque.** Avisa de un nombre desconocido o con espacios en las variables, de un arranque que no cupo en las 12 partes (en la parte 12) y de un `NEB_HOME` que apunte al caché del plugin. Esa variable la dejaba un `/wakeup` anterior a 6.14.3, y se ignora.
 
 **Duplicados.** Claude Code no deduplica un hook de plugin contra una entrada de settings. Si activas un hook en estas variables, quita su entrada de tu `settings.json` (las que los templates anteriores a 6.15.0 copiaban desde `$NEB_HOME`), o correrá dos veces. Un maintainer con clon puede conservar sus entradas y no activar las variables; si un proyecto activa por `NEB_PROJECT_HOOKS` un hook que ya tiene como entrada, redefine `NEB_PROJECT_HOOKS` sin ese hook en el `settings.local.json` del proyecto.
 

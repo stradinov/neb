@@ -6,7 +6,7 @@ Este archivo es el **índice/mapa** de la metodología: orden de lectura y flujo
 
 ## Orden de lectura
 
-Transversales **inyectadas al arranque** (vía [`startup.md`](startup.md), garantizadas en toda sesión):
+Transversales **inyectadas al arranque** (vía [`startup.md`](startup.md), completas en el contexto desde el primer prompt de cada sesión; hoy, por el hook `SessionStart` en partes, supuesto R1):
 
 - [Communication](communication.md) — comunicación dev↔Claude: BLUF, menús, idioma, hilo conductor, handoff.
 - [Correspondence](correspondence.md) — correos a terceros: estructura a la medida del destinatario, formato HTML, idioma y registro.
@@ -48,4 +48,4 @@ Referencia (on-demand):
 Clarificación → Estimación → Propuesta → Implementación → Validación → Control de cambios → Producción → Documentación → Retroalimentación
 ```
 
-**Arranque garantizado**: reglas always-on cargadas vía [`startup.md`](startup.md) (`@import` determinista). Los archivos de fase se leen al entrar en la fase.
+**Arranque completo desde el primer prompt**: las reglas always-on se reúnen en [`startup.md`](startup.md) por `@import`, y hoy las entrega el hook `SessionStart` en partes (supuesto R1 de [platform-assumptions.md](../methodology/platform-assumptions.md)). Los archivos de fase se leen al entrar en la fase.

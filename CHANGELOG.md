@@ -4,6 +4,48 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.21.0] - 2026-11-04
+
+> **Minor**: el arranque llega completo a Claude. Hasta ahora, desde la primera versión del plugin, ninguna sesión lo había recibido completo. La plataforma topa cada salida de hook en 10,000 caracteres, y el arranque, de unos 62.8 k, llegaba como un adelanto de 2,000 más la ruta de un archivo que Claude no está obligado a leer. Ahora el `SessionStart` lo entrega en hasta 12 partes que caben en el tope, y un gate del pre-push bloquea publicar un arranque del núcleo que no quepa.
+>
+> - **Cambios de fuerza normativa** declarados (`methodology/principles.md` § "Declarar"):
+>   - se **precisa** el criterio de la promesa 8 (`methodology/promises.md`). Las reglas siempre activas y el trigger de formalización deben estar completos en el contexto antes de la primera respuesta. El `@import` «garantizado» deja de ser el criterio, y el mecanismo pasa a «Dónde se materializa» (supuesto R1);
+>   - se **agregan** dos instrucciones al arranque, que siempre está activo:
+>     - si falta una parte o las huellas no coinciden, Claude avisa al dev;
+>     - si el arranque no cupo en las 12 partes, Claude lee con Read lo que quedó fuera antes de responder y avisa al dev;
+>   - se **agrega** el gate 6 del pre-push, bloqueante. Exige que el arranque del núcleo quepa en 8 de las 12 partes, medido sobre el working tree del clon (no `NEB_HOME`) y con una raíz de instalación de 100 caracteres;
+>   - el arranque se **inyecta también tras `/clear`** (matcher `clear`). Antes, después de `/clear` la sesión quedaba sin arranque. Que la plataforma dispare `clear` y `compact` sigue sin verificar en una sesión interactiva (R1);
+>   - se **precisan** `general/startup.md`, `general/index.md` y `general/profile-detection.md`. En lugar de una carga «garantizada y determinista», dicen lo que se exige (las reglas completas desde el primer prompt) y nombran el hook como mecanismo vigente.
+> - **Adoptantes**:
+>   - el cambio llega con `claude plugin update` y un reinicio de Claude Code, porque `hooks/hooks.json` y el script corren desde la caché del plugin;
+>   - costo: cada sesión carga el arranque completo, unos 25–30 k tokens según una estimación (antes, un adelanto de 2,000 caracteres), y lo vuelve a cargar tras `/clear` y al compactar (sin verificar en sesión interactiva, R1). Las 12 entradas suman entre 0.6 y 1 s al iniciar;
+>   - si el overlay y la configuración personal no caben en las 12 partes, la última lleva un aviso;
+>   - quien mantiene el núcleo recopia `hooks/pre-push-changelog` a `.git/hooks/pre-push` para que corra el gate 6.
+
+### Added
+- **`hooks/tests/test_bootstrap_context.py`**. Cubre:
+  - el corte sin pérdida y dentro del límite en UTF-16;
+  - que no corte dentro de un bloque de código;
+  - el corte duro de una línea larga y los caracteres fuera del BMP;
+  - el desbordamiento;
+  - las partes del script real, con la misma huella;
+  - `neb: skip`, la subsesión, `--check-size` y `main()` dentro del proceso.
+- **`hooks/pre-push-changelog`**: gate 6, `neb-bootstrap-context.py --check-size --root "$NEB_ROOT"`.
+
+### Changed
+- **`bootstrap/neb-bootstrap-context.py`** corta el arranque en partes de 9,000 unidades UTF-16 o menos, con la cabecera incluida:
+  - corta en límites de sección, subsección, párrafo o línea, y no corta dentro de un bloque de código; la excepción es un bloque que no cabe solo en una parte o que queda sin cerrar, que se corta en duro;
+  - cada parte abre con «parte k de n · huella», y la introducción pide avisar al dev si falta una parte o las huellas no coinciden;
+  - nuevos modos `--part k` y `--check-size --root`;
+  - la parte 12 lleva el aviso de desbordamiento;
+  - la salida es UTF-8 con LF;
+  - sin argumentos sigue emitiendo el arranque completo.
+- **`hooks/hooks.json`**: el `SessionStart` pasa a tres grupos, `startup`, `clear` y `compact`, con 12 entradas cada uno, de `--part 1` a `--part 12`. Son matchers simples, sin alternancia, para no depender de que la versión de Claude Code acepte la alternancia: si no la aceptara, el arranque no llegaría.
+- **`methodology/platform-assumptions.md`** R1: el tope de 10,000 caracteres por salida, la entrega en hasta 12 partes y su verificación (2.1.318 · CLI y 2.1.309 · motor de la app), más los consumidores nuevos.
+- **`methodology/promises.md`** (promesa 8), **`general/startup.md`**, **`general/index.md`**, **`general/profile-detection.md`** y **`docs/how-it-works.md`**: la entrega en partes como mecanismo vigente.
+- **`hooks/README.md`**: el `SessionStart` en partes y los 6 gates del pre-push; decía 4.
+- **`hooks/tests/test_hooks_json.py`**: valida el `SessionStart` nuevo contra el `MAX_PARTS` del script.
+
 ## [6.20.0] - 2026-11-04
 
 > **Minor**: la tabla de supuestos de plataforma (`methodology/platform-assumptions.md`) define su propio mantenimiento: quién cuenta como consumidor, cuándo entra, se re-verifica, se cita y sale una fila, y que un ID no se reutiliza. `methodology/principles.md` conserva el principio y remite a la tabla.

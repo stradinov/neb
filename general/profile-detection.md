@@ -1,6 +1,6 @@
 # Detección y profile activo
 
-Cómo Claude detecta el profile al iniciar trabajo y lo mantiene como estado durante la sesión. Se carga al arranque vía [`startup.md`](startup.md) (`@import` garantizado; ver [index.md](index.md) para mapa on-demand). La heurística canónica vive en [`profiles/index.md`](../profiles/index.md); este archivo define cuándo y cómo se aplica.
+Cómo Claude detecta el profile al iniciar trabajo y lo mantiene como estado durante la sesión. Se carga al arranque vía [`startup.md`](startup.md) (`@import`; lo entrega completo el hook `SessionStart`, supuesto R1; ver [index.md](index.md) para mapa on-demand). La heurística canónica vive en [`profiles/index.md`](../profiles/index.md); este archivo define cuándo y cómo se aplica.
 
 ## Al iniciar trabajo
 

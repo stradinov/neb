@@ -5,7 +5,8 @@
     y está en el evento que declara neb-hook.py (HOOKS); no falta ninguna
   • el placeholder va entre comillas y la cadena de intérpretes es `python … || python3 …`
   • timeouts: notify-* 10 s, preprocess-prompt 35 s (su `claude -p` interno es de 30 s)
-  • el SessionStart no cambia
+  • el SessionStart: un grupo por matcher (`startup`, `clear`, `compact`), cada uno con una entrada
+    `--part k` por parte del arranque (MAX_PARTS de bootstrap/neb-bootstrap-context.py), sin repetidos
   • el gate en un shell real: unión de NEB_HOOKS y NEB_PROJECT_HOOKS, sin falsos positivos por
     prefijo, stdin íntegro hasta el script
 
@@ -30,12 +31,17 @@ _spec = importlib.util.spec_from_file_location("neb_hook", os.path.join(HOOKS_DI
 nh = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(nh)
 
+_spec = importlib.util.spec_from_file_location(
+    "neb_bootstrap_context", os.path.join(os.path.dirname(HOOKS_DIR), "bootstrap", "neb-bootstrap-context.py"))
+nb = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(nb)
+
 GATE_RE = re.compile(
     r'^case ",\$NEB_HOOKS,\$NEB_PROJECT_HOOKS," in \*,(?P<gate>[a-z-]+),\*\) '
     r'python "\$\{CLAUDE_PLUGIN_ROOT\}/hooks/neb-hook\.py" (?P<a1>[a-z-]+) \|\| '
     r'python3 "\$\{CLAUDE_PLUGIN_ROOT\}/hooks/neb-hook\.py" (?P<a2>[a-z-]+) ;; esac$')
-BOOTSTRAP = ('python "${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py" || '
-             'python3 "${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py"')
+BOOTSTRAP_PART = ('python "${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py" --part %d || '
+                  'python3 "${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py" --part %d')
 
 sys.path.insert(0, HERE)
 from test_neb_root import BASH  # noqa: E402 — bash como lo resuelve Claude Code (Git Bash en Windows)
@@ -87,11 +93,19 @@ class TestEstructura(unittest.TestCase):
             gate = GATE_RE.match(h["command"]).group("gate")
             self.assertEqual(h.get("timeout"), want.get(gate), gate)
 
-    def test_session_start_sin_cambios(self):
+    def test_session_start_en_partes(self):
+        # La plataforma topa cada salida en 10,000 caracteres y fusiona los comandos idénticos:
+        # una entrada distinta por parte, tantas como MAX_PARTS (supuesto R1). Un matcher simple por
+        # evento, sin alternancia, para no depender de que la versión de Claude Code la acepte.
         ss = self.hooks["SessionStart"]
-        self.assertEqual([g["matcher"] for g in ss], ["startup", "compact"])
+        self.assertEqual([g["matcher"] for g in ss], ["startup", "clear", "compact"])
         for g in ss:
-            self.assertEqual([h["command"] for h in g["hooks"]], [BOOTSTRAP])
+            cmds = [h["command"] for h in g["hooks"]]
+            self.assertEqual(cmds, [BOOTSTRAP_PART % (k, k) for k in range(1, nb.MAX_PARTS + 1)], g["matcher"])
+            self.assertEqual(len(set(cmds)), len(cmds))
+            for h in g["hooks"]:
+                self.assertEqual(h["type"], "command")
+                self.assertNotIn("timeout", h)
 
 
 STUB = """import os, sys

@@ -7,7 +7,104 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\""
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 1 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 1"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 2 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 2"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 3 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 3"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 4 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 4"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 5 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 5"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 6 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 6"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 7 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 7"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 8 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 8"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 9 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 9"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 10 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 10"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 11 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 11"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 12 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 12"
+          }
+        ]
+      },
+      {
+        "matcher": "clear",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 1 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 1"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 2 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 2"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 3 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 3"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 4 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 4"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 5 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 5"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 6 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 6"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 7 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 7"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 8 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 8"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 9 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 9"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 10 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 10"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 11 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 11"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 12 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 12"
           }
         ]
       },
@@ -16,7 +113,51 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\""
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 1 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 1"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 2 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 2"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 3 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 3"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 4 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 4"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 5 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 5"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 6 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 6"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 7 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 7"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 8 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 8"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 9 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 9"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 10 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 10"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 11 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 11"
+          },
+          {
+            "type": "command",
+            "command": "python \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 12 || python3 \"${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py\" --part 12"
           }
         ]
       }

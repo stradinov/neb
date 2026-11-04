@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # managed-by: neb/hooks/pre-push-changelog
 # Hook pre-push del maintainer — único punto de enforcement BLOQUEANTE de neb.
-# Encadena 5 gates antes de publicar:
+# Encadena 6 gates antes de publicar:
 #   1. Integridad del kernel: assemble-startup.py --check (ningún import del arranque roto).
 #   2. Términos vetados (PII/marcas): extension point del overlay — corre
 #      $NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh si existe (el script privado
@@ -11,6 +11,9 @@
 #   4. Sincronía CHANGELOG.md ↔ changelog.d/ (assemble-changelog.py --check).
 #   5. Sincronía plugin.json.version ↔ VERSION (el manager compara semver; un campo
 #      congelado bloquea 'claude plugin update' en silencio para todos los marketplace).
+#   6. Tamaño del arranque: el arranque del núcleo cabe en las partes del hook SessionStart
+#      (neb-bootstrap-context.py --check-size; la plataforma topa cada salida en 10,000
+#      caracteres y lo que pasa de ahí no llega completo a Claude — supuesto R1).
 #
 # Instalación (maintainer): cp hooks/pre-push-changelog .git/hooks/pre-push
 # Bypass (requiere autorización explícita del dev): git push --no-verify
@@ -113,6 +116,16 @@ if [ -f "$NEB_ROOT/VERSION" ] && [ -f "$PLUGIN_JSON" ]; then
          "reporta 'already at latest' y ningún marketplace entrega el contenido nuevo." \
          "Sincroniza con: bootstrap/bump-version.sh   (o edita .claude-plugin/plugin.json.version a $VER_SRC)"
   fi
+fi
+
+# ── Gate 6: el arranque del núcleo cabe en las partes del SessionStart ───────
+# Mide el working tree del clon ($NEB_ROOT, no NEB_HOME) con una raíz de instalación larga.
+if ! "$PY" "$NEB_ROOT/bootstrap/neb-bootstrap-context.py" --check-size --root "$NEB_ROOT" >/dev/null 2>/tmp/neb_size_err; then
+  fail "El arranque del núcleo no cabe en las partes del hook SessionStart." \
+       "$(cat /tmp/neb_size_err 2>/dev/null | head -3)" \
+       "Lo que no cabe no llega completo a Claude (R1). Adelgaza el arranque o, con OK del dev," \
+       "sube MAX_PARTS en bootstrap/neb-bootstrap-context.py junto con las entradas de hooks/hooks.json" \
+       "y los textos que citan 12 y 8 partes (R1, hooks/README.md, docs/how-it-works.md)."
 fi
 
 exit 0

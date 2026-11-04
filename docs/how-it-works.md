@@ -84,6 +84,13 @@ comunicación, detección de profile, onboarding— ensambladas desde
 `general/startup.md`, más el overlay y la configuración personal del adoptante.
 El resto del contenido se carga on-demand según lo que el contexto requiera.
 
+La plataforma topa cada salida de hook en 10,000 caracteres; arriba de eso, Claude
+solo ve un adelanto. Por eso el plugin registra 12 entradas `SessionStart` para cada
+evento (al iniciar, tras `/clear` y al compactar). El arranque sale en tantas partes como
+necesite, hasta 12, cada una con la cabecera «parte k de n · huella»; las entradas
+que sobran no emiten nada. Un gate del pre-push bloquea publicar un núcleo que no
+quepa.
+
 Los proyectos cliente **no** necesitan importar el núcleo en su
 `CLAUDE.md`: el hook inyecta el arranque en toda sesión, de modo que un
 `CLAUDE.md` de proyecto conserva solo sus imports de profile y su contenido
