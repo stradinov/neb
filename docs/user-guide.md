@@ -121,12 +121,12 @@ Lo anterior cubre **usar** Neb. **Contribuir al núcleo** —corregir o extender
 
 ```bash
 git clone https://github.com/stradinov/neb ~/neb   # o donde prefieras
-cp ~/neb/hooks/pre-push-changelog ~/neb/.git/hooks/pre-push   # gate del CHANGELOG
+cp ~/neb/hooks/pre-push-changelog ~/neb/.git/hooks/pre-push   # gates del pre-push
 ```
 
 Flujo: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo (fork + PR si no tienes write). Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`. Los hooks opcionales activados con `NEB_HOOKS` corren siempre el plugin cargado: para probarlos desde el clon, usa `--plugin-dir`.
 
-El clon del núcleo y tu espacio de trabajo son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)
+El clon del núcleo y tu espacio de trabajo son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. `git pull` no reinstala el hook `pre-push`: cuando cambia `hooks/pre-push-changelog`, repite el `cp`. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)
 
 ### Cómo se redactan los MDs (modos de redacción)
 

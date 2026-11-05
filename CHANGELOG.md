@@ -9,7 +9,7 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 > **Minor**: el pre-push valida lo que se publica, no la copia. Hasta ahora, los gates 1, 2, 4, 5 y 6 leían el árbol de trabajo. En una copia compartida con trabajo sin commitear validaban una mezcla: pasaba un commit roto si la copia lo «arreglaba» (por ejemplo, un `CHANGELOG.md` regenerado sin commitear) y se bloqueaba uno sano por archivos ajenos. Además, sin upstream o desde un HEAD separado el hook salía con 0 sin correr nada, y validaba `HEAD` en lugar de la ref que se empujaba. Ahora el hook toma de su entrada estándar cada ref que se publica y corre los gates sobre el árbol de ese commit, extraído a un directorio temporal.
 >
 > - **Cambios de fuerza normativa** declarados (`methodology/principles.md` § "Declarar"):
->   - el pre-push **bloquea** casos que antes dejaba pasar: un push desde HEAD separado, el push de una ref que no es `HEAD` y un commit cuyo defecto solo estaba «arreglado» en la copia;
+>   - el pre-push **valida, y bloquea si hay defecto**, casos que antes no validaba: un push sin upstream o desde HEAD separado, el push de una ref que no es `HEAD` y un commit cuyo defecto solo estaba «arreglado» en la copia;
 >   - el gate 6 mide el árbol del commit publicado, ya no «el working tree del clon» (texto de la 6.21.0).
 > - **Adoptantes**: quien mantiene el núcleo recopia `hooks/pre-push-changelog` a `.git/hooks/pre-push`; `git pull` no lo reinstala. Con el hook viejo instalado, el defecto sigue sin avisar. Sin efecto para quien solo instala el plugin.
 
@@ -30,7 +30,7 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
   - los gates 1, 2, 5 y 6 corren una vez por commit, y el 3 y el 4 por ref;
   - en una ref nueva, los archivos salen de los commits que ninguna ref remota tiene (`--remotes` si el push va a una URL);
   - el mensaje de bloqueo nombra la ref y el SHA.
-- **`hooks/README.md`** § "pre-push-changelog" y **`process/version-control.md`** § "Gate pre-push": qué valida el hook y que hay que reinstalarlo al actualizar.
+- **`hooks/README.md`** § "pre-push-changelog", **`process/version-control.md`** § "Gate pre-push" y **`docs/user-guide.md`** § "Contribuir al núcleo": qué valida el hook y que hay que reinstalarlo al actualizar.
 - **`bootstrap/neb-bootstrap-context.py`**: docstring de `_check_size`.
 
 ## [6.24.0] - 2026-11-04
