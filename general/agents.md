@@ -32,7 +32,7 @@ Claude Code expone dos capas de subagentes, con propósitos distintos:
 | 4 Implementación | `Explore` | Verificar existencia o signatura de un método antes de editar. Lookup puntual. |
 | 4 Implementación | `general-purpose` | Subtarea compleja que requiere búsqueda + análisis + decisión antes de escribir código. |
 | 5 Validación | `Explore` | Verificar que un cambio quedó aplicado en todos los archivos esperados (grep de nombre/constante). |
-| 9 Improvement | `general-purpose` | Diagnóstico de defecto cross-REQ, revisión de métricas, análisis de utilidad de roles. |
+| 9 Improvement | `general-purpose` | Diagnóstico de defecto cross-REQ, revisión de métricas y de la pertinencia de roles. |
 
 ## Regla de selección y escalamiento
 

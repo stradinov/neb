@@ -49,7 +49,7 @@ Algunos archivos mezclan capas **por cohesión de dominio** y NO se fragmentan: 
 - [`../general/agents.md`](../general/agents.md) — catálogo de subagentes del harness de Claude Code + selección; referencia transversal consultada en cualquier fase.
 - [`../general/incidents.md`](../general/incidents.md) — protocolo reactivo P1/P2, paralelo al ciclo lineal 1–9; el ciclo de vida del artefacto INCIDENT MD sí vive en `workflow/changes.md`.
 - [`plan-review.md`](../process/plan-review.md) — proceso + plantilla de briefing + criterio de activación, intrínsecos entre sí.
-- [`roles-catalog.md`](roles-catalog.md) — catálogo + tracking de utilidad (scores) + evolución, cohesivos; la invocación (cuándo/cómo) sí vive aparte en `process/roles-invocation.md`.
+- [`roles-catalog.md`](roles-catalog.md) — catálogo + evolución, cohesivos; la invocación (cuándo/cómo) sí vive aparte en `process/roles-invocation.md`.
 - [`platform-assumptions.md`](platform-assumptions.md) — tabla de supuestos de plataforma + su mantenimiento (alta, re-verificación, retiro e ID), cohesivos: el mantenimiento se aplica fila por fila.
 - [`personal-vs-team.md`](personal-vs-team.md) — la regla de convivencia personal/equipo incluye el gate "Claude avisa ante un override que contradice el baseline"; cohesivo con la regla, no se separa a `process/`.
 

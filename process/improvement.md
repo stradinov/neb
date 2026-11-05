@@ -23,7 +23,7 @@ El **Reporte de cierre** (presentado al dev en Fase 8, sección `## Reporte de c
 
 Si la desviación tiene causa documentada (ej. complejidad real más alta por incidencia anotada en el MD), la acción puede saltarse — pero con justificación inline.
 
-**Actualizar utilidad de roles invocados**: tras el plan-review, aplicar Δ score a cada rol según el evento que aplique de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) "Utilidad de roles" — +1 si cazó defecto, -0.1 si no aportó hallazgos, -1 si debió cazar y no lo hizo (descubierto post-cierre). El Δ se anota en el change MD bajo **Utilidad de roles** y, si el profile en que se invocó el rol tiene tabla de utilidad propia en el overlay del adoptante con fila de ese rol, también ahí, con la fecha. La tabla "Resumen de utilidad" del núcleo no recibe el Δ de cada REQ.
+**Aporte de los roles despachados**: en Fase 9, Claude anota en el registro del REQ, bajo **Aporte de roles**, una línea por rol revisor despachado en el REQ, con una etiqueta: *aportó* (cazó un defecto o dio un hallazgo que cambió el plan o el entregable), *sin hallazgos* o *debió cazar* (un defecto de su foco, descubierto después del cierre del REQ que lo introdujo, con ese REQ). La línea *debió cazar* va en el REQ que descubre el defecto, aunque el rol no se haya despachado en él. La revisión agregada lee estas líneas (§ "Revisión agregada" › "Qué se revisa").
 
 En la misma Fase 9, Claude chequea el disparador de la revisión agregada (§ "Revisión agregada" › "Disparador").
 
@@ -73,8 +73,7 @@ La revisión vence al **cambio de mes calendario**: cuando la última revisión 
 
 - la línea `**Revisión agregada:** <YYYY-MM-DD>`, con la fecha en que armó la lista;
 - los `changes/` que abarcó y cómo contó cada REQ una vez (en git, las copias de un worktree son el mismo registro);
-- la lista de los REQs que cubre: los cerrados (Estado «Cerrado») antes de ese día que ninguna revisión anterior cubrió. Los que cerraron ese día quedan para la siguiente, porque sus Fases 8 y 9 pueden estar en curso;
-- el score que asentó para cada fila de utilidad que evaluó (§ "Verificación de utilidad de roles").
+- la lista de los REQs que cubre: los cerrados (Estado «Cerrado») antes de ese día que ninguna revisión anterior cubrió. Los que cerraron ese día quedan para la siguiente, porque sus Fases 8 y 9 pueden estar en curso.
 
 Lo que la revisión analiza sale de los REQs de esa lista. La última revisión registrada es la de fecha más reciente.
 
@@ -82,6 +81,7 @@ Lo que la revisión analiza sale de los REQs de esa lista. La última revisión 
 
 - Métricas agregadas de los REQs que cubre contra umbrales de [`workflow/metrics.md`](../workflow/metrics.md): ¿hay una métrica que se dispara repetidamente (ej. 5 de 10 cierran con re-entregas=3), o una que no disparó en el período y ya no aporta?
 - Patrones cualitativos de fricción recurrente: incidencias del mismo tipo, fases que consistentemente exceden turnos, decisiones que se reabren.
+- Pertinencia de cada rol revisor, en cada profile donde está declarado (un rol transversal, en todos). Con las líneas «Aporte de roles» de los REQs que cubren esta revisión y la anterior: ¿un rol que no se despachó en ningún REQ de las dos, aunque su profile tuvo REQs? ¿Uno despachado solo con *sin hallazgos*? ¿Uno con *debió cazar* en más de un REQ? Si su despacho es condicional, la revisión dice si la condición se dio, o que no es determinable. Si hay un rol así, propone deprecarlo, ajustar su foco o redefinir su pertinencia (ver [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) § "Evolución de roles"). Las anotaciones anteriores con Δ cuentan como etiquetas: +1 es *aportó*, −0.1 *sin hallazgos* y −1 *debió cazar*.
 - **Análisis longitudinal de costo por modelo** (si hay datos de uso de API en los change MDs): comparar cost-per-REQ a complejidad constante entre versiones de Claude. Dos señales posibles:
   - Costo baja manteniendo calidad → Claude mejoró o la metodología es más eficiente.
   - Costo sube o se mantiene con calidad baja → investigar si el tipo de REQ cambió o si hay uso ineficiente del modelo (ej. Opus para tareas que Sonnet resolvería igual).
@@ -92,14 +92,6 @@ Lo que la revisión analiza sale de los REQs de esa lista. La última revisión 
 1–3 propuestas de mejora a la metodología, formato Fase 9 individual. Si no hay patrón claro, lo informa en una línea ("revisión agregada de N REQs al <fecha> — sin patrón persistente").
 
 Cada propuesta derivada entra como REQ aparte con plan-review (ver [`process/plan-review.md`](plan-review.md)).
-
-### Verificación de utilidad de roles
-
-El score de un rol vive en una tabla de utilidad: "Resumen de utilidad" de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md), o la tabla propia de un profile en el overlay del adoptante, que ya recibe el Δ de los roles con fila en ella invocados bajo ese profile. Para una fila del núcleo, la revisión agregada suma al score de la fila los Δ de utilidad de roles anotados en los registros de los REQs que cubre (en la primera revisión, los cerrados después de la **Última act.** de la fila), salvo los que ya recibió una tabla propia. Aplica el neto de cada día de cierre, en orden de fecha (la «Fecha cierre» del registro o, si falta, la de inicio del nombre del archivo), con el tope de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) § "Rangos" tras cada día. Asienta con su fecha el score de cada fila que cambia; una fila cuyo score no cambia conserva su fecha (un adoptante que no mantiene el núcleo lo asienta en una tabla propia de su overlay). Sobre esos scores:
-
-1. Aplica Δ −0.5 a roles no invocados en 5 plan-reviews consecutivos donde habrían aplicado.
-2. Identifica roles con score `< -1` sostenido por **2 evaluaciones consecutivas** y propone: *"El rol `<X>` no aporta hallazgos sostenidos. ¿Se depreca, se ajusta su foco o se redefine su pertinencia?"*
-3. Roles con score `≥ +3` se marcan core — no se deprecan ni se reformulan sin justificación fuerte.
 
 ### Trazabilidad
 
