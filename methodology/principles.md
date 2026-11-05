@@ -76,6 +76,7 @@ Output esperado:
 
 - Plan (Fase 3): el plan separa dependientes/datos **verificados** (con la fuente: grep `X`, lectura de `Y:Z-W`, LSP, skill `<nombre>`, memoria `<archivo>`) de los **asumidos sin verificar** (con la razón y la acción pendiente).
 - Cierre de edit (Fase 4): Claude menciona qué fuentes consultó vs cuáles dio por entendidas por contexto previo.
+- Corrección de un artefacto del REQ (cualquier fase): quien corrige una regla, un criterio, una cifra o una afirmación que el REQ ya había escrito en uno de sus artefactos actualiza, antes de presentar la corrección al dev o a una re-revisión, lo que depende de lo corregido en los artefactos de ese REQ: los pasajes que lo aplican o lo repiten, y las cifras, listas y órdenes calculados con el valor anterior. Sin eso, el dependiente sigue afirmando lo que la corrección desmintió. La actualización no alcanza lo que registra un momento, como el plan ya aprobado o una entrada fechada del registro. En `self-applied`, los punteros a un archivo o una sección que se mueve o se renombra siguen el eje 3 de § "Coherencia global sobre cambio mínimo".
 - Respuesta exploratoria (cualquier fase): si un hecho citado no se verificó en el turno actual, marcarlo `[asumido]`, `[memoria sin re-verificar]` o `[dominio sin research]`.
 - Pregunta o menú al dev (cualquier fase): la premisa se verifica antes del menú o se marca; contrato, y caso del motivo de un estado que parece deliberado, en [`../general/communication.md`](../general/communication.md) § "Elecciones: menú de selección".
 

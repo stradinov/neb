@@ -4,6 +4,25 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.27.0] - 2026-11-04
+
+> **Minor**: revisión de familia de la clase «corrección no propagada a sus dependientes» (`process/improvement.md` § "Recurrencia por familia (≥3 similares)"), tras diagnóstico del defecto 3 (origen Fase 3, tipo plan) en 6.22.0. En ese REQ, tres correcciones no llegaron a lo que dependía de ellas: la regla del día de la lista no llegó a lo que la revisión analiza, la que ataba el análisis a la lista no llegó a una de las propuestas, y el orden por fecha de cierre no llegó al cálculo que fechaba los topes. Los gates de F4 cazaron las tres, a costa de rondas extra.
+>
+> - **Cambios de fuerza normativa** declarados (`methodology/principles.md` § "Declarar"):
+>   - se **agrega** el invariante de la clase: quien corrige una regla, un criterio, una cifra o una afirmación que el REQ ya había escrito en uno de sus artefactos actualiza, antes de presentar la corrección al dev o a una re-revisión, lo que depende de lo corregido en los artefactos de ese REQ: los pasajes que lo aplican o lo repiten, y las cifras, listas y órdenes calculados con el valor anterior. La actualización no alcanza lo que registra un momento, como el plan ya aprobado o una entrada fechada del registro;
+>   - se **estrecha** el gate: en una re-revisión, el revisor reporta como hallazgo lo que dependa de una corrección y no la refleje, en los términos del bullet nuevo; con la condición de paso de F4 y F7, eso bloquea el gate. Para que el revisor llegue a esos dependientes y al bullet, el briefing lleva la ruta del registro del requerimiento, si ya existe, y siempre la del núcleo de Neb en uso y la del `deployment.md` del profile (supuesto R12). Antes, la del `deployment.md` iba solo si no estaba bajo el directorio de trabajo, condición que no distingue el núcleo de sus copias en el caché del plugin.
+
+### Added
+- **`methodology/principles.md`** § "Suposiciones explícitas antes de afirmar" › Output esperado: bullet «Corrección de un artefacto del REQ». En `self-applied`, remite al eje 3 de § "Coherencia global sobre cambio mínimo" los punteros a lo que se mueve o se renombra.
+- **`process/plan-review.md`** § "Plantilla de briefing para subagentes": campo «Registro».
+
+### Changed
+- **`process/plan-review.md`** § "Plantilla de briefing para subagentes":
+  - «Profile» lleva siempre la ruta del `deployment.md` del profile y la del núcleo de Neb en uso (en `self-applied`, el clon que se edita), y cita el supuesto R12;
+  - «Tu tarea»: en una re-revisión, lo que dependa de una corrección y no la refleje es hallazgo, en los términos del bullet nuevo.
+- **`agents/qa-process-engineer.md`** foco «Alineación con políticas existentes»: el `deployment.md` del profile se lee en la ruta que da el briefing, ya no bajo el directorio de trabajo.
+- **`methodology/platform-assumptions.md`** R12: `process/plan-review.md` entre sus consumidores.
+
 ## [6.26.0] - 2026-11-04
 
 > **Minor**: tras revisión agregada de 249 REQs al 2026-11-04. La utilidad de roles saturaba y dependía de que se anotara el Δ. Los revisores más invocados estaban en el tope (5.0). Ninguno de los −1 de la historia movió un score, porque cada uno llegó con un +1 del mismo REQ: un revisor con cuatro fallas post-cierre anotadas el mismo día seguiría en 5.0. Desde su creación en mayo de 2026, el score no sostuvo ninguna deprecación ni ninguna reformulación.

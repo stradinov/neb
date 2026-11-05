@@ -43,7 +43,8 @@ Eres <nombre del rol> en la metodología. Revisa el siguiente plan propuesto por
 ## Plan propuesto
 
 **REQ**: <descripción de una línea del requerimiento>
-**Profile**: <profile activo> (con la ruta de su `deployment.md` si no está bajo el directorio de trabajo)
+**Profile**: <profile activo> (con la ruta de su `deployment.md` y la del núcleo de Neb en uso, que en `self-applied` es el clon que se edita: el revisor no recibe el arranque de la sesión, supuesto R12 de `methodology/platform-assumptions.md`)
+**Registro**: <ruta del registro del requerimiento, si ya existe>
 **Archivos afectados**: <lista: Archivo | Cambio>
 
 **Cambios propuestos**:
@@ -55,7 +56,7 @@ Eres <nombre del rol> en la metodología. Revisa el siguiente plan propuesto por
 
 ## Tu tarea
 
-Aplica tu mandato completo y reporta hallazgos. En una re-revisión, coteja cada corrección con su fuente: la que no tenga fuente, cuya fuente no puedas leer y no traiga extracto, o cuya fuente no la sostenga es un hallazgo. Máximo 300 palabras.
+Aplica tu mandato completo y reporta hallazgos. En una re-revisión, coteja cada corrección con su fuente: la que no tenga fuente, cuya fuente no puedas leer y no traiga extracto, o cuya fuente no la sostenga es un hallazgo. También lo es lo que dependa de una corrección y no la refleje, en los términos del bullet «Corrección de un artefacto del REQ» de `methodology/principles.md` § "Suposiciones explícitas antes de afirmar". Máximo 300 palabras.
 ```
 
 ## Output
