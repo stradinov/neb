@@ -173,7 +173,7 @@ Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` regi
 
 - **El `SessionStart`** (`bootstrap/neb-bootstrap-context.py`): inyecta el arranque ensamblado, en partes.
   - La plataforma topa cada salida de hook en 10,000 caracteres, y lo que pasa de ahí no llega completo a Claude (supuesto R1 de [`methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)).
-  - Por eso hay 12 entradas por matcher (`startup`, `clear` y `compact`), que corren al iniciar, tras `/clear` y al compactar; `clear` y `compact` están sin verificar en sesión interactiva (R1). Cada entrada corre el script con `--part k`.
+  - Por eso hay 12 entradas por matcher (`startup`, `clear` y `compact`), que corren al iniciar, tras `/clear` y al compactar; `clear` está sin verificar en sesión interactiva (R1). Cada entrada corre el script con `--part k`.
   - El arranque usa tantas partes como necesite, hasta 12, cada una de 9,000 caracteres o menos y con la cabecera «parte k de n · huella». Las entradas que sobran no emiten nada.
   - Si el arranque no cabe en las 12 partes, la parte 12 termina con un aviso: qué bloques faltan y de qué archivo leerlos.
   - Costo: cada sesión carga el arranque completo (unos 25–30 k tokens, estimado), y las 12 entradas suman entre 0.6 y 1 s al iniciar.

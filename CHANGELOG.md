@@ -4,6 +4,16 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.28.1] - 2026-11-05
+
+> **Patch**: R1 de `methodology/platform-assumptions.md` registra como verificado el arranque al iniciar y al compactar en sesiones interactivas de la app. En tres arranques y cuatro compactaciones (2.1.317, 2026-11-05), llegó completo en sus 9 partes, todas con la misma huella. Cierra la prueba de compactación del REQ que entregó el arranque en partes (6.21.0). `clear` sigue sin verificar.
+
+### Changed
+- **`methodology/platform-assumptions.md`** R1:
+  - columna «Verificado»: el arranque al iniciar y al compactar en sesiones interactivas de la app, verificado (2.1.317 · app · 2026-11-05 · change MD del REQ `neb-arranque-en-partes` § Evidencia). `clear` y un agregado mayor de 152,000 caracteres siguen sin verificar;
+  - «Cómo probarlo»: `/clear` y la compactación se leen en el transcript de una sesión interactiva, porque no corren en `-p`.
+- **`hooks/README.md`** § "Bajo el plugin de Neb": solo `clear` queda sin verificar en sesión interactiva.
+
 ## [6.28.0] - 2026-11-04
 
 > **Minor**: Re-entregas e Incidencias se cuentan con una sola regla en los REQs de un profile de proceso, y la acción del umbral de Re-entregas deja de suponer la causa, tras diagnóstico del defecto «Re-entregas se cuenta distinto y su acción supone la causa» (origen Fase 9, disparadores cuantitativos; tipo loop) en 6.19.0. En los REQs `self-applied` de una misma fecha, unos contaban como re-entrega cada re-revisión de gate y otros no, porque la revisión de roles es a la vez gate y validación del profile. Además, «Plan de pruebas insuficiente» no aplicó en ninguno de los disparos por re-revisiones: la causa ya estaba en el diagnóstico de defectos.
