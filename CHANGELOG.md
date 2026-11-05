@@ -4,6 +4,22 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.23.0] - 2026-11-04
+
+> **Minor**: revisión de familia de la clase «obligación sin sujeto acotado» (`process/improvement.md` § "Recurrencia por familia (≥3 similares)"), tras diagnóstico del defecto 1 (origen Fase 3, tipo plan) en 6.20.0, el 3.º de la familia con los dos de `methodology/principles.md` en 6.17.0. En los tres, una regla heredaba pasos a todo REQ: reescribir menciones al editar el archivo, re-verificar filas de supuestos por usar el gate, y «el REQ ajusta el mecanismo» sin antecedente. Los tres se corrigieron antes de publicarse.
+>
+> - **Cambios de fuerza normativa** declarados (`methodology/principles.md` § "Declarar"):
+>   - se **agrega** el invariante de la clase como regla de redacción. Una obligación deja en su misma oración a quién le toca: lo nombra su sujeto o lo identifica su disparador, y le toca a quien cambia su objeto o se apoya en él. Un evento del objeto no la acota por sí solo. Editar el archivo que la contiene no la dispara, salvo que su objeto sea la edición misma; usar el mecanismo vigente de un gate no dispara la que protege el supuesto de ese mecanismo. La obligación que recae en todo REQ de su alcance, o en cada fase, turno o fecha, lo dice con ese sujeto. Las obligaciones anteriores a la regla se ajustan cuando un REQ cambie la regla que las contiene;
+>   - se **amplía** el foco «Verificabilidad de criterios» del `qa-process-engineer` a esa regla, en reglas de la metodología (ajuste de foco). QA la verifica en F3, F4 y F7. Dos de los tres casos nacieron después de F3.
+
+### Added
+- **`methodology/principles.md`** § "Lineamientos para editar MDs" › Claridad: bullet «Sujeto de una obligación».
+- **`methodology/roles-catalog.md`** § "Evolución de roles" › Atribución del defecto: fila «Obligación sin sujeto acotado» → QA Process Engineer (sub-foco verificabilidad).
+
+### Changed
+- **`profiles/self-applied/roles.md`** foco de QA Process Engineer, «Verificabilidad de criterios y aceptación»: incluye a quién le toca cada obligación.
+- **`agents/qa-process-engineer.md`** foco «Verificabilidad de criterios»: en reglas de la metodología, cada obligación nueva, movida, partida o corregida cumple «Sujeto de una obligación».
+
 ## [6.22.0] - 2026-11-04
 
 > **Minor**: la revisión agregada (`process/improvement.md` § "Revisión agregada") se vuelve chequeable, tras diagnóstico del defecto «Loop tardío» (origen Fase 9, tipo loop) en 6.19.0. Existía desde mayo de 2026 y nunca había corrido: su disparador no guardaba la fecha de la última revisión ni fijaba cuándo se chequea. Incluye la primera revisión agregada (lista del 2026-11-04), que asienta scores de la tabla «Resumen de utilidad».
