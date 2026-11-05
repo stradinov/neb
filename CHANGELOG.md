@@ -4,6 +4,50 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.22.0] - 2026-11-04
+
+> **Minor**: la revisión agregada (`process/improvement.md` § "Revisión agregada") se vuelve chequeable, tras diagnóstico del defecto «Loop tardío» (origen Fase 9, tipo loop) en 6.19.0. Existía desde mayo de 2026 y nunca había corrido: su disparador no guardaba la fecha de la última revisión ni fijaba cuándo se chequea. Incluye la primera revisión agregada (lista del 2026-11-04), que asienta scores de la tabla «Resumen de utilidad».
+>
+> - **Cambios de fuerza normativa** declarados (`methodology/principles.md` § "Declarar"):
+>   - se **precisa** cuándo se chequea el disparador: en la Fase 9 de cada REQ, junto a los disparadores cuantitativos. Antes decía «Claude lo propone proactivamente al cumplirse la condición», sin un momento fijo. Ahora:
+>     - si la revisión vence, Claude propone abrirla como REQ;
+>     - si el dev la pospone, queda el pendiente del mes `[revision-agregada-<YYYY-MM>]`, que la revisión cierra al correr;
+>   - se **agrega** el registro de cada revisión. Su change MD va en el `changes/` de la raíz del espacio de trabajo (`NEB_WORKSPACE`) y lleva:
+>     - la línea `**Revisión agregada:** <YYYY-MM-DD>`;
+>     - los `changes/` abarcados y cómo contó cada REQ una vez;
+>     - la lista de los REQs que cubre: los cerrados antes del día de la lista que ninguna revisión anterior cubrió;
+>     - el score de cada fila de utilidad que evaluó.
+>
+>     Lo que la revisión analiza (métricas, patrones, costo y Δ de roles) sale de esa lista;
+>   - se **elimina** el disparador «N = 10 changes cerrados». Contarlos exigía recorrer, en cada cierre, todos los `changes/` del adoptante. La revisión vence al cambio de mes calendario:
+>     - cuando la última revisión registrada es de un mes anterior al actual;
+>     - si no hay ninguna, al primer cambio de mes después del primer REQ cerrado;
+>   - se **precisa** la suma de la verificación de utilidad de roles:
+>     - parte de los REQs que la revisión cubre (en la primera, los cerrados después de la «Última act.» de la fila);
+>     - aplica el neto de cada día de cierre, con el tope tras cada día;
+>     - asienta con su fecha solo las filas cuyo score cambia. Una fila sin cambio conserva su fecha, así que una revisión que no cambia scores no toca el núcleo.
+> - **Adoptantes**:
+>   - quien ya tiene REQs cerrados en meses anteriores tiene la revisión vencida desde su primera Fase 9 tras actualizar;
+>   - esa primera revisión cubre todo su historial cerrado, y para los roles, los Δ desde la «Última act.» de cada fila;
+>   - el registro de cada revisión es lo que permite chequear la siguiente;
+>   - las 5 filas que asienta esta versión (fecha 2026-11-04) llevan los scores del mantenedor de neb. La primera revisión de cualquier adoptante parte de esas filas, así que en ellas no se suman sus Δ anteriores al 2026-11-04. Un adoptante que no mantiene el núcleo asienta el resultado en una tabla propia de su overlay (6.19.0).
+
+### Changed
+- **`process/improvement.md`**:
+  - § "Disparadores cuantitativos": la Fase 9 chequea el disparador de la revisión agregada;
+  - § "Revisión agregada" › "Disparador": cambio de mes, cuándo se chequea, pendiente del mes y registro de la revisión;
+  - § "Qué se revisa": «de los REQs que cubre» (antes, «de los últimos N changes») y «re-entregas» (antes, «re-deployments»);
+  - § "Output" y § "Trazabilidad": «N REQs al <fecha>» (antes, «N changes desde <fecha>»);
+  - § "Verificación de utilidad de roles": ventana por la lista de la revisión, neto por día con tope y solo las filas que cambian;
+  - § "Recurrencia por familia (≥3 similares)": independiente del disparador de la revisión agregada (antes, del umbral N = 10).
+- **`methodology/roles-catalog.md`**:
+  - § "Resumen de utilidad", con la primera revisión agregada (lista del 2026-11-04):
+    - QA Process Engineer 0.0 → 5.0, Process Improvement Analyst 0.9 → 5.0 y Context Completeness Reviewer 0.0 → 5.0, que quedan como core;
+    - Skill QA Engineer y Security Reviewer, 1.0 → 2.0;
+    - las demás filas, sin cambio;
+    - la introducción dice que la revisión asienta el score cuando cambia.
+  - § "Trazabilidad" de "Evolución de roles": «tras revisión agregada de N REQs».
+
 ## [6.21.1] - 2026-11-04
 
 > **Patch**: `workflow/pendings.md` § "Sesiones pausadas" remitía el procedimiento de pausar y reanudar una sesión a `workflow/metrics.md`, que ya no lo tiene: vive en `process/execution.md` § "Gestión de sesiones (handoff)" desde antes de 1.0.0. Sin cambio de contrato.

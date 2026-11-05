@@ -25,6 +25,8 @@ Si la desviación tiene causa documentada (ej. complejidad real más alta por in
 
 **Actualizar utilidad de roles invocados**: tras el plan-review, aplicar Δ score a cada rol según el evento que aplique de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) "Utilidad de roles" — +1 si cazó defecto, -0.1 si no aportó hallazgos, -1 si debió cazar y no lo hizo (descubierto post-cierre). El Δ se anota en el change MD bajo **Utilidad de roles** y, si el profile en que se invocó el rol tiene tabla de utilidad propia en el overlay del adoptante con fila de ese rol, también ahí, con la fecha. La tabla "Resumen de utilidad" del núcleo no recibe el Δ de cada REQ.
 
+En la misma Fase 9, Claude chequea el disparador de la revisión agregada (§ "Revisión agregada" › "Disparador").
+
 ## Diagnóstico de origen del defecto
 
 El **Process Improvement Analyst** diagnostica el origen del defecto cuando se detecta (vía métrica, patch retrospectivo o reporte de uso post-cierre). El output va en la sección "Diagnóstico de defectos" del change MD, según el formato de la tabla siguiente.
@@ -49,7 +51,7 @@ Si el defecto se detecta tiempo después, en uso post-cierre: la **etapa de orig
 
 ### Recurrencia por familia (≥3 similares)
 
-Cuando el campo **Patrón / aislado** del Diagnóstico se marca **≥3 similares** (el defecto es el 3.º o posterior de una misma clase / causa raíz), el REQ derivado NO se limita a un parche puntual del caso: **dispara una revisión-de-familia obligatoria** — consolidar el **invariante común** de la clase y un **checklist de regresión reutilizable** que gatee las próximas ocurrencias. Esto es **independiente del umbral `N = 10` de la revisión agregada** (§ "Revisión agregada"): basta con marcar ≥3 similares en un solo Diagnóstico. Rompe el patrón "cada bug de la familia se parcha en aislamiento sin abstraer nunca la clase".
+Cuando el campo **Patrón / aislado** del Diagnóstico se marca **≥3 similares** (el defecto es el 3.º o posterior de una misma clase / causa raíz), el REQ derivado NO se limita a un parche puntual del caso: **dispara una revisión-de-familia obligatoria** — consolidar el **invariante común** de la clase y un **checklist de regresión reutilizable** que gatee las próximas ocurrencias. Esto es **independiente del disparador de la revisión agregada** (§ "Revisión agregada"): basta con marcar ≥3 similares en un solo Diagnóstico. Rompe el patrón "cada bug de la familia se parcha en aislamiento sin abstraer nunca la clase".
 
 ### Salida
 
@@ -63,16 +65,22 @@ Complementa la retroalimentación per-requerimiento con análisis cross-changes 
 
 ### Disparador
 
-El primero que ocurra:
+La revisión vence al **cambio de mes calendario**: cuando la última revisión registrada es de un mes anterior al actual. Sin revisión registrada, vence al primer cambio de mes después del primer REQ cerrado.
 
-- **N = 10 changes cerrados** desde la última revisión agregada.
-- **Cierre de mes calendario**.
+**Cuándo se chequea.** En la Fase 9 de cada REQ, junto a los disparadores cuantitativos. Si vence y no está abierto el pendiente `[revision-agregada-<YYYY-MM>]` del mes en curso, Claude propone abrirla como REQ. Si el dev la pospone, Claude da de alta ese pendiente; la revisión, al correr, cierra los pendientes `[revision-agregada-*]` que encuentre abiertos. El dev también puede pedirla en cualquier momento.
 
-Claude lo propone proactivamente al cumplirse la condición; el dev también puede pedirlo en cualquier momento.
+**Registro.** Cada revisión agregada es un REQ. Su change MD va en el `changes/` de la raíz del espacio de trabajo del adoptante (`NEB_WORKSPACE`), y lleva:
+
+- la línea `**Revisión agregada:** <YYYY-MM-DD>`, con la fecha en que armó la lista;
+- los `changes/` que abarcó y cómo contó cada REQ una vez (en git, las copias de un worktree son el mismo registro);
+- la lista de los REQs que cubre: los cerrados (Estado «Cerrado») antes de ese día que ninguna revisión anterior cubrió. Los que cerraron ese día quedan para la siguiente, porque sus Fases 8 y 9 pueden estar en curso;
+- el score que asentó para cada fila de utilidad que evaluó (§ "Verificación de utilidad de roles").
+
+Lo que la revisión analiza sale de los REQs de esa lista. La última revisión registrada es la de fecha más reciente.
 
 ### Qué se revisa
 
-- Métricas agregadas de los últimos N changes contra umbrales de [`workflow/metrics.md`](../workflow/metrics.md): ¿hay una métrica que se dispara repetidamente (ej. 5 de 10 cierran con re-deployments=3), o una que no disparó en el período y ya no aporta?
+- Métricas agregadas de los REQs que cubre contra umbrales de [`workflow/metrics.md`](../workflow/metrics.md): ¿hay una métrica que se dispara repetidamente (ej. 5 de 10 cierran con re-entregas=3), o una que no disparó en el período y ya no aporta?
 - Patrones cualitativos de fricción recurrente: incidencias del mismo tipo, fases que consistentemente exceden turnos, decisiones que se reabren.
 - **Análisis longitudinal de costo por modelo** (si hay datos de uso de API en los change MDs): comparar cost-per-REQ a complejidad constante entre versiones de Claude. Dos señales posibles:
   - Costo baja manteniendo calidad → Claude mejoró o la metodología es más eficiente.
@@ -81,13 +89,13 @@ Claude lo propone proactivamente al cumplirse la condición; el dev también pue
 
 ### Output
 
-1–3 propuestas de mejora a la metodología, formato Fase 9 individual. Si no hay patrón claro, lo informa en una línea ("revisión agregada de N changes desde X — sin patrón persistente").
+1–3 propuestas de mejora a la metodología, formato Fase 9 individual. Si no hay patrón claro, lo informa en una línea ("revisión agregada de N REQs al <fecha> — sin patrón persistente").
 
 Cada propuesta derivada entra como REQ aparte con plan-review (ver [`process/plan-review.md`](plan-review.md)).
 
 ### Verificación de utilidad de roles
 
-El score de un rol vive en una tabla de utilidad: "Resumen de utilidad" de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md), o la tabla propia de un profile en el overlay del adoptante, que ya recibe el Δ de los roles con fila en ella invocados bajo ese profile. Para una fila del núcleo, la revisión agregada suma al score de la fila los Δ de utilidad de roles anotados en los change MDs de los REQs cerrados desde su **Última act.**, salvo los que ya recibió una tabla propia, y asienta el resultado con su fecha (un adoptante que no mantiene el núcleo lo asienta en una tabla propia de su overlay). Sobre esos scores:
+El score de un rol vive en una tabla de utilidad: "Resumen de utilidad" de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md), o la tabla propia de un profile en el overlay del adoptante, que ya recibe el Δ de los roles con fila en ella invocados bajo ese profile. Para una fila del núcleo, la revisión agregada suma al score de la fila los Δ de utilidad de roles anotados en los registros de los REQs que cubre (en la primera revisión, los cerrados después de la **Última act.** de la fila), salvo los que ya recibió una tabla propia. Aplica el neto de cada día de cierre, en orden de fecha (la «Fecha cierre» del registro o, si falta, la de inicio del nombre del archivo), con el tope de [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) § "Rangos" tras cada día. Asienta con su fecha el score de cada fila que cambia; una fila cuyo score no cambia conserva su fecha (un adoptante que no mantiene el núcleo lo asienta en una tabla propia de su overlay). Sobre esos scores:
 
 1. Aplica Δ −0.5 a roles no invocados en 5 plan-reviews consecutivos donde habrían aplicado.
 2. Identifica roles con score `< -1` sostenido por **2 evaluaciones consecutivas** y propone: *"El rol `<X>` no aporta hallazgos sostenidos. ¿Se depreca, se ajusta su foco o se redefine su pertinencia?"*
@@ -95,7 +103,7 @@ El score de un rol vive en una tabla de utilidad: "Resumen de utilidad" de [`met
 
 ### Trazabilidad
 
-El CHANGELOG entry del REQ derivado menciona explícitamente "tras revisión agregada de N changes desde <fecha>". Sin sección dedicada en el repo: el origen vive en la confirmación del cambio del REQ (en git: el commit).
+El CHANGELOG entry del REQ derivado menciona explícitamente "tras revisión agregada de N REQs al <fecha>". Sin sección dedicada en el repo: el origen vive en la confirmación del cambio del REQ (en git: el commit).
 
 Si Claude identifica un ajuste:
 

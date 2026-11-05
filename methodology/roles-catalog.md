@@ -70,21 +70,21 @@ Si un REQ requiere un revisor no listado (ej. Accessibility Reviewer, Domain Ana
 
 ## Resumen de utilidad
 
-Tracking del valor real de cada rol/sub-foco. **Utilidad** es el score a la fecha de **Última act.**: la fila no recibe el Δ de cada REQ, que se anota en el change MD; la revisión agregada calcula el score con esos Δ, sin contar los que ya recibió una tabla propia del overlay, y lo asienta aquí (ver [`../process/improvement.md`](../process/improvement.md) § "Verificación de utilidad de roles").
+Tracking del valor real de cada rol/sub-foco. **Utilidad** es el score a la fecha de **Última act.**: la fila no recibe el Δ de cada REQ, que se anota en el change MD; la revisión agregada calcula el score con esos Δ, sin contar los que ya recibió una tabla propia del overlay, y lo asienta aquí cuando cambia (ver [`../process/improvement.md`](../process/improvement.md) § "Verificación de utilidad de roles").
 
 | Rol | Tipo | Impl. | Profile | Utilidad | Última act. |
 |---|---|---|---|---|---|
 | Process Architect | principal | persona | self-applied | 1.0 | 2026-05-03 |
 | Profile Author | principal | persona | profile-authoring | 1.0 | 2026-05-15 |
-| QA Process Engineer | revisor | **subagente** (`qa-process-engineer`) | self-applied | 0.0 | 2026-05-17 |
-| Process Improvement Analyst | revisor | **subagente** (`process-improvement-analyst`) | self-applied | 0.9 | 2026-05-17 |
+| QA Process Engineer | revisor | **subagente** (`qa-process-engineer`) | self-applied | 5.0 (core) | 2026-11-04 |
+| Process Improvement Analyst | revisor | **subagente** (`process-improvement-analyst`) | self-applied | 5.0 (core) | 2026-11-04 |
 | Software Engineer | principal | persona | software (futuro) | 1.0 | 2026-05-03 |
 | Code Reviewer | revisor | persona | software (futuro) | 1.0 | 2026-05-17 |
-| Security Reviewer | revisor | persona | software (futuro) | 1.0 | 2026-05-17 |
+| Security Reviewer | revisor | persona | software (futuro) | 2.0 | 2026-11-04 |
 | Database Engineer | revisor | persona | software (futuro) | 1.0 | 2026-05-14 |
-| Skill QA Engineer | revisor | **subagente** (`skill-qa-engineer`) | skill-authoring | 1.0 | 2026-05-14 |
+| Skill QA Engineer | revisor | **subagente** (`skill-qa-engineer`) | skill-authoring | 2.0 | 2026-11-04 |
 | Fact-Check Reviewer | revisor | **subagente** (`fact-check-reviewer`) | research | 1.0 | 2026-05-17 |
-| Context Completeness Reviewer | revisor | **subagente** (`context-completeness-reviewer`) | transversal (todos los profiles) | 0.0 | 2026-05-21 |
+| Context Completeness Reviewer | revisor | **subagente** (`context-completeness-reviewer`) | transversal (todos los profiles) | 5.0 (core) | 2026-11-04 |
 | SysAdmin / SRE | revisor | persona | software (futuro) | 1.0 | 2026-05-03 |
 | Frontend Reviewer | revisor por dimensión | persona | software (futuro) | 1.0 | 2026-05-03 |
 | Observability Reviewer | revisor por dimensión | persona | software (futuro) | 1.0 | 2026-05-03 |
@@ -132,7 +132,7 @@ Esta regla previene role inflation. Roles ad-hoc usados una sola vez no se promu
 
 ### Trazabilidad
 
-CHANGELOG entry del ajuste menciona explícitamente *"tras detección del defecto X en REQ Y"* — análogo a "tras revisión agregada de N changes".
+CHANGELOG entry del ajuste menciona explícitamente *"tras detección del defecto X en REQ Y"* — análogo a "tras revisión agregada de N REQs".
 
 ## Utilidad de roles
 
