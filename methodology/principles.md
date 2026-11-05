@@ -6,7 +6,7 @@ Qué características hacen útil a una metodología de trabajo con un agente de
 
 1. **Explícita** — vive en archivos versionados que el agente lee. No es conocimiento tácito.
 2. **Refinable** — tiene un loop de mejora declarado (ver [improvement](../process/improvement.md)).
-3. **Mensurable** — métricas concretas (turnos por fase, re-deployments, incidencias, complejidad estimada vs real).
+3. **Mensurable** — métricas concretas (turnos por fase, re-entregas, incidencias, complejidad estimada vs real).
 4. **Agnóstica del profile en su core** — `general/` no menciona paths, comandos ni servidores. Lo específico vive en `profiles/<profile>/`.
 5. **Personalizable sin romper el equipo** — `personal/<usuario>.md` puede estrechar o agregar, no relajar (ver [personal-vs-team](personal-vs-team.md)).
 6. **Importable** — los proyectos referencian al repo vía `@imports` estables sobre los `index.md`.

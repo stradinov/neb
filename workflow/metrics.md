@@ -7,7 +7,8 @@ Métricas que Claude registra automáticamente en `<proyecto>/changes/<fecha>-<n
 Tabla en [`templates/change.md.template`](../templates/change.md.template).
 
 - **Turnos por fase** se cuentan al cierre de cada fase.
-- **Re-entregas** se incrementa por cada nuevo ciclo de validación fallida (nueva versión enviada al ambiente de revisión o equivalente). **No incluye** fix-revalidate locales pre-validación — sólo cuenta cuando el entregable vuelve a salir al ambiente de revisión o equivalente.
+- **Re-entregas** se incrementa por cada nuevo ciclo de validación fallida (nueva versión enviada al ambiente de revisión o equivalente). **No incluye** fix-revalidate locales pre-validación — sólo cuenta cuando el entregable vuelve a salir al ambiente de revisión o equivalente. Un ciclo va de una validación que falla a la siguiente validación del entregable corregido; lo que falla a la vez y se corrige junto es un solo ciclo, aunque fallen varias pruebas o revisores.
+  - **En un profile de proceso** ([`vocabulary.md`](../methodology/vocabulary.md) § "Tipos de validación"), su validación empieza con la primera revisión de gate de Fase 4 o la primera prueba que juzga otro rol (un subagente o el dev), lo que ocurra antes, y falla con una revisión de gate de Fase 4 o 7 con hallazgos, una prueba del plan que no cumple su criterio o una entrega que el dev devuelve por un defecto, si obliga a corregir el entregable o su changelog; la falla corregida suma aunque no se vuelva a validar. Lo que el rol principal corre y corrige antes es fix-revalidate local. No cuentan: el plan-review de Fase 3, que revisa el plan; la corrección que solo toca el registro, que documenta *sobre* el REQ ([`vocabulary.md`](../methodology/vocabulary.md) § "Discriminador registro vs entregable"), salvo que el plan lo declare parte del entregable; la que corrige la prueba misma; ni el cambio que el dev pide por preferencia o por información nueva.
 - **Incidencias** y **complejidad estimada vs real** se completan al cerrar (Fase 8).
 
 ## Cuándo accionar
@@ -16,7 +17,7 @@ Umbrales sugeridos. Al cerrar el requerimiento, Claude compara las métricas con
 
 | Métrica | Umbral | Acción en Fase 9 |
 |---|---|---|
-| **Re-entregas** | > 2 | Plan de pruebas insuficiente — revisar criterios y casos cubiertos |
+| **Re-entregas** | > 2 | Diagnóstico de los defectos que causaron esos ciclos ([`process/improvement.md`](../process/improvement.md) § "Diagnóstico de origen del defecto"), con la mejora que deriva de su etapa de origen y tipo de causa, o ninguna si el diagnóstico no deriva mejora; si la causa es un caso que el plan de pruebas no cubría, revisar sus criterios y casos |
 | **Turnos Fase 1 (Clarificación)** | > 5 | Propuesta inicial poco clara — destilar lecciones para clarificación |
 | **Complejidad real ≠ estimada** | desviación de 2+ niveles (baja↔alta) | Calibrar criterios de estimación en `planning.md` |
 | **Incidencias surgidas** | ≥ 3 | Plan no anticipó dependencias — revisar Fase 3 (alcance/riesgos) |
@@ -26,13 +27,13 @@ Umbrales sugeridos. Al cerrar el requerimiento, Claude compara las métricas con
 | **Acciones destructivas no autorizadas** | ≥ 1 | Revisar reglas en [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Acciones destructivas" y reforzar disciplina |
 | **Out-of-scope edits** | ≥ 1 | Revisar plan o disciplinar alcance en Fase 3 |
 
-Los umbrales son sugeridos, ajustables por experiencia. Si una desviación tiene causa documentada (ej. complejidad real subió por incidencia mayor anotada), la acción puede saltarse con justificación en el MD.
+Los umbrales son sugeridos, ajustables por experiencia. Si una desviación tiene causa documentada (ej. complejidad real subió por incidencia mayor anotada), la acción puede saltarse con justificación en el MD, salvo la de Re-entregas, que ya parte de la causa.
 
 ### Definiciones operativas
 
 Captura: las 3 primeras dependen de señal explícita o ausencia de ella; las 3 últimas son **auto-reportadas por Claude al cierre** (silenciosas para el dev — visibles al revisar Métricas del MD antes de aprobar cierre).
 
-- **Incidencias surgidas**: cambios menores no planeados durante la implementación (renombre de columna, archivo SQL faltante, bug detectado en repaso). Sobre el **alcance**.
+- **Incidencias surgidas**: cambios menores no planeados durante la implementación (renombre de columna, archivo SQL faltante, bug detectado en repaso). Sobre el **alcance**. En un profile de proceso, entre el plan aprobado y la entrega final, cuenta una incidencia por cada elemento —archivo, sección, regla (también una fila de tabla o un hallazgo de research) o dependencia— que la entrega agrega o quita respecto del alcance aprobado (el plan o, sin plan, el pedido del dev), y por cada defecto ajeno a lo planeado que corrige (así se lee «bug detectado en repaso»), lo encuentre quien lo encuentre: el rol principal, una prueba, un gate o el dev. Un mismo elemento repartido en varios archivos cuenta uno. Una regla nueva cuenta aunque la pida un hallazgo; reescribir una regla planeada para corregir su defecto no cuenta, ni lo que se agrega y se quita antes de la entrega. La métrica cuenta el desvío; si el cambio se tramita como incidencia durante el trabajo o vuelve a Fase 3 lo decide [`process/execution.md`](../process/execution.md) § "Incidencias durante el trabajo", y en los dos casos suma. Incidencias y Re-entregas miden cosas distintas: un mismo hallazgo puede sumar a las dos.
 - **Errores de implementación de Claude**: veces que Claude se desvió del plan aprobado y el dev tuvo que señalarlo. Sobre la **ejecución**. NO cuenta autocorrección dentro de la misma respuesta. NO cuenta clarificación legítima sobre info inexistente.
 - **Faltas de contexto**: veces que Claude pidió o asumió algo ya documentado en CLAUDE.md, memoria del proyecto o repo de metodología. Sobre la **recuperación de información**. Señal de gap en docs, no en el agente.
 - **Implementaciones sin aprobación**: veces que Claude entró a Fase 4 sin OK explícito ni implícito según [`planning.md`](../process/planning.md) § "Propuesta de implementación". **No cuenta como falta** la aprobación implícita válida (pregunta sobre detalles o contrapropuesta que **asume** que el código se escribirá) — eso es aprobación. **Sí cuenta** solo: silencio, pregunta de aclaración sin presuponer implementación, o contrapropuesta que requiere nueva confirmación.

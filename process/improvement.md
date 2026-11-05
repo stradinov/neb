@@ -21,7 +21,7 @@ El **Reporte de cierre** (presentado al dev en Fase 8, sección `## Reporte de c
 - Si "Complejidad estimada / real" diverge en 2+ niveles Y el costo en tokens es consistentemente mayor al esperado para esa complejidad → reforzar criterio de estimación (acción redundante con el umbral de `Complejidad real ≠ estimada`, pero el costo sirve como evidencia cuantitativa).
 - Si el costo del REQ es notablemente alto para su complejidad real → anotar como hipótesis en el registro de aprendizaje del dev. No deriva acción de metodología por sí solo.
 
-Si la desviación tiene causa documentada (ej. complejidad real más alta por incidencia anotada en el MD), la acción puede saltarse — pero con justificación inline.
+Si la desviación tiene causa documentada (ej. complejidad real más alta por incidencia anotada en el MD), la acción puede saltarse — pero con justificación inline. La de Re-entregas no se salta: ya parte de la causa ([`workflow/metrics.md`](../workflow/metrics.md) § "Cuándo accionar").
 
 **Aporte de los roles despachados**: en Fase 9, Claude anota en el registro del REQ, bajo **Aporte de roles**, una línea por rol revisor despachado en el REQ, con una etiqueta: *aportó* (cazó un defecto o dio un hallazgo que cambió el plan o el entregable), *sin hallazgos* o *debió cazar* (un defecto de su foco, descubierto después del cierre del REQ que lo introdujo, con ese REQ). La línea *debió cazar* va en el REQ que descubre el defecto, aunque el rol no se haya despachado en él. La revisión agregada lee estas líneas (§ "Revisión agregada" › "Qué se revisa").
 
