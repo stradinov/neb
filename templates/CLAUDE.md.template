@@ -10,7 +10,7 @@
 <!-- Personal override del proyecto, si existe (gitignored): -->
 <!-- @./.claude/personal.md -->
 
-<!-- Opt-out de Neb (opcional; ver neb/general/profile-detection.md "Opt-out de profile / Neb"):
+<!-- Opt-out de Neb (opcional; ver neb/general/profile-detection.md § "Marcadores de proyecto"):
      neb-profile: none   → este proyecto usa Neb pero sin profile (Claude no sugiere profile)
      neb: skip         → este proyecto no usa Neb (reservado; sin efecto hasta que exista el hook del plugin) -->
 

@@ -19,7 +19,7 @@ Transversales **on-demand** (su cláusula base viaja espejada en el arranque; el
 
 - [Agents](agents.md) — al despachar subagentes (tipos y mapeo a fases).
 - [Incidents](incidents.md) — al detectar una incidencia post-entrega a producción.
-- [Change control gate](../process/change-control-gate.md) — al confirmar cambios (Fase 4); núcleo espejado en phase-transitions § "Gates de cola"; ownership de `.md` y punto de restauración en [methodology/change-control-policy.md](../methodology/change-control-policy.md).
+- [Change control gate](../process/change-control-gate.md) — al confirmar cambios (Fase 4); núcleo espejado en [phase-transitions.md](../process/phase-transitions.md) § "Gates de cola"; ownership de `.md` y punto de restauración en [methodology/change-control-policy.md](../methodology/change-control-policy.md).
 
 Fases (secuenciales por requerimiento):
 

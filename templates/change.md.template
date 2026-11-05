@@ -83,11 +83,14 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 ## Diagnóstico de defectos
 
 <!-- Opcional. Completar solo si este REQ detectó defectos durante o post-cierre.
-     Ver [improvement.md](../process/improvement.md) "Diagnóstico de origen del defecto". -->
+     Ver [improvement.md](../process/improvement.md) "Diagnóstico de origen del defecto".
+     Patrón / aislado: solo `aislado` o `≥3 similares` (este dispara la revisión de familia de
+     improvement.md § "Recurrencia por familia"); el detalle va tras el valor:
+     «`≥3 similares`: A, B, C» o «`aislado` (2 casos: …)». -->
 
 | Defecto | Etapa de origen | Tipo de causa | Patrón / aislado | REQ derivado |
 |---|---|---|---|---|
-| ... | Fase X | plan / ejecución / validación / producción / documentación / loop / transversal | aislado o ≥3 similares | REQ-NNN o `—` (pendiente) |
+| ... | Fase X | plan / ejecución / validación / producción / documentación / loop / transversal | `aislado` o `≥3 similares` | REQ-NNN o `—` (pendiente) |
 
 ## Trazabilidad
 

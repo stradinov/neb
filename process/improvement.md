@@ -51,7 +51,7 @@ Si el defecto se detecta tiempo después, en uso post-cierre: la **etapa de orig
 
 ### Recurrencia por familia (≥3 similares)
 
-Cuando el campo **Patrón / aislado** del Diagnóstico se marca **≥3 similares** (el defecto es el 3.º o posterior de una misma clase / causa raíz), el REQ derivado NO se limita a un parche puntual del caso: **dispara una revisión-de-familia obligatoria** — consolidar el **invariante común** de la clase y un **checklist de regresión reutilizable** que gatee las próximas ocurrencias. Esto es **independiente del disparador de la revisión agregada** (§ "Revisión agregada"): basta con marcar ≥3 similares en un solo Diagnóstico. Rompe el patrón "cada bug de la familia se parcha en aislamiento sin abstraer nunca la clase".
+Cuando el campo **Patrón / aislado** del Diagnóstico se marca **≥3 similares** (el defecto es el 3.º o posterior de una misma clase / causa raíz), el REQ derivado NO se limita a un parche puntual del caso: **dispara una revisión-de-familia obligatoria** — consolidar el **invariante común** de la clase y un **checklist de regresión reutilizable** que gatee las próximas ocurrencias. Esto es **independiente del disparador de la revisión agregada** (§ "Revisión agregada"): basta con marcar ≥3 similares en un solo Diagnóstico. El campo admite solo `aislado` o `≥3 similares`, con el detalle tras el valor ([`templates/change.md.template`](../templates/change.md.template)); otro valor no dispara la revisión de familia. Rompe el patrón "cada bug de la familia se parcha en aislamiento sin abstraer nunca la clase".
 
 ### Salida
 

@@ -47,7 +47,7 @@ Al retomar un requerimiento interrumpido:
 2. Leer el MD del requerimiento (`<proyecto>/changes/<fecha>-<nombre>.md`) para ver estado.
 3. Si el `active_*.md` tiene "Pendiente de entrega" → atender primero.
 4. Si la última fase no está cerrada → continuar desde ahí.
-5. Si la sesión se reanudó vía `claude --resume <nombre>`, eliminar la entrada correspondiente en `pendings.md` §"Sesiones pausadas".
+5. Si la sesión se reanudó vía `claude --resume <nombre>`, eliminar la entrada correspondiente en `~/.claude/pendings.md` §"Sesiones pausadas".
 
 Resumir el estado en una línea al inicio:
 

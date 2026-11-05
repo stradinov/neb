@@ -34,7 +34,7 @@ El MD se crea como draft al aprobar el plan y se completa durante la implementac
 
 ### Plan resumido vs plan literal
 
-El "plan resumido" del draft vive en § "Plan de elaboración" (tabla `Elemento | Cambio`) — es un **resumen**, no el plan literal. En complejidad media/alta el plan literal se persiste aparte en `~/.claude/approved-plans/` (ver [approved-plans.md](approved-plans.md)). Cuando la aprobación fue **conversacional** (sin plan mode), Claude llena el campo `**Plan aprobado:**` de la sección Trazabilidad con el path de ese archivo; en plan mode el path lo deja el hook. Direccionalidad completa: [traceability.md](traceability.md).
+El "plan resumido" del draft vive en [`templates/change.md.template`](../templates/change.md.template) § "Plan de elaboración" (tabla `Elemento | Cambio`) — es un **resumen**, no el plan literal. En complejidad media/alta el plan literal se persiste aparte en `~/.claude/approved-plans/` (ver [approved-plans.md](approved-plans.md)). Cuando la aprobación fue **conversacional** (sin plan mode), Claude llena el campo `**Plan aprobado:**` de la sección Trazabilidad con el path de ese archivo; en plan mode el path lo deja el hook. Direccionalidad completa: [traceability.md](traceability.md).
 
 Con `autoCompactEnabled: true`, un hook PreCompact actualiza el draft antes de cada compactación usando el `active_<proyecto>_<slug>.md` del REQ (o la sección legacy `## Requerimiento activo`; ver [memory.md](memory.md) y [hooks/README.md](../hooks/README.md)).
 
@@ -45,5 +45,5 @@ Variante del change MD para incidentes detectados post-entrega final: registro r
 - **Path**: `<proyecto>/changes/<YYYY-MM-DD>-incident-<slug>.md`, desde [`templates/incident.md.template`](../templates/incident.md.template).
 - **Apertura**: el dev lo crea y lo notifica explícitamente a Claude.
 - **Cierre**: marcar `Estado: Cerrado` cuando (1) la mitigación está verificada en producción y (2) hubo 7 días sin recurrencia del síntoma; confirmar el cambio según el mecanismo del profile.
-- **Cross-link al requerimiento que lo originó**: si el incidente es atribuible a un deploy identificable, anotar en el INCIDENT MD `**Originado por:** changes/<fecha>-<req>.md (confirmación <ref>)` y la referencia inversa en el change MD original (§ "Resultado post-entrega"). Alimenta la métrica de re-entregas y los análisis de Fase 9. Modelo completo: [traceability.md](traceability.md).
+- **Cross-link al requerimiento que lo originó**: si el incidente es atribuible a un deploy identificable, anotar en el INCIDENT MD `**Originado por:** changes/<fecha>-<req>.md (confirmación <ref>)` y la referencia inversa en el change MD original ([`templates/change.md.template`](../templates/change.md.template) § "Resultado post-entrega"). Alimenta la métrica de re-entregas y los análisis de Fase 9. Modelo completo: [traceability.md](traceability.md).
 

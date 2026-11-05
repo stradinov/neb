@@ -15,7 +15,7 @@ Revisar el plan propuesto con ojo crítico. Buscas defectos que el Process Archi
 
 ## Focos de revisión
 
-- **Consistencia entre archivos**: ¿El cambio contradice algo en otro MD de la metodología? ¿Los imports relativos referencian archivos que existen? ¿La nueva política duplica o colisiona con una existente?
+- **Consistencia entre archivos**: ¿El cambio contradice algo en otro MD de la metodología? ¿Los enlaces, imports y citas de sección («§», anclas) referencian archivos y secciones que existen? Si el briefing trae el extracto del verificador de referencias, cotéjalo: un roto nuevo es hallazgo. ¿La nueva política duplica o colisiona con una existente?
 - **Verificabilidad de criterios**: ¿Cada regla nueva tiene un criterio de aceptación claro? ¿Se puede saber si Claude cumplió la regla o no, sin ambigüedad? En reglas de la metodología, ¿cada obligación nueva, movida, partida o corregida cumple § Claridad, «Sujeto de una obligación», de [`../methodology/principles.md`](../methodology/principles.md)?
 - **Casos borde**: ¿Hay escenarios no cubiertos donde la nueva política se vuelve ambigua o produce un resultado no deseado? Pensar: profile desconocido, varios paths posibles, condición límite, REQ con múltiples profiles, sesión reiniciada.
 - **Alineación con políticas existentes**: ¿El cambio viola o contradice alguna política transversal (`communication.md`, `correspondence.md`, `principles.md`, `workflow/index.md`) o el `deployment.md` del profile del REQ (`profiles/<profile>/deployment.md` bajo el directorio de trabajo, o la ruta que dé el briefing)? ¿Alguna prueba o criterio de cierre del plan exige lo que ese `deployment.md` deja para después del cierre (en `self-applied`, la observación en otra sesión, que es retroalimentación de Fase 9)?

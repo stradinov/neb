@@ -110,13 +110,13 @@ El prompt de sistema base de Claude prescribe cambio mínimo: no refactor, no cl
 
 1. **Vocabulario canónico** — ENUM de estados ([../workflow/index.md](../workflow/index.md)), glosario abstracto ([vocabulary.md](vocabulary.md)), distinción metodología/proceso (§ "Fases vs políticas" en este archivo). Términos introducidos o modificados se clasifican según el canónico, o se justifica el cambio del canónico mismo.
 2. **Dependientes cross-file** — `grep` del concepto, archivo o regla editada en todo el repo. Match afectado = otro archivo depende semánticamente del término (cita la regla, importa el archivo, replica el ENUM). Los matches afectados se incluyen en el plan o se justifica por qué no aplica.
-3. **Referencias** — enlaces relativos e `@imports` apuntan a contenido vigente. Renombres y movimientos arrastran actualización en consumidores.
+3. **Referencias** — enlaces relativos, anclas, `@imports` y citas de sección resuelven a un archivo vigente y a un encabezado de ese archivo; una «§» sin archivo nombrado, al propio. Mover, renombrar o dividir un archivo o una sección arrastra, en el mismo REQ, a sus consumidores de neb y del overlay del adoptante.
 
-**Exclusión** (alineada con [`../process/plan-review.md`](../process/plan-review.md) § "Cuándo aplica"): cosméticos puros — typos sin término canónico, reordenamientos dentro de una sección, fix de enlaces rotos. Para esos basta "Detectar y reportar (no fix silencioso)" más abajo.
+**Exclusión** (alineada con [`../process/plan-review.md`](../process/plan-review.md) § "Cuándo aplica"): cosméticos puros — typos sin término canónico, reordenamientos dentro de una sección, fix de enlaces rotos. Para esos basta "Detectar y reportar (no fix silencioso)" más abajo; la exclusión no los exime del verificador de referencias de `self-applied` ([`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Validación").
 
 **Cobertura**: solo `self-applied`. El resto de profiles listados en [../profiles/index.md](../profiles/index.md) sigue el cambio mínimo del prompt de sistema base; ampliaciones específicas se declaran en `profiles/<X>/conventions.md`.
 
-**Relación con otros gates**: este principio es turno-a-turno (Claude lo aplica antes de cerrar cada edit). El subagente `qa-process-engineer` audita formalmente los tres ejes en Fase 3 (plan-review) y Fase 4 (gate de cierre) — ver `profiles/self-applied/roles.md`. "Detectar y reportar (no fix silencioso)" más abajo es reactivo (qué hacer al encontrar inconsistencia mientras editas).
+**Relación con otros gates**: este principio es turno-a-turno (Claude lo aplica antes de cerrar cada edit). El subagente `qa-process-engineer` audita formalmente los tres ejes en Fase 3 (plan-review), Fase 4 (gate de cierre) y Fase 7 (pre-entrega) — ver `profiles/self-applied/roles.md`; en esos gates, el eje 3 lo respalda el extracto del verificador de referencias ([`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Validación"). "Detectar y reportar (no fix silencioso)" más abajo es reactivo (qué hacer al encontrar inconsistencia mientras editas).
 
 ## Lineamientos para editar MDs
 

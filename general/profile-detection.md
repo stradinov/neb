@@ -13,7 +13,7 @@ Al entrar a un directorio de proyecto, Claude detecta el profile:
 
    Prioridad canónica y heurísticas estructurales: [`profiles/index.md`](../profiles/index.md).
 1. **Identificar la raíz del proyecto** — subir hasta encontrar `.git` (o equivalente) si el cwd es un subdirectorio.
-2. **Leer `CLAUDE.md` del proyecto** si existe — confirmar imports `@~/.claude/neb/profiles/<profile>/...` y revisar el **marcador de opt-out** (ver §"Opt-out de profile / Neb por proyecto"): si el proyecto declaró `neb-profile: none`, continúa genérico **sin sugerir profile** (no se ejecuta el paso 4 para profile desconocido).
+2. **Leer `CLAUDE.md` del proyecto** si existe — confirmar imports `@~/.claude/neb/profiles/<profile>/...` y revisar el **marcador de opt-out** (ver § "Marcadores de proyecto (opt-out de profile/Neb · opt-in de logbook central)"): si el proyecto declaró `neb-profile: none`, continúa genérico **sin sugerir profile** (no se ejecuta el paso 4 para profile desconocido).
 3. **Si imports incompletos o ausentes**, ejecutar heurísticas de [`profiles/index.md`](../profiles/index.md) — primer match gana.
 4. **Actuar según resultado**:
 

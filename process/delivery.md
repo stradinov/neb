@@ -24,7 +24,7 @@ La política universal de control de cambios (autorización en Fase 4, ownership
 
 Independiente del profile:
 
-- **Punto de restauración**: debe existir un estado previo recuperable antes de la entrega final (ver [change-control.md](change-control-gate.md) § "Punto de restauración"). Sin él no hay rollback rápido — ver [incidents.md](../general/incidents.md).
+- **Punto de restauración**: debe existir un estado previo recuperable antes de la entrega final (ver [change-control-policy.md](../methodology/change-control-policy.md) § "Punto de restauración"). Sin él no hay rollback rápido — ver [incidents.md](../general/incidents.md).
 - Condiciones adicionales por profile (BD, routing crítico, firma del cliente, etc.): ver `profiles/<profile>/deployment.md`.
 
 Pasos específicos por profile: `profiles/<profile>/deployment.md`.

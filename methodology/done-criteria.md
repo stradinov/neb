@@ -10,7 +10,7 @@ Criterios que determinan cuándo un **requerimiento** está terminado. Lo que se
   - **Media/alta**: tabla `### Resultado` del [`change.md.template`](../templates/change.md.template) sin ❌. Cualquier ❌ requiere fix + revalidar.
   - **Baja**: checklist `- [x]` del Plan de pruebas suficiente.
   - **Validación implícita** (sin artefactos, ver [`../process/delivery.md`](../process/delivery.md) § Validación): se omite la tabla; cierre por confirmación inline del dev.
-- [ ] **Flujos críticos** — si el riesgo de regresión es `medio`/`alto` (ver [vocabulary.md](vocabulary.md) "Riesgo de regresión"): la tabla incluye ≥1 fila con prefijo `[crítico]` y todas las filas `[crítico]` están en ✅. Cualquier `[crítico]` con ❌ bloquea cierre.
+- [ ] **Flujos críticos** — si el riesgo de regresión es `medio`/`alto` (ver [`../process/planning.md`](../process/planning.md) § "Riesgo de regresión"): la tabla incluye ≥1 fila con prefijo `[crítico]` y todas las filas `[crítico]` están en ✅. Cualquier `[crítico]` con ❌ bloquea cierre.
 - [ ] **Validación superada** — usuario o Claude confirmó (o cliente aprobó, según profile). Claude registra fecha.
 - [ ] **Sin tareas abiertas** — todas en `completed`, ninguna `in_progress`.
 

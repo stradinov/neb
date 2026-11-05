@@ -41,8 +41,8 @@ Revisor transversal (no exclusivo de `self-applied` — aplica a todos los profi
 | Fase | Subagente | Momento de activación |
 |---|---|---|
 | 3 Plan-review | `qa-process-engineer` + `process-improvement-analyst` (siempre, salvo cosméticos) + `context-completeness-reviewer` (cuando el plan introduce concepto/término nuevo, referencia archivo no leído, o agrega regla cross-file) | Tras generar el plan inicial, antes de pedir OK al dev |
-| 4 Cierre (gate) | `qa-process-engineer` (+ `context-completeness-reviewer` si el artefacto difiere del plan en ≥1 archivo no listado o sección no descrita, o se tomaron decisiones no planeadas) | Tras completar edición de MDs, antes de declarar Fase 4 lista |
-| 7 Pre-ejecución (gate) | `qa-process-engineer` + `context-completeness-reviewer` | Antes de `git push` — verifica CHANGELOG, versión bumped, imports no rotos, y suposiciones residuales |
+| 4 Cierre (gate) | `qa-process-engineer` (+ `context-completeness-reviewer` si el artefacto difiere del plan en ≥1 archivo no listado o sección no descrita, o se tomaron decisiones no planeadas) | Tras completar edición de MDs, antes de declarar Fase 4 lista; el briefing lleva el extracto del verificador de referencias ([deployment.md](deployment.md) § "Validación") |
+| 7 Pre-ejecución (gate) | `qa-process-engineer` + `context-completeness-reviewer` | Antes de `git push` — verifica CHANGELOG, versión bumped, enlaces, citas de sección e imports sin rotos (extracto del verificador, [deployment.md](deployment.md) § "Validación") y suposiciones residuales |
 | 9 Improvement | `process-improvement-analyst` | Al detectar defecto no cazado por ningún rol (patch retrospectivo, reporte en uso) |
 | Incidentes P1/P2 | `process-improvement-analyst` | En análisis raíz del proceso tras incidente en producción |
 
