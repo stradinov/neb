@@ -4,6 +4,18 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.21.1] - 2026-11-04
+
+> **Patch**: `workflow/pendings.md` § "Sesiones pausadas" remitía el procedimiento de pausar y reanudar una sesión a `workflow/metrics.md`, que ya no lo tiene: vive en `process/execution.md` § "Gestión de sesiones (handoff)" desde antes de 1.0.0. Sin cambio de contrato.
+
+### Changed
+- **`workflow/pendings.md`** § "Sesiones pausadas" cita el supuesto R10 (`/rename` y `claude --resume`), del que depende (`methodology/platform-assumptions.md` § "Mantenimiento": una regla que depende de una fila la cita por su ID).
+
+### Fixed
+- **`workflow/pendings.md`** § "Sesiones pausadas", punteros al procedimiento de handoff:
+  - «Procedimiento completo» enlaza `process/execution.md` § "Pausar y reanudar la misma sesión Claude", en vez de `workflow/metrics.md`;
+  - «Cuándo Claude elimina» nombra el archivo del paso 5, `process/execution.md` § "Retomar una sesión interrumpida". Sin archivo, la cita apuntaba a una sección que `pendings.md` no tiene.
+
 ## [6.21.0] - 2026-11-04
 
 > **Minor**: el arranque llega completo a Claude. Hasta ahora, desde la primera versión del plugin, ninguna sesión lo había recibido completo. La plataforma topa cada salida de hook en 10,000 caracteres, y el arranque, de unos 62.8 k, llegaba como un adelanto de 2,000 más la ruta de un archivo que Claude no está obligado a leer. Ahora el `SessionStart` lo entrega en hasta 12 partes que caben en el tope, y un gate del pre-push bloquea publicar un arranque del núcleo que no quepa.

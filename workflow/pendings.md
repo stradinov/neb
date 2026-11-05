@@ -46,7 +46,7 @@ Asignar al nuevo ítem el **siguiente entero libre** (típicamente `máx + 1`, p
 
 ## Sección "Sesiones pausadas"
 
-Heading dedicado en `pendings.md` para sesiones Claude nombradas con `/rename` cuando el dev anuncia pausa/continuación posterior. Permite recuperar el comando de reanudación sin que el dev recuerde el nombre.
+Heading dedicado en `pendings.md` para sesiones Claude nombradas con `/rename` (supuesto R10 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) cuando el dev anuncia pausa/continuación posterior. Permite recuperar el comando de reanudación sin que el dev recuerde el nombre.
 
 Esto cubre **reanudar la propia sesión local** (mismo dev, misma máquina). Para **relevo cross-dev / cross-máquina** (otro dev continúa, u otra máquina) ver la [bitácora de relevo](logbook.md), que además registra sesiones automáticamente sin depender del anuncio de pausa.
 
@@ -58,10 +58,10 @@ Formato:
 - **`<nombre-sesion>`** — <descripción del hilo, 1–2 líneas>. Reanudar: `claude --resume <nombre-sesion>`.
 ```
 
-No numerado (los ítems numerados son pendientes accionables; estos son recuperables). Procedimiento completo en [`workflow/metrics.md`](metrics.md) §"Pausar y reanudar la misma sesión Claude".
+No numerado (los ítems numerados son pendientes accionables; estos son recuperables). Procedimiento completo en [`process/execution.md`](../process/execution.md) §"Pausar y reanudar la misma sesión Claude".
 
 **Cuándo Claude escribe**: al detectar el anuncio de pausa (ver [`general/communication.md`](../general/communication.md) §"Handoff de sesión").
 
-**Cuándo Claude elimina**: al reanudar la sesión vía `--resume <nombre>` (paso 5 de §"Retomar una sesión interrumpida"), o si el dev anuncia descarte explícito.
+**Cuándo Claude elimina**: al reanudar la sesión vía `--resume <nombre>` (paso 5 de [`process/execution.md`](../process/execution.md) §"Retomar una sesión interrumpida"), o si el dev anuncia descarte explícito.
 
 **Ventana de 30 días**: si una sesión pausada no se reanuda en 30 días, Claude pregunta al dev antes de eliminar el ítem (no asume descarte implícito — el hilo puede seguir siendo útil).
