@@ -1,42 +1,62 @@
 #!/usr/bin/env bash
 # managed-by: neb/hooks/pre-push-changelog
 # Hook pre-push del maintainer — único punto de enforcement BLOQUEANTE de neb.
+# Valida lo que se publica, no la copia: por cada ref de la entrada estándar
+# (<local ref> <local sha> <remote ref> <remote sha>) extrae el árbol del commit que se
+# empuja a un directorio temporal y corre ahí los gates, con los scripts de ese árbol.
+# Lo que está sin commitear en la copia no cuenta. Vale igual desde un HEAD separado.
 # Encadena 6 gates antes de publicar:
 #   1. Integridad del kernel: assemble-startup.py --check (ningún import del arranque roto).
 #   2. Términos vetados (PII/marcas): extension point del overlay — corre
 #      $NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh si existe (el script privado
-#      no se publica; el hook solo lo invoca).
+#      no se publica; el hook solo lo invoca, con el árbol extraído como raíz).
 #   3. Fragment obligatorio: cambios normativos (fuera de changelog.d/, CHANGELOG.md,
-#      research/) exigen un fragment en el mismo push ("Cualquier cambio entra al CHANGELOG").
+#      research/) exigen un fragment en los archivos que cambia el push de esa ref
+#      ("Cualquier cambio entra al CHANGELOG").
 #   4. Sincronía CHANGELOG.md ↔ changelog.d/ (assemble-changelog.py --check).
 #   5. Sincronía plugin.json.version ↔ VERSION (el manager compara semver; un campo
 #      congelado bloquea 'claude plugin update' en silencio para todos los marketplace).
 #   6. Tamaño del arranque: el arranque del núcleo cabe en las partes del hook SessionStart
 #      (neb-bootstrap-context.py --check-size; la plataforma topa cada salida en 10,000
 #      caracteres y lo que pasa de ahí no llega completo a Claude — supuesto R1).
+# Los gates 1, 2, 5 y 6 dependen solo del árbol: corren una vez por commit. El 3 y el 4
+# dependen de los archivos que cambia cada ref: corren por ref.
+#
+# Rango de archivos de cada ref:
+#   - remote sha conocido localmente → git diff <remote sha> <commit> (lo que cambia en el remoto);
+#   - ref nueva o remote sha desconocido → archivos de los commits que ninguna ref remota tiene
+#     (--remotes=<remoto> si $1 es un remoto configurado; --remotes si $1 es una URL).
+# Borrados y refs que no cambian archivos no corren gates.
 #
 # Instalación (maintainer): cp hooks/pre-push-changelog .git/hooks/pre-push
+#   (git pull no lo reinstala: repetir el cp al actualizar el hook).
 # Bypass (requiere autorización explícita del dev): git push --no-verify
 
 set -euo pipefail
 
-ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+REMOTE="${1:-}"
 
-# Auto-detectar si neb vive como subtree (layout histórico) o en la raíz del repo
-if [ -d "$ROOT/neb/changelog.d" ]; then
-  NEB_ROOT="$ROOT/neb"
-  PREFIX="neb/"
+is_zero() { case "$1" in *[!0]*) return 1 ;; *) return 0 ;; esac; }
+
+# ── Refs que se publican ──────────────────────────────────────────────────────
+REFS=()
+while read -r LREF LSHA RREF RSHA; do
+  [ -n "${LSHA:-}" ] || continue
+  is_zero "$LSHA" && continue                       # borrado: nada que validar
+  REFS+=("$LREF $LSHA $RREF ${RSHA:-0}")
+done
+[ "${#REFS[@]}" -eq 0 ] && exit 0
+
+# $1 es el nombre del remoto, o la URL si se empuja directo a una
+IS_NAMED=0
+while read -r R; do
+  [ -n "$REMOTE" ] && [ "$R" = "$REMOTE" ] && IS_NAMED=1
+done <<<"$(git remote)"
+if [ "$IS_NAMED" -eq 1 ]; then
+  EXCL=(--remotes="$REMOTE")
 else
-  NEB_ROOT="$ROOT"
-  PREFIX=""
+  EXCL=(--remotes)
 fi
-
-# @{push} requiere upstream configurado; si no hay, salir silencioso
-if ! git rev-parse --abbrev-ref "@{push}" >/dev/null 2>&1; then
-  exit 0
-fi
-PUSHED="$(git diff --name-only "@{push}..HEAD" 2>/dev/null || true)"
-[ -z "$PUSHED" ] && exit 0
 
 # Detectar Python
 if command -v py >/dev/null 2>&1; then
@@ -49,9 +69,13 @@ else
   exit 1
 fi
 
+WORK="$(mktemp -d)"
+trap 'rm -rf "$WORK"' EXIT
+
+CUR=""
 fail() {
   echo >&2 ""
-  echo >&2 "[pre-push] $1"
+  echo >&2 "[pre-push] $CUR: $1"
   echo >&2 ""
   shift
   for line in "$@"; do echo >&2 "  $line"; done
@@ -60,72 +84,129 @@ fail() {
   exit 1
 }
 
-# ── Gate 1: integridad de la cadena de imports del arranque ─────────────────
-if ! "$PY" "$NEB_ROOT/bootstrap/assemble-startup.py" --check "$NEB_ROOT/general/startup.md" >/dev/null 2>/tmp/neb_check_err; then
-  fail "Cadena de imports del arranque ROTA — no publicar un kernel degradado." \
-       "$(cat /tmp/neb_check_err 2>/dev/null | head -5)" \
-       "Repara el import (rename/move sin actualizar startup.md) y reintenta."
-fi
-
-# ── Gate 2: términos vetados (extension point del overlay privado) ──────────
-SCAN_RAN=0
+SCANS=()
 if [ -n "${NEB_WORKSPACE:-}" ]; then
   for s in "$NEB_WORKSPACE"/*/scripts/scan-forbidden-terms.sh; do
-    [ -f "$s" ] || continue
-    SCAN_RAN=1
-    if ! bash "$s" "$NEB_ROOT" >/tmp/neb_scan_out 2>&1; then
+    [ -f "$s" ] && SCANS+=("$s")
+  done
+fi
+
+# Archivos que cambia la publicación de una ref
+pushed_files() {
+  local commit="$1" rsha="$2"
+  if ! is_zero "$rsha" && git cat-file -e "${rsha}^{commit}" 2>/dev/null; then
+    git diff --name-only --no-renames "$rsha" "$commit"
+  else
+    git log --format= --name-only --no-renames "$commit" --not "${EXCL[@]}" | sed '/^$/d' | sort -u
+  fi
+}
+
+# Árbol del commit, extraído con un índice temporal (no toca el índice ni la copia)
+extract_tree() {
+  local commit="$1" dir="$WORK/$1"
+  if [ ! -d "$dir/tree" ]; then
+    mkdir -p "$dir/tree"
+    GIT_INDEX_FILE="$dir/index" git read-tree "$commit"
+    GIT_INDEX_FILE="$dir/index" git checkout-index -a --prefix="$dir/tree/"
+  fi
+}
+
+# Gates 1, 2, 5 y 6: dependen solo del árbol
+tree_gates() {
+  local dir="$WORK/$1"
+  [ -f "$dir/tree-ok" ] && return 0
+  if [ "${#SCANS[@]}" -eq 0 ] && [ ! -f "$WORK/scan-warned" ]; then
+    echo >&2 "[pre-push] aviso: NEB_WORKSPACE sin scan de términos vetados — gate de PII omitido."
+    : > "$WORK/scan-warned"
+  fi
+
+  # ── Gate 1: integridad de la cadena de imports del arranque ───────────────
+  if ! "$PY" "$NEB_ROOT/bootstrap/assemble-startup.py" --check "$NEB_ROOT/general/startup.md" >/dev/null 2>"$dir/check_err"; then
+    fail "Cadena de imports del arranque ROTA — no publicar un kernel degradado." \
+         "$(head -5 "$dir/check_err" 2>/dev/null)" \
+         "Repara el import (rename/move sin actualizar startup.md) y reintenta."
+  fi
+
+  # ── Gate 2: términos vetados (extension point del overlay privado) ────────
+  local s
+  for s in ${SCANS[@]+"${SCANS[@]}"}; do
+    if ! bash "$s" "$NEB_ROOT" >"$dir/scan_out" 2>&1; then
       fail "Términos vetados detectados en el set público (PII/marcas)." \
-           "$(tail -8 /tmp/neb_scan_out 2>/dev/null)" \
+           "$(tail -8 "$dir/scan_out" 2>/dev/null)" \
            "Sanea los archivos señalados antes de publicar."
     fi
   done
-fi
-if [ "$SCAN_RAN" -eq 0 ]; then
-  echo >&2 "[pre-push] aviso: NEB_WORKSPACE sin scan de términos vetados — gate de PII omitido."
-fi
 
-# ── Gate 3: cambios normativos exigen fragment en el push ───────────────────
-NORMATIVE="$(printf '%s\n' "$PUSHED" | grep -vE "^${PREFIX}(changelog\.d/|CHANGELOG\.md$|research/)" || true)"
-HAS_FRAGMENT="$(printf '%s\n' "$PUSHED" | grep -E "^${PREFIX}changelog\.d/" || true)"
-if [ -n "$NORMATIVE" ] && [ -z "$HAS_FRAGMENT" ]; then
-  fail "Cambios normativos sin fragment de CHANGELOG en el push." \
-       "Archivos: $(printf '%s\n' "$NORMATIVE" | head -3 | tr '\n' ' ')..." \
-       "Crea changelog.d/<version>.md (bootstrap/bump-version.sh) y regenera el CHANGELOG."
-fi
-
-# ── Gate 4: sincronía CHANGELOG.md ↔ changelog.d/ ───────────────────────────
-if printf '%s\n' "$PUSHED" | grep -q "^${PREFIX}changelog\.d/"; then
-  if ! "$PY" "$NEB_ROOT/bootstrap/assemble-changelog.py" --check >/dev/null 2>&1; then
-    fail "CHANGELOG.md desactualizado respecto a changelog.d/." \
-         "Regenera y commitea antes del push:" \
-         "  py bootstrap/assemble-changelog.py && git add CHANGELOG.md && git commit -m 'docs: regenerar CHANGELOG'"
+  # ── Gate 5: plugin.json.version sincronizado con VERSION ───────────────────
+  # El manager compara el semver de plugin.json.version; si no coincide con VERSION
+  # (fuente de verdad del release), 'claude plugin update' reporta "already at latest"
+  # y ningún marketplace entrega el contenido nuevo. No publicar desincronizado.
+  local plugin_json="$NEB_ROOT/.claude-plugin/plugin.json" ver_src pj_ver
+  if [ -f "$NEB_ROOT/VERSION" ] && [ -f "$plugin_json" ]; then
+    ver_src="$(tr -d '[:space:]' < "$NEB_ROOT/VERSION")"
+    pj_ver="$("$PY" -c "import json,io,sys;print(json.load(io.open(sys.argv[1],encoding='utf-8')).get('version',''))" "$plugin_json" 2>/dev/null || echo '')"
+    if [ "$ver_src" != "$pj_ver" ]; then
+      fail "plugin.json.version ('$pj_ver') != VERSION ('$ver_src') — el plugin se publicaría desincronizado." \
+           "'claude plugin update' compara plugin.json.version; si no coincide con la versión publicada" \
+           "reporta 'already at latest' y ningún marketplace entrega el contenido nuevo." \
+           "Sincroniza con: bootstrap/bump-version.sh   (o edita .claude-plugin/plugin.json.version a $ver_src)"
+    fi
   fi
-fi
 
-# ── Gate 5: plugin.json.version sincronizado con VERSION ─────────────────────
-# El manager compara el semver de plugin.json.version; si no coincide con VERSION
-# (fuente de verdad del release), 'claude plugin update' reporta "already at latest"
-# y ningún marketplace entrega el contenido nuevo. No publicar desincronizado.
-PLUGIN_JSON="$NEB_ROOT/.claude-plugin/plugin.json"
-if [ -f "$NEB_ROOT/VERSION" ] && [ -f "$PLUGIN_JSON" ]; then
-  VER_SRC="$(tr -d '[:space:]' < "$NEB_ROOT/VERSION")"
-  PJ_VER="$("$PY" -c "import json,io,sys;print(json.load(io.open(sys.argv[1],encoding='utf-8')).get('version',''))" "$PLUGIN_JSON" 2>/dev/null || echo '')"
-  if [ "$VER_SRC" != "$PJ_VER" ]; then
-    fail "plugin.json.version ('$PJ_VER') != VERSION ('$VER_SRC') — el plugin se publicaría desincronizado." \
-         "'claude plugin update' compara plugin.json.version; si no coincide con la versión publicada" \
-         "reporta 'already at latest' y ningún marketplace entrega el contenido nuevo." \
-         "Sincroniza con: bootstrap/bump-version.sh   (o edita .claude-plugin/plugin.json.version a $VER_SRC)"
+  # ── Gate 6: el arranque del núcleo cabe en las partes del SessionStart ─────
+  # Mide el árbol del commit publicado (no NEB_HOME) con una raíz de instalación larga.
+  if ! "$PY" "$NEB_ROOT/bootstrap/neb-bootstrap-context.py" --check-size --root "$NEB_ROOT" >/dev/null 2>"$dir/size_err"; then
+    fail "El arranque del núcleo no cabe en las partes del hook SessionStart." \
+         "$(head -3 "$dir/size_err" 2>/dev/null)" \
+         "Lo que no cabe no llega completo a Claude (R1). Adelgaza el arranque o, con OK del dev," \
+         "sube MAX_PARTS en bootstrap/neb-bootstrap-context.py junto con las entradas de hooks/hooks.json" \
+         "y los textos que citan 12 y 8 partes (R1, hooks/README.md, docs/how-it-works.md)."
   fi
-fi
 
-# ── Gate 6: el arranque del núcleo cabe en las partes del SessionStart ───────
-# Mide el working tree del clon ($NEB_ROOT, no NEB_HOME) con una raíz de instalación larga.
-if ! "$PY" "$NEB_ROOT/bootstrap/neb-bootstrap-context.py" --check-size --root "$NEB_ROOT" >/dev/null 2>/tmp/neb_size_err; then
-  fail "El arranque del núcleo no cabe en las partes del hook SessionStart." \
-       "$(cat /tmp/neb_size_err 2>/dev/null | head -3)" \
-       "Lo que no cabe no llega completo a Claude (R1). Adelgaza el arranque o, con OK del dev," \
-       "sube MAX_PARTS en bootstrap/neb-bootstrap-context.py junto con las entradas de hooks/hooks.json" \
-       "y los textos que citan 12 y 8 partes (R1, hooks/README.md, docs/how-it-works.md)."
-fi
+  : > "$dir/tree-ok"
+}
+
+for REF in "${REFS[@]}"; do
+  read -r LREF LSHA RREF RSHA <<<"$REF"
+  if ! COMMIT="$(git rev-parse --verify -q "${LSHA}^{commit}")"; then
+    echo >&2 "[pre-push] aviso: $RREF no apunta a un commit ($LSHA) — sin gates."
+    continue
+  fi
+  CUR="$RREF @ $(git rev-parse --short "$COMMIT")"
+
+  PUSHED="$(pushed_files "$COMMIT" "$RSHA")" || fail "No se pudo calcular qué archivos publica la ref (git diff/log falló)."
+  [ -z "$PUSHED" ] && continue
+
+  extract_tree "$COMMIT"
+  TREE="$WORK/$COMMIT/tree"
+  # Auto-detectar si neb vive como subtree (layout histórico) o en la raíz del repo
+  if [ -d "$TREE/neb/changelog.d" ]; then
+    NEB_ROOT="$TREE/neb"
+    PREFIX="neb/"
+  else
+    NEB_ROOT="$TREE"
+    PREFIX=""
+  fi
+
+  tree_gates "$COMMIT"
+
+  # ── Gate 3: cambios normativos exigen fragment en el push ──────────────────
+  NORMATIVE="$(printf '%s\n' "$PUSHED" | grep -vE "^${PREFIX}(changelog\.d/|CHANGELOG\.md$|research/)" || true)"
+  HAS_FRAGMENT="$(printf '%s\n' "$PUSHED" | grep -E "^${PREFIX}changelog\.d/" || true)"
+  if [ -n "$NORMATIVE" ] && [ -z "$HAS_FRAGMENT" ]; then
+    fail "Cambios normativos sin fragment de CHANGELOG en el push." \
+         "Archivos: $(printf '%s\n' "$NORMATIVE" | head -3 | tr '\n' ' ')..." \
+         "Crea changelog.d/<version>.md (bootstrap/bump-version.sh) y regenera el CHANGELOG."
+  fi
+
+  # ── Gate 4: sincronía CHANGELOG.md ↔ changelog.d/ ─────────────────────────
+  if [ -n "$HAS_FRAGMENT" ]; then
+    if ! "$PY" "$NEB_ROOT/bootstrap/assemble-changelog.py" --check >/dev/null 2>&1; then
+      fail "CHANGELOG.md desactualizado respecto a changelog.d/ en el commit publicado." \
+           "Lo regenerado sin commitear no cuenta. Regenera y commitea antes del push:" \
+           "  py bootstrap/assemble-changelog.py && git add CHANGELOG.md && git commit -m 'docs: regenerar CHANGELOG'"
+    fi
+  fi
+done
 
 exit 0

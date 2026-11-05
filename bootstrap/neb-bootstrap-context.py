@@ -314,7 +314,7 @@ def _overflow_notice(blocks, missing_from, rest):
 def _check_size(root):
     """Gate 6 del pre-push: el arranque del nucleo de root cabe en NUCLEUS_MAX_PARTS partes.
 
-    Mide el working tree del clon en root (no NEB_HOME ni NEB_WORKSPACE, sin los guards del hook) y simula
+    Mide el arbol en root, que el pre-push extrae del commit publicado (no NEB_HOME ni NEB_WORKSPACE, sin los guards del hook) y simula
     una raiz de instalacion de LONG_ROOT caracteres, porque el ensamblador reescribe los enlaces a absolutos."""
     _utf8_stdout()
     if not root or not os.path.isfile(os.path.join(root, 'general', 'startup.md')):
