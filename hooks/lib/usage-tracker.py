@@ -128,8 +128,9 @@ _active_cache = {}
 
 def req_of_path(file_path):
     """Slug del REQ al que pertenece un archivo editado, o None. El change MD da el slug por su nombre; un
-    active_*.md, por la primera ruta `changes/AAAA-MM-DD-<slug>.md` que cite (el campo varía entre
-    plantillas) o, si no cita ninguna o ya no existe, por su nombre de archivo."""
+    active_*.md, por la ruta `changes/AAAA-MM-DD-<slug>.md` de su campo `Draft changes MD` o `Change MD`
+    (el nombre varía entre plantillas); si no la tiene, por la primera que cite; si no cita ninguna o el
+    archivo ya no existe, por su nombre de archivo."""
     if not isinstance(file_path, str):
         return None
     m = CHANGE_RE.search(file_path)
