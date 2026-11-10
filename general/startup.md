@@ -6,6 +6,7 @@ Punto de entrada de la metodología. Reúne vía `@import` las reglas operativas
 @correspondence.md
 @profile-detection.md
 @../process/phase-transitions.md
+@compaction.md
 @onboarding.md
 @../workflow/index.md
 

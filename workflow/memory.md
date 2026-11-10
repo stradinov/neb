@@ -20,7 +20,7 @@ Estructura del contexto duradero: ver [`templates/project-memory.md.template`](.
 
 ## Requerimientos activos
 
-Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estructura completa en [`templates/active-req.md.template`](../templates/active-req.md.template)). **Un archivo por REQ** — varios REQ del mismo proyecto coexisten sin pisarse. Es la **fuente de verdad** local del estado del REQ: la bitácora de relevo (`work`) y el hook PreCompact (que actualiza el draft del change MD) leen estos archivos. Campos canónicos:
+Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estructura completa en [`templates/active-req.md.template`](../templates/active-req.md.template)). **Un archivo por REQ** — varios REQ del mismo proyecto coexisten sin pisarse. Es la **fuente de verdad** local del estado del REQ: la bitácora de relevo (`work`) los lee, y tras compactar Claude recupera de aquí el estado ([`../general/compaction.md`](../general/compaction.md)). Campos canónicos:
 
 ```markdown
 - **Nombre:** <slug del requerimiento>
@@ -34,7 +34,7 @@ Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estru
 
 Un REQ está **bien-formado** (y entra a la bitácora) si tiene al menos `Nombre` y `Path del proyecto`. Se elimina el archivo completo al cerrar el REQ. `Path del proyecto` decide además si el REQ se publica al central: cuenta su primer path absoluto (puede llevar texto después) y el marcador del `CLAUDE.md` de ese repo — ver [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador".
 
-> **Compatibilidad:** los hooks aún leen el formato legacy (sección `## Requerimiento activo` dentro de `project_<nombre>.md`) durante la transición; si un REQ aparece en ambos formatos, gana el `active_*.md`. Migración natural: al próximo update del REQ, escribir el `active_*.md` y quitar la sección legacy.
+> **Compatibilidad:** la bitácora aún lee el formato legacy (sección `## Requerimiento activo` dentro de `project_<nombre>.md`) durante la transición; si un REQ aparece en ambos formatos, gana el `active_*.md`. Migración natural: al próximo update del REQ, escribir el `active_*.md` y quitar la sección legacy.
 
 ### "Pendiente de entrega" (dentro del `active_*.md`)
 

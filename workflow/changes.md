@@ -36,7 +36,7 @@ El MD se crea como draft al aprobar el plan y se completa durante la implementac
 
 El "plan resumido" del draft vive en [`templates/change.md.template`](../templates/change.md.template) § "Plan de elaboración" (tabla `Elemento | Cambio`) — es un **resumen**, no el plan literal. En complejidad media/alta el plan literal se persiste aparte en `~/.claude/approved-plans/` (ver [approved-plans.md](approved-plans.md)). Cuando la aprobación fue **conversacional** (sin plan mode), Claude llena el campo `**Plan aprobado:**` de la sección Trazabilidad con el path de ese archivo; en plan mode el path lo deja el hook. Direccionalidad completa: [traceability.md](traceability.md).
 
-Con `autoCompactEnabled: true`, un hook PreCompact actualiza el draft antes de cada compactación usando el `active_<proyecto>_<slug>.md` del REQ (o la sección legacy `## Requerimiento activo`; ver [memory.md](memory.md) y [hooks/README.md](../hooks/README.md)).
+El draft lo actualiza Claude en cada fase mayor completada (tabla de arriba); ningún hook lo reescribe. Lo que la compactación debe conservar del REQ, y de dónde se recupera el detalle después, lo fija [`../general/compaction.md`](../general/compaction.md).
 
 ## Incident MD
 

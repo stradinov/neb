@@ -4,6 +4,32 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.30.0] - 2026-11-09
+
+> **Minor**: la compactación se vuelve segura para topar el contexto. El arranque trae `general/compaction.md`, una sección `# Compact instructions` que le dice al resumen qué conservar de un REQ (registro, fase, OK dados y pendientes, decisiones con su motivo) y cómo recuperar el detalle tras compactar. La plantilla de settings del dev topa la compactación automática en 500k (`autoCompactWindow`, llave raíz), y se retiran sus dos hooks `PreCompact` legacy: desde 5.0.0 no encontraban el REQ de la sesión, y uno lanzaba un agente en cada compactación.
+>
+> - **Cambios de fuerza normativa** declarados (`methodology/principles.md` § "Declarar"):
+>   - **regla nueva** en el arranque (`general/compaction.md` § "Tras compactar"): el detalle se recupera del `active_*.md` y del change MD, del transcript solo con búsquedas puntuales; un OK que el resumen no registra se vuelve a pedir;
+>   - se **retira** el aviso de `autoCompactEnabled` al saludar (`general/communication.md` § "Pendientes en saludos y conversación trivial"): avisaba que el draft no se refrescaría, y ningún hook lo refresca ya;
+>   - el draft del change MD lo actualiza Claude en cada fase mayor (la regla ya existía en `workflow/changes.md`); se quita la mención al refresco por hook.
+> - **Por qué 500k**: simulación sobre 671 sesiones reales de 14 días, con el precio real de lectura de caché: −20 % del gasto del hilo principal en Opus 5.5 y −18 % en Fable 5.1, con ~360 compactaciones más. No incluye el costo de releer lo que el resumen pierda; `/neb-usage` mide las relecturas.
+> - **Por qué global y no por modelo**: los dos funcionan desde el archivo de settings (R23), pero el modelo en uso cambia (Fable 5.2 apareció el mismo día) y una lista por modelo se queda atrás. `[asumido]` un tope mayor que la ventana de un modelo no lo afecta: el único caso son los subprocesos de un turno con Haiku 4.5 (ventana de 200k) de `ops-capture` y `preprocess-prompt`.
+> - **Adoptantes**: copien `autoCompactWindow` de `templates/claude-user-settings.json.template` a su `~/.claude/settings.json` y quiten de ahí los `PreCompact` legacy (agente `auto` y guardia `manual`); el `PreCompact` de `logbook-sync` se queda.
+
+### Added
+- **`general/compaction.md`** (importado en `general/startup.md`, listado en `general/index.md`): `# Compact instructions` y § "Tras compactar".
+- **`methodology/platform-assumptions.md`**: R22 (la sección llega al resumen desde el arranque, verificada con canario) y R23 (`autoCompactWindow`: a qué contexto compacta y desde dónde se aplica), las dos verificadas.
+
+### Changed
+- **`templates/claude-user-settings.json.template`**: `autoCompactWindow: 500000`; sin `hooks`.
+- **`hooks/README.md`**: § "PreCompact legacy (retirados en 6.30.0)" en lugar de § "PreCompact: preservar estado antes de compactar"; el ejemplo de `"shell": "powershell"` apunta a `logbook-sync.ps1`.
+- **`workflow/changes.md`** § "Ciclo de vida del draft", **`workflow/memory.md`** § "Requerimientos activos" y **`templates/active-req.md.template`**: sin el refresco del draft por hook.
+- **`general/communication.md`**: sin el aviso de `autoCompactEnabled` ni la viñeta de Delegaciones sobre el refresco del draft.
+
+### Removed
+- **`methodology/platform-assumptions.md`** R3, sin consumidores (§ "Filas retiradas").
+- Los hooks `PreCompact` `auto` (agente) y `manual` (guardia de `/compact`) de `templates/claude-user-settings.json.template`.
+
 ## [6.29.0] - 2026-11-09
 
 > **Minor**: el gasto de tokens se mide por REQ, con los subagentes y los precios de los modelos 5.x, con el comando nuevo `/neb-usage`. El hook `Stop` `usage-tracker` se retira: leía `model` y `usage` fuera de `message` (registraba ceros), contaba de 3 a 5 veces cada llamada, no veía a los subagentes y atribuía el turno al `active_*.md` modificado más recientemente.

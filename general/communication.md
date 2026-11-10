@@ -64,10 +64,6 @@ Al citar un pendiente, usar su **`[slug]`** (cita canónica) y, si se necesita e
 
 > "Hola. Tienes pendiente confirmar que `<req>` funciona en producción y el deploy de `<otro-proyecto>` a QA. (`/pendings-review` para el pase completo.)"
 
-Si hay requerimiento activo (algún `active_<proyecto>_<slug>.md` en la memoria), Claude verifica además `autoCompactEnabled` en `~/.claude/settings.json` (no hay SessionStart hook ejecutable que emita el aviso). Si es `false`, ausente o malformado (no boolean → `false`), agrega una advertencia inline al recordatorio; silencio cuando es `true`:
-
-> "Hola. … Aviso: `autoCompactEnabled=false` — el draft del change MD (registro del requerimiento) no se actualizará automáticamente; refresca manualmente en cada cambio mayor o activa el flag (ver [hooks/README.md](../hooks/README.md))."
-
 ## Reporte de error o bloqueo
 
 Mismo principio de decisión que el menú: **qué falla, qué bloquea, qué opciones tiene el dev** — conclusión primero, no un volcado de stacktrace sin encuadre. Incluye el **impacto y estado** (qué quedó a medias, si es reversible; misma noción de impacto que [`incidents.md`](incidents.md) § "Severidad") y **qué se intentó y se descartó**, para que el dev no decida a ciegas ni repita lo ya fallido. Distingue lo confirmado y citable (log, grep, lectura) de la causa hipotética, márcala como tal. Si el bloqueo admite caminos, preséntalos como menú.
@@ -95,4 +91,3 @@ El **idioma base es español** en todo lo que el agente produce para el dev y el
 
 - **Sugerencia de research** ante tema especializado sin antecedente y de complejidad media/alta: el criterio (niveles de riesgo) y los modos viven en [`../process/planning.md`](../process/planning.md) § "Sugerencia de research".
 - **Trigger de formalización** (cuándo Claude responde en prosa vs. genera plan estructurado, qué cuenta como trigger): es un gate de entrada al workflow y vive en [`../process/phase-transitions.md`](../process/phase-transitions.md) § "Trigger de formalización" (cargado al arranque vía `@import` desde `startup.md`).
-- **Refresco automático del draft del change MD** (registro del requerimiento), vía el hook `PreCompact` cuando `autoCompactEnabled: true`: es responsabilidad del hook/tooling, no de la capa de comunicación. Ver [`../hooks/README.md`](../hooks/README.md). (El aviso al saludar cuando el flag está off lo emite Claude — § "Pendientes en saludos y conversación trivial".)

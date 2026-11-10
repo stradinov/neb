@@ -12,6 +12,7 @@ Transversales **inyectadas al arranque** (vía [`startup.md`](startup.md), compl
 - [Correspondence](correspondence.md) — correos a terceros: estructura a la medida del destinatario, formato HTML, idioma y registro.
 - [Profile detection](profile-detection.md) — detección del profile al iniciar y profile activo durante la sesión.
 - [Phase transitions](../process/phase-transitions.md) — enrutamiento del workflow: trigger de formalización, anti-desviación, mapa de fases, gates de cola, conflictos normativos.
+- [Compaction](compaction.md) — qué conserva el resumen al compactar y cómo se recupera el detalle después.
 - [Onboarding](onboarding.md) — oferta del recorrido `/wakeup`.
 - [Workflow index](../workflow/index.md) — mapa de artefactos + ENUM de estados.
 

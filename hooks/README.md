@@ -13,37 +13,11 @@ Hooks de Neb. El plugin registra en `hooks/hooks.json` el `SessionStart` y los h
 - **Bajo el plugin**: lo corre `hooks/lib/approved_plan.py` (Python, sin `jq`). El slug es ASCII completo (`ñ` → `n`, símbolos → `-`).
 - **Entrada de settings con clon** (`save-approved-plan.sh`): requiere `bash`, `jq`, `iconv` y `NEB_HOME` apuntando al clon. En Git Bash, `iconv //TRANSLIT` trunca el slug en el primer carácter no ASCII.
 
-### PreCompact: preservar estado antes de compactar
+### PreCompact legacy (retirados en 6.30.0)
 
-Dos hooks en `~/.claude/settings.json` (config **personal del dev**) que preservan el estado de un requerimiento activo antes de que `autoCompactEnabled: true` borre el plan aprobado y el avance.
+La plantilla de settings del dev traía dos hooks `PreCompact`: un agente (`matcher: "auto"`) que copiaba el estado del REQ activo al draft del change MD antes de compactar, y una guardia (`matcher: "manual"`) que frenaba `/compact` si el draft tenía más de 15 minutos sin cambios. Desde 5.0.0 buscaban el formato legacy (`## Requerimiento activo` en `project_*.md`) y no los `active_*.md`, así que no encontraban el REQ de la sesión, y el agente se lanzaba en cada compactación automática. Se retiraron: el estado del REQ sobrevive a la compactación porque vive en su `active_*.md`, `logbook-sync` lo captura en `PreCompact`, el arranque se reinyecta y [`general/compaction.md`](../general/compaction.md) le dice al resumen qué conservar. El draft lo actualiza Claude en cada transición de fase ([`workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft").
 
-**Fuente de verdad**: los `active_<proyecto>_<slug>.md` del dir de memoria (o la sección legacy `## Requerimiento activo` en `project_<nombre>.md`). Si no hay ninguno, los hooks no hacen nada.
-
-Se configuran una vez en `~/.claude/settings.json` del dev — no requieren activación por proyecto. Variantes en [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
-
-> **Failsafe del flag**: si `autoCompactEnabled` es `false` o ausente, el hook `auto` no dispara y el draft envejece silenciosamente. La verificación al inicio de sesión vive en [`general/communication.md`](../general/communication.md) § "Pendientes en saludos y conversación trivial" — Claude advierte al saludar si hay requerimiento activo. No hay SessionStart hook ejecutable (Claude lo verifica al leer settings.json).
-
-#### `matcher: "auto"` — agente silencioso
-
-Tipo `agent`. Antes de cada auto-compactación:
-1. Localiza `~/.claude/projects/<project-id>/memory/`.
-2. Busca los `active_*.md` (o `project_*.md` con sección legacy `## Requerimiento activo`).
-3. Por cada REQ activo extrae: Path del proyecto, Draft changes MD, Estado, Plan resumido, Archivos modificados, Próximos pasos.
-4. Actualiza (o crea) `<Path del proyecto>/<Draft changes MD>` con esa información.
-
-Independiente del OS (es un agente Claude, no un comando shell).
-
-#### `matcher: "manual"` — guardia para `/compact` explícito
-
-Tipo `command`. Bloquea `/compact` si hay un REQ activo (`active_*.md` o sección legacy) y el draft no fue modificado en los últimos 15 minutos. Si el draft es reciente o no hay requerimiento activo, permite.
-
-UX: el dev ve el bloqueo, actualiza el draft (cualquier cambio renueva el timestamp), re-ejecuta `/compact`.
-
-Depende del OS:
-- **Windows**: PowerShell (`shell: "powershell"`).
-- **Linux/Mac**: bash con `grep`, `stat`.
-
-Implementaciones en [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
+Si tu `~/.claude/settings.json` todavía los tiene, quítalos; el `PreCompact` de `logbook-sync` se queda.
 
 ### Medidor de uso (`/neb-usage`) — antes hook `usage-tracker`
 
@@ -202,4 +176,4 @@ Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` regi
 - Rápidos: si tardan más de 100ms, mover a proceso async. **Excepción documentada**: `preprocess-prompt.py` opera entre 13–25 s porque invoca `claude -p` (Haiku) — la naturaleza de la corrección lo justifica. Es de activación voluntaria y personal: no afecta a devs que no lo activen.
 - Defensivos: ante error, `exit 0` y registrar a stderr — un hook no bloquea al usuario.
 - Sin secretos: nunca leer/escribir credenciales.
-- **Cross-OS**: un solo comando en Git Bash o `sh` (§ "Bajo el plugin de Neb"); `python` corre en Windows y `python3` en Linux/Mac modernos. El problema de stdin de neb v2.23.2 venía de `cmd /c py "%VAR%\..."`, que no propaga el stdin al script. Para una entrada propia de PowerShell en settings sigue sirviendo `"shell": "powershell"` con `$env:VAR`, como el `PreCompact` `manual` de [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
+- **Cross-OS**: un solo comando en Git Bash o `sh` (§ "Bajo el plugin de Neb"); `python` corre en Windows y `python3` en Linux/Mac modernos. El problema de stdin de neb v2.23.2 venía de `cmd /c py "%VAR%\..."`, que no propaga el stdin al script. Para una entrada propia de PowerShell en settings sigue sirviendo `"shell": "powershell"` con `$env:VAR`, como la de `logbook-sync.ps1` (§ "logbook-sync").
