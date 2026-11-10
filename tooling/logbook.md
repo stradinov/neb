@@ -24,7 +24,7 @@ Recurso del hook que alimenta la [bitácora de relevo](../workflow/logbook.md). 
 ## Captura (hook `logbook-sync`)
 
 - Eventos: **`Stop`** (cada turno) + **`SessionEnd`** (cierre graceful) + **`PreCompact`** (antes de compactar).
-- Deriva el estado del **REQ activo** de la memoria del proyecto (mismo lookup que `usage-tracker`); si no hay REQ → registra **sesión exploratoria** liviana (para `--resume` local).
+- Deriva el estado del **REQ activo** de la memoria del proyecto (`find_active_reqs` de `hooks/lib/_db_shared.py`); si no hay REQ → registra **sesión exploratoria** liviana (para `--resume` local).
 - Guarda estado + `transcript_path` localmente. Si el entorno es compartido, la captura lanza un **sync detached** (`logbook.py sync`, best-effort) que drena el outbox y sube el **transcript incremental**: envía el tramo crudo del `.jsonl` (`content`, con las salidas de herramientas) y `text_plain` (sin `tool_result` ni líneas estructurales — lo que se indexa para búsqueda). Qué conserva el servidor de `content` lo define el repositorio del backend central.
   - **Cursor por sesión** (`session_sync`, desde 6.12): una fila por sesión, atribuida a un solo work. La atribución prefiere uno publicado, con opt-in y sin conflicto, y se fija al crear la fila (se reasigna si una captura posterior trae uno mejor). Como el cursor no depende del work, una sesión que otra pisa en los REQ activos del mismo directorio sigue subiendo, y una sesión que toca varios REQ sube una sola vez. Vive en SQLite y avanza solo con un `200`, sin bajar nunca.
   - **Un sync a la vez** por máquina.

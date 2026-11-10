@@ -116,8 +116,16 @@ def _env_notices(bootstrap_dir):
                             'neb_hook')
         invalid = hook.invalid_tokens()
         names = ', '.join('`%s`' % n for n in hook.HOOKS)
+        retired_map = getattr(hook, 'RETIRED', {})
     except Exception:  # noqa: BLE001 — el aviso es accesorio; el arranque no se rompe por el
-        invalid = []
+        invalid, retired_map = [], {}
+    retired = [(v, t) for v, t in invalid if t in retired_map]
+    invalid = [(v, t) for v, t in invalid if t not in retired_map]
+    if retired:
+        notices.append(
+            "Hooks opcionales retirados que siguen activados y ya no corren: %s. Ofrece al dev quitarlos de la "
+            "variable (con su OK)." % ', '.join('`%s` en `%s` (retirado en %s)' % (t, v, retired_map[t])
+                                                   for v, t in retired))
     if invalid:
         notices.append(
             "Valores que el gate de los hooks opcionales no reconoce, y que por eso no corren: %s. "

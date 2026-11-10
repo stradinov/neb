@@ -1,5 +1,5 @@
 {
   "env": {
-    "NEB_PROJECT_HOOKS": "save-approved-plan,usage-tracker,logbook-sync,ops-capture"
+    "NEB_PROJECT_HOOKS": "save-approved-plan,logbook-sync,ops-capture"
   }
 }

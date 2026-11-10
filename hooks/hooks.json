@@ -178,10 +178,6 @@
         "hooks": [
           {
             "type": "command",
-            "command": "case \",$NEB_HOOKS,$NEB_PROJECT_HOOKS,\" in *,usage-tracker,*) python \"${CLAUDE_PLUGIN_ROOT}/hooks/neb-hook.py\" usage-tracker || python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/neb-hook.py\" usage-tracker ;; esac"
-          },
-          {
-            "type": "command",
             "command": "case \",$NEB_HOOKS,$NEB_PROJECT_HOOKS,\" in *,logbook-sync,*) python \"${CLAUDE_PLUGIN_ROOT}/hooks/neb-hook.py\" logbook-sync || python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/neb-hook.py\" logbook-sync ;; esac"
           },
           {

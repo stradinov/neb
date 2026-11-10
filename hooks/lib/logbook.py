@@ -258,7 +258,7 @@ def _event(con, work_id, dev, machine, action, prev_owner=None, note=None):
 
 # ----------------------------------------------------------------------- memoria
 # find_active_reqs (plural, soporta N REQ activos) y el parser _field viven ahora en
-# _db_shared.py — fuente única compartida con usage-tracker.py (antes había 2 copias).
+# _db_shared.py — fuente única (antes había 2 copias); usage-tracker.py ya no la usa desde 6.29.0.
 
 
 def _first_user_prompt(jsonl_path, limit=120):

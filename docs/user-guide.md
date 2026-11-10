@@ -100,7 +100,7 @@ Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque
 { "env": { "NEB_HOOKS": "logbook-sync" } }
 ```
 
-Con eso aplica a todos tus proyectos, desde la siguiente sesión. Para activarlo solo en un proyecto para todo el equipo, usa `NEB_PROJECT_HOOKS` en su `.claude/settings.json` versionado. Corre con el código del plugin instalado, sin `NEB_HOME`. En Windows requiere Git Bash (Git for Windows). Los demás hooks opcionales (`usage-tracker`, `save-approved-plan`, `notify-on-stop`, `notify-on-permission`, `ops-capture`, `preprocess-prompt`) se activan igual: ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb". Si tu `settings.json` todavía invoca hooks desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esas entradas al activarlos, o correrán dos veces.
+Con eso aplica a todos tus proyectos, desde la siguiente sesión. Para activarlo solo en un proyecto para todo el equipo, usa `NEB_PROJECT_HOOKS` en su `.claude/settings.json` versionado. Corre con el código del plugin instalado, sin `NEB_HOME`. En Windows requiere Git Bash (Git for Windows). Los demás hooks opcionales (`save-approved-plan`, `notify-on-stop`, `notify-on-permission`, `ops-capture`, `preprocess-prompt`) se activan igual: ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb". Si tu `settings.json` todavía invoca hooks desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esas entradas al activarlos, o correrán dos veces.
 
 El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
 

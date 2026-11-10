@@ -256,7 +256,7 @@ class TestResolveMemoryDir(unittest.TestCase):
         self.assertEqual(_db_shared.resolve_memory_dir(self.home, "", self.encoded), self.default)
 
     def test_user_scope_ignored_without_cwd_for_project(self):
-        """Sin cwd (caso usage-tracker), solo user scope; project/local no se leen."""
+        """Sin cwd, solo user scope; project/local no se leen."""
         self._settings("project", os.path.join(self.tmp, "p"))
         self._settings("user", os.path.join(self.tmp, "u"))
         # cwd="" → no mira project/local → gana user

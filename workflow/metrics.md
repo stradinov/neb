@@ -57,7 +57,7 @@ Señales que aparecen en el **Reporte de cierre** al finalizar un REQ. No tienen
 
 ### Criterios de admisión
 
-Una señal debe pasar todos los criterios para entrar con interpretación sugerida. Pasar 2–3 la admite como dato crudo sin interpretación. Pasar < 2 descarta la señal.
+Una señal debe pasar todos los criterios para entrar con interpretación sugerida. Pasar 2–4 la admite como dato crudo sin interpretación. Pasar < 2 descarta la señal.
 
 | # | Criterio | Qué exige |
 |---|---|---|
@@ -72,6 +72,9 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 | Señal | Criterios | Veredicto | Razón de exclusión (si aplica) |
 |---|---|---|---|
 | **Tokens + costo + breakdown por modelo** | 5/5 | ✅ Dato informativo (con interpretación) | — |
+| **Costo por tipo de agente** (hilo principal / cada `agentType` de subagente) | 5/5 | ✅ Dato informativo (con interpretación) | — |
+| % de llamadas del hilo principal con más de 300k de contexto (y mediana) | 4/5 | ⚪ Dato crudo | Falla 4: depende del tope de compactación configurado (`autoCompactWindow`), externo al REQ |
+| Compactaciones y relecturas del transcript tras compactar | 3/5 | ⚪ Dato crudo | Fallan 3 y 4: dependen del tope configurado y no sugieren por sí solas qué aprender; sirven para verificar un cambio de tope |
 | Tiempo wall-clock | 2/5 | ❌ No admitida | Ruido por tools lentas; no atribuible a fases; varía con modelo |
 | Líneas de código netas | 2/5 | ❌ No admitida | No comparable cross-profile; no atribuible; refactors la distorsionan |
 | Conteo de commits | 1/5 | ❌ No admitida | No correlaciona con calidad; no atribuible |
@@ -85,16 +88,22 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 1. Tokens y USD son unidades comparables entre cualquier REQ y profile.
 2. Se cruza con complejidad estimada/real, fase, y modelo activo — permite detectar calibración rota.
 3. Interpreta directamente: si un REQ de complejidad "baja" costó como "media", el dev recalibra su criterio.
-4. Tokens son estables — no los afecta la velocidad del sistema, el modelo usado, ni los reinicios de sesión.
+4. La lectura de caché y la salida no las afecta la velocidad del sistema ni la de las herramientas. La escritura de caché sí sube con los reinicios y las pausas largas, por eso el bloque la da aparte: el criterio se cumple sobre cada componente por separado, no sobre la suma.
 5. Cross-REQs permite separar dos señales: evolución de Claude (mismo modelo, metodología mejoró → costo baja) y evolución del modelo (mismo tipo de REQ → ¿Opus 4.7 es más eficiente que 4.6?).
 
-**Captura:** hook `Stop` `usage-tracker` (`hooks/lib/usage-tracker.py`) actualiza automáticamente la sección "Reporte de cierre" del draft del change MD al cierre de cada turno. Requiere al menos un `active_<proyecto>_<slug>.md` (o sección legacy `## Requerimiento activo`); con varios REQ activos, atribuye el costo del turno al de modificación más reciente.
+**Captura:** al completar el Reporte de cierre, Claude corre `/neb-usage --write <change MD>` ([`commands/neb-usage.md`](../commands/neb-usage.md)), que escribe el bloque de uso entre los marcadores del change MD. Lee los transcripts del hilo principal y de los subagentes, una llamada por `message.id`. Atribuye cada llamada al último registro del REQ (change MD o `active_*.md`) que editó la sesión; los subagentes, por la hora de su llamada. Detalle: [`hooks/README.md`](../hooks/README.md) § "Medidor de uso (`/neb-usage`) — antes hook `usage-tracker`".
 
-**Breakdown por modelo:** el JSONL de la sesión registra el campo `model` en cada entry de tipo `assistant`. El hook agrupa tokens y costo por modelo en la misma invocación — soporta cambio de modelo mid-sesión (`/model`).
+**Breakdown por modelo y por agente:** el transcript registra `message.model` en cada llamada (supuesto R21 de [`../methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)); el reporte agrupa tokens y costo por modelo, lo que cubre el cambio de modelo a media sesión (`/model`), y por tipo de agente.
 
-**Pricing:** tabla manual en `hooks/pricing.yml`. Actualizar cuando Anthropic publique nuevo modelo o cambie precios.
+**Pricing:** tabla manual en `hooks/pricing.yml`, a precio de API (no el consumo de una suscripción). Actualizar cuando Anthropic publique nuevo modelo o cambie precios.
 
 **Revisión:** entra a la revisión agregada (`improvement.md §Revisión agregada`). Si en 10 REQs consecutivos el dato no aporta aprendizaje reportado, proponer revisión.
+
+### Costo por tipo de agente
+
+**Por qué pasa los 5 criterios:** se mide en las mismas unidades que el total (1); se cruza con la fase y con el gate que invocó al revisor (2); muestra qué parte del REQ gastaron los subagentes y cuál de ellos (3); se lee por componente, como el total (4); y en la revisión agregada separa el costo de los revisores de gate del de los subagentes de trabajo (5).
+
+**Qué aprender:** un revisor que gasta mucho para un informe corto pide un briefing con extractos y rutas exactas ([`../process/plan-review.md`](../process/plan-review.md) § "Plantilla de briefing para subagentes"); un subagente de trabajo caro es candidato a otro modelo, que en un gate pide OK del dev (supuesto R20 de [`../methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)).
 
 ### Loop pedagógico en la revisión agregada
 

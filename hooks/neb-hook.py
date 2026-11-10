@@ -16,7 +16,6 @@ Defensivo: ante cualquier falla, exit 0 — un hook no bloquea la sesión.
 """
 import json
 import os
-import re
 import subprocess
 import sys
 
@@ -36,12 +35,15 @@ except ImportError:
 # Hook → evento(s) donde hooks/hooks.json lo registra. test_hooks_json.py verifica que coincidan.
 HOOKS = {
     "save-approved-plan":   ("PostToolUse",),
-    "usage-tracker":        ("Stop",),
     "logbook-sync":         ("Stop", "SessionEnd", "PreCompact"),
     "notify-on-stop":       ("Stop",),
     "notify-on-permission": ("Notification",),
     "ops-capture":          ("SessionEnd",),
     "preprocess-prompt":    ("UserPromptSubmit",),
+}
+# Hooks retirados → versión y qué los reemplaza (el arranque avisa si siguen en las variables).
+RETIRED = {
+    "usage-tracker": "6.29.0; el uso se mide al cerrar con `/neb-usage`",
 }
 ENV_VARS = ("NEB_HOOKS", "NEB_PROJECT_HOOKS")
 IS_WINDOWS = os.name == "nt"
@@ -118,16 +120,6 @@ def _spawn_detached(hook, argv, payload):
     return None
 
 
-def _encoded_project_dir(event):
-    """Nombre del directorio del proyecto en ~/.claude/projects: el padre de transcript_path, que es
-    exacto (Claude Code convierte también `.`), o la codificación del cwd de usage-tracker.sh."""
-    parts = re.split(r"[/\\]", event.get("transcript_path") or "")
-    if len(parts) >= 3 and parts[-3] == "projects" and parts[-2]:
-        return parts[-2]
-    cwd = event.get("cwd") or ""
-    return cwd.replace(":", "-").replace("/", "-").replace("\\", "-")
-
-
 def dispatch(hook, payload, event, home):
     py = sys.executable
     if hook == "logbook-sync":
@@ -135,11 +127,6 @@ def dispatch(hook, payload, event, home):
         if sid and cwd:
             _run(hook, [py, os.path.join(LIB, "logbook.py"), sid, cwd, event.get("transcript_path") or "",
                   event.get("hook_event_name") or "", ROOT, home], payload, stderr=subprocess.DEVNULL)
-    elif hook == "usage-tracker":
-        sid, cwd = event.get("session_id") or "", event.get("cwd") or ""
-        if sid and cwd:
-            _run(hook, [py, os.path.join(LIB, "usage-tracker.py"), sid, _encoded_project_dir(event), ROOT, home],
-                 payload, stderr=subprocess.DEVNULL)
     elif hook == "save-approved-plan":
         import approved_plan
         approved_plan.save(event, home)

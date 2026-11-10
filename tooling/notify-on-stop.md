@@ -149,7 +149,7 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0`. Nunca bloquea la sesión.
 - **Cross-OS**: bajo el plugin, el hook corre en Git Bash en Windows y el dispatcher elige el `.ps1`; en macOS y Linux, el `.sh`. Una entrada de settings con clon declara `"shell": "powershell"` con `$env:VAR` en Windows.
 - **Linux/Mac**: `jq` es requisito blando — sin `jq`, el script cae a valores por defecto completos y solo puede emitir 1 chime de cortesía (no calcula duración).
-- **Múltiples hooks `Stop`**: Claude Code los ejecuta en paralelo; convive con otros hooks `Stop` del repo (p. ej. `usage-tracker`).
+- **Múltiples hooks `Stop`**: Claude Code los ejecuta en paralelo; convive con otros hooks `Stop` del repo (p. ej. `logbook-sync`).
 - **Coexistencia con `Notification`** (`notify-on-permission`): eventos semánticamente distintos. Si el dev activa ambos, suenan chimes en secuencia (permission → approve → tool corre → cierre de turno). Ver [`tooling/notify-on-permission.md`](notify-on-permission.md) § 5.
 - **Sin secretos**: no lee ni escribe credenciales.
 
@@ -182,7 +182,7 @@ Escenarios a probar tras activar:
 | 11 | Transcript inaccesible (path inválido en payload) | 1 chime de cortesía + `exit 0`. |
 | 12 | Linux/Mac sin player instalado | `exit 0` silencioso. |
 | 13 | Windows con WAV en path con espacios | Suena correctamente. |
-| 14 | Coexistencia con `usage-tracker` (otro hook `Stop`) | Ambos corren; ninguno bloquea al otro. |
+| 14 | Coexistencia con `logbook-sync` (otro hook `Stop`) | Ambos corren; ninguno bloquea al otro. |
 | 15 | Desactivación permanente (quitar `notify-on-stop` de `NEB_HOOKS` + reiniciar) | Sin chime. |
 
 Escenarios 1–4, 6, 9, 10, 13–15 corren en máquina Windows. Escenarios 12 (Linux/Mac sin player) quedan como verificación pendiente cuando otro dev del equipo lo active.

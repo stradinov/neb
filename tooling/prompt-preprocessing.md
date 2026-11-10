@@ -155,7 +155,6 @@ Umbral conservador a propósito: ante duda, pasa a Capa B (Haiku decide).
   - `preprocess-prompt.py` (`UserPromptSubmit`) — evita la auto-recursión (cascada de timeouts); fue el motivo original de la bandera.
   - `neb-bootstrap-context.py` (`SessionStart`) — **no inyecta el arranque**; sin esto el Haiku corrector recibe instrucciones de asistente + pendientes y **responde** la pregunta en vez de corregirla.
   - `hooks/neb-hook.py` (los hooks opcionales bajo el plugin) — no despacha ninguno en la subsesión.
-  - `usage-tracker.sh` (`Stop`, entrada de settings con clon) — no cuenta los tokens de la subsesión contra el REQ activo.
   - `logbook-sync.{sh,ps1}` (`Stop`/`SessionEnd`/`PreCompact`, entrada de settings con clon) — no escribe la subsesión a la bitácora.
   - `notify-on-stop` / `notify-on-permission` — evitan el "chime fantasma".
 

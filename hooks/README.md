@@ -45,24 +45,16 @@ Depende del OS:
 
 Implementaciones en [`templates/claude-user-settings.json.template`](../templates/claude-user-settings.json.template).
 
-### usage-tracker
+### Medidor de uso (`/neb-usage`) — antes hook `usage-tracker`
 
-`Stop` — dispara al cierre de cada turno de Claude. Acumula tokens y costo del turno en la sección **"Reporte de cierre"** del draft del change MD del REQ activo.
+No es un hook: es el CLI `hooks/lib/usage-tracker.py report` y el comando [`/neb-usage`](../commands/neb-usage.md). Lee los transcripts de `~/.claude/projects` y reporta tokens y USD a precio de API, por REQ o por ventana de días. El bloque de uso del change MD se escribe al cerrar el REQ con `/neb-usage --write <change MD>` ([`workflow/metrics.md`](../workflow/metrics.md) § "Tokens, costo y breakdown por modelo").
 
-- **Requiere**: Python (`py` / `python` / `python3`). La entrada de settings con clon (`usage-tracker.sh`) requiere además `bash` y `jq`.
-- **Directorio del proyecto**: bajo el plugin sale del padre de `transcript_path`, que es exacto. `usage-tracker.sh` lo deriva del cwd y no convierte `.` como Claude Code.
-- **Pricing**: `hooks/pricing.yml` — tabla manual. Actualizar cuando Anthropic publique nuevo modelo o cambie precios.
-- **Estado incremental**: `~/.claude/projects/<encoded-cwd>/<session-id>.usage-offset` y `.usage-state.json`. El hook procesa solo las líneas nuevas del JSONL desde la última invocación.
-- **Idempotente**: ejecutar dos veces sobre el mismo turno no duplica conteos — el offset file lo previene.
-- **REQ activo**: se localiza vía `find_active_reqs` (los `active_*.md`, o sección legacy `## Requerimiento activo` en `project_*.md`). Con varios REQ activos, atribuye el costo del turno al de modificación más reciente. Extrae `Path del proyecto` y `Draft changes MD` (mismo formato que PreCompact).
-- **Marcadores en el draft**: el hook reemplaza el bloque entre `<!-- usage-tracker-start -->` y `<!-- usage-tracker-end -->`. Si los marcadores no están presentes, el hook no modifica el draft.
-- **Edge cases**:
-  - Sin REQ activo → `exit 0` silencioso.
-  - Draft no existe → `exit 0`.
-  - Modelo sin entrada en `pricing.yml` → tokens se acumulan, costo se marca `—`; warning a stderr.
-  - Python no encontrado → warning a stderr, `exit 0`.
-  - Cualquier error → `exit 0` (no bloquea al dev).
-- **Subsesión interna del corrector**: si `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), `exit 0` antes de leer stdin — no cuenta los tokens del subproceso `claude -p` contra el REQ activo. Ver `hooks/lib/subsession.py`.
+- **Qué cuenta**: el hilo principal y los subagentes, incluidos los agentes de workflow, cada uno con su `agentType`. Cuenta una llamada por `message.id` y deduplica entre archivos (copias de `--resume` y forks); separa la escritura de caché de 5 min y de 1 h. El formato del transcript del que depende es el supuesto R21 de [`methodology/platform-assumptions.md`](../methodology/platform-assumptions.md).
+- **Atribución**: una llamada del hilo principal va al último REQ cuyo change MD o `active_*.md` editó la sesión hasta ese momento (`Write`/`Edit`); un `active_*.md` cuenta para el change MD de su campo `Draft changes MD` (o `Change MD`; si no, la primera ruta `changes/AAAA-MM-DD-<slug>.md` que cite) o, si no cita ninguno, para el slug de su nombre de archivo. Las llamadas previas al primer toque van al primer REQ tocado; una sesión sin toques queda «sin REQ». Una llamada de subagente va al REQ vigente en el hilo principal a su misma hora. Las ediciones hechas por Bash o desde un subagente no atribuyen.
+- **Señales**: % de llamadas del hilo principal con más de 300k de contexto (y la mediana), compactaciones por disparo y relecturas del transcript completo tras compactar.
+- **Precios**: `hooks/pricing.yml`, tabla manual; actualizarla cuando Anthropic publique un modelo o cambie un precio. Un modelo sin precio deja el total marcado como parcial.
+- **Escritura**: `--write` solo reemplaza lo que hay entre `<!-- usage-tracker-start -->` y `<!-- usage-tracker-end -->`; sin marcadores no escribe. No guarda estado propio.
+- **Retiro del hook (6.29.0)**: el hook `Stop` `usage-tracker` leía `model` y `usage` fuera de `message`, donde el transcript no los trae (registraba ceros), no deduplicaba y atribuía al `active_*.md` de mtime mayor. El nombre ya no corre desde `NEB_HOOKS` / `NEB_PROJECT_HOOKS`, y el arranque avisa que se retiró si sigue ahí (`RETIRED` en `hooks/neb-hook.py`).
 
 **Lógica completa**: `hooks/lib/usage-tracker.py`.
 
@@ -138,7 +130,7 @@ Implementaciones en [`templates/claude-user-settings.json.template`](../template
 - **Mecanismo genérico, dominio en el overlay**: el prompt de detección por defecto es genérico; el overlay lo especializa con `NEB_OPS_CAPTURE_PROMPT_FILE` (prompt con vocabulario de dominio) y `NEB_OPS_SIGNALS_EXTRA` (regex extra del gate). Modelo configurable con `NEB_OPS_CAPTURE_MODEL` (por defecto, Haiku).
 - **Defensivo**: ante cualquier falla (sin transcript, sin actividad operativa, sin CLI, timeout 120s) `exit 0` — nunca bloquea el cierre de sesión. El subagente tiene instrucción de **no volcar secretos** al inbox.
 - **Seguridad (decisión de diseño)**: el hook re-envía fragmentos del transcript a la API (vía `claude -p`) y **NO redacta/filtra secretos de entrada**. El transcript de la sesión ya pasó por la API durante la propia sesión (Claude Code), así que el hook no agrega exposición nueva. El manejo de credenciales es responsabilidad **operativa del equipo adoptante**, no del hook — por diseño, el skill no filtra contenido por seguridad.
-- **Activación voluntaria**: `ops-capture` en `NEB_HOOKS` o `NEB_PROJECT_HOOKS`, como `usage-tracker` y `logbook-sync`.
+- **Activación voluntaria**: `ops-capture` en `NEB_HOOKS` o `NEB_PROJECT_HOOKS`, como `logbook-sync`.
 - **Guard de subsesión interna**: si `NEB_INTERNAL_SUBSESSION=1` → no captura — evita capturar la subsesión Haiku del corrector y la propia recursión (invoca `claude -p`). Ver `hooks/lib/subsession.py`.
 - **Lógica completa**: `hooks/ops-capture.py` + `hooks/lib/ops_inbox.py`.
 
@@ -162,7 +154,7 @@ Encadena 6 gates:
 Con el plugin de Neb no se copian bloques de hooks: el plugin ya los registra (§ "Bajo el plugin de Neb"). Para activarlos en un proyecto, el `<proyecto>/.claude/settings.json` declara la lista en su `env`; [`templates/claude-settings.json.template`](../templates/claude-settings.json.template) y `settings.template.json` traen ejemplos:
 
 ```json
-{ "env": { "NEB_PROJECT_HOOKS": "save-approved-plan,usage-tracker" } }
+{ "env": { "NEB_PROJECT_HOOKS": "save-approved-plan,logbook-sync" } }
 ```
 
 > El script `link-into-project.sh` que generaba ese `settings.json` (modelo clone) fue eliminado en 3.0.0.
@@ -178,16 +170,16 @@ Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` regi
   - Si el arranque no cabe en las 12 partes, la parte 12 termina con un aviso: qué bloques faltan y de qué archivo leerlos.
   - Costo: cada sesión carga el arranque completo (unos 25–30 k tokens, estimado), y las 12 entradas suman entre 0.6 y 1 s al iniciar.
   - No consume stdin.
-- **Los hooks opcionales de este README**: `save-approved-plan`, `usage-tracker`, `logbook-sync`, `notify-on-stop`, `notify-on-permission`, `ops-capture` y `preprocess-prompt`. Hay una entrada por hook, y cada entrada abre con un gate en el shell. Si el hook no está activado, la entrada termina ahí, sin arrancar Python (~50 ms por entrada en Windows). Si está activado, llama a `hooks/neb-hook.py <hook>`. Ese dispatcher lee el JSON del evento y corre el hook con el código del propio plugin: la versión instalada, sin `NEB_HOME`.
+- **Los hooks opcionales de este README**: `save-approved-plan`, `logbook-sync`, `notify-on-stop`, `notify-on-permission`, `ops-capture` y `preprocess-prompt`. Hay una entrada por hook, y cada entrada abre con un gate en el shell. Si el hook no está activado, la entrada termina ahí, sin arrancar Python (~50 ms por entrada en Windows). Si está activado, llama a `hooks/neb-hook.py <hook>`. Ese dispatcher lee el JSON del evento y corre el hook con el código del propio plugin: la versión instalada, sin `NEB_HOME`.
 
 **Activación voluntaria**, con dos listas separadas por comas y sin espacios, que se suman:
 
 | Variable | Dónde va | Para qué |
 |---|---|---|
 | `NEB_HOOKS` | `env` de `~/.claude/settings.json` (todos tus proyectos) o del `settings.local.json` de un proyecto (ahí reemplaza tu lista de usuario: repite los que quieras conservar) | Tus hooks personales: `notify-*`, `preprocess-prompt`, `logbook-sync`… |
-| `NEB_PROJECT_HOOKS` | `env` del `.claude/settings.json` versionado del proyecto | Los que el proyecto activa para todo el equipo: `save-approved-plan`, `usage-tracker`… |
+| `NEB_PROJECT_HOOKS` | `env` del `.claude/settings.json` versionado del proyecto | Los que el proyecto activa para todo el equipo: `save-approved-plan`, `logbook-sync`… |
 
-- **El valor de proyecto sustituye al de usuario.** En el `env` de Claude Code, una misma variable del proyecto reemplaza a la del usuario. Por eso hay dos variables y el gate evalúa su unión: un proyecto que activa `usage-tracker` no apaga tus `notify-*`.
+- **El valor de proyecto sustituye al de usuario.** En el `env` de Claude Code, una misma variable del proyecto reemplaza a la del usuario. Por eso hay dos variables y el gate evalúa su unión: un proyecto que activa `save-approved-plan` no apaga tus `notify-*`.
 - **Para apagar en un proyecto**, redefine la variable en su `settings.local.json`: `"NEB_HOOKS": ""` apaga tus hooks personales ahí, y `"NEB_PROJECT_HOOKS": ""` te excluye de los que activa el proyecto. El marcador `<!-- neb: skip -->` apaga el arranque, no los hooks.
 - **Un cambio en estas variables** aplica desde la siguiente sesión.
 - **Avisos del arranque.** Avisa de un nombre desconocido o con espacios en las variables, de un arranque que no cupo en las 12 partes (en la parte 12) y de un `NEB_HOME` que apunte al caché del plugin. Esa variable la dejaba un `/wakeup` anterior a 6.14.3, y se ignora.

@@ -4,6 +4,40 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.29.0] - 2026-11-09
+
+> **Minor**: el gasto de tokens se mide por REQ, con los subagentes y los precios de los modelos 5.x, con el comando nuevo `/neb-usage`. El hook `Stop` `usage-tracker` se retira: leía `model` y `usage` fuera de `message` (registraba ceros), contaba de 3 a 5 veces cada llamada, no veía a los subagentes y atribuía el turno al `active_*.md` modificado más recientemente.
+>
+> - **Cambios de fuerza normativa** declarados (`methodology/principles.md` § "Declarar"):
+>   - **cambia el paso** del Reporte de cierre (`process/delivery.md` § "Antes de la entrega final", paso 3): el bloque de «Uso de API» lo llena Claude con `/neb-usage --write <change MD>` en vez de un hook en cada turno;
+>   - se **retira** el hook opcional `usage-tracker`: el nombre deja de correr desde `NEB_HOOKS` / `NEB_PROJECT_HOOKS`, y el arranque avisa que se retiró si sigue ahí;
+>   - se **admiten** tres señales nuevas en `workflow/metrics.md` § "Señales evaluadas": el costo por tipo de agente, con interpretación; el % de llamadas con más de 300k de contexto y las compactaciones con sus relecturas, como dato crudo;
+>   - se **precisa** la regla de admisión de `workflow/metrics.md` § "Criterios de admisión": una señal que pasa 4 de 5 criterios entra como dato crudo (antes la regla solo nombraba 2–3); y el criterio 4 del total de tokens se cumple por componente, porque la escritura de caché sí sube con reinicios y pausas.
+> - **SemVer**: el retiro de `usage-tracker` va en minor, no en major (el precedente de 4.6.0 difirió a un major el retiro de una bandera legacy), porque el hook no tenía uso funcional que romper: registraba ceros o múltiplos del gasto.
+> - **Adoptantes**: quiten `usage-tracker` de `NEB_HOOKS` / `NEB_PROJECT_HOOKS`. Los bloques de uso de los change MD cerrados antes de esta versión no son comparables (registraban ceros o múltiplos del gasto real).
+
+### Added
+- **`hooks/lib/usage-tracker.py report`** (reescrito) y **`commands/neb-usage.md`**:
+  - gasto por REQ (`--req`) o por ventana de días (`--days`), con `--write` para el bloque del change MD;
+  - el hilo principal y los subagentes, incluidos los agentes de workflow, por `agentType` y por modelo;
+  - una llamada por `message.id` con dedupe entre archivos, y escritura de caché de 5 min y de 1 h por separado;
+  - atribución por edición del registro del REQ en la sesión, y de cada subagente por la hora de su llamada;
+  - señales: % de llamadas con más de 300k, compactaciones y relecturas del transcript tras compactar.
+- **`hooks/tests/test_usage_tracker.py`**: 21 pruebas.
+- **`hooks/neb-hook.py`** `RETIRED` y su aviso propio en el arranque (`bootstrap/neb-bootstrap-context.py`), con prueba en `hooks/tests/test_neb_root.py`.
+- **`methodology/platform-assumptions.md`**: R21, el formato del transcript del que depende el medidor.
+
+### Changed
+- **`hooks/pricing.yml`**: modelos 5.x (Fable 5.1 y 5, Opus 5.5 y 5, Sonnet 5.5 y 5, Haiku 5.5 con su tramo de contexto largo), Opus 4.8 y 4.6, campo `cache_write_1h_per_mtok`; Opus 4.7 y Haiku 4.5 corregidos al precio vigente; Opus 4.5 y Sonnet 4.5, marcados sin verificar; el tramo largo de Haiku 5.5 sobre la caché, marcado `[asumido]`.
+- **`process/delivery.md`** § "Antes de la entrega final", paso 3: llenar el bloque de uso con `/neb-usage --write`.
+- **`workflow/metrics.md`**: § "Criterios de admisión" (4 de 5 = dato crudo); § "Señales evaluadas", con las señales nuevas; § "Tokens, costo y breakdown por modelo" (captura, desglose por agente, criterio 4); § "Costo por tipo de agente" nueva.
+- **`templates/change.md.template`** § Reporte de cierre: el bloque nuevo (marcadores intactos).
+- **`hooks/README.md`**: § "Medidor de uso (`/neb-usage`) — antes hook `usage-tracker`", y los ejemplos de activación sin `usage-tracker`.
+- **`hooks/settings.template.json`**, **`templates/claude-settings.json.template`**, **`docs/user-guide.md`**, **`tooling/logbook.md`**, **`tooling/notify-on-stop.md`**, **`tooling/prompt-preprocessing.md`**, **`hooks/lib/subsession.py`**, **`hooks/lib/logbook.py`** (comentario): sin `usage-tracker`.
+
+### Removed
+- Hook `Stop` `usage-tracker`: su entrada en `hooks/hooks.json`, su rama en `hooks/neb-hook.py` y `hooks/usage-tracker.sh`.
+
 ## [6.28.1] - 2026-11-05
 
 > **Patch**: R1 de `methodology/platform-assumptions.md` registra como verificado el arranque al iniciar y al compactar en sesiones interactivas de la app. En tres arranques y cuatro compactaciones (2.1.317, 2026-11-05), llegó completo en sus 9 partes, todas con la misma huella. Cierra la prueba de compactación del REQ que entregó el arranque en partes (6.21.0). `clear` sigue sin verificar.

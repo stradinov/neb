@@ -8,7 +8,6 @@ Stop, SessionEnd, Notification…) produciendo **efectos espurios**:
 - SessionStart (`neb-bootstrap-context.py`): inyecta el arranque de Neb → el
   corrector Haiku, con instrucciones de asistente + pendientes en contexto,
   **responde** la pregunta en vez de corregir ortografía.
-- Stop (`usage-tracker.sh`): cuenta los tokens de Haiku contra el REQ activo.
 - Stop/SessionEnd/PreCompact (`logbook-sync`): escribe la subsesión a la bitácora.
 - Stop/Notification (`notify-on-*`): "chime fantasma".
 

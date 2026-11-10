@@ -1,41 +1,122 @@
-# Pricing de modelos Anthropic — USD por millón de tokens (MTok)
-# Fuente: https://www.anthropic.com/pricing
-# Actualizar al publicar nuevo modelo o cuando Anthropic cambie precios.
-# Campos: input_per_mtok, output_per_mtok, cache_write_per_mtok, cache_read_per_mtok
-# Nombre de clave: model ID exacto que aparece en el campo "model" del JSONL de sesión.
+# Precios de los modelos de Anthropic — USD por millón de tokens (MTok), API de primera parte.
+# Fuente: tabla de modelos del skill `claude-api` (cacheada 2026-10-06) y https://www.anthropic.com/pricing.
+# Actualizar al publicarse un modelo o cambiar un precio. Clave = model ID exacto del campo `message.model`
+# del transcript.
+#
+# Campos:
+#   input_per_mtok, output_per_mtok
+#   cache_write_per_mtok      escritura de caché con TTL de 5 min (1.25× la entrada)
+#   cache_write_1h_per_mtok   escritura de caché con TTL de 1 h (2× la entrada)
+#   cache_read_per_mtok       lectura de caché (0.1× la entrada, salvo donde se indica)
+#   long_context_above_tokens / long_context_multiplier
+#                             tramo de contexto largo: con un prompt mayor al umbral, todo el costo se
+#                             multiplica (Haiku 5.5)
+# Sin un campo de caché, el tracker usa esos múltiplos de la entrada.
+# Los valores de caché salen de la regla general de la fuente (1.25× / 2× / ~0.1× la entrada), salvo las
+# excepciones que se anotan (Fable 5.1, Opus 5.5). [asumido] marca lo que la fuente no dice.
+
+claude-fable-5-1:
+  input_per_mtok: 10.00
+  output_per_mtok: 50.00
+  cache_write_per_mtok: 12.50
+  cache_write_1h_per_mtok: 20.00
+  cache_read_per_mtok: 0.25          # 0.025× la entrada
+
+claude-fable-5:
+  input_per_mtok: 10.00
+  output_per_mtok: 50.00
+  cache_write_per_mtok: 12.50
+  cache_write_1h_per_mtok: 20.00
+  cache_read_per_mtok: 1.00
+
+claude-opus-5-5:
+  input_per_mtok: 4.00
+  output_per_mtok: 20.00
+  cache_write_per_mtok: 5.00
+  cache_write_1h_per_mtok: 8.00
+  cache_read_per_mtok: 0.20          # 0.05× la entrada
+
+claude-opus-5:
+  input_per_mtok: 5.00
+  output_per_mtok: 25.00
+  cache_write_per_mtok: 6.25
+  cache_write_1h_per_mtok: 10.00
+  cache_read_per_mtok: 0.50
+
+claude-sonnet-5-5:
+  input_per_mtok: 2.00
+  output_per_mtok: 10.00
+  cache_write_per_mtok: 2.50
+  cache_write_1h_per_mtok: 4.00
+  cache_read_per_mtok: 0.20
+
+claude-sonnet-5:
+  input_per_mtok: 2.00
+  output_per_mtok: 10.00
+  cache_write_per_mtok: 2.50
+  cache_write_1h_per_mtok: 4.00
+  cache_read_per_mtok: 0.20
+
+claude-haiku-5-5:
+  input_per_mtok: 0.10
+  output_per_mtok: 0.50
+  cache_write_per_mtok: 0.125
+  cache_write_1h_per_mtok: 0.20
+  cache_read_per_mtok: 0.01
+  long_context_above_tokens: 100000  # arriba de 100k de prompt: $0.50 / $2.50 (fuente)
+  long_context_multiplier: 5         # [asumido] el tramo también multiplica la caché; umbral = entrada + caché
+
+claude-opus-4-8:
+  input_per_mtok: 5.00
+  output_per_mtok: 25.00
+  cache_write_per_mtok: 6.25
+  cache_write_1h_per_mtok: 10.00
+  cache_read_per_mtok: 0.50
 
 claude-opus-4-7:
-  input_per_mtok: 15.00
-  output_per_mtok: 75.00
-  cache_write_per_mtok: 18.75
-  cache_read_per_mtok: 1.50
+  input_per_mtok: 5.00
+  output_per_mtok: 25.00
+  cache_write_per_mtok: 6.25
+  cache_write_1h_per_mtok: 10.00
+  cache_read_per_mtok: 0.50
 
+claude-opus-4-6:
+  input_per_mtok: 5.00
+  output_per_mtok: 25.00
+  cache_write_per_mtok: 6.25
+  cache_write_1h_per_mtok: 10.00
+  cache_read_per_mtok: 0.50
+
+claude-sonnet-4-6:
+  input_per_mtok: 3.00
+  output_per_mtok: 15.00
+  cache_write_per_mtok: 3.75
+  cache_write_1h_per_mtok: 6.00
+  cache_read_per_mtok: 0.30
+
+claude-haiku-4-5:
+  input_per_mtok: 1.00
+  output_per_mtok: 5.00
+  cache_write_per_mtok: 1.25
+  cache_write_1h_per_mtok: 2.00
+  cache_read_per_mtok: 0.10
+
+claude-haiku-4-5-20251001:
+  input_per_mtok: 1.00
+  output_per_mtok: 5.00
+  cache_write_per_mtok: 1.25
+  cache_write_1h_per_mtok: 2.00
+  cache_read_per_mtok: 0.10
+
+# Sin verificar contra la fuente de arriba (no los lista): se conservan los valores anteriores.
 claude-opus-4-5:
   input_per_mtok: 15.00
   output_per_mtok: 75.00
   cache_write_per_mtok: 18.75
   cache_read_per_mtok: 1.50
 
-claude-sonnet-4-6:
-  input_per_mtok: 3.00
-  output_per_mtok: 15.00
-  cache_write_per_mtok: 3.75
-  cache_read_per_mtok: 0.30
-
 claude-sonnet-4-5:
   input_per_mtok: 3.00
   output_per_mtok: 15.00
   cache_write_per_mtok: 3.75
   cache_read_per_mtok: 0.30
-
-claude-haiku-4-5:
-  input_per_mtok: 0.80
-  output_per_mtok: 4.00
-  cache_write_per_mtok: 1.00
-  cache_read_per_mtok: 0.08
-
-claude-haiku-4-5-20251001:
-  input_per_mtok: 0.80
-  output_per_mtok: 4.00
-  cache_write_per_mtok: 1.00
-  cache_read_per_mtok: 0.08

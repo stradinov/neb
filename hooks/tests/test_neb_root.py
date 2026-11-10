@@ -126,12 +126,17 @@ class TestArranque(unittest.TestCase):
         self.assertNotIn("Aviso de Neb", head)
 
     def test_nombres_invalidos_avisan(self):
-        head = self._header(self._bootstrap(NEB_HOOKS="logbook-sync,Notify", NEB_PROJECT_HOOKS="usage-tracker"))
+        head = self._header(self._bootstrap(NEB_HOOKS="logbook-sync,Notify", NEB_PROJECT_HOOKS="save-approved-plan"))
         self.assertIn("`Notify` en `NEB_HOOKS`", head)
-        self.assertNotIn("`usage-tracker` en", head)
+        self.assertNotIn("`save-approved-plan` en", head)
+
+    def test_hook_retirado_avisa_aparte(self):
+        head = self._header(self._bootstrap(NEB_HOOKS="logbook-sync,usage-tracker"))
+        self.assertIn("`usage-tracker` en `NEB_HOOKS` (retirado en 6.29.0", head)
+        self.assertNotIn("no reconoce", head)
 
     def test_nombres_validos_sin_aviso(self):
-        head = self._header(self._bootstrap(NEB_HOOKS="logbook-sync", NEB_PROJECT_HOOKS="usage-tracker"))
+        head = self._header(self._bootstrap(NEB_HOOKS="logbook-sync", NEB_PROJECT_HOOKS="save-approved-plan"))
         self.assertNotIn("Aviso de Neb", head)
 
 

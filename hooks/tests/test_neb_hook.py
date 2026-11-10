@@ -4,7 +4,7 @@
 Cubre hooks/neb-hook.py y hooks/lib/approved_plan.py:
   • gate: unión de NEB_HOOKS y NEB_PROJECT_HOOKS; valores inválidos (desconocidos, con espacios)
   • main(): gate apagado, subsesión interna y stdin inválido no despachan
-  • dispatch(): argumentos de cada hook (logbook-sync, usage-tracker, notify-*, ops-capture,
+  • dispatch(): argumentos de cada hook (logbook-sync, notify-*, ops-capture,
     preprocess-prompt), PYTHONIOENCODING en los hijos, ops-capture desacoplado
   • save-approved-plan: slug ASCII completo, ruta y encabezado, proyecto de un cwd de Windows
   • extremo a extremo: neb-hook.py como proceso con un HOME temporal
@@ -40,8 +40,8 @@ _spec.loader.exec_module(nh)
 class TestGate(unittest.TestCase):
 
     def test_union_de_las_dos_variables(self):
-        env = {"NEB_HOOKS": "notify-on-stop,logbook-sync", "NEB_PROJECT_HOOKS": "usage-tracker"}
-        self.assertEqual(nh.enabled_hooks(env), {"notify-on-stop", "logbook-sync", "usage-tracker"})
+        env = {"NEB_HOOKS": "notify-on-stop,logbook-sync", "NEB_PROJECT_HOOKS": "save-approved-plan"}
+        self.assertEqual(nh.enabled_hooks(env), {"notify-on-stop", "logbook-sync", "save-approved-plan"})
 
     def test_proyecto_solo(self):
         self.assertEqual(nh.enabled_hooks({"NEB_PROJECT_HOOKS": "save-approved-plan"}), {"save-approved-plan"})
@@ -51,10 +51,15 @@ class TestGate(unittest.TestCase):
         self.assertEqual(nh.enabled_hooks({"NEB_HOOKS": "", "NEB_PROJECT_HOOKS": ","}), set())
 
     def test_invalidos_no_activan(self):
-        env = {"NEB_HOOKS": "logbook-sync, usage-tracker,Notify,logbook", "NEB_PROJECT_HOOKS": "x"}
+        env = {"NEB_HOOKS": "logbook-sync, ops-capture,Notify,logbook", "NEB_PROJECT_HOOKS": "x"}
         self.assertEqual(nh.enabled_hooks(env), {"logbook-sync"})
-        self.assertEqual(nh.invalid_tokens(env), [("NEB_HOOKS", " usage-tracker"), ("NEB_HOOKS", "Notify"),
+        self.assertEqual(nh.invalid_tokens(env), [("NEB_HOOKS", " ops-capture"), ("NEB_HOOKS", "Notify"),
                                                   ("NEB_HOOKS", "logbook"), ("NEB_PROJECT_HOOKS", "x")])
+
+    def test_usage_tracker_retirado(self):
+        # 6.29.0: el uso se mide al cerrar con /neb-usage; el nombre ya no activa nada y el arranque avisa.
+        self.assertEqual(nh.enabled_hooks({"NEB_HOOKS": "usage-tracker"}), set())
+        self.assertEqual(nh.invalid_tokens({"NEB_HOOKS": "usage-tracker"}), [("NEB_HOOKS", "usage-tracker")])
 
     def test_sin_invalidos(self):
         self.assertEqual(nh.invalid_tokens({"NEB_HOOKS": "ops-capture,,preprocess-prompt"}), [])
@@ -78,7 +83,7 @@ class TestMain(unittest.TestCase):
         self.assertEqual(d.call_args[0][2], {"session_id": "s", "cwd": "/p"})
 
     def test_apagado_no_despacha(self):
-        self._main({"NEB_HOOKS": "usage-tracker"}).assert_not_called()
+        self._main({"NEB_HOOKS": "notify-on-stop"}).assert_not_called()
 
     def test_subsesion_interna_no_despacha(self):
         self._main({"NEB_HOOKS": "logbook-sync", "NEB_INTERNAL_SUBSESSION": "1"}).assert_not_called()
@@ -116,24 +121,6 @@ class TestDispatch(unittest.TestCase):
     def test_logbook_sync_sin_sesion_no_corre(self):
         run, _, _ = self._dispatch("logbook-sync", event={"cwd": "/p"})
         run.assert_not_called()
-
-    def test_usage_tracker_proyecto_desde_transcript(self):
-        # El cwd tiene '.', que Claude Code convierte a '-' y encode_cwd no.
-        run, _, _ = self._dispatch("usage-tracker")
-        argv = run.call_args[0][0]
-        self.assertEqual(argv[1:], [os.path.join(nh.LIB, "usage-tracker.py"), "sid-1",
-                                    "C--Users-x-mi-proyecto", nh.ROOT, "HOME"])
-
-    def test_usage_tracker_transcript_posix(self):
-        ev = {"session_id": "s", "cwd": "/Users/x/mi.proyecto",
-              "transcript_path": "/Users/x/.claude/projects/-Users-x-mi-proyecto/s.jsonl"}
-        run, _, _ = self._dispatch("usage-tracker", event=ev)
-        self.assertEqual(run.call_args[0][0][3], "-Users-x-mi-proyecto")
-
-    def test_usage_tracker_fallback_encode_cwd(self):
-        ev = {"session_id": "s", "cwd": "C:\\Users\\x\\proj"}
-        run, _, _ = self._dispatch("usage-tracker", event=ev)
-        self.assertEqual(run.call_args[0][0][3], "C--Users-x-proj")
 
     def test_notify_windows_ps1(self):
         run, _, _ = self._dispatch("notify-on-stop", windows=True)

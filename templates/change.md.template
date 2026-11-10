@@ -134,13 +134,13 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 | Re-entregas | — |
 | Complejidad estimada / real | — / — |
 
-**Uso de API** *(auto — hook `usage-tracker`)*
+**Uso de API** *(lo escribe `/neb-usage --write <este change MD>` al cerrar)*
 
 <!-- usage-tracker-start -->
-| Modelo | Tokens (in · out · cache_w · cache_r) | Costo USD |
-|---|---|---|
-| — | — | — |
-| **Total** | — | **—** |
+| Agente | Llamadas | Tokens (in · out · cache_w · cache_r) | USD (precio de API) |
+|---|---|---|---|
+| — | — | — | — |
+| **Total** | — | — | **—** |
 <!-- usage-tracker-end -->
 
-*Si el bloque anterior muestra `—`, el hook no encontró REQ activo o no se ejecutó en esta sesión. Ver `hooks/README.md §usage-tracker`.*
+*Si el bloque muestra `—`, el comando no corrió todavía. Atribución y señales: `hooks/README.md` § "Medidor de uso (`/neb-usage`) — antes hook `usage-tracker`".*
