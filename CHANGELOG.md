@@ -23,7 +23,7 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
   - una llamada por `message.id` con dedupe entre archivos, y escritura de caché de 5 min y de 1 h por separado;
   - atribución por edición del registro del REQ en la sesión, y de cada subagente por la hora de su llamada;
   - señales: % de llamadas con más de 300k, compactaciones y relecturas del transcript tras compactar.
-- **`hooks/tests/test_usage_tracker.py`**: 21 pruebas.
+- **`hooks/tests/test_usage_tracker.py`**: 22 pruebas. Ajustadas al retiro: `test_hooks_json.py`, `test_neb_hook.py`, `test_neb_root.py` y `test_active_reqs.py`.
 - **`hooks/neb-hook.py`** `RETIRED` y su aviso propio en el arranque (`bootstrap/neb-bootstrap-context.py`), con prueba en `hooks/tests/test_neb_root.py`.
 - **`methodology/platform-assumptions.md`**: R21, el formato del transcript del que depende el medidor.
 
