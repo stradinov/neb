@@ -149,10 +149,10 @@ class Atribucion(Base):
         self.assertEqual(calls[0]["req"], "req-z")
 
     def test_active_md_con_otro_campo_y_nombre_sucio(self):
-        # Caso real: `Nombre` trae texto extra y el registro va en `Change MD:`, no en `Draft changes MD:`.
+        # Caso visto en uso: `Nombre` trae texto extra y el registro va en `Change MD:`, no en `Draft changes MD:`.
         mem = os.path.join(self.tmp, "memory")
         os.makedirs(mem)
-        active = os.path.join(mem, "active_gonher_otro-nombre.md")
+        active = os.path.join(mem, "active_proj_otro-nombre.md")
         with open(active, "w", encoding="utf-8") as f:
             f.write("- **Nombre:** req-z · **Rama:** feature/x\n- **Change MD:** `changes/2026-11-01-req-z.md`\n")
         self.write("s1.jsonl", _assistant("a", _t(0), tools=[("Edit", {"file_path": active})]))
