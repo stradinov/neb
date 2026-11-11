@@ -4,6 +4,13 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.31.2] - 2026-11-10
+
+> **Patch**: evidencia de R24 y R25 precisada. Una sesión nueva de la app de escritorio lee el settings de usuario al arrancar, sin reiniciar la app: cada sesión, y cada reanudación, es un proceso CLI aparte. Por eso la prueba de la app que desmintió R24 es válida.
+
+### Changed
+- **`methodology/platform-assumptions.md`** R24: la app corrió 2.1.321 (no 2.1.318, que es la versión de las pruebas `claude -p`), y su sesión de prueba arrancó después de escribirse el settings. R25: pasa a «parcial», con el modelo de procesos de la app, lo observado en una sesión abierta y una prueba repetible.
+
 ## [6.31.1] - 2026-11-10
 
 > **Patch**: se retira la acción «name-only» de `/neb-usage plugins`. La prueba con el plugin publicado desmintió R24: `skillOverrides: "name-only"` lista sin descripción un skill que no es de plugin, pero no tiene efecto en un skill de plugin, con la clave `<plugin>:<skill>` ni con el nombre a secas (CLI 2.1.318, app y `claude -p`). La acción no ahorraba nada.
