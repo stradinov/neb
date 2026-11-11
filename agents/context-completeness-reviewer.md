@@ -22,7 +22,7 @@ Cazar alucinaciones de dos fuentes distintas, con acciones distintas para cada u
 
 - **Afirmaciones sobre archivos**: "el archivo X contiene Y", "la función Z hace W", "el método A tiene N callers". ¿El autor abrió X, leyó la firma de Z, hizo grep de A?
 - **Afirmaciones sobre datos**: "la tabla T tiene N filas con condición C", "el ENUM E contiene los valores V1, V2". ¿Se consultó la BD o el archivo canónico?
-- **Afirmaciones sobre configuración o estado de ambiente**: "el cron está activo", "la versión deployada es X", "el flag F está en true". ¿Hay evidencia de la sesión actual o se asume desde memoria?
+- **Afirmaciones sobre configuración o estado de ambiente**: "el cron está activo", "la versión deployada es X", "el flag F está en true". ¿Hay evidencia de la sesión actual o se asume desde memoria? Un comportamiento de Claude Code se coteja con su fila de `methodology/platform-assumptions.md`: versión e interfaz probadas, con la vía.
 - **Afirmaciones sobre convenciones del proyecto**: "el patrón es X", "esto siempre se hace así". ¿Se verificó contra un caso reciente o se asume desde lecturas pasadas?
 - **Afirmaciones sobre el motivo de un estado**: "se quitó a propósito", "es decisión de negocio", "ya no se usa". ¿Se reconstruyó el motivo (a quién sirve, si sigue vivo) o se asume desde el mensaje de la confirmación del cambio o desde otro revisor? Criterio y fuentes: `general/communication.md` § "Elecciones: menú de selección", bullet «Opciones ancladas al estado real».
 - **Dependientes invisibles**: el plan menciona modificar M, pero ¿se grep-eó M en todo el repo para listar consumidores? ¿O se asumió que los conocidos son todos?
@@ -55,7 +55,7 @@ Una fila por suposición no resuelta. Si una suposición cae en ambos tipos (ej.
 
 Si hay filas con N, **el gate/cierre de la fase queda bloqueado** (no se inventa estado nuevo del REQ — el ENUM de `workflow/index.md` se mantiene) hasta que el autor:
 
-- Para `contexto`: verifique localmente y actualice el plan/artefacto, o reformule como `[asumido, no verificado: <razón>]`.
+- Para `contexto`: verifique localmente y actualice el plan/artefacto, o reformule como `[asumido, no verificado: <razón>]`. En plan-review, cuando la Re-verificación (`methodology/platform-assumptions.md` § "Mantenimiento") alcanza a un supuesto de plataforma del diseño, lo que de él se puede probar en una sesión desechable no se resuelve reformulándolo: solo probándolo. Que el plan reparta bien, por fila, lo que prueba antes del OK y lo que deja en riesgos es parte de la revisión.
 - Para `dominio`: abra REQ de research, marque la suposición como `[pendiente de research: <tema>]`, o reformule como `[inferencia explícita, no verificada en dominio]`.
 
 Máximo 300 palabras de prosa adicional. La tabla es el output central.

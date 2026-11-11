@@ -4,6 +4,19 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.32.0] - 2026-11-11
+
+> **Minor**: un supuesto de plataforma del que depende el diseño de un plan se prueba **antes del OK del plan** si se puede probar en una sesión desechable (sesión nueva y no interactiva, con el mecanismo montado a mano y sin publicar la entrega). Mientras no esté probado, el plan no se aprueba; ya no se difiere a una prueba posterior a la entrega ni se resuelve declarándolo `[asumido]`. Tras diagnóstico del defecto R24 / name-only (origen Fase 3, plan defectuoso) en REQ `neb-usage-plugins`, que repite el de R23 en `neb-tope-contexto-compactacion`.
+>
+> - **Vía de la prueba**: la más cercana a la entrega que permita la sesión (un archivo de settings y no un flag, si la entrega es un archivo). Un resultado en contra cambia el plan antes del OK, salvo que la diferencia de vía lo explique: entonces se repite por una vía más cercana. Uno a favor por otra vía deja en los riesgos del plan lo que falta (fuente de settings, interfaz, versión de la app), igual que lo que solo se ve con la entrega publicada, en una sesión interactiva o en el entorno de otro adoptante.
+> - **Adoptantes**: los planes que se apoyan en una fila alcanzada por la Re-verificación (mecanismo nuevo, o regla que se cambia por cómo se comporta la plataforma) suman esa prueba antes del OK del plan (con plan-review, antes de los revisores). Usar el mecanismo vigente de un gate no la dispara.
+
+### Changed
+- **`methodology/platform-assumptions.md`** § Mantenimiento: la Re-verificación fija el momento (antes del OK del plan), la vía, el reparto por fila entre lo que se prueba antes y lo que queda en riesgos, y qué hacer con un resultado en contra o a favor; la Alta remite a ella cuando el plan que da de alta la fila depende de ella. La intro de la tabla pide que la prueba desechable corra desde un directorio sin el marcador `neb-logbook: central`.
+- **`process/plan-review.md`** § Flujo, paso 1: el rol principal hace esa prueba antes de pasar el plan a los revisores; sin ella, el plan no va a OK.
+- **`methodology/principles.md`** § "Suposiciones explícitas antes de afirmar": en el plan de Fase 3, ese supuesto no cabe entre los asumidos.
+- **`agents/context-completeness-reviewer.md`**: coteja un comportamiento de Claude Code con su fila (versión, interfaz y vía probadas), y en plan-review reformular ese supuesto como `[asumido]` ya no lo resuelve.
+
 ## [6.31.2] - 2026-11-10
 
 > **Patch**: evidencia de R24 y R25 precisada. Una sesión nueva de la app de escritorio lee el settings de usuario al arrancar, sin reiniciar la app: cada sesión, y cada reanudación, es un proceso CLI aparte. Por eso la prueba de la app que desmintió R24 es válida.
