@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""test_usage_tracker.py — medidor de tokens por REQ y por ventana (6.29.0).
+"""test_usage_tracker.py — medidor de tokens por REQ y por ventana (6.29.0) y auditoría de plugins (6.31.0).
 
 Cubre hooks/lib/usage-tracker.py:
   • lector: campos en `message.*`, una llamada por `message.id`, `<synthetic>` fuera, escritura 5 min / 1 h
@@ -8,6 +8,9 @@ Cubre hooks/lib/usage-tracker.py:
   • compactaciones y relecturas del transcript tras compactar, atribuidas al REQ vigente
   • precios: modelo sin precio ⇒ total parcial; tramo de contexto largo
   • --write: solo entre marcadores; sin marcadores no escribe
+  • plugins: peso y componentes (archivos, plugin.json, marketplace); uso por MCP, Agent, Skill y comandos
+    (calificados y sin calificar); ventana; dedupe; neb@* y plugins en false fuera; clasificación
+  • apply: disable / name-only conservan las claves ajenas; no escribe si el resultado no parsea o cambia otra clave
 
 Framework: unittest (stdlib). Transcripts sintéticos en un directorio temporal; nunca toca ~/.claude.
   py -m unittest discover -s hooks/tests -p test_usage_tracker.py
@@ -297,6 +300,292 @@ class Escritura(unittest.TestCase):
         with contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(ut.main([]), 2)
             self.assertEqual(ut.main(["report", "--write", os.path.join(self.tmp, "otro.md")]), 2)
+
+
+def _now_iso(offset_days=0):
+    import datetime as _dt
+    t = _dt.datetime.now(_dt.timezone.utc) - _dt.timedelta(days=offset_days)
+    return t.strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+
+def _tool(mid, ts, name, inp, tid):
+    return json.dumps({"type": "assistant", "timestamp": ts, "message": {
+        "id": mid, "model": "m-a", "content": [{"type": "tool_use", "id": tid, "name": name, "input": inp}]}})
+
+
+def _command(uuid, ts, cmd, as_list=False):
+    text = "<command-message>x</command-message>\n<command-name>/%s</command-name>" % cmd
+    content = [{"type": "text", "text": text}] if as_list else text
+    return json.dumps({"type": "user", "uuid": uuid, "timestamp": ts, "message": {"role": "user", "content": content}})
+
+
+class PluginsBase(unittest.TestCase):
+    """Un ~/.claude sintético: settings, installed_plugins.json, known_marketplaces.json y plugins en caché."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.claude = os.path.join(self.tmp, ".claude")
+        self.projects = os.path.join(self.claude, "projects")
+        os.makedirs(os.path.join(self.projects, "C--repo"))
+        self.installed, self.market = {}, []
+        self.mkt_dir = os.path.join(self.tmp, "mkt")
+        self.settings = os.path.join(self.claude, "settings.json")
+
+    def tearDown(self):
+        shutil.rmtree(self.tmp, ignore_errors=True)
+
+    def _put(self, path, text):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        with open(path, "w", encoding="utf-8", newline="") as f:
+            f.write(text)
+
+    def plugin(self, name, skills=(), agents=(), commands=(), files=None, manifest=None, market=None):
+        pid = name + "@mk"
+        root = os.path.join(self.claude, "plugins", "cache", "mk", name, "1.0.0")
+        os.makedirs(root)
+        for s, desc in skills:
+            self._put(os.path.join(root, "skills", s, "SKILL.md"), "---\nname: %s\ndescription: %s\n---\n# x\n" % (s, desc))
+        for kind, items in (("agents", agents), ("commands", commands)):
+            for n, desc in items:
+                self._put(os.path.join(root, kind, n + ".md"), "---\ndescription: %s\n---\n" % desc)
+        for rel, data in (files or {}).items():
+            self._put(os.path.join(root, rel), json.dumps(data))
+        if manifest is not None:
+            self._put(os.path.join(root, ".claude-plugin", "plugin.json"), json.dumps(manifest))
+        self.installed[pid] = [{"scope": "user", "installPath": root, "version": "1.0.0"}]
+        if market is not None:
+            self.market.append(dict(market, name=name))
+        return pid
+
+    def save(self, enabled, extra=None):
+        data = dict(extra or {}, enabledPlugins=enabled)
+        self._put(self.settings, json.dumps(data, indent=2))
+        self._put(os.path.join(self.claude, "plugins", "installed_plugins.json"),
+                  json.dumps({"version": 2, "plugins": self.installed}))
+        self._put(os.path.join(self.claude, "plugins", "known_marketplaces.json"),
+                  json.dumps({"mk": {"installLocation": self.mkt_dir}}))
+        self._put(os.path.join(self.mkt_dir, ".claude-plugin", "marketplace.json"), json.dumps({"plugins": self.market}))
+
+    def transcript(self, rel, lines):
+        self._put(os.path.join(self.projects, "C--repo", rel), "\n".join(lines) + "\n")
+
+    def audit(self, days=90):
+        plugins = ut.plugin_inventory(self.settings)
+        usage, _n = ut.plugin_usage(self.projects, plugins, ut.time.time() - days * 86400)
+        return {p["name"]: p for p in plugins}, usage
+
+
+class Plugins(PluginsBase):
+    def test_peso_y_componentes_de_las_tres_fuentes(self):
+        a = self.plugin("a", skills=[("s1", "abcde")], agents=[("ag", "xyz")], commands=[("c", "12")],
+                        files={".mcp.json": {"mcpServers": {"srv": {"command": "x"}}},
+                               "custom/hooks.json": {"hooks": {"PreToolUse": [], "Stop": []}}},
+                        manifest={"name": "a", "hooks": "./custom/hooks.json"})
+        b = self.plugin("b", manifest={"name": "b", "mcpServers": {"m2": {"command": "y"}}})
+        lsp = self.plugin("lsp", market={"strict": False, "lspServers": {"intelephense": {"command": "i"}}})
+        self.save({a: True, b: True, lsp: True})
+        plugins, _ = self.audit()
+        pa = plugins["a"]
+        self.assertEqual(pa["weight"], {"skills": 5, "agents": 3, "commands": 2, "total": 10})
+        self.assertEqual((pa["mcp"], pa["hooks"]), ({"srv"}, {"PreToolUse", "Stop"}))
+        self.assertEqual(plugins["b"]["mcp"], {"m2"})
+        self.assertEqual(plugins["lsp"]["lsp"], {"intelephense"})
+
+    def test_descripcion_en_bloque_plegado(self):
+        a = self.plugin("a")
+        self._put(os.path.join(self.installed[a][0]["installPath"], "skills", "s", "SKILL.md"),
+                  "---\nname: s\ndescription: >\n  uno dos\n  tres\nmetadata:\n  v: 1\n---\n")
+        self.save({a: True})
+        self.assertEqual(self.audit()[0]["a"]["skills"], {"s": len("uno dos tres")})
+
+    def test_uso_por_mcp_agent_skill_y_comandos(self):
+        a = self.plugin("a", skills=[("s1", "d"), ("s2", "d")], agents=[("ag", "d")], commands=[("cmd", "d")],
+                        files={".mcp.json": {"mcpServers": {"srv": {}}}})
+        b = self.plugin("b", commands=[("solo-b", "d")])
+        self.save({a: True, b: True})
+        now = _now_iso()
+        self.transcript("s1.jsonl", [
+            _tool("m1", now, "mcp__plugin_a_srv__run", {}, "t1"),
+            _tool("m2", now, "Agent", {"subagent_type": "a:ag"}, "t2"),
+            _tool("m3", now, "Skill", {"skill": "a:s1"}, "t3"),
+            _command("u1", now, "a:s2"),                     # comando calificado que es un skill → carga de skill
+            _command("u2", now, "a:cmd", as_list=True),      # comando calificado
+            _command("u3", now, "solo-b"),                   # sin calificar, un solo candidato
+            _command("u4", now, "model"),                    # integrado de la CLI: no cuenta
+        ])
+        _p, usage = self.audit()
+        self.assertEqual({k: v[0] for k, v in usage["a"].items()}, {"mcp": 1, "agent": 1, "skill": 2, "command": 1})
+        self.assertEqual(usage["b"]["command"][0], 1)
+
+    def test_sin_calificar_ambiguo_no_cuenta(self):
+        a = self.plugin("a", commands=[("dup", "d")])
+        b = self.plugin("b", skills=[("dup", "d")])
+        self.save({a: True, b: True})
+        self.transcript("s1.jsonl", [_command("u1", _now_iso(), "dup")])
+        _p, usage = self.audit()
+        self.assertEqual(sum(v[0] for v in usage["a"].values()) + sum(v[0] for v in usage["b"].values()), 0)
+
+    def test_fuera_de_ventana_y_dedupe(self):
+        a = self.plugin("a", files={".mcp.json": {"mcpServers": {"srv": {}}}})
+        self.save({a: True})
+        now, old = _now_iso(), _now_iso(400)
+        line = _tool("m1", now, "mcp__plugin_a_srv__run", {}, "t1")
+        self.transcript("s1.jsonl", [line, line, _tool("m0", old, "mcp__plugin_a_srv__run", {}, "t0")])
+        self.transcript("s2.jsonl", [line])                    # copia de --resume
+        _p, usage = self.audit()
+        self.assertEqual(usage["a"]["mcp"][0], 1)
+
+    def test_dos_tool_use_del_mismo_mensaje_cuentan_dos(self):
+        # El transcript pone cada bloque en su línea con el mismo message.id: deduplicar por message.id perdería uno.
+        a = self.plugin("a", files={".mcp.json": {"mcpServers": {"srv": {}}}})
+        self.save({a: True})
+        now = _now_iso()
+        self.transcript("s1.jsonl", [_tool("m1", now, "mcp__plugin_a_srv__x", {}, "t1"),
+                                     _tool("m1", now, "mcp__plugin_a_srv__y", {}, "t2")])
+        _p, usage = self.audit()
+        self.assertEqual(usage["a"]["mcp"][0], 2)
+
+    def test_skill_que_apunta_a_un_comando_cuenta_como_comando(self):
+        a = self.plugin("a", skills=[("s", "d")], commands=[("c", "d")])
+        self.save({a: True})
+        self.transcript("s1.jsonl", [_tool("m1", _now_iso(), "Skill", {"skill": "a:c"}, "t1")])
+        _p, usage = self.audit()
+        self.assertEqual((usage["a"]["skill"][0], usage["a"]["command"][0]), (0, 1))
+
+    def test_tool_result_con_command_name_no_cuenta(self):
+        a = self.plugin("a", commands=[("cmd", "d")])
+        self.save({a: True})
+        self.transcript("s1.jsonl", [json.dumps({"type": "user", "uuid": "u", "timestamp": _now_iso(), "message": {
+            "content": [{"type": "tool_result", "content": "<command-name>/a:cmd</command-name>"}]}})])
+        _p, usage = self.audit()
+        self.assertEqual(usage["a"]["command"][0], 0)
+
+    def test_clasificacion_y_reporte(self):
+        idle = self.plugin("idle", skills=[("s", "d" * 10)])
+        heavy = self.plugin("heavy", skills=[("h1", "d" * 500), ("h2", "d")],
+                            files={".mcp.json": {"mcpServers": {"srv": {}}}})
+        light = self.plugin("light", skills=[("l", "d")], files={".mcp.json": {"mcpServers": {"srv": {}}}})
+        used = self.plugin("used", skills=[("u", "d")])
+        lsp = self.plugin("lsp", market={"lspServers": {"x": {}}})
+        hooks_only = self.plugin("hk", files={"hooks/hooks.json": {"hooks": {"Stop": []}}})
+        off = self.plugin("off", skills=[("o", "d")])
+        neb = self.plugin("neb", skills=[("n", "d")])
+        self.save({idle: True, heavy: True, light: True, used: True, lsp: True, hooks_only: True, off: False,
+                   neb: True})
+        now = _now_iso()
+        self.transcript("s1.jsonl", [_tool("m1", now, "mcp__plugin_heavy_srv__x", {}, "t1"),
+                                     _tool("m2", now, "mcp__plugin_light_srv__x", {}, "t2"),
+                                     _tool("m3", now, "Skill", {"skill": "used:u"}, "t3")])
+        plugins, usage = self.audit()
+        got = {n: ut.classify(p, usage[n]) for n, p in plugins.items()}
+        self.assertNotIn("off", got)                                   # en false: no se lista
+        self.assertEqual(got, {"idle": ut.DISABLE, "heavy": ut.NAME_ONLY, "light": ut.NAME_ONLY, "used": ut.IN_USE,
+                               "lsp": ut.NOT_AUDITABLE, "hk": ut.NOT_AUDITABLE, "neb": ut.DISABLE})
+        report = ut.render_plugins(list(plugins.values()), usage, 90, 1, self.settings, {})
+        self.assertNotIn("neb@mk", report)                             # neb@* excluido del reporte
+        self.assertLess(report.index("**name-only** `heavy@mk`"), report.index("**name-only** `light@mk`"))
+
+    def test_aviso_de_settings_de_proyecto(self):
+        a = self.plugin("a", skills=[("s", "d")])
+        self.save({a: True})
+        cwd = os.path.join(self.tmp, "repo")
+        self._put(os.path.join(cwd, ".claude", "settings.local.json"), json.dumps({"enabledPlugins": {a: True}}))
+        ov = ut.project_overrides(cwd, self.settings)
+        self.assertEqual(ov[a][1], True)
+        self.assertEqual(ut.project_overrides(self.tmp, self.settings), {})   # cwd = home: es el de usuario
+        plugins, usage = self.audit()
+        self.assertIn("ese valor gana", ut.render_plugins(list(plugins.values()), usage, 90, 0, self.settings, ov))
+
+
+class Apply(PluginsBase):
+    def setUp(self):
+        super().setUp()
+        self.pid = self.plugin("a", skills=[("s1", "d"), ("s2", "d")])
+        self.save({self.pid: True, "otro@mk": True},
+                  extra={"env": {"X": "ñ"}, "skillOverrides": {"ajeno:skill": "off"}, "model": "opus"})
+        with open(self.settings, encoding="utf-8") as f:
+            self.before = json.load(f)
+
+    def run_apply(self, *args):
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return ut.main(["apply", self.pid, *args, "--settings", self.settings])
+
+    def load(self):
+        with open(self.settings, encoding="utf-8") as f:
+            return json.load(f)
+
+    def test_disable_solo_cambia_su_clave(self):
+        self.assertEqual(self.run_apply("disable"), 0)
+        after = self.load()
+        self.assertIs(after["enabledPlugins"][self.pid], False)
+        after["enabledPlugins"][self.pid] = True
+        self.assertEqual(after, self.before)
+
+    def test_name_only_por_skill(self):
+        self.assertEqual(self.run_apply("name-only"), 0)
+        after = self.load()
+        self.assertEqual(after["skillOverrides"], {"ajeno:skill": "off", "a:s1": "name-only", "a:s2": "name-only"})
+        del after["skillOverrides"], self.before["skillOverrides"]
+        self.assertEqual(after, self.before)
+
+    def test_no_escribe_si_el_resultado_no_parsea(self):
+        with open(self.settings, "rb") as f:
+            raw = f.read()
+        changes, err = ut.update_json(self.settings, lambda d: [("enabledPlugins", self.pid, False)],
+                                      dumps=lambda data, indent: "{roto")
+        self.assertIsNone(changes)
+        self.assertIn("no se escribió", err)
+        with open(self.settings, "rb") as f:
+            self.assertEqual(f.read(), raw)
+        self.assertEqual([n for n in os.listdir(self.claude) if n.endswith(".tmp")], [])
+
+    def test_no_escribe_si_otra_clave_cambia(self):
+        def mutate(d):
+            d["model"] = "otro"                                        # cambio no declarado
+            return [("enabledPlugins", self.pid, False)]
+        changes, err = ut.update_json(self.settings, mutate)
+        self.assertIsNone(changes)
+        self.assertEqual(self.load(), self.before)
+
+    def test_settings_invalido_no_se_toca(self):
+        self._put(self.settings, "{no es json")
+        self.assertEqual(self.run_apply("disable"), 2)                 # lo rechaza antes de escribir
+        changes, err = ut.update_json(self.settings, lambda d: [])     # y update_json tampoco lo toca
+        self.assertIsNone(changes)
+        self.assertIn("no es JSON válido", err)
+        with open(self.settings, encoding="utf-8") as f:
+            self.assertEqual(f.read(), "{no es json")
+
+    def test_settings_enlazado_se_escribe_en_su_destino(self):
+        link = os.path.join(self.tmp, "link.json")
+        try:
+            os.symlink(self.settings, link)
+        except (OSError, NotImplementedError):
+            self.skipTest("sin permiso para enlaces simbólicos")
+        changes, err = ut.update_json(link, lambda d: (d["enabledPlugins"].update({self.pid: False}) or
+                                                       [("enabledPlugins", self.pid, False)]))
+        self.assertIsNone(err)
+        self.assertTrue(os.path.islink(link))
+        self.assertIs(self.load()["enabledPlugins"][self.pid], False)
+
+    def test_conserva_saltos_crlf(self):
+        with open(self.settings, encoding="utf-8") as f:
+            text = f.read()
+        self._put(self.settings, text.replace("\n", "\r\n"))
+        self.assertEqual(self.run_apply("disable"), 0)
+        with open(self.settings, "rb") as f:
+            self.assertIn(b"\r\n", f.read())
+
+    def test_argumentos_invalidos(self):
+        with contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(ut.main(["apply", "sin-marketplace", "disable", "--settings", self.settings]), 2)
+            with self.assertRaises(SystemExit):
+                ut.main(["apply", self.pid, "borrar", "--settings", self.settings])
+            self.assertEqual(ut.main(["apply", "neb@mk", "disable", "--settings", self.settings]), 2)
+            self.assertEqual(ut.main(["apply", "inactivo@mk", "disable", "--settings", self.settings]), 2)
+            other = self.plugin("vacio")                               # instalado, sin skills
+            self.save({self.pid: True, other: True})
+            self.assertEqual(ut.main(["apply", other, "name-only", "--settings", self.settings]), 2)
 
 
 if __name__ == "__main__":

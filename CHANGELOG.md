@@ -4,6 +4,24 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.31.0] - 2026-11-10
+
+> **Minor**: `/neb-usage plugins` audita los plugins activos: cuánto pesan en el contexto fijo (caracteres de descripción de sus skills, agentes y comandos) contra cuánto se usan en los transcripts (MCP, agentes, skills y comandos). Propone por candidato «desactivar» (cero usos en la ventana) o «name-only» (se usa, pero ninguno de sus skills se carga) y, con OK del dev desde el menú, `usage-tracker.py apply` escribe el cambio en `~/.claude/settings.json`.
+>
+> - **Única escritura**: `apply` relee el settings justo antes, cambia solo `enabledPlugins.<id>` o las claves `skillOverrides["<plugin>:<skill>"]`, verifica en un temporal que el JSON parsea y que ninguna otra clave cambió, y reemplaza. `report` no cambia.
+> - **Sin verificar todavía** (R24, R25): que `skillOverrides` acepta el nombre calificado de un skill de plugin y que los cambios rigen en la sesión siguiente. Se verifican al aplicar name-only a un plugin y abrir una sesión nueva.
+> - **Adoptantes**: nada que hacer; el comando corre en solo lectura y pide OK antes de escribir.
+
+### Added
+- **`hooks/lib/usage-tracker.py`**: subcomandos `plugins [--days N] [--projects DIR] [--settings FILE]` (90 días por defecto; solo lectura) y `apply <id> disable|name-only [--settings FILE]`. El inventario de componentes (MCP, hooks, LSP) lee los archivos del plugin, su `plugin.json` y su entrada del marketplace.
+- **`hooks/tests/test_usage_tracker.py`**: 18 pruebas de `plugins` y `apply` (40 en el archivo).
+- **`methodology/platform-assumptions.md`**: R24 (`skillOverrides` con nombre calificado) y R25 (los cambios de settings rigen en una sesión nueva), sin verificar.
+
+### Changed
+- **`commands/neb-usage.md`**: modo `plugins` con su menú por candidato; el modo `report` no cambia.
+- **`hooks/README.md`** § "Medidor de uso (`/neb-usage`)": `plugins` (qué lee y qué no) y `apply`.
+- **`methodology/platform-assumptions.md`** R21: las formas del transcript que lee `plugins` (`mcp__plugin_*`, `subagent_type`, `skill`, `<command-name>`).
+
 ## [6.30.0] - 2026-11-09
 
 > **Minor**: la compactación se vuelve segura para topar el contexto. El arranque trae `general/compaction.md`, una sección `# Compact instructions` que le dice al resumen qué conservar de un REQ (registro, fase, OK dados y pendientes, decisiones con su motivo) y cómo recuperar el detalle tras compactar. La plantilla de settings del dev topa la compactación automática en 500k (`autoCompactWindow`, llave raíz), y se retiran sus dos hooks `PreCompact` legacy: desde 5.0.0 no encontraban el REQ de la sesión, y uno lanzaba un agente en cada compactación.

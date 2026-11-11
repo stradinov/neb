@@ -4,6 +4,8 @@ usage-tracker.py — gasto de tokens por REQ o por ventana de días, leído de l
 
 Uso:
   usage-tracker.py report [--days N] [--req <slug>] [--write <change MD>] [--projects <dir>]
+  usage-tracker.py plugins [--days N] [--projects <dir>] [--settings <settings.json>]
+  usage-tracker.py apply <plugin@marketplace> disable|name-only [--settings <settings.json>]
 
   --days N     ventana: transcripts modificados en los últimos N días (por defecto 14 sin --req/--write).
   --req SLUG   solo las llamadas atribuidas al REQ SLUG (slug = nombre del change MD sin la fecha).
@@ -21,7 +23,27 @@ Qué cuenta (formato del transcript: supuesto R21 de methodology/platform-assump
     primer REQ tocado; sin toques, «sin REQ». Una llamada de subagente va al REQ vigente en el hilo principal
     a su misma hora.
 
-Salida: exit 0 con el reporte; exit 2 ante argumentos inválidos.
+plugins (solo lectura) — auditoría de los plugins activos: peso fijo contra uso real.
+  --days N     ventana de uso (por defecto 90); --settings, el settings de usuario (por defecto
+               ~/.claude/settings.json); `installed_plugins.json` y `known_marketplaces.json` se leen de
+               `plugins/` junto a ese archivo.
+  Inventario: `enabledPlugins` en `true` (sin `neb@*`). Peso: caracteres de `description` de
+  `skills/*/SKILL.md`, `agents/*.md` y `commands/*.md`. Componentes que se pierden al desactivar: MCP, hooks y
+  LSP (de los archivos del plugin, de su `plugin.json` y de su entrada en el marketplace). Uso, con dedupe por
+  bloque (`tool_use.id` o el `uuid` de la línea `user`): `mcp__plugin_<nombre>_*`, `Agent`/`Task` con
+  `subagent_type` `<nombre>:*`, `Skill` con `skill` `<nombre>:*` y `<command-name>` en líneas `user`
+  (calificado, o sin calificar si coincide con un solo comando o skill de los plugins activos). [asumido] las
+  copias de --resume y los forks conservan `tool_use.id` y `uuid`; si no, una copia contaría dos veces (el
+  veredicto solo distingue cero de no cero).
+  Clasificación: con señal medible y cero usos → desactivar; con usos, skills y cero cargas de skill →
+  name-only; sin señal medible (solo LSP o hooks) → no auditable.
+
+apply (la única escritura) — `disable` pone `enabledPlugins.<id> = false`; `name-only` pone
+  `skillOverrides["<nombre>:<skill>"] = "name-only"` por cada skill del plugin. Relee el archivo justo antes,
+  escribe a un temporal en el mismo directorio, verifica que parsea y que el resto de las claves no cambió,
+  y reemplaza. Solo se corre con OK del dev desde el menú de /neb-usage plugins.
+
+Salida: exit 0 con el reporte; exit 1 si `apply` no pudo escribir; exit 2 ante argumentos inválidos.
 """
 
 import argparse
@@ -31,6 +53,7 @@ import os
 import re
 import statistics
 import sys
+import tempfile
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -444,6 +467,488 @@ def write_block(path, block):
     return True
 
 
+# --------------------------------------------------------------------------- plugins: inventario y peso
+
+DEFAULT_SETTINGS = os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
+PLUGINS_DAYS = 90
+NEB_PREFIX = "neb@"
+COMMAND_RE = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
+DISABLE, NAME_ONLY, NOT_AUDITABLE, IN_USE = "desactivar", "name-only", "no auditable", "en uso"
+USE_KINDS = ("mcp", "agent", "skill", "command")      # skill = cargas de skill (por Skill o por comando)
+USE_LABELS = {"mcp": "MCP", "agent": "agentes", "skill": "skills", "command": "comandos"}
+COMPONENT_KEYS = (("mcp", "mcpServers"), ("hooks", "hooks"), ("lsp", "lspServers"))
+
+
+def _load_json(path):
+    try:
+        with open(path, encoding="utf-8-sig") as f:
+            data = json.load(f)
+    except (OSError, ValueError, TypeError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def _unquote(v):
+    if len(v) >= 2 and v[0] == v[-1] == '"':
+        try:
+            return json.loads(v)
+        except ValueError:
+            return v[1:-1]
+    if len(v) >= 2 and v[0] == v[-1] == "'":
+        return v[1:-1].replace("''", "'")
+    return v
+
+
+def _frontmatter(path):
+    """{clave: texto} de las claves de primer nivel del frontmatter YAML de un .md: escalares (también los que
+    siguen en líneas indentadas), bloques `>` (une con espacios) y `|` (une con saltos)."""
+    try:
+        with open(path, encoding="utf-8", errors="replace") as f:
+            lines = f.read().splitlines()
+    except OSError:
+        return {}
+    if not lines or lines[0].strip() != "---":
+        return {}
+    end = next((i for i in range(1, len(lines)) if lines[i].strip() == "---"), None)
+    if end is None:
+        return {}
+    out, key, style, parts = {}, None, None, []
+
+    def flush():
+        if key is None:
+            return
+        if style and style[0] == "|":
+            val = "\n".join(p.strip() for p in parts)
+        else:
+            val = " ".join(p.strip() for p in parts if p.strip())
+        out[key] = _unquote(val.strip())
+
+    for ln in lines[1:end]:
+        m = re.match(r"([A-Za-z0-9_-]+):(?:\s+(.*))?$", ln)
+        if m and not ln[:1].isspace():
+            flush()
+            key, rest = m.group(1), (m.group(2) or "").strip()
+            if rest[:1] in (">", "|") and len(rest) <= 2:
+                style, parts = rest, []
+            else:
+                style, parts = None, ([rest] if rest else [])
+        elif key is not None:
+            parts.append(ln)
+    flush()
+    return out
+
+
+def _resolve(value, root):
+    """Valor de una clave de componentes: un objeto tal cual; una ruta (o lista de rutas) relativa a root, su JSON."""
+    values = value if isinstance(value, list) else [value]
+    out = []
+    for v in values:
+        if isinstance(v, dict):
+            out.append(v)
+        elif isinstance(v, str) and root:
+            d = _load_json(os.path.join(root, v))
+            if d:
+                out.append(d)
+    return out
+
+
+def _names(kind, d):
+    """Servidores MCP / eventos de hooks / servidores LSP de un objeto de declaración."""
+    if kind == "mcp":
+        d = d["mcpServers"] if isinstance(d.get("mcpServers"), dict) else d
+        return {k for k, v in d.items() if isinstance(v, dict)}
+    if kind == "hooks":
+        d = d["hooks"] if isinstance(d.get("hooks"), dict) else d
+        return {k for k, v in d.items() if isinstance(v, list)}
+    d = d["lspServers"] if isinstance(d.get("lspServers"), dict) else d
+    return {k for k, v in d.items() if isinstance(v, dict)}
+
+
+def scan_plugin(pid, root, entry=None):
+    """Componentes y peso de un plugin instalado en root. entry = su entrada del marketplace.json (puede
+    declarar MCP, hooks o LSP, p. ej. un plugin `strict: false` sin plugin.json)."""
+    name = pid.split("@", 1)[0]
+    p = {"id": pid, "name": name, "root": root, "skills": {}, "agents": {}, "commands": {},
+         "mcp": set(), "hooks": set(), "lsp": set(), "custom_paths": [],
+         "missing": not (root and os.path.isdir(root))}
+    if not p["missing"]:
+        sdir = os.path.join(root, "skills")
+        for d in sorted(os.listdir(sdir)) if os.path.isdir(sdir) else []:
+            f = os.path.join(sdir, d, "SKILL.md")
+            if os.path.isfile(f):
+                fm = _frontmatter(f)
+                p["skills"][fm.get("name") or d] = len(fm.get("description", ""))
+        for kind in ("agents", "commands"):
+            kdir = os.path.join(root, kind)
+            for fn in sorted(os.listdir(kdir)) if os.path.isdir(kdir) else []:
+                if fn.endswith(".md"):
+                    fm = _frontmatter(os.path.join(kdir, fn))
+                    nm = (fm.get("name") if kind == "agents" else None) or fn[:-3]
+                    p[kind][nm] = len(fm.get("description", ""))
+        for kind, rel in (("mcp", ".mcp.json"), ("hooks", os.path.join("hooks", "hooks.json")), ("lsp", ".lsp.json")):
+            d = _load_json(os.path.join(root, rel))
+            if d:
+                p[kind] |= _names(kind, d)
+    manifest = _load_json(os.path.join(root, ".claude-plugin", "plugin.json")) if not p["missing"] else None
+    for decl in (manifest, entry):
+        for kind, key in COMPONENT_KEYS:
+            if decl and key in decl:
+                for d in _resolve(decl[key], root):
+                    p[kind] |= _names(kind, d)
+    p["custom_paths"] = sorted(k for k in ("skills", "agents", "commands") if manifest and k in manifest)
+    p["weight"] = {k: sum(p[k].values()) for k in ("skills", "agents", "commands")}
+    p["weight"]["total"] = sum(p["weight"].values())
+    return p
+
+
+def _market_entry(markets, mkt, name):
+    loc = (markets.get(mkt) or {}).get("installLocation") if isinstance(markets.get(mkt), dict) else None
+    data = _load_json(os.path.join(loc, ".claude-plugin", "marketplace.json")) if loc else None
+    for e in (data or {}).get("plugins") or []:
+        if isinstance(e, dict) and e.get("name") == name:
+            return e
+    return None
+
+
+def _plugins_dir(settings_path):
+    return os.path.join(os.path.dirname(os.path.abspath(settings_path)), "plugins")
+
+
+def locate_plugin(settings_path, pid):
+    """scan_plugin() de pid según `installed_plugins.json` (instalación de usuario primero) y su marketplace."""
+    pdir = _plugins_dir(settings_path)
+    installed = (_load_json(os.path.join(pdir, "installed_plugins.json")) or {}).get("plugins") or {}
+    markets = _load_json(os.path.join(pdir, "known_marketplaces.json")) or {}
+    entries = installed.get(pid) or []
+    if isinstance(entries, dict):
+        entries = [entries]
+    entries = [e for e in entries if isinstance(e, dict)]
+    inst = next((e for e in entries if e.get("scope") == "user"), entries[0] if entries else {})
+    name, _, mkt = pid.partition("@")
+    return scan_plugin(pid, inst.get("installPath"), _market_entry(markets, mkt, name))
+
+
+def plugin_inventory(settings_path):
+    """Plugins con `enabledPlugins` en true en el settings de usuario (neb incluido; lo excluye el reporte)."""
+    settings = _load_json(settings_path) or {}
+    ep = settings.get("enabledPlugins") if isinstance(settings.get("enabledPlugins"), dict) else {}
+    return [locate_plugin(settings_path, pid) for pid, on in ep.items() if on is True]
+
+
+# --------------------------------------------------------------------------- plugins: uso en los transcripts
+
+def _plugin_events(path, plugins, bare):
+    """(nombre, tipo, ts, llave de dedupe) por cada uso de un plugin en el transcript."""
+    try:
+        f = open(path, encoding="utf-8", errors="replace")
+    except OSError:
+        return
+    with f:
+        for n, line in enumerate(f):
+            is_cmd = "<command-name>" in line
+            if not is_cmd and not ('"tool_use"' in line and ("mcp__plugin_" in line or '"Skill"' in line
+                                                             or '"subagent_type"' in line)):
+                continue
+            try:
+                o = json.loads(line)
+            except ValueError:
+                continue
+            msg = o.get("message") or {}
+            ts = _ts(o.get("timestamp"))
+            content = msg.get("content")
+            if o.get("type") == "user" and is_cmd:
+                texts = [content] if isinstance(content, str) else [
+                    b.get("text") or "" for b in content or [] if isinstance(b, dict) and b.get("type") == "text"]
+                for t in texts:
+                    for m in COMMAND_RE.finditer(t):
+                        cmd = m.group(1)
+                        plugin, sep, sub = cmd.partition(":")
+                        if sep and plugin in plugins:
+                            kind = "skill" if sub in plugins[plugin]["skills"] else "command"
+                        elif not sep and len(bare.get(cmd, ())) == 1:
+                            plugin, kind = bare[cmd][0]
+                        else:
+                            continue
+                        yield plugin, kind, ts, ("u", o.get("uuid") or (path, n), cmd)
+            elif o.get("type") == "assistant" and isinstance(content, list):
+                for b in content:
+                    if not (isinstance(b, dict) and b.get("type") == "tool_use"):
+                        continue
+                    tool, inp = b.get("name") or "", b.get("input") or {}
+                    key = ("t", b.get("id") or (msg.get("id"), tool, json.dumps(inp, sort_keys=True)))
+                    plugin = kind = None
+                    if tool.startswith("mcp__plugin_"):
+                        rest = tool[len("mcp__plugin_"):]
+                        hits = [nm for nm in plugins if rest.startswith(nm + "_")]
+                        plugin, kind = (max(hits, key=len) if hits else None), "mcp"
+                    elif tool in ("Agent", "Task") and isinstance(inp.get("subagent_type"), str):
+                        plugin, kind = inp["subagent_type"].partition(":")[0] if ":" in inp["subagent_type"] else None, "agent"
+                    elif tool == "Skill" and isinstance(inp.get("skill"), str) and ":" in inp["skill"]:
+                        plugin, _, sub = inp["skill"].partition(":")
+                        in_cmds = plugin in plugins and sub in plugins[plugin]["commands"]
+                        kind = "command" if in_cmds and sub not in plugins[plugin]["skills"] else "skill"
+                    if plugin in plugins:
+                        yield plugin, kind, ts, key
+
+
+def plugin_usage(projects, plugins, cutoff):
+    """({nombre: {tipo: [usos, último ts]}}, transcripts leídos) en la ventana; cada uso cuenta una vez aunque
+    el bloque se repita en copias del transcript (--resume, forks)."""
+    by_name = {p["name"]: p for p in plugins}
+    bare = defaultdict(list)
+    for p in plugins:
+        bare_kinds = [("skill", s) for s in p["skills"]] + [("command", c) for c in p["commands"]]
+        for kind, nm in bare_kinds:
+            if (p["name"], kind) not in bare[nm]:
+                bare[nm].append((p["name"], kind))
+    usage = {p["name"]: {k: [0, None] for k in USE_KINDS} for p in plugins}
+    seen = set()
+    files = session_files(projects, cutoff=cutoff)
+    for _mtime, path, _sid, _main in files:
+        for plugin, kind, ts, key in _plugin_events(path, by_name, bare):
+            if (ts is not None and ts < cutoff) or key in seen:
+                continue
+            seen.add(key)
+            u = usage[plugin][kind]
+            u[0] += 1
+            if ts is not None and (u[1] is None or ts > u[1]):
+                u[1] = ts
+    return usage, len(files)
+
+
+def classify(p, u):
+    if not (p["skills"] or p["agents"] or p["commands"] or p["mcp"]):
+        return NOT_AUDITABLE
+    if sum(v[0] for v in u.values()) == 0:
+        return DISABLE
+    if p["skills"] and u["skill"][0] == 0:
+        return NAME_ONLY
+    return IN_USE
+
+
+def project_overrides(cwd, user_settings):
+    """{id: (archivo, valor)} de `enabledPlugins` en `.claude/settings.json` y `settings.local.json` del cwd
+    (el local gana); se omite el archivo si es el mismo settings de usuario (cwd = home)."""
+    out = {}
+    for fn in ("settings.json", "settings.local.json"):
+        path = os.path.join(cwd, ".claude", fn)
+        if os.path.normcase(os.path.abspath(path)) == os.path.normcase(os.path.abspath(user_settings)):
+            continue
+        d = _load_json(path) or {}
+        for pid, v in (d.get("enabledPlugins") or {}).items() if isinstance(d.get("enabledPlugins"), dict) else []:
+            out[pid] = (path, v)
+    return out
+
+
+def _date(ts):
+    return datetime.fromtimestamp(ts).strftime("%Y-%m-%d") if ts else "—"
+
+
+def _components(p):
+    parts = []
+    if p["mcp"]:
+        parts.append("MCP " + ", ".join("`%s`" % s for s in sorted(p["mcp"])))
+    if p["hooks"]:
+        parts.append("hooks " + ", ".join(sorted(p["hooks"])))
+    if p["lsp"]:
+        parts.append("LSP " + ", ".join("`%s`" % s for s in sorted(p["lsp"])))
+    return "; ".join(parts) or "—"
+
+
+def render_plugins(plugins, usage, days, nfiles, settings_path, overrides):
+    audited = [p for p in plugins if not p["id"].startswith(NEB_PREFIX)]
+    verdict = {p["id"]: classify(p, usage[p["name"]]) for p in audited}
+    grand = sum(p["weight"]["total"] for p in audited) or 1
+    audited.sort(key=lambda p: -p["weight"]["total"])
+    out = ["# Plugins activos: peso contra uso (últimos %g días)" % days, "",
+           "Desde %s · transcripts leídos: %d · settings: `%s` · `neb@*` excluido" % (
+               _date(time.time() - days * 86400), nfiles, settings_path), "",
+           "| Plugin | Peso fijo (caracteres de descripción) | Skills · agentes · comandos | "
+           "Se pierde también al desactivar | Usos (MCP · agentes · skills · comandos) | Último uso | Veredicto |",
+           "|---|---|---|---|---|---|---|"]
+    for p in audited:
+        u = usage[p["name"]]
+        last = " · ".join("%s %s" % (USE_LABELS[k], _date(u[k][1])) for k in USE_KINDS if u[k][1]) or "—"
+        out.append("| `%s` | %s (%.0f %%) | %d · %d · %d | %s | %s | %s | %s |" % (
+            p["id"], "{:,}".format(p["weight"]["total"]), 100 * p["weight"]["total"] / grand,
+            len(p["skills"]), len(p["agents"]), len(p["commands"]), _components(p),
+            " · ".join(str(u[k][0]) for k in USE_KINDS), last, verdict[p["id"]]))
+    dis = [p for p in audited if verdict[p["id"]] == DISABLE]
+    nam = sorted((p for p in audited if verdict[p["id"]] == NAME_ONLY), key=lambda p: -p["weight"]["skills"])
+    noa = [p for p in audited if verdict[p["id"]] == NOT_AUDITABLE]
+    out += ["", "## Candidatos", ""]
+    if not dis and not nam:
+        out.append("Sin candidatos en la ventana.")
+    for p in dis:
+        extra = _components(p)
+        out.append("- **Desactivar** `%s`: %s caracteres; cero usos en %g días. %s" % (
+            p["id"], "{:,}".format(p["weight"]["total"]), days,
+            "Se pierde también: %s." % extra if extra != "—" else "Sin MCP, hooks ni LSP."))
+    for p in nam:
+        u = usage[p["name"]]
+        out.append("- **name-only** `%s`: %d skills, %s caracteres de descripciones de skills; "
+                   "%d usos y cero cargas de skill en %g días." % (
+                       p["id"], len(p["skills"]), "{:,}".format(p["weight"]["skills"]),
+                       sum(v[0] for v in u.values()), days))
+    if noa:
+        out += ["", "No auditables (sin señal medible en el transcript; nunca candidatos): " + ", ".join(
+            "`%s` (%s)" % (p["id"], _components(p)) for p in noa)]
+    notes = []
+    for p in audited:
+        if p["id"] in overrides:
+            path, v = overrides[p["id"]]
+            notes.append("`%s` está declarado `%s` en `%s`: ese valor gana al del settings de usuario." % (
+                p["id"], json.dumps(v), path))
+        if p["missing"]:
+            notes.append("`%s`: no se encontró su `installPath` en `installed_plugins.json`; no se midió su peso." % p["id"])
+        if p["custom_paths"]:
+            notes.append("`%s`: su `plugin.json` declara rutas propias de %s, que no se leen; su peso puede "
+                         "quedar corto." % (p["id"], ", ".join(p["custom_paths"])))
+    if notes:
+        out += ["", "## Avisos", ""] + ["- " + n for n in notes]
+    out += ["", "## Límites de la medición", "",
+            "- El peso cuenta la `description` del frontmatter de `skills/*/SKILL.md`, `agents/*.md` y "
+            "`commands/*.md`. Claude Code recorta el listado de skills a un tope, así que el costo real puede ser "
+            "menor que el peso.",
+            "- Un comando sin calificar (`/x`) cuenta solo si `x` coincide con un único comando o skill de los "
+            "plugins activos.",
+            "- Un plugin sin skills, agentes, comandos ni MCP (solo LSP o hooks) no deja rastro medible: "
+            "«no auditable»."]
+    return "\n".join(out)
+
+
+# --------------------------------------------------------------------------- apply: la única escritura
+
+def _indent_of(text):
+    m = re.search(r"\n([ \t]+)\S", text)
+    if not m:
+        return 2
+    return "\t" if m.group(1).startswith("\t") else len(m.group(1))
+
+
+def _dumps(data, indent):
+    return json.dumps(data, indent=indent, ensure_ascii=False)
+
+
+def update_json(path, mutate, dumps=_dumps):
+    """Relee path justo antes, aplica mutate(data) → [(clave, subclave, valor)], escribe a un temporal del mismo
+    directorio, verifica que parsea, que trae los cambios y que nada más cambió, y reemplaza.
+    Devuelve (cambios, None) o (None, motivo); con motivo, el archivo quedó intacto."""
+    try:
+        with open(path, encoding="utf-8", newline="") as f:
+            raw = f.read()
+    except OSError as e:
+        return None, "no se pudo leer %s: %s" % (path, e)
+    bom = raw.startswith("\ufeff")
+    text = raw[1:] if bom else raw
+    try:
+        data, before = json.loads(text), json.loads(text)
+    except ValueError as e:
+        return None, "%s no es JSON válido (%s); no se tocó" % (path, e)
+    if not isinstance(data, dict):
+        return None, "%s no es un objeto JSON; no se tocó" % path
+    try:
+        changes = mutate(data)
+    except ValueError as e:
+        return None, str(e)
+    nl = "\r\n" if "\r\n" in text else "\n"
+    out = dumps(data, _indent_of(text)).replace("\n", nl) + (nl if text.endswith("\n") else "")
+    path = os.path.realpath(path)          # un settings enlazado (dotfiles) se escribe en su destino
+    fd, tmp = tempfile.mkstemp(prefix=".neb-usage-", suffix=".tmp", dir=os.path.dirname(path))
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            f.write(("\ufeff" if bom else "") + out)
+        with open(tmp, encoding="utf-8-sig") as f:
+            check = json.load(f)
+        touched = defaultdict(dict)
+        for key, sub, value in changes:
+            touched[key][sub] = value
+        for key in set(before) | set(check):
+            want = before.get(key)
+            if key in touched:
+                want = dict(want or {})
+                want.update(touched[key])
+            if check.get(key) != want:
+                raise ValueError("la clave `%s` no quedó como se esperaba" % key)
+        os.replace(tmp, path)
+    except (OSError, ValueError) as e:
+        try:
+            os.remove(tmp)
+        except OSError:
+            pass
+        return None, "no se escribió %s: %s" % (path, e)
+    return changes, None
+
+
+def cli_apply(argv):
+    ap = argparse.ArgumentParser(prog="usage-tracker.py apply")
+    ap.add_argument("plugin", help="id del plugin, <nombre>@<marketplace>")
+    ap.add_argument("action", choices=["disable", "name-only"])
+    ap.add_argument("--settings", default=DEFAULT_SETTINGS)
+    a = ap.parse_args(argv)
+    if "@" not in a.plugin:
+        print("usage-tracker: el id va como <nombre>@<marketplace> (columna Plugin de `plugins`)", file=sys.stderr)
+        return 2
+    if a.plugin.startswith(NEB_PREFIX):
+        print("usage-tracker: neb no se audita ni se aplica desde aquí", file=sys.stderr)
+        return 2
+    ep = (_load_json(a.settings) or {}).get("enabledPlugins")
+    if not (isinstance(ep, dict) and ep.get(a.plugin) is True):
+        print("usage-tracker: `%s` no está en `true` en `enabledPlugins` de %s" % (a.plugin, a.settings), file=sys.stderr)
+        return 2
+    skills = []
+    if a.action == "name-only":
+        skills = sorted(locate_plugin(a.settings, a.plugin)["skills"])
+        if not skills:
+            print("usage-tracker: `%s` no tiene skills que pasar a name-only" % a.plugin, file=sys.stderr)
+            return 2
+
+    def mutate(data):
+        key = "enabledPlugins" if a.action == "disable" else "skillOverrides"
+        if not isinstance(data.setdefault(key, {}), dict):
+            raise ValueError("`%s` no es un objeto en %s; no se tocó" % (key, a.settings))
+        if a.action == "disable":
+            changes = [(key, a.plugin, False)]
+        else:
+            changes = [(key, "%s:%s" % (a.plugin.split("@")[0], s), "name-only") for s in skills]
+        for k, sub, value in changes:
+            data[k][sub] = value
+        return changes
+
+    changes, err = update_json(a.settings, mutate)
+    if err:
+        print("usage-tracker: " + err, file=sys.stderr)
+        return 1
+    print("Actualizado `%s`:" % a.settings)
+    print("\n".join("- `%s.%s` = %s" % (k, s, json.dumps(v)) for k, s, v in changes))
+    if a.action == "name-only":
+        print("\nQue `skillOverrides` reconozca el nombre calificado está sin verificar (supuesto R24): "
+              "en la sesión nueva, revisa que esos skills se listen sin descripción.")
+    print("\nRige al abrir una sesión nueva (supuesto R25). Para revertir: %s." % (
+        "volver `enabledPlugins.%s` a `true`" % a.plugin if a.action == "disable"
+        else "borrar esas claves de `skillOverrides`"))
+    ov = project_overrides(os.getcwd(), a.settings).get(a.plugin)
+    if ov:
+        print("Aviso: `%s` declara `%s` = %s, y ese valor gana al del settings de usuario." % (
+            ov[0], a.plugin, json.dumps(ov[1])))
+    return 0
+
+
+def cli_plugins(argv):
+    ap = argparse.ArgumentParser(prog="usage-tracker.py plugins")
+    ap.add_argument("--days", type=float, default=PLUGINS_DAYS)
+    ap.add_argument("--projects", default=os.path.join(os.path.expanduser("~"), ".claude", "projects"))
+    ap.add_argument("--settings", default=DEFAULT_SETTINGS)
+    a = ap.parse_args(argv)
+    if _load_json(a.settings) is None:
+        print("usage-tracker: no se pudo leer %s como JSON" % a.settings, file=sys.stderr)
+        return 2
+    plugins = plugin_inventory(a.settings)
+    usage, nfiles = plugin_usage(a.projects, plugins, time.time() - a.days * 86400)
+    print(render_plugins(plugins, usage, a.days, nfiles, a.settings, project_overrides(os.getcwd(), a.settings)))
+    return 0
+
+
 # --------------------------------------------------------------------------- CLI
 
 def active_names(projects, req):
@@ -512,10 +1017,11 @@ def main(argv=None):
     argv = sys.argv[1:] if argv is None else argv
     if hasattr(sys.stdout, "reconfigure"):
         sys.stdout.reconfigure(encoding="utf-8")
-    if not argv or argv[0] != "report":
+    commands = {"report": cli_report, "plugins": cli_plugins, "apply": cli_apply}
+    if not argv or argv[0] not in commands:
         print(__doc__.strip(), file=sys.stderr)
         return 2
-    return cli_report(argv[1:])
+    return commands[argv[0]](argv[1:])
 
 
 if __name__ == "__main__":
