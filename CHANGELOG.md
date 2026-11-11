@@ -4,6 +4,13 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.32.2] - 2026-11-11
+
+> **Patch**: la columna «Cómo probarlo» de R24 conservaba el método de prueba de 6.31.0 («Pasar a name-only los skills de un plugin con `/neb-usage plugins`»), que dejó de existir cuando 6.31.1 retiró name-only del comando; quedaba pegado al método vigente como «…plugins`, En un directorio…». Se quita; el método vigente no cambia.
+
+### Fixed
+- **`methodology/platform-assumptions.md`** R24, «Cómo probarlo»: sin el método retirado.
+
 ## [6.32.1] - 2026-11-11
 
 > **Patch**: aclaración de la Re-verificación de 6.32.0. La frase sobre si la prueba posterior a la entrega difiere el cierre remitía a cada profile, y solo `self-applied` lo define. Ahora dice solo lo de `self-applied`; en los demás profiles rige lo que ya decían sus reglas de cierre, sin norma nueva.
