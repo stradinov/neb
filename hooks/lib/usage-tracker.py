@@ -11,7 +11,9 @@ Uso:
   --req SLUG   solo las llamadas atribuidas al REQ SLUG (slug = nombre del change MD sin la fecha).
   --write MD   reemplaza el bloque entre <!-- usage-tracker-start --> y <!-- usage-tracker-end --> de MD con
                el gasto de su REQ (el slug sale del nombre de MD si no se da --req). Sin marcadores no escribe.
-  --projects   raíz de los transcripts (por defecto ~/.claude/projects).
+  --projects   raíz de los transcripts (por defecto <dir de config>/projects).
+
+El dir de config es `CLAUDE_CONFIG_DIR` si está definida; si no, ~/.claude (supuesto R26).
 
 Qué cuenta (formato del transcript: supuesto R21 de methodology/platform-assumptions.md):
   - Hilo principal `<proyecto>/<sesión>.jsonl` y subagentes `<proyecto>/<sesión>/subagents/**/agent-*.jsonl`
@@ -25,9 +27,10 @@ Qué cuenta (formato del transcript: supuesto R21 de methodology/platform-assump
 
 plugins (solo lectura) — auditoría de los plugins activos: peso fijo contra uso real.
   --days N     ventana de uso (por defecto 90); --settings, el settings de usuario (por defecto
-               ~/.claude/settings.json); `installed_plugins.json` y `known_marketplaces.json` se leen de
-               `plugins/` junto a ese archivo.
-  Inventario: `enabledPlugins` en `true` (sin `neb@*`). Peso: caracteres de `description` de
+               <dir de config>/settings.json); `installed_plugins.json` y `known_marketplaces.json` se leen
+               de `plugins/` junto a ese archivo (supuesto R26); --projects, como en report.
+  Inventario: `enabledPlugins` en `true` del settings de usuario; `neb@*` se lee pero no sale en el reporte.
+  No ve plugins activados solo en settings de proyecto, local o administrados. Peso: caracteres de `description` de
   `skills/*/SKILL.md`, `agents/*.md` y `commands/*.md`. Componentes que se pierden al desactivar: MCP, hooks y
   LSP (de los archivos del plugin, de su `plugin.json` y de su entrada en el marketplace). Uso, con dedupe por
   bloque (`tool_use.id` o el `uuid` de la línea `user`): `mcp__plugin_<nombre>_*`, `Agent`/`Task` con
@@ -40,8 +43,11 @@ plugins (solo lectura) — auditoría de los plugins activos: peso fijo contra u
 
 apply (la única escritura) — `disable` pone `enabledPlugins.<id> = false`; `name-only` pone
   `skillOverrides["<nombre>:<skill>"] = "name-only"` por cada skill del plugin. Relee el archivo justo antes,
-  escribe a un temporal en el mismo directorio, verifica que parsea y que el resto de las claves no cambió,
-  y reemplaza. Solo se corre con OK del dev desde el menú de /neb-usage plugins.
+  escribe a un temporal en el mismo directorio (con el modo del original; si el settings es un enlace, en su
+  destino), verifica que parsea y que el resto de las claves no cambió, y reemplaza. El contenido ajeno queda
+  igual; el formato se reescribe con la sangría detectada. Rechaza `neb@*` y los plugins que no están en
+  `true`; tras name-only avisa que R24 está sin verificar. Solo se corre con OK del dev desde el menú de
+  /neb-usage plugins.
 
 Salida: exit 0 con el reporte; exit 1 si `apply` no pudo escribir; exit 2 ante argumentos inválidos.
 """
@@ -53,6 +59,7 @@ import os
 import re
 import statistics
 import sys
+import shutil
 import tempfile
 import time
 from collections import defaultdict
@@ -469,7 +476,9 @@ def write_block(path, block):
 
 # --------------------------------------------------------------------------- plugins: inventario y peso
 
-DEFAULT_SETTINGS = os.path.join(os.path.expanduser("~"), ".claude", "settings.json")
+def claude_dir():
+    """Dir de configuración de Claude Code: `CLAUDE_CONFIG_DIR` o ~/.claude (supuesto R26)."""
+    return os.environ.get("CLAUDE_CONFIG_DIR") or os.path.join(os.path.expanduser("~"), ".claude")
 PLUGINS_DAYS = 90
 NEB_PREFIX = "neb@"
 COMMAND_RE = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
@@ -808,8 +817,10 @@ def render_plugins(plugins, usage, days, nfiles, settings_path, overrides):
         out += ["", "## Avisos", ""] + ["- " + n for n in notes]
     out += ["", "## Límites de la medición", "",
             "- El peso cuenta la `description` del frontmatter de `skills/*/SKILL.md`, `agents/*.md` y "
-            "`commands/*.md`. Claude Code recorta el listado de skills a un tope, así que el costo real puede ser "
-            "menor que el peso.",
+            "`commands/*.md`. `[asumido]` Claude Code recorta el listado de skills a un tope, así que el costo real "
+            "puede ser menor que el peso.",
+            "- Solo se ven los plugins en `true` del settings de usuario: no los activados solo en un settings de "
+            "proyecto, local o administrado.",
             "- Un comando sin calificar (`/x`) cuenta solo si `x` coincide con un único comando o skill de los "
             "plugins activos.",
             "- Un plugin sin skills, agentes, comandos ni MCP (solo LSP o hooks) no deja rastro medible: "
@@ -870,6 +881,7 @@ def update_json(path, mutate, dumps=_dumps):
                 want.update(touched[key])
             if check.get(key) != want:
                 raise ValueError("la clave `%s` no quedó como se esperaba" % key)
+        shutil.copymode(path, tmp)         # mkstemp crea con 0600 en POSIX
         os.replace(tmp, path)
     except (OSError, ValueError) as e:
         try:
@@ -884,7 +896,7 @@ def cli_apply(argv):
     ap = argparse.ArgumentParser(prog="usage-tracker.py apply")
     ap.add_argument("plugin", help="id del plugin, <nombre>@<marketplace>")
     ap.add_argument("action", choices=["disable", "name-only"])
-    ap.add_argument("--settings", default=DEFAULT_SETTINGS)
+    ap.add_argument("--settings", default=os.path.join(claude_dir(), "settings.json"))
     a = ap.parse_args(argv)
     if "@" not in a.plugin:
         print("usage-tracker: el id va como <nombre>@<marketplace> (columna Plugin de `plugins`)", file=sys.stderr)
@@ -937,8 +949,8 @@ def cli_apply(argv):
 def cli_plugins(argv):
     ap = argparse.ArgumentParser(prog="usage-tracker.py plugins")
     ap.add_argument("--days", type=float, default=PLUGINS_DAYS)
-    ap.add_argument("--projects", default=os.path.join(os.path.expanduser("~"), ".claude", "projects"))
-    ap.add_argument("--settings", default=DEFAULT_SETTINGS)
+    ap.add_argument("--projects", default=os.path.join(claude_dir(), "projects"))
+    ap.add_argument("--settings", default=os.path.join(claude_dir(), "settings.json"))
     a = ap.parse_args(argv)
     if _load_json(a.settings) is None:
         print("usage-tracker: no se pudo leer %s como JSON" % a.settings, file=sys.stderr)
@@ -980,7 +992,7 @@ def cli_report(argv):
     ap.add_argument("--days", type=float)
     ap.add_argument("--req")
     ap.add_argument("--write")
-    ap.add_argument("--projects", default=os.path.join(os.path.expanduser("~"), ".claude", "projects"))
+    ap.add_argument("--projects", default=os.path.join(claude_dir(), "projects"))
     a = ap.parse_args(argv)
     req = a.req
     if a.write and not req:

@@ -497,6 +497,19 @@ class Plugins(PluginsBase):
         self.assertIn("ese valor gana", ut.render_plugins(list(plugins.values()), usage, 90, 0, self.settings, ov))
 
 
+class ConfigDir(unittest.TestCase):
+    def test_respeta_claude_config_dir(self):
+        old = os.environ.get("CLAUDE_CONFIG_DIR")
+        try:
+            os.environ["CLAUDE_CONFIG_DIR"] = os.path.join("X:", "cfg")
+            self.assertEqual(ut.claude_dir(), os.path.join("X:", "cfg"))
+            del os.environ["CLAUDE_CONFIG_DIR"]
+            self.assertEqual(ut.claude_dir(), os.path.join(os.path.expanduser("~"), ".claude"))
+        finally:
+            if old is not None:
+                os.environ["CLAUDE_CONFIG_DIR"] = old
+
+
 class Apply(PluginsBase):
     def setUp(self):
         super().setUp()
