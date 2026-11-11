@@ -4,6 +4,20 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.31.1] - 2026-11-10
+
+> **Patch**: se retira la acción «name-only» de `/neb-usage plugins`. La prueba con el plugin publicado desmintió R24: `skillOverrides: "name-only"` lista sin descripción un skill que no es de plugin, pero no tiene efecto en un skill de plugin, con la clave `<plugin>:<skill>` ni con el nombre a secas (CLI 2.1.318, app y `claude -p`). La acción no ahorraba nada.
+>
+> - Un plugin con usos cuyos skills no se cargaron en la ventana queda «en uso», y el reporte lo lista aparte, con su peso y sin menú: desactivarlo quitaría también lo que sí se usa.
+> - **Adoptantes**: si aplicaron name-only con 6.31.0, esas claves de `skillOverrides` (`<plugin>:<skill>`) no tienen efecto y pueden borrarse.
+
+### Changed
+- **`hooks/lib/usage-tracker.py`**: el veredicto «name-only» pasa a «en uso» con la lista informativa `idle_skills`; `apply` solo acepta `disable`.
+- **`commands/neb-usage.md`**: el menú por candidato queda en «Desactivarlo» / «Dejarlo»; la lista de skills sin cargar se presenta sin menú.
+- **`hooks/README.md`** § "Medidor de uso (`/neb-usage`)": veredicto y `apply` sin name-only.
+- **`methodology/platform-assumptions.md`** R24: reescrita como desmentida, con la evidencia y una prueba repetible.
+- **`hooks/tests/test_usage_tracker.py`**: `test_name_only_retirado` en lugar de `test_name_only_por_skill`; la clasificación espera «en uso» y la lista de skills sin cargar.
+
 ## [6.31.0] - 2026-11-10
 
 > **Minor**: `/neb-usage plugins` audita los plugins activos: cuánto pesan en el contexto fijo (caracteres de descripción de sus skills, agentes y comandos) contra cuánto se usan en los transcripts (MCP, agentes, skills y comandos). Propone por candidato «desactivar» (cero usos en la ventana) o «name-only» (se usa, pero ninguno de sus skills se carga) y, con OK del dev desde el menú, `usage-tracker.py apply` escribe el cambio en `~/.claude/settings.json`.

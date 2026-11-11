@@ -10,7 +10,7 @@ Cubre hooks/lib/usage-tracker.py:
   • --write: solo entre marcadores; sin marcadores no escribe
   • plugins: peso y componentes (archivos, plugin.json, marketplace); uso por MCP, Agent, Skill y comandos
     (calificados y sin calificar); ventana; dedupe; neb@* y plugins en false fuera; clasificación
-  • apply: disable / name-only conservan las claves ajenas; no escribe si el resultado no parsea o cambia otra clave
+  • apply: disable conserva las claves ajenas; name-only retirado (6.31.1); no escribe si el resultado no parsea o cambia otra clave
 
 Framework: unittest (stdlib). Transcripts sintéticos en un directorio temporal; nunca toca ~/.claude.
   py -m unittest discover -s hooks/tests -p test_usage_tracker.py
@@ -479,11 +479,13 @@ class Plugins(PluginsBase):
         plugins, usage = self.audit()
         got = {n: ut.classify(p, usage[n]) for n, p in plugins.items()}
         self.assertNotIn("off", got)                                   # en false: no se lista
-        self.assertEqual(got, {"idle": ut.DISABLE, "heavy": ut.NAME_ONLY, "light": ut.NAME_ONLY, "used": ut.IN_USE,
+        self.assertEqual(got, {"idle": ut.DISABLE, "heavy": ut.IN_USE, "light": ut.IN_USE, "used": ut.IN_USE,
                                "lsp": ut.NOT_AUDITABLE, "hk": ut.NOT_AUDITABLE, "neb": ut.DISABLE})
         report = ut.render_plugins(list(plugins.values()), usage, 90, 1, self.settings, {})
         self.assertNotIn("neb@mk", report)                             # neb@* excluido del reporte
-        self.assertLess(report.index("**name-only** `heavy@mk`"), report.index("**name-only** `light@mk`"))
+        self.assertEqual([n for n, p in plugins.items() if ut.idle_skills(p, usage[n])], ["heavy", "light"])
+        self.assertLess(report.index("- `heavy@mk`: 2 skills"), report.index("- `light@mk`: 1 skill,"))
+        self.assertNotIn("name-only", report)                         # sin acción que proponer para sus skills
 
     def test_aviso_de_settings_de_proyecto(self):
         a = self.plugin("a", skills=[("s", "d")])
@@ -534,12 +536,11 @@ class Apply(PluginsBase):
         after["enabledPlugins"][self.pid] = True
         self.assertEqual(after, self.before)
 
-    def test_name_only_por_skill(self):
-        self.assertEqual(self.run_apply("name-only"), 0)
-        after = self.load()
-        self.assertEqual(after["skillOverrides"], {"ajeno:skill": "off", "a:s1": "name-only", "a:s2": "name-only"})
-        del after["skillOverrides"], self.before["skillOverrides"]
-        self.assertEqual(after, self.before)
+    def test_name_only_retirado(self):
+        # R24 desmentido: skillOverrides no tiene efecto en skills de plugin; apply ya no lo ofrece.
+        with contextlib.redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            ut.main(["apply", self.pid, "name-only", "--settings", self.settings])
+        self.assertEqual(self.load(), self.before)
 
     def test_no_escribe_si_el_resultado_no_parsea(self):
         with open(self.settings, "rb") as f:
@@ -596,9 +597,7 @@ class Apply(PluginsBase):
                 ut.main(["apply", self.pid, "borrar", "--settings", self.settings])
             self.assertEqual(ut.main(["apply", "neb@mk", "disable", "--settings", self.settings]), 2)
             self.assertEqual(ut.main(["apply", "inactivo@mk", "disable", "--settings", self.settings]), 2)
-            other = self.plugin("vacio")                               # instalado, sin skills
-            self.save({self.pid: True, other: True})
-            self.assertEqual(ut.main(["apply", other, "name-only", "--settings", self.settings]), 2)
+
 
 
 if __name__ == "__main__":

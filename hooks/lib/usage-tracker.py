@@ -5,7 +5,7 @@ usage-tracker.py — gasto de tokens por REQ o por ventana de días, leído de l
 Uso:
   usage-tracker.py report [--days N] [--req <slug>] [--write <change MD>] [--projects <dir>]
   usage-tracker.py plugins [--days N] [--projects <dir>] [--settings <settings.json>]
-  usage-tracker.py apply <plugin@marketplace> disable|name-only [--settings <settings.json>]
+  usage-tracker.py apply <plugin@marketplace> disable [--settings <settings.json>]
 
   --days N     ventana: transcripts modificados en los últimos N días (por defecto 14 sin --req/--write).
   --req SLUG   solo las llamadas atribuidas al REQ SLUG (slug = nombre del change MD sin la fecha).
@@ -38,15 +38,15 @@ plugins (solo lectura) — auditoría de los plugins activos: peso fijo contra u
   (calificado, o sin calificar si coincide con un solo comando o skill de los plugins activos). [asumido] las
   copias de --resume y los forks conservan `tool_use.id` y `uuid`; si no, una copia contaría dos veces (el
   veredicto solo distingue cero de no cero).
-  Clasificación: con señal medible y cero usos → desactivar; con usos, skills y cero cargas de skill →
-  name-only; sin señal medible (solo LSP o hooks) → no auditable.
+  Clasificación: con señal medible y cero usos → desactivar; con usos → en uso (si además tiene skills y
+  ninguno se cargó, el reporte lo anota sin proponer acción: `skillOverrides` no tiene efecto en skills de
+  plugin, supuesto R24 desmentido); sin señal medible (solo LSP o hooks) → no auditable.
 
-apply (la única escritura) — `disable` pone `enabledPlugins.<id> = false`; `name-only` pone
-  `skillOverrides["<nombre>:<skill>"] = "name-only"` por cada skill del plugin. Relee el archivo justo antes,
+apply (la única escritura) — `disable` pone `enabledPlugins.<id> = false`. Relee el archivo justo antes,
   escribe a un temporal en el mismo directorio (con el modo del original; si el settings es un enlace, en su
   destino), verifica que parsea y que el resto de las claves no cambió, y reemplaza. El contenido ajeno queda
   igual; el formato se reescribe con la sangría detectada. Rechaza `neb@*` y los plugins que no están en
-  `true`; tras name-only avisa que R24 está sin verificar. Solo se corre con OK del dev desde el menú de
+  `true`. Solo se corre con OK del dev desde el menú de
   /neb-usage plugins.
 
 Salida: exit 0 con el reporte; exit 1 si `apply` no pudo escribir; exit 2 ante argumentos inválidos.
@@ -482,7 +482,7 @@ def claude_dir():
 PLUGINS_DAYS = 90
 NEB_PREFIX = "neb@"
 COMMAND_RE = re.compile(r"<command-name>/?([^<\s]+)</command-name>")
-DISABLE, NAME_ONLY, NOT_AUDITABLE, IN_USE = "desactivar", "name-only", "no auditable", "en uso"
+DISABLE, NOT_AUDITABLE, IN_USE = "desactivar", "no auditable", "en uso"
 USE_KINDS = ("mcp", "agent", "skill", "command")      # skill = cargas de skill (por Skill o por comando)
 USE_LABELS = {"mcp": "MCP", "agent": "agentes", "skill": "skills", "command": "comandos"}
 COMPONENT_KEYS = (("mcp", "mcpServers"), ("hooks", "hooks"), ("lsp", "lspServers"))
@@ -730,9 +730,13 @@ def classify(p, u):
         return NOT_AUDITABLE
     if sum(v[0] for v in u.values()) == 0:
         return DISABLE
-    if p["skills"] and u["skill"][0] == 0:
-        return NAME_ONLY
     return IN_USE
+
+
+def idle_skills(p, u):
+    """En uso, con skills y ninguno cargado en la ventana: su peso no rinde, pero no hay acción que lo quite
+    sin perder el resto del plugin (supuesto R24, desmentido)."""
+    return classify(p, u) == IN_USE and bool(p["skills"]) and u["skill"][0] == 0
 
 
 def project_overrides(cwd, user_settings):
@@ -783,22 +787,25 @@ def render_plugins(plugins, usage, days, nfiles, settings_path, overrides):
             len(p["skills"]), len(p["agents"]), len(p["commands"]), _components(p),
             " · ".join(str(u[k][0]) for k in USE_KINDS), last, verdict[p["id"]]))
     dis = [p for p in audited if verdict[p["id"]] == DISABLE]
-    nam = sorted((p for p in audited if verdict[p["id"]] == NAME_ONLY), key=lambda p: -p["weight"]["skills"])
+    idle = sorted((p for p in audited if idle_skills(p, usage[p["name"]])), key=lambda p: -p["weight"]["skills"])
     noa = [p for p in audited if verdict[p["id"]] == NOT_AUDITABLE]
     out += ["", "## Candidatos", ""]
-    if not dis and not nam:
+    if not dis:
         out.append("Sin candidatos en la ventana.")
     for p in dis:
         extra = _components(p)
         out.append("- **Desactivar** `%s`: %s caracteres; cero usos en %g días. %s" % (
             p["id"], "{:,}".format(p["weight"]["total"]), days,
             "Se pierde también: %s." % extra if extra != "—" else "Sin MCP, hooks ni LSP."))
-    for p in nam:
+    if idle:
+        out += ["", "En uso, con skills que no se cargaron en la ventana (sin acción: `skillOverrides` no tiene "
+                "efecto en skills de plugin, supuesto R24; desactivar quitaría también lo que sí se usa):", ""]
+    for p in idle:
         u = usage[p["name"]]
-        out.append("- **name-only** `%s`: %d skills, %s caracteres de descripciones de skills; "
-                   "%d usos y cero cargas de skill en %g días." % (
-                       p["id"], len(p["skills"]), "{:,}".format(p["weight"]["skills"]),
-                       sum(v[0] for v in u.values()), days))
+        out.append("- `%s`: %d skill%s, %s caracteres de descripciones de skills; %d usos y cero cargas de "
+                   "skill en %g días." % (p["id"], len(p["skills"]), "" if len(p["skills"]) == 1 else "s",
+                                         "{:,}".format(p["weight"]["skills"]),
+                                    sum(v[0] for v in u.values()), days))
     if noa:
         out += ["", "No auditables (sin señal medible en el transcript; nunca candidatos): " + ", ".join(
             "`%s` (%s)" % (p["id"], _components(p)) for p in noa)]
@@ -895,7 +902,7 @@ def update_json(path, mutate, dumps=_dumps):
 def cli_apply(argv):
     ap = argparse.ArgumentParser(prog="usage-tracker.py apply")
     ap.add_argument("plugin", help="id del plugin, <nombre>@<marketplace>")
-    ap.add_argument("action", choices=["disable", "name-only"])
+    ap.add_argument("action", choices=["disable"])
     ap.add_argument("--settings", default=os.path.join(claude_dir(), "settings.json"))
     a = ap.parse_args(argv)
     if "@" not in a.plugin:
@@ -908,21 +915,12 @@ def cli_apply(argv):
     if not (isinstance(ep, dict) and ep.get(a.plugin) is True):
         print("usage-tracker: `%s` no está en `true` en `enabledPlugins` de %s" % (a.plugin, a.settings), file=sys.stderr)
         return 2
-    skills = []
-    if a.action == "name-only":
-        skills = sorted(locate_plugin(a.settings, a.plugin)["skills"])
-        if not skills:
-            print("usage-tracker: `%s` no tiene skills que pasar a name-only" % a.plugin, file=sys.stderr)
-            return 2
 
     def mutate(data):
-        key = "enabledPlugins" if a.action == "disable" else "skillOverrides"
+        key = "enabledPlugins"
         if not isinstance(data.setdefault(key, {}), dict):
             raise ValueError("`%s` no es un objeto en %s; no se tocó" % (key, a.settings))
-        if a.action == "disable":
-            changes = [(key, a.plugin, False)]
-        else:
-            changes = [(key, "%s:%s" % (a.plugin.split("@")[0], s), "name-only") for s in skills]
+        changes = [(key, a.plugin, False)]
         for k, sub, value in changes:
             data[k][sub] = value
         return changes
@@ -933,12 +931,8 @@ def cli_apply(argv):
         return 1
     print("Actualizado `%s`:" % a.settings)
     print("\n".join("- `%s.%s` = %s" % (k, s, json.dumps(v)) for k, s, v in changes))
-    if a.action == "name-only":
-        print("\nQue `skillOverrides` reconozca el nombre calificado está sin verificar (supuesto R24): "
-              "en la sesión nueva, revisa que esos skills se listen sin descripción.")
-    print("\nRige al abrir una sesión nueva (supuesto R25). Para revertir: %s." % (
-        "volver `enabledPlugins.%s` a `true`" % a.plugin if a.action == "disable"
-        else "borrar esas claves de `skillOverrides`"))
+    print("\nRige al abrir una sesión nueva (supuesto R25). Para revertir: volver `enabledPlugins.%s` a "
+          "`true`." % a.plugin)
     ov = project_overrides(os.getcwd(), a.settings).get(a.plugin)
     if ov:
         print("Aviso: `%s` declara `%s` = %s, y ese valor gana al del settings de usuario." % (
