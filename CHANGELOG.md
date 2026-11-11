@@ -4,6 +4,13 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.32.1] - 2026-11-11
+
+> **Patch**: aclaración de la Re-verificación de 6.32.0. La frase sobre si la prueba posterior a la entrega difiere el cierre remitía a cada profile, y solo `self-applied` lo define. Ahora dice solo lo de `self-applied`; en los demás profiles rige lo que ya decían sus reglas de cierre, sin norma nueva.
+
+### Changed
+- **`methodology/platform-assumptions.md`** § Mantenimiento, Re-verificación: «En `self-applied`, esa prueba posterior no difiere el cierre: es retroalimentación de Fase 9», en lugar de «lo decide el profile».
+
 ## [6.32.0] - 2026-11-11
 
 > **Minor**: un supuesto de plataforma del que depende el diseño de un plan se prueba **antes del OK del plan** si se puede probar en una sesión desechable (sesión nueva y no interactiva, con el mecanismo montado a mano y sin publicar la entrega). Mientras no esté probado, el plan no se aprueba; ya no se difiere a una prueba posterior a la entrega ni se resuelve declarándolo `[asumido]`. Tras diagnóstico del defecto R24 / name-only (origen Fase 3, plan defectuoso) en REQ `neb-usage-plugins`, que repite el de R23 en `neb-tope-contexto-compactacion`.
