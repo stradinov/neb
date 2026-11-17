@@ -54,11 +54,12 @@ La tabla puede expandirse vía Fase 9 si surge un caso recurrente no cubierto.
 
 ## Agentes funcionales
 
-Además de los revisores de fase (tablas anteriores), existen **agentes funcionales**: subagentes invocados por un **skill** para una tarea acotada, no por la máquina de fases ni por los gates. No participan en la cobertura mínima por fase y no se anuncian en el modo de anuncio de roles. Los despacha un skill que corre en el hilo principal, donde se consolidan sus resultados (sobre anidamiento, ver el supuesto R13 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)).
+Además de los revisores de fase (tablas anteriores), existen **agentes funcionales**: subagentes invocados por un **skill** o por una **política transversal** para una tarea acotada, no por la máquina de fases ni por los gates. No participan en la cobertura mínima por fase y no se anuncian en el modo de anuncio de roles. Los despacha el hilo principal (el skill o quien aplica la política), donde se consolidan sus resultados (sobre anidamiento, ver el supuesto R13 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)).
 
 | Agente | Invocado por | Propósito | Tools |
 |---|---|---|---|
 | `pendings-recommender` | skill `pendings-review` (fan-out top-K) | Propone abordaje de solución para un pendiente; no escribe la DB | Read, Grep, Glob |
+| `correspondence-fact-checker` | política [`../general/correspondence.md`](../general/correspondence.md) § "Verificación de los hechos" (correo que atribuye una causa) | Coteja las afirmaciones de hecho de un correo con sus fuentes y busca otra causa del mismo dato | Read, Grep, Glob |
 
 > Nota para QA: esta subsección es la sede provisional del registro de agentes funcionales. Si QA prefiere otra sede (p.ej. `methodology/roles-catalog.md` o `skills/README.md`), reubicar y dejar puntero aquí.
 

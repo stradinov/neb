@@ -85,6 +85,7 @@ Inventario de los roles del catálogo: tipo, implementación y profile. La perti
 | Skill QA Engineer | revisor | **subagente** (`skill-qa-engineer`) | skill-authoring |
 | Fact-Check Reviewer | revisor | **subagente** (`fact-check-reviewer`) | research |
 | Context Completeness Reviewer | revisor | **subagente** (`context-completeness-reviewer`) | transversal (todos los profiles) |
+| Correspondence Fact-Check Reviewer | revisor | **subagente** (`correspondence-fact-checker`) | transversal (correos a terceros) |
 | SysAdmin / SRE | revisor | persona | software (futuro) |
 | Frontend Reviewer | revisor por dimensión | persona | software (futuro) |
 | Observability Reviewer | revisor por dimensión | persona | software (futuro) |

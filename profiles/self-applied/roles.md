@@ -49,3 +49,4 @@ Revisor transversal (no exclusivo de `self-applied` — aplica a todos los profi
 ## Agentes funcionales (no revisores de fase)
 
 - **Pendings Recommender** — `subagente` (`agents/pendings-recommender.md`). Invocado por el skill `pendings-review` para el fan-out de soluciones profundas (top-K). No es revisor de fase ni entra en la cobertura por fase; ver `process/roles-invocation.md` § "Agentes funcionales".
+- **Correspondence Fact-Check Reviewer** — `subagente` (`agents/correspondence-fact-checker.md`), transversal. Lo invoca `general/correspondence.md` § "Verificación de los hechos" cuando un correo a un tercero atribuye una causa. No es revisor de fase ni entra en la cobertura por fase; ver `process/roles-invocation.md` § "Agentes funcionales".

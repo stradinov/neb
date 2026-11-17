@@ -9,7 +9,7 @@ Este archivo es el **índice/mapa** de la metodología: orden de lectura y flujo
 Transversales **inyectadas al arranque** (vía [`startup.md`](startup.md), completas en el contexto desde el primer prompt de cada sesión; hoy, por el hook `SessionStart` en partes, supuesto R1):
 
 - [Communication](communication.md) — comunicación dev↔Claude: BLUF, menús, idioma, hilo conductor, handoff.
-- [Correspondence](correspondence.md) — correos a terceros: estructura a la medida del destinatario, formato HTML, idioma y registro.
+- [Correspondence](correspondence.md) — correos a terceros: estructura a la medida del destinatario, verificación de los hechos, formato HTML, idioma y registro.
 - [Profile detection](profile-detection.md) — detección del profile al iniciar y profile activo durante la sesión.
 - [Phase transitions](../process/phase-transitions.md) — enrutamiento del workflow: trigger de formalización, anti-desviación, mapa de fases, gates de cola, conflictos normativos.
 - [Compaction](compaction.md) — qué conserva el resumen al compactar y cómo se recupera el detalle después.
