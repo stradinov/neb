@@ -5,7 +5,8 @@
 # (<local ref> <local sha> <remote ref> <remote sha>) extrae el árbol del commit que se
 # empuja a un directorio temporal y corre ahí los gates, con los scripts de ese árbol.
 # Lo que está sin commitear en la copia no cuenta. Vale igual desde un HEAD separado.
-# Encadena 6 gates antes de publicar:
+# El hook mismo sí sale de la copia: la envoltura instalada ejecuta este archivo del clon principal.
+# Encadena 7 gates antes de publicar:
 #   1. Integridad del kernel: assemble-startup.py --check (ningún import del arranque roto).
 #   2. Términos vetados (PII/marcas): extension point del overlay — corre
 #      $NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh si existe (el script privado
@@ -20,7 +21,9 @@
 #      (neb-bootstrap-context.py --check-size; la plataforma topa cada salida en 10,000
 #      caracteres y lo que pasa de ahí no llega completo a Claude — supuesto R1) y no pasa
 #      de NUCLEUS_MAX_CHARS caracteres (no crece sin una decisión explícita).
-# Los gates 1, 2, 5 y 6 dependen solo del árbol: corren una vez por commit. El 3 y el 4
+#   7. Forma única: check-style.py no encuentra formas vetadas de un término ni de una cita
+#      de sección en los .md. Si el árbol no trae el script (anterior a 6.35.0), no hay gate.
+# Los gates 1, 2, 5, 6 y 7 dependen solo del árbol: corren una vez por commit. El 3 y el 4
 # dependen de los archivos que cambia cada ref: corren por ref.
 #
 # Rango de archivos de cada ref:
@@ -29,8 +32,8 @@
 #     (--remotes=<remoto> si $1 es un remoto configurado; --remotes si $1 es una URL).
 # Borrados y refs que no cambian archivos no corren gates.
 #
-# Instalación (maintainer): cp hooks/pre-push-changelog .git/hooks/pre-push
-#   (git pull no lo reinstala: repetir el cp al actualizar el hook).
+# Instalación (maintainer, una sola vez): cp hooks/pre-push-wrapper .git/hooks/pre-push
+#   (la envoltura ejecuta este archivo del clon principal: no hay copia que actualizar).
 # Bypass (requiere autorización explícita del dev): git push --no-verify
 
 set -euo pipefail
@@ -112,7 +115,7 @@ extract_tree() {
   fi
 }
 
-# Gates 1, 2, 5 y 6: dependen solo del árbol
+# Gates 1, 2, 5, 6 y 7: dependen solo del árbol
 tree_gates() {
   local dir="$WORK/$1"
   [ -f "$dir/tree-ok" ] && return 0
@@ -164,6 +167,16 @@ tree_gates() {
          "y los textos que citan 12 y 8 partes (R1, hooks/README.md, docs/how-it-works.md)." \
          "Si lo que falla es el tope de caracteres, adelgaza el arranque o, con OK del dev, sube NUCLEUS_MAX_CHARS" \
          "en el mismo script junto con el valor que cita hooks/README.md."
+  fi
+
+  # ── Gate 7: forma única de términos y de citas de sección ──────────────────
+  if [ -f "$NEB_ROOT/bootstrap/check-style.py" ]; then
+    if ! "$PY" "$NEB_ROOT/bootstrap/check-style.py" --root "$NEB_ROOT" >"$dir/style_out" 2>/dev/null; then
+      fail "Forma vetada de un término o de una cita de sección en los .md." \
+           "$(head -8 "$dir/style_out" 2>/dev/null)" \
+           "Cada línea: archivo:línea, regla, texto y forma canónica. Un literal va en código." \
+           "Lista completa: py bootstrap/check-style.py"
+    fi
   fi
 
   : > "$dir/tree-ok"

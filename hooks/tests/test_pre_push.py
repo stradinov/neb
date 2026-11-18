@@ -10,6 +10,8 @@ marcador FAIL_G<n>; la compuerta 5 falla si VERSION y plugin.json no coinciden. 
   • gate 3 por ref: fragmento ausente, en el commit o solo en la copia; dos refs al mismo SHA
   • ref nueva, borrado, stdin vacío, varias refs, tag anotado, remote sha desconocido, push a una URL
   • higiene: el temporal se borra y la copia y su índice quedan intactos
+  • gate 7 (forma única): bloquea, y se omite si el árbol no trae el linter
+  • envoltura (hooks/pre-push-wrapper): corre el hook del clon principal, también desde un worktree
 
 Framework: unittest (stdlib). Árboles temporales; nunca toca la copia de neb ni ~/.claude.
   py -m unittest discover -s hooks/tests -p test_pre_push.py
@@ -25,6 +27,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 NEB = os.path.abspath(os.path.join(HERE, "..", ".."))
 HOOK = os.path.join(NEB, "hooks", "pre-push-changelog")
+WRAPPER = os.path.join(NEB, "hooks", "pre-push-wrapper")
 sys.path.insert(0, HERE)
 from test_neb_root import BASH  # noqa: E402 — bash como lo resuelve Claude Code (Git Bash en Windows)
 
@@ -81,6 +84,7 @@ class PrePushTest(unittest.TestCase):
             "bootstrap/assemble-startup.py": STUB_PY % "1",
             "bootstrap/assemble-changelog.py": STUB_PY % "4",
             "bootstrap/neb-bootstrap-context.py": STUB_PY % "6",
+            "bootstrap/check-style.py": STUB_PY % "7",
             "VERSION": "1.0.0\n",
             ".claude-plugin/plugin.json": json.dumps({"version": "1.0.0"}) + "\n",
             "changelog.d/1.0.0.md": "## [1.0.0]\n",
@@ -160,16 +164,16 @@ class PrePushTest(unittest.TestCase):
     # ── 1 y 2: se valida el commit, no la copia ───────────────────────────────
     def test_commit_sano_copia_sucia_pasa(self):
         self.commit({"a.md": "x\n"}, "sano", fragment="1.1.0")
-        for g in "1246":
+        for g in "12467":
             self.wt("FAIL_G%s" % g, "x")
         self.wt("VERSION", "9.9.9\n")
         self.assertPasses(self.run_hook([self.line()]))
         ran = {g for g, _ in self.logged()}
-        self.assertEqual(ran, {"g1", "g2", "g4", "g6"})
+        self.assertEqual(ran, {"g1", "g2", "g4", "g6", "g7"})
 
     def test_commit_con_defecto_copia_arreglada_bloquea(self):
         for g, msg in (("1", "arranque ROTA"), ("2", "Términos vetados"), ("4", "CHANGELOG.md desactualizado"),
-                       ("6", "no cabe")):
+                       ("6", "no cabe"), ("7", "Forma vetada")):
             with self.subTest(gate=g):
                 self.git("reset", "-q", "--hard", "origin/main")
                 self.commit({"FAIL_G%s" % g: "x"}, "defecto %s" % g, fragment="1.1.0")
@@ -292,6 +296,53 @@ class PrePushTest(unittest.TestCase):
         self.assertEqual(self.git("status", "--porcelain"), estado)
         with open(os.path.join(self.repo, ".git", "index"), "rb") as f:
             self.assertEqual(f.read(), indice)
+
+    # ── 12: gate 7 sin linter en el árbol ─────────────────────────────────────
+    def test_gate7_se_omite_si_el_arbol_no_trae_el_linter(self):
+        self.commit({"bootstrap/check-style.py": None, "FAIL_G7": "x"}, "árbol sin linter", fragment="1.1.0")
+        self.assertPasses(self.run_hook([self.line()]))
+        self.assertNotIn("g7", {g for g, _ in self.logged()})
+
+    # ── 13: envoltura instalada en lugar de la copia del hook ─────────────────
+    def install_wrapper(self, with_hook=True):
+        shutil.copy(WRAPPER, os.path.join(self.repo, ".git", "hooks", "pre-push"))
+        if with_hook:
+            os.makedirs(os.path.join(self.repo, "hooks"), exist_ok=True)
+            shutil.copy(HOOK, os.path.join(self.repo, "hooks", "pre-push-changelog"))
+
+    def test_envoltura_corre_el_hook_del_clon_con_stdin_y_argumentos(self):
+        self.install_wrapper()
+        self.commit({"FAIL_G7": "x"}, "defecto", fragment="1.1.0")
+        r = self.push("origin", "main")
+        self.assertBlocks(r, "Forma vetada")
+        self.assertIn("[pre-push] hook: ", r.stderr)
+        self.assertIn("refs/heads/main @ ", r.stderr)  # la ref llegó por la entrada estándar
+        self.git("reset", "-q", "--hard", "origin/main")
+        self.commit({"a.md": "x\n"}, "sano", fragment="1.1.0")
+        self.assertPasses(self.push("origin", "main"))
+
+    def test_envoltura_desde_un_worktree_corre_el_hook_del_clon_principal(self):
+        self.install_wrapper()
+        wt = os.path.join(self.tmp, "wt")
+        self.git("worktree", "add", "-q", "-b", "otra", fwd(wt))
+        run = lambda *a: subprocess.run(["git", *a], cwd=wt, env=self.env, capture_output=True, text=True,
+                                        encoding="utf-8")
+        self._write(os.path.join(wt, "FAIL_G1"), "x")
+        self._write(os.path.join(wt, "changelog.d", "1.1.0.md"), "## [1.1.0]\n")
+        self.assertEqual(run("add", "-A").returncode, 0)
+        self.assertEqual(run("commit", "-q", "-m", "defecto en el worktree").returncode, 0)
+        r = run("push", "origin", "otra")
+        self.assertBlocks(r, "arranque ROTA")
+        # La ruta sale en la forma del shell (en Git Bash, /tmp/...): se compara por su cola.
+        self.assertIn("/repo/hooks/pre-push-changelog", fwd(r.stderr))
+        self.assertNotIn("/wt/hooks/", fwd(r.stderr))
+
+    def test_envoltura_sin_hook_en_el_clon_avisa_y_no_bloquea(self):
+        self.install_wrapper(with_hook=False)
+        self.commit({"FAIL_G1": "x"}, "defecto", fragment="1.1.0")
+        r = self.push("origin", "main")
+        self.assertPasses(r)
+        self.assertIn("sin gates", r.stderr)
 
     def commit_tree_only(self, files):
         """Crea un commit hijo de origin/main sin tocar la copia ni el índice (hash-object + mktree)."""

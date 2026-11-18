@@ -117,11 +117,11 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 
 ### pre-push-changelog (git hook del repo, no Claude Code)
 
-`.git/hooks/pre-push` — git hook nativo del **clon del maintainer** (`cp hooks/pre-push-changelog .git/hooks/pre-push`). Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX).
+`.git/hooks/pre-push` — git hook nativo del **clon del maintainer**. Se instala una sola vez la envoltura (`cp hooks/pre-push-wrapper .git/hooks/pre-push`), que ejecuta `hooks/pre-push-changelog` del clon principal, también desde un worktree (aunque el del worktree sea más nuevo), y escribe en stderr qué hook corrió; si el clon principal no trae el hook, avisa y no bloquea. Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX).
 
-Valida lo que se publica, no la copia. Por cada ref de la entrada estándar del hook (`<local ref> <local sha> <remote ref> <remote sha>`), extrae el árbol del commit que se empuja a un directorio temporal y corre ahí los gates, con los scripts de ese árbol. Lo que está sin commitear en la copia no cuenta, y un push desde un HEAD separado se valida igual. Los archivos que cambia cada ref salen del diff contra el `remote sha`; en una ref nueva, de los commits que ninguna ref remota tiene. Un borrado o una ref que no cambia archivos no corre gates. `git pull` no reinstala el hook: al actualizarlo, repetir el `cp`.
+Valida lo que se publica, no la copia. Por cada ref de la entrada estándar del hook (`<local ref> <local sha> <remote ref> <remote sha>`), extrae el árbol del commit que se empuja a un directorio temporal y corre ahí los gates, con los scripts de ese árbol. Lo que está sin commitear en la copia no cuenta, y un push desde un HEAD separado se valida igual. Los archivos que cambia cada ref salen del diff contra el `remote sha`; en una ref nueva, de los commits que ninguna ref remota tiene. Un borrado o una ref que no cambia archivos no corre gates. El hook mismo sí sale de la copia: cambia con `git pull` sin reinstalar nada, y una edición suya sin confirmar ya rige.
 
-Encadena 6 gates:
+Encadena 7 gates:
 
 1. Integridad de la cadena de imports del arranque (`assemble-startup.py --check`).
 2. Términos vetados vía extension point del overlay (`$NEB_WORKSPACE/*/scripts/scan-forbidden-terms.sh`, si existe).
@@ -129,6 +129,7 @@ Encadena 6 gates:
 4. Sincronía `CHANGELOG.md` ↔ `changelog.d/`. Su detalle está en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
 5. Sincronía `plugin.json.version` ↔ `VERSION`.
 6. El arranque del núcleo cabe en las partes del `SessionStart` (`neb-bootstrap-context.py --check-size --root <árbol>`). Mide el árbol del commit publicado, no `NEB_HOME`, con una raíz de instalación larga. Falla si el núcleo ocupa más de 8 de las 12 partes, lo que deja lugar al overlay y a la configuración personal, o si pasa de 40,000 caracteres (`NUCLEUS_MAX_CHARS`), el tope que impide que el arranque crezca sin una decisión explícita.
+7. Forma única de términos y de citas de sección (`check-style.py --root <árbol>`): sin `change MD` en minúscula, `F<n>` por «Fase <n>» ni `single source of truth`, y toda cita como `§ "Título"`. Los bloques cercados y el código en línea no cuentan. Si el árbol publicado no trae el script, el gate se omite.
 
 ## Activación en un proyecto
 

@@ -5,7 +5,7 @@ SQLite neb.db (REQ neb-pendings-sqlite). Reusa los módulos de hooks/lib/ (pendi
 _db_shared.py): NO reimplementa create/classify/_ensure_sentinel ni el patrón de escritura.
 
 Qué hace:
-  • Parsea el pendings.md (formato canónico de workflow/pendings.md, tolerando variaciones):
+  • Parsea el pendings.md plano (el formato anterior a neb.db, tolerando variaciones):
       - Secciones  "## <area> — <tema> — <fecha>"  → un `topic` (slug = el área).
       - Ítems       "NNN. **[slug] ... — <Estado>.**"  → un `pending` por ítem ACTIVO.
       - Sub-ítems   "- **(a) ...**" / "- ✅ **(a)** ..."  → un `pending` propio por sub-ítem

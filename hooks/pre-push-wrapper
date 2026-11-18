@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+# managed-by: neb/hooks/pre-push-wrapper
+# Envoltura del pre-push: ejecuta hooks/pre-push-changelog del clon principal con los
+# argumentos y la entrada estándar que git le pasa. La copia instalada no envejece cuando
+# cambia el hook, y un worktree corre el mismo hook que el clon.
+#
+# Instalación (maintainer, una sola vez): cp hooks/pre-push-wrapper .git/hooks/pre-push
+
+COMMON="$(git rev-parse --git-common-dir)" || exit 1
+TOP="$(cd "$COMMON/.." && pwd)"
+for HOOK in "$TOP/hooks/pre-push-changelog" "$TOP/neb/hooks/pre-push-changelog"; do
+  if [ -f "$HOOK" ]; then
+    echo >&2 "[pre-push] hook: $HOOK"
+    exec bash "$HOOK" "$@"
+  fi
+done
+echo >&2 "[pre-push] aviso: no existe hooks/pre-push-changelog en $TOP — sin gates."
+exit 0

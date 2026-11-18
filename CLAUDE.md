@@ -19,6 +19,7 @@ Meta-instrucciones para Claude cuando edita la metodología misma.
 
 - Archivos: `kebab-case.md`, sin prefijos numéricos.
 - Cada carpeta de lineamientos (`general/`, `methodology/`, `process/`, `workflow/`, `tooling/`, `profiles/` y cada `profiles/<profile>/`) tiene su `index.md` con orden de lectura. Las demás llevan `README.md` (`skills/`, `hooks/`, `research/`) o ninguno (`agents/`, `commands/`, `docs/`, `bootstrap/`, `templates/`).
+- Forma única de términos y de citas de sección (`§ "Título"`): la verifica `bootstrap/check-style.py` en el pre-push; los canónicos viven en [`methodology/vocabulary.md`](methodology/vocabulary.md) § "Índice de términos canónicos".
 - Imports internos: paths relativos (`../methodology/principles.md`). Los del propio `CLAUDE.md` también son relativos — funcionan en cualquier ubicación del clon.
 - Proyectos externos **no importan el framework**: lo inyecta el plugin (hook `SessionStart`).
 

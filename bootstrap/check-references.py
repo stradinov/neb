@@ -28,8 +28,8 @@ Qué se verifica:
 
 - @import en línea propia (@ruta.md): la ruta existe (relativa al archivo; @~/ no se verifica).
 
-No verifica citas sin comillas (§ Contexto) ni la línea de una cita con número
-(`archivo.md:46` solo verifica el archivo).
+No verifica citas sin comillas (§ Contexto), que check-style.py veta, ni la línea de una
+cita con número (`archivo.md:46` solo verifica el archivo).
 
 Salida: una línea por roto, <repo>:<archivo>:<línea> TAB <tipo> TAB <destino> TAB <título>.
 --save-baseline guarda las claves (sin número de línea) de los rotos actuales; --baseline
