@@ -59,7 +59,7 @@ El plan de pruebas incluye: flujos a validar, criterios de éxito, orden, y qui�
 
 Cierre: **"¿De acuerdo con este plan?"**
 
-Al recibir aprobación, Claude crea o actualiza la memoria del proyecto y el MD del requerimiento. Ver [workflow/memory.md](../workflow/memory.md) y [workflow/changes.md](../workflow/changes.md). En complejidad **media/alta aprobada sin plan mode**, además persiste el plan literal en `~/.claude/approved-plans/` vía `Write` (en plan mode lo guarda el hook `save-approved-plan` si está activado; si no dejó archivo, también va por `Write`) — ver [workflow/approved-plans.md](../workflow/approved-plans.md) § "Persistencia conversacional".
+Al recibir aprobación, Claude crea o actualiza la memoria del proyecto y el MD del requerimiento. Ver [workflow/memory.md](../workflow/memory.md) y [workflow/changes.md](../workflow/changes.md). En complejidad **media/alta aprobada sin plan mode**, además persiste el plan literal en `~/.claude/approved-plans/` vía `Write` (en plan mode lo guarda el hook `save-approved-plan` si está activado, supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md); si no dejó archivo, también va por `Write`) — ver [workflow/approved-plans.md](../workflow/approved-plans.md) § "Persistencia conversacional".
 
 ## Propuesta de implementación
 

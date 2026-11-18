@@ -36,7 +36,7 @@ Cuando un plan de complejidad **media/alta** se aprueba en conversación (sin pa
 Casos borde:
 
 - **Re-aprobación** en la misma sesión: nuevo archivo por timestamp (igual que el hook genera uno por cada `ExitPlanMode`); el último es el vigente.
-- **Plan mode sin archivo y no-duplicación**: tras `ExitPlanMode`, Claude busca en `approved-plans/` un archivo creado después de la aprobación. Si existe, el hook ya guardó y no se duplica. Si no existe (p. ej., el hook no está activado), Claude lo persiste con `Write` bajo estas mismas convenciones. Ante duda (p. ej. tras compactación), la misma búsqueda va antes de escribir.
+- **Plan mode sin archivo y no-duplicación**: tras `ExitPlanMode`, Claude busca en `approved-plans/` un archivo creado después de la aprobación. Si existe, el hook ya guardó y no se duplica (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md): el hook termina de escribir antes de que Claude siga). Si no existe (p. ej., el hook no está activado), Claude lo persiste con `Write` bajo estas mismas convenciones. Ante duda (p. ej. tras compactación), la misma búsqueda va antes de escribir.
 
 Niveles **baja / trivial / no-formal** no persisten artefacto (ver [`process/planning.md`](../process/planning.md) § "Cuándo aplica cada aprobación").
 

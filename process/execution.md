@@ -17,7 +17,7 @@ Los estándares de código (baseline: sin comentarios salvo WHY no obvio, saniti
 
 - Solo acciones read-only y edición del archivo de plan.
 - Cierra con `ExitPlanMode` (aprobación del usuario).
-- Un plan aprobado en plan mode lo guarda el hook `save-approved-plan` si está activado. Si tras `ExitPlanMode` no hay un archivo nuevo en `~/.claude/approved-plans/`, Claude lo persiste con `Write`, igual que los aprobados conversacionalmente (media/alta) (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
+- Un plan aprobado en plan mode lo guarda el hook `save-approved-plan` si está activado (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). Si tras `ExitPlanMode` no hay un archivo nuevo en `~/.claude/approved-plans/`, Claude lo persiste con `Write`, igual que los aprobados conversacionalmente (media/alta) (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
 
 Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquitectónicas, o conviene ver el plan antes de gastar tiempo en código.
 
