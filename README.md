@@ -43,6 +43,8 @@ para montar tu *espacio de trabajo* (directorio donde extiendes la metodología,
 
 > El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores. En Windows, Neb requiere Git for Windows (Git Bash): Claude Code corre ahí los hooks del plugin.
 
+> El plugin no se actualiza solo hasta que lo decidas: ver [Guía del usuario](docs/user-guide.md) § "Mantener Neb al día".
+
 ---
 
 ## Qué te da

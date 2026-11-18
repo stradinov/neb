@@ -15,6 +15,55 @@ Luego escribe `/wakeup` — el recorrido conecta o monta tu espacio de trabajo (
 
 > El modelo de **clonar el repo + correr `bootstrap/install.sh`** fue **eliminado en 3.0.0** (obsoleto desde 2.0.0) como vía de uso. El clon solo es necesario para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo)).
 
+El plugin no se actualiza solo hasta que lo decidas: ver [Mantener Neb al día](#mantener-neb-al-día).
+
+## Mantener Neb al día
+
+Según la documentación de Claude Code, la actualización automática viene **apagada** en los marketplaces de terceros, y el de Neb es uno de ellos. Mientras no la enciendas, tu instalación se queda en la versión que instalaste. La misma documentación no da a `marketplace.json` un campo para encenderla: la decides tú, una vez por máquina.
+
+**Encenderla.** Hay tres vías:
+
+- **Aceptar la oferta.** Mientras no hayas decidido, Claude te ofrece encenderla al cierre de su primera respuesta. Con tu OK, corre el ayudante del plugin (abajo). Si la rechazas, queda apagada y la oferta no vuelve. La oferta sale solo si tu settings ya trae la entrada del marketplace, que es donde se escribe la decisión.
+- **El interruptor «Enable auto-update»** de `/plugin`, pestaña Marketplaces. Según la documentación de Claude Code, escribe esa misma clave, y queda oculto con `DISABLE_AUTOUPDATER=1` mientras no exista `FORCE_AUTOUPDATE_PLUGINS=1`; es el caso de la app de escritorio (abajo).
+- **A mano**, en tu `~/.claude/settings.json`. La entrada del marketplace lleva `"autoUpdate": true`. Esa entrada la crea `claude plugin marketplace add` (con `/plugin marketplace add` no se ha comprobado); si no la tienes, agrégala completa:
+
+  ```json
+  "extraKnownMarketplaces": {
+    "neb": {
+      "source": { "source": "github", "repo": "stradinov/neb" },
+      "autoUpdate": true
+    }
+  }
+  ```
+
+**Qué esperar con la actualización automática encendida.**
+
+- Después de tu primer mensaje en una sesión interactiva, Claude Code espera hasta diez minutos y actualiza en disco los plugins de los marketplaces con actualización automática encendida. La sesión abierta sigue con la versión que cargó; la nueva rige desde la **siguiente sesión**, o antes con `/reload-plugins` (según la documentación de Claude Code; en la app de escritorio se observó a los 7 minutos).
+- Recibes **cada versión que se publica**; hoy no hay un canal estable aparte. Si prefieres elegir el momento, déjala apagada y actualiza a mano.
+- **En la app de escritorio** se observó que las sesiones corren con `DISABLE_AUTOUPDATER=1` (versión 2.1.325). Según la documentación de Claude Code, esa variable apaga toda la actualización automática de plugins y oculta el interruptor, salvo que exista `FORCE_AUTOUPDATE_PLUGINS=1`. Esta última la vuelve a encender para **todos** tus marketplaces con actualización automática encendida, no solo para el de Neb. Cuando aceptas la oferta desde la app, el ayudante la agrega al bloque `env` de tu settings. No se ha probado si la actualización corre sin ella. A mano: `"env": { "FORCE_AUTOUPDATE_PLUGINS": "1" }`.
+
+**Actualizar a mano**, con la actualización automática apagada o para no esperar:
+
+```
+claude plugin marketplace update neb
+claude plugin update neb@neb
+```
+
+**Máquinas con sesiones no interactivas** (servidores, CI, tareas programadas): deja `"autoUpdate": false` en la entrada del marketplace. El plugin no cambia de versión sin que lo decidas y el arranque deja de traer la oferta.
+
+**Ver el estado y cambiar de opinión.** Lo más simple es pedírselo a Claude («enciende la actualización automática de Neb», «apágala»). Claude corre el ayudante, que vive en el plugin instalado: `<dir de configuración>/plugins/cache/<marketplace>/neb/<versión>/hooks/lib/autoupdate.py` (el dir de configuración es `~/.claude`, salvo que uses `CLAUDE_CONFIG_DIR`). Si `CLAUDE_CODE_PLUGIN_CACHE_DIR` lleva los plugins fuera de tu dir de configuración, el ayudante no ubica tu settings y no escribe: decide a mano o con el interruptor. También lo corres tú, con Python; pon en la terminal el mismo `CLAUDE_CONFIG_DIR` que tu sesión de Claude Code, o ninguno si tu sesión no lo usa, porque si no coincide el ayudante no escribe:
+
+```
+python <ruta>/hooks/lib/autoupdate.py status     # el estado y qué archivo lo decide; no escribe
+python <ruta>/hooks/lib/autoupdate.py enable     # la enciende
+python <ruta>/hooks/lib/autoupdate.py disable    # la apaga
+```
+
+- `enable` y `disable` solo escriben tu settings de usuario, y antes dejan al lado un respaldo `settings.json.bak-neb-<fecha>-<hora>`. Para revertir, restaura ese respaldo o cambia la clave. El contenido del settings se conserva; si el archivo estaba minificado, queda con sangría.
+- Para cambiar de opinión sirve cualquiera de las tres vías. Según la documentación de Claude Code, la clave de tu settings manda sobre la de `plugins/known_marketplaces.json` y el interruptor escribe las dos; eso no se ha probado con Neb.
+- `disable` no quita `FORCE_AUTOUPDATE_PLUGINS`. Bórrala a mano si ningún otro marketplace la necesita.
+- Si tu settings no trae la entrada del marketplace, el ayudante no escribe nada y te muestra el bloque para agregarla a mano.
+
 ## Conectarse al espacio de trabajo del equipo
 
 Si tu equipo ya tiene un **repositorio del espacio de trabajo** (overlay + `changes/` + `personal/` centralizados), no creas nada: lo conectas. Tres pasos:

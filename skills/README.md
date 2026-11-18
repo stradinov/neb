@@ -25,7 +25,7 @@ fuente única de los skills de Claude Code disponibles. Cualquier REQ que cree, 
 
 ## Instalación
 
-Los skills se **auto-descubren** del plugin de Neb instalado — no se copian a `~/.claude`. Basta con instalar/actualizar el plugin (ver [docs/user-guide.md](../docs/user-guide.md) § "Instalar"). Tras editar o agregar un skill, `/reload-plugins` (o `claude plugin update neb`) lo refresca sin reiniciar; en sesión nueva ya está disponible.
+Los skills se **auto-descubren** del plugin de Neb instalado — no se copian a `~/.claude`. Basta con instalar/actualizar el plugin (ver [docs/user-guide.md](../docs/user-guide.md) § "Instalar"). Tras editar o agregar un skill, `/reload-plugins` lo refresca sin reiniciar; en sesión nueva ya está disponible. Para traer una versión publicada, `claude plugin update neb@<marketplace>` o la actualización automática (ver [docs/user-guide.md](../docs/user-guide.md) § "Mantener Neb al día").
 
 > El modelo de copiar skills a `~/.claude` corresponde al modelo clone, **eliminado en 3.0.0** — los skills se auto-descubren del plugin.
 
