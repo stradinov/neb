@@ -15,7 +15,7 @@ Hooks de Neb. El plugin registra en `hooks/hooks.json` el `SessionStart` y los h
 
 ### PreCompact legacy (retirados en 6.30.0)
 
-La plantilla de settings del dev traía dos hooks `PreCompact`: un agente (`matcher: "auto"`) que copiaba el estado del REQ activo al draft del Change MD antes de compactar, y una guardia (`matcher: "manual"`) que frenaba `/compact` si el draft tenía más de 15 minutos sin cambios. Desde 5.0.0 buscaban el formato legacy (`## Requerimiento activo` en `project_*.md`) y no los `active_*.md`, así que no encontraban el REQ de la sesión, y el agente se lanzaba en cada compactación automática. Se retiraron: el estado del REQ sobrevive a la compactación porque vive en su `active_*.md`, `logbook-sync` lo captura en `PreCompact`, el arranque se reinyecta y [`general/compaction.md`](../general/compaction.md) le dice al resumen qué conservar. El draft lo actualiza Claude en cada fase mayor ([`workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft").
+La plantilla de settings del dev traía dos hooks `PreCompact`: un agente (`matcher: "auto"`) que copiaba el estado del REQ activo al draft del Change MD antes de compactar, y una guardia (`matcher: "manual"`) que frenaba `/compact` si el draft tenía más de 15 minutos sin cambios. Se retiraron: el estado del REQ sobrevive a la compactación porque vive en su `active_*.md`, `logbook-sync` lo captura en `PreCompact`, el arranque se reinyecta y [`general/compaction.md`](../general/compaction.md) le dice al resumen qué conservar. El draft lo actualiza Claude en cada fase mayor ([`workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft").
 
 Si tu `~/.claude/settings.json` todavía los tiene, quítalos; el `PreCompact` de `logbook-sync` se queda.
 
@@ -139,8 +139,6 @@ Con el plugin de Neb no se copian bloques de hooks: el plugin ya los registra (�
 { "env": { "NEB_PROJECT_HOOKS": "save-approved-plan,logbook-sync" } }
 ```
 
-> El script `link-into-project.sh` que generaba ese `settings.json` (modelo clone) fue eliminado en 3.0.0.
-
 ## Bajo el plugin de Neb
 
 Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` registra:
@@ -166,9 +164,18 @@ Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` regi
 - **Un cambio en estas variables** aplica desde la siguiente sesión.
 - **Avisos del arranque.** Avisa de un nombre desconocido o con espacios en las variables, de un arranque que no cupo en las 12 partes (en la parte 12) y de un `NEB_HOME` que apunte al caché del plugin. Esa variable la dejaba un `/wakeup` anterior a 6.14.3, y se ignora. También avisa cuando la actualización automática del plugin no está decidida:
   - **Cuándo sale.** Claude Code trae apagada la actualización automática de un marketplace de terceros (supuesto R28 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). La decide la clave `autoUpdate` de la entrada del marketplace: la de `extraKnownMarketplaces.<marketplace>` en un archivo de settings y, si ahí falta, la de `plugins/known_marketplaces.json`. De los archivos de settings, Neb solo lee el de usuario. Mientras la clave no esté en ninguno de los dos, el arranque le pide a Claude ofrecerle al dev encenderla, una vez por conversación y solo si hay una persona presente.
-  - **Cuándo no sale.** Con la clave en cualquiera de los dos archivos; si el plugin no corre desde el caché de plugins (`--plugin-dir`, un clon), de cuya ruta salen el marketplace y el dir de configuración (supuesto R27); si alguno de los dos archivos no se puede leer; o si el settings de usuario no trae la entrada del marketplace, porque ahí `enable` y `disable` no escriben y la oferta no se podría contestar. Tampoco sale si el dir que sale de esa ruta no es el dir de configuración en uso (`CLAUDE_CONFIG_DIR` o `~/.claude`, supuesto R26), como pasa cuando `CLAUDE_CODE_PLUGIN_CACHE_DIR` fija otra raíz `plugins/` o cuando el ayudante se corre a mano con otro `CLAUDE_CONFIG_DIR` que el de la sesión: el settings ya no se deduce de la ruta, y `enable` y `disable` rechazan sin nombrar ningún settings.
+  - **Cuándo no sale.**
+    - Con la clave en cualquiera de los dos archivos.
+    - Si el plugin no corre desde el caché de plugins (`--plugin-dir`, un clon), de cuya ruta salen el marketplace y el dir de configuración (supuesto R27).
+    - Si alguno de los dos archivos no se puede leer.
+    - Si el settings de usuario no trae la entrada del marketplace, porque ahí `enable` y `disable` no escriben y la oferta no se podría contestar.
+    - Si el dir que sale de esa ruta no es el dir de configuración en uso (`CLAUDE_CONFIG_DIR` o `~/.claude`, supuesto R26), como pasa cuando `CLAUDE_CODE_PLUGIN_CACHE_DIR` fija otra raíz `plugins/` o cuando el ayudante se corre a mano con otro `CLAUDE_CONFIG_DIR` que el de la sesión: el settings ya no se deduce de la ruta, y `enable` y `disable` rechazan sin nombrar ningún settings.
   - **Qué hace el arranque.** Solo lee. El aviso mide 800 unidades UTF-16 o menos y va en la parte 1.
-  - **`hooks/lib/autoupdate.py`** aplica la decisión, con el OK del dev. `enable` deja `autoUpdate: true` en la entrada del marketplace del settings de usuario; `disable`, `false`; `status` muestra el estado y no escribe. Con `DISABLE_AUTOUPDATER` en su entorno (la app de escritorio lanza así sus sesiones), `enable` deja además `FORCE_AUTOUPDATE_PLUGINS: "1"` en `env`, que aplica a todo marketplace con actualización automática encendida (supuesto R29); `disable` no la quita. Antes de escribir respalda el settings en `settings.json.bak-neb-<AAAAMMDD-HHMMSS>`. Si nada cambia, no escribe. Si el settings no existe o no trae la entrada del marketplace, o si alguno de los dos archivos no se puede leer, rechaza sin escribir y muestra cómo dejarlo a mano. La escritura conserva el contenido, el BOM, los fines de línea y la sangría; un settings minificado queda con sangría. Lo que ve el usuario: [`../docs/user-guide.md`](../docs/user-guide.md) § "Mantener Neb al día".
+  - **`hooks/lib/autoupdate.py`** aplica la decisión, con el OK del dev. Lo que ve el usuario: [`../docs/user-guide.md`](../docs/user-guide.md) § "Mantener Neb al día".
+    - `enable` deja `autoUpdate: true` en la entrada del marketplace del settings de usuario; `disable`, `false`; `status` muestra el estado y no escribe.
+    - Con `DISABLE_AUTOUPDATER` en su entorno (la app de escritorio lanza así sus sesiones), `enable` deja además `FORCE_AUTOUPDATE_PLUGINS: "1"` en `env`, que aplica a todo marketplace con actualización automática encendida (supuesto R29); `disable` no la quita.
+    - Antes de escribir respalda el settings en `settings.json.bak-neb-<AAAAMMDD-HHMMSS>`. Si nada cambia, no escribe. La escritura conserva el contenido, el BOM, los fines de línea y la sangría; un settings minificado queda con sangría.
+    - Si el settings no existe o no trae la entrada del marketplace, o si alguno de los dos archivos no se puede leer, rechaza sin escribir y muestra cómo dejarlo a mano.
 
 **Duplicados.** Claude Code no deduplica un hook de plugin contra una entrada de settings. Si activas un hook en estas variables, quita su entrada de tu `settings.json` (las que los templates anteriores a 6.15.0 copiaban desde `$NEB_HOME`), o correrá dos veces. Un maintainer con clon puede conservar sus entradas y no activar las variables; si un proyecto activa por `NEB_PROJECT_HOOKS` un hook que ya tiene como entrada, redefine `NEB_PROJECT_HOOKS` sin ese hook en el `settings.local.json` del proyecto.
 

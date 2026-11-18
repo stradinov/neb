@@ -4,6 +4,19 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.38.1] - 2026-11-18
+
+> **Patch**: redacción, sin cambio de fuerza normativa. Cuarta tanda del requerimiento de redacción breve, sobre `methodology/platform-assumptions.md`, `hooks/README.md`, `docs/user-guide.md` y `skills/README.md`. Las filas de la tabla de supuestos no cambian: su versión, fecha y fuente son la evidencia de cada supuesto.
+
+### Changed
+- **`methodology/platform-assumptions.md`** § "Mantenimiento": la viñeta «Re-verificación» queda en una regla y cinco subviñetas con las mismas oraciones: «Antes del OK del plan», «Vía de la prueba», «Si el resultado contradice el diseño», «Si lo confirma» y «Registro».
+- **`hooks/README.md`**:
+  - § "PreCompact legacy (retirados en 6.30.0)": sale el relato de por qué fallaban los dos hooks; queda qué eran, por qué ya no hacen falta y la indicación de quitarlos del settings.
+  - Avisos del arranque: «Cuándo no sale» lista sus cinco casos en subviñetas, y `hooks/lib/autoupdate.py` separa en subviñetas lo que hace cada orden, la variable que agrega, el respaldo y los rechazos.
+  - Sale la nota sobre el script `link-into-project.sh`, que ya no existe.
+- **`docs/user-guide.md`**: «Privacidad» de la bitácora, en su propio párrafo.
+- **`skills/README.md`** § "Instalación": sale la nota sobre el modelo de copia eliminado; el párrafo anterior ya dice que los skills no se copian a `~/.claude`.
+
 ## [6.38.0] - 2026-11-18
 
 > **Minor**: tres lineamientos nuevos para editar los `.md` de la metodología. Tercera tanda del requerimiento de redacción breve: dejan escrito el criterio con que se revisaron las dos tandas anteriores. No agregan un verificador ni un tope: los aplica quien edita y los revisan los roles de siempre.
