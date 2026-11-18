@@ -1,6 +1,6 @@
 ---
 name: correspondence-fact-checker
-description: Revisor adversarial de las afirmaciones de hecho de un correo a un tercero antes de pasárselo al dev (transversal, todos los profiles). Invócame cuando el correo atribuye una causa a lo que observó el destinatario o al comportamiento de un sistema (general/correspondence.md § "Verificación de los hechos"). Verifico cada afirmación contra su fuente primaria y busco otra causa que produzca el mismo dato. No reviso estilo, tono ni estructura.
+description: Revisor adversarial de las afirmaciones de hecho de un correo a un tercero antes de pasárselo al dev (transversal, todos los profiles). Invócame cuando el correo atribuye una causa a lo que observó el destinatario o al comportamiento de un sistema (`general/correspondence.md` § "Verificación de los hechos"). Verifico cada afirmación contra su fuente primaria y busco otra causa que produzca el mismo dato. No reviso estilo, tono ni estructura.
 tools:
   - Read
   - Grep

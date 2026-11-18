@@ -46,6 +46,8 @@ Revisor transversal (no exclusivo de `self-applied` — aplica a todos los profi
 | 9 Improvement | `process-improvement-analyst` | Al detectar defecto no cazado por ningún rol (patch retrospectivo, reporte en uso) |
 | Incidentes P1/P2 | `process-improvement-analyst` | En análisis raíz del proceso tras incidente en producción |
 
+**Aporte por pull request.** En un clon donde el dev no tiene permiso de escritura, las filas de Fase 3, 4 y 7 no aplican como están: antes de publicar, Claude comprueba que el aporte no toca los archivos reservados (en vez de verificar CHANGELOG y versión) y el `context-completeness-reviewer` revisa los textos que se publican ([`../../process/upstream-contribution.md`](../../process/upstream-contribution.md) § "Procedimiento"). El `qa-process-engineer` y el `process-improvement-analyst` revisan el aporte del lado del mantenedor ([deployment.md](deployment.md) § "Incorporar un PR").
+
 ## Agentes funcionales (no revisores de fase)
 
 - **Pendings Recommender** — `subagente` (`agents/pendings-recommender.md`). Invocado por el skill `pendings-review` para el fan-out de soluciones profundas (top-K). No es revisor de fase ni entra en la cobertura por fase; ver `process/roles-invocation.md` § "Agentes funcionales".

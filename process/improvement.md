@@ -97,15 +97,31 @@ Cada propuesta derivada entra como REQ aparte con plan-review (ver [`process/pla
 
 El CHANGELOG entry del REQ derivado menciona explícitamente "tras revisión agregada de N REQs al <fecha>". Sin sección dedicada en el repo: el origen vive en la confirmación del cambio del REQ (en git: el commit).
 
-Si Claude identifica un ajuste:
+## Aplicar un ajuste
 
-1. Lo propone en una línea: *"Mejora sugerida a la metodología: [cambio concreto]. ¿Se aplica?"*
-2. Con confirmación, edita el archivo correspondiente del repo `methodology`.
-3. Confirma y entrega el cambio según el mecanismo del profile (en `self-applied`/git, commit + push):
-   ```
-   docs: actualizar metodología — <descripción breve>
-   ```
+Rige todo ajuste a la metodología que salga de la Fase 9: de la retroalimentación, de un disparador cuantitativo, de un diagnóstico o de la revisión agregada. Si no hay nada que ajustar, Claude lo indica en una línea.
 
-Si no hay nada que ajustar, lo indica en una línea.
+Claude propone el ajuste con su destino, que depende de dónde vive la regla:
 
-Versionado SemVer y entrada en `CHANGELOG.md`: ver [CLAUDE.md](../CLAUDE.md) del repo.
+| Destino | Cuándo | Cómo se aplica |
+|---|---|---|
+| Overlay o `personal/` del adoptante | La regla solo se puede redactar con paths, comandos, un profile de dominio o un cliente del adoptante | Claude la edita en el espacio de trabajo del adoptante y la confirma y entrega según su mecanismo |
+| Núcleo, con permiso de escritura | La regla se redacta sin esos elementos y aplicaría a otro adoptante; el dev puede escribir en el repo del núcleo | Con confirmación, Claude edita el archivo en el clon del núcleo (si el dev no tiene uno, lo obtiene como en el paso 2 de [`upstream-contribution.md`](upstream-contribution.md); el caché del plugin no se edita) y lo confirma y entrega según el mecanismo del profile (en `self-applied`/git, commit + push con `docs: actualizar metodología — <descripción breve>`). Versionado SemVer y entrada en `CHANGELOG.md`: [CLAUDE.md](../CLAUDE.md) del repo |
+| Núcleo, sin permiso de escritura | La misma regla, y el dev no puede escribir en el repo del núcleo | Aporte por pull request: [`upstream-contribution.md`](upstream-contribution.md) |
+
+**Permiso de escritura.** Claude lo comprueba con `gh repo view <repo del núcleo> --json viewerPermission`: `WRITE`, `MAINTAIN` o `ADMIN` es permiso; otro valor es sin permiso. Si `gh` falta o no tiene sesión (`gh auth status` distinto de 0), Claude le pregunta al dev si tiene permiso de escritura en ese repo. El repo del núcleo es el campo `repository` de su `.claude-plugin/plugin.json` (supuesto R27 de [`../methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)).
+
+**Con permiso de escritura, o con destino en el overlay**, Claude lo propone en una línea: *"Mejora sugerida a la metodología: [cambio concreto]. ¿Se aplica?"*
+
+**Sin permiso de escritura**, la propuesta va como menú:
+
+- **Aportar por PR** — muestra el delta (archivo del núcleo, sección y texto nuevo) y el nombre de la rama, y anuncia el cambio al profile `self-applied`.
+- **Aplicarlo solo en el overlay** — si la regla estrecha o agrega.
+- **Abrir un issue** — para un defecto del núcleo sin corrección clara ([`upstream-contribution.md`](upstream-contribution.md) § "Abrir un issue"). Un defecto con corrección acotada se aporta por PR.
+- **No aportar.**
+
+El REQ derivado que piden § "Diagnóstico de origen del defecto" › "Salida" y § "Revisión agregada" › "Output" depende de la opción:
+
+- **Aportar por PR**: el adoptante no lo abre. Su plan-review lo sustituye la revisión del diff que hace el mantenedor ([`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Incorporar un PR"), y la cita de origen va en el cuerpo del PR.
+- **Aplicarlo solo en el overlay**: se abre en el espacio de trabajo del adoptante, como piden esas secciones.
+- **Abrir un issue** o **No aportar**: no hay REQ derivado.

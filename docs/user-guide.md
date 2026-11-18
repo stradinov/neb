@@ -13,7 +13,7 @@ Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni 
 
 Luego escribe `/wakeup` — el recorrido conecta o monta tu espacio de trabajo (vía `setup-workspace.sh`) y te guía por los pasos de abajo. Un hook `SessionStart` inyecta el arranque de la metodología en cada sesión; los skills, agents y commands del plugin se auto-descubren.
 
-> El modelo de **clonar el repo + correr `bootstrap/install.sh`** fue **eliminado en 3.0.0** (obsoleto desde 2.0.0) como vía de uso. El clon solo es necesario para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores)).
+> El modelo de **clonar el repo + correr `bootstrap/install.sh`** fue **eliminado en 3.0.0** (obsoleto desde 2.0.0) como vía de uso. El clon solo es necesario para **contribuir al núcleo** (ver [Contribuir al núcleo](#contribuir-al-núcleo)).
 
 ## Conectarse al espacio de trabajo del equipo
 
@@ -41,7 +41,7 @@ tu-workspace/
 └── CLAUDE.md   ← importa tus profiles de dominio (el arranque del núcleo lo inyecta el plugin)
 ```
 
-> El layout con `neb/` como **subtree** del repo y el flujo `git subtree add/pull/push` corresponden al modelo de **contribución al núcleo**, no de uso — ver [Contribuir al núcleo](#contribuir-al-núcleo-mantenedores).
+> El layout con `neb/` como **subtree** del repo y el flujo `git subtree add/pull/push` corresponden al modelo de **contribución al núcleo**, no de uso — ver [Contribuir al núcleo](#contribuir-al-núcleo).
 
 ### Configurar el entorno
 
@@ -115,16 +115,23 @@ Con el comando `/logbook`:
 
 Por defecto la bitácora es **local** (tu máquina) — si trabajas solo, no necesitas nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva, con búsqueda de texto completo del corpus— lo habilita el **backend central** del equipo (servidor opcional, distribuido en un repositorio dedicado). **Privacidad**: la bitácora es **local por defecto** —nada se publica al equipo salvo que lo pidas, aunque tengas el central configurado—. Para que un proyecto comparta su trabajo al catálogo central (works **y sesiones exploratorias**, con el transcript de las sesiones que abras en ese proyecto —el cliente lo envía crudo, salidas de herramientas incluidas; la búsqueda indexa solo el texto sin ellas—), agrega `<!-- neb-logbook: central -->` a su `CLAUDE.md` (**de activación voluntaria por proyecto**). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
 
-## Contribuir al núcleo (mantenedores)
+## Contribuir al núcleo
 
-Lo anterior cubre **usar** Neb. **Contribuir al núcleo** —corregir o extender lo que vive en el repo neb, no tu overlay— es un rol de mantenedor y requiere un **clon normal del repo**, separado de tu espacio de trabajo:
+Lo anterior cubre **usar** Neb. **Contribuir al núcleo** —corregir o extender lo que vive en el repo neb, no tu overlay— requiere un **clon normal del repo**, separado de tu espacio de trabajo:
 
 ```bash
 git clone https://github.com/stradinov/neb ~/neb   # o donde prefieras
-cp ~/neb/hooks/pre-push-wrapper ~/neb/.git/hooks/pre-push   # envoltura de los gates del pre-push
 ```
 
-Flujo: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo (fork + PR si no tienes write). Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`. Los hooks opcionales activados con `NEB_HOOKS` corren siempre el plugin cargado: para probarlos desde el clon, usa `--plugin-dir`.
+**Sin permiso de escritura en el repo** aportas por pull request: sin fragmento de CHANGELOG, sin incremento de versión y sin instalar el hook `pre-push`. Si la mejora sale de la retroalimentación de un requerimiento (Fase 9), Claude prepara el pull request contigo; el procedimiento y las reglas están en [`process/upstream-contribution.md`](../process/upstream-contribution.md) y en [CONTRIBUTING](../CONTRIBUTING.md).
+
+**Como mantenedor** (con permiso de escritura) instalas además la envoltura de los gates del pre-push:
+
+```bash
+cp ~/neb/hooks/pre-push-wrapper ~/neb/.git/hooks/pre-push
+```
+
+Flujo del mantenedor: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo. Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`. Los hooks opcionales activados con `NEB_HOOKS` corren siempre el plugin cargado: para probarlos desde el clon, usa `--plugin-dir`.
 
 El clon del núcleo y tu espacio de trabajo son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. La envoltura instalada ejecuta `hooks/pre-push-changelog` del clon, así que el hook `pre-push` se actualiza con `git pull` sin reinstalarlo. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)
 

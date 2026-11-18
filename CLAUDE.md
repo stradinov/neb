@@ -10,6 +10,7 @@ Meta-instrucciones para Claude cuando edita la metodología misma.
 
 - **Eres recursivo**: la metodología que editas es la que aplicas. Sigue las fases (clarificación → propuesta → implementación → commit) usando la metodología actual.
 - **Cualquier cambio entra al `CHANGELOG.md`** antes del tag. El CHANGELOG se gestiona vía fragmentos en `changelog.d/<version>.md` ensamblados por `bootstrap/assemble-changelog.py` — ver flujo en [`process/version-control.md`](process/version-control.md) § "CHANGELOG fragmentado".
+- **Sin permiso de escritura en el repo** (clon para aportar por pull request; cómo se comprueba: [`process/improvement.md`](process/improvement.md) § "Aplicar un ajuste"): rige [`process/upstream-contribution.md`](process/upstream-contribution.md). El aporte no lleva CHANGELOG ni incremento de versión, que asigna el mantenedor al incorporarlo, y nada se publica sin OK del dev.
 - **Versionado SemVer**:
   - Patch (1.0.0 → 1.0.1): redacción, typos, aclaraciones.
   - Minor (1.0.x → 1.1.0): nuevos lineamientos, profiles, hooks.

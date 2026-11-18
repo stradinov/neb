@@ -38,6 +38,7 @@ El principio (Claude es dueño operativo de los **artefactos que Neb genera** y,
   - **Segmentos de contenido humano** (`<!-- human -->` … `<!-- /human -->`) dentro de un `.md` — el bloque marca contenido bajo control directo de un humano, cuya voz e intención no se alteran sin él; modificarlo requiere OK explícito aunque el commit sea solo-`.md` (Claude propone deltas inline). La autonomía cubre el resto del archivo. Ver [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Ownership de archivos `.md`".
   - `.md` de upstream en repos fork de proyectos externos (ej. el `CHANGELOG.md` y `README.md` del core de un framework de terceros forkeado). La autonomía cubre solo `.md` agregados por el equipo al fork.
   - Operaciones git no rutinarias sobre tags publicados, `git revert` de commits ajenos publicados, reescritura de historia compartida.
+  - Publicar a nombre del dev en un repositorio donde no tiene permiso de escritura (`gh repo fork`, `git push` a ese fork, `gh pr create`, `gh issue create`, comentarios) y llevar a la rama principal el contenido de un pull request ajeno: ver [`upstream-contribution.md`](upstream-contribution.md) y [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Incorporar un PR".
 - **Caso mixto — recomendación operativa**: cuando sea posible separar en commits atómicos por categoría (uno solo-`.md` autónomo + uno de código con OK), Claude prefiere la separación. Si la atomicidad lógica exige un solo commit (código y su `README.md`), Claude pide OK por el commit mixto (o lo confirma de forma autónoma si la parte de código cumple el piso) y comunica al dev que el `.md` quedó arrastrado al gate del código.
 - **No relaja otros lineamientos**: `--no-verify` sigue prohibido sin autorización (§ "Commits"); pre-commit y pre-push hooks deben pasar; mensajes en formato `tipo: descripción` (español, máx. 72 caracteres); `git add` por nombre, no `-A`.
 
@@ -112,7 +113,7 @@ Claude ejecuta estos pasos como parte de Fase 6/7, antes del push del REQ:
 
 ### Gate pre-push
 
-El git hook `.git/hooks/pre-push` del repo `neb` (el maintainer instala una vez la envoltura: `cp hooks/pre-push-wrapper .git/hooks/pre-push`) corre sus 7 gates (lista en `hooks/README.md` § "pre-push-changelog") sobre el árbol del commit que se publica, no sobre el árbol de trabajo. Lo regenerado sin commitear no cuenta. Entre ellos, `assemble-changelog.py --check` corre por cada ref cuyos archivos publicados incluyen `changelog.d/`. Si retorna 1:
+El git hook `.git/hooks/pre-push` del repo `neb` (el mantenedor instala una vez la envoltura: `cp hooks/pre-push-wrapper .git/hooks/pre-push`) corre sus 7 gates (lista en `hooks/README.md` § "pre-push-changelog") sobre el árbol del commit que se publica, no sobre el árbol de trabajo. Lo regenerado sin commitear no cuenta. Entre ellos, `assemble-changelog.py --check` corre por cada ref cuyos archivos publicados incluyen `changelog.d/`. Si retorna 1:
 
 - El push aborta con mensaje claro.
 - Claude (leyendo el mensaje del hook) regenera (`py bootstrap/assemble-changelog.py`), hace commit de `CHANGELOG.md` como commit final del REQ y reintenta push.
@@ -127,3 +128,4 @@ Dos sesiones paralelas pueden crear `changelog.d/1.5.0.md` cada una con contenid
 - La segunda renombra su fragmento al siguiente valor disponible (e.g. `changelog.d/1.5.0.md` → `changelog.d/1.6.0.md`) y bumpea `VERSION` al mismo valor.
 - Un hueco en la historia (e.g. v1.5.0 saltado entre v1.4.0 y v1.6.0) es aceptable y no se reescribe historia.
 - `VERSION` sigue siendo single-line por convención SemVer; la colisión sobre `VERSION` es trivial (1 número, primera en hacer commit gana).
+- Entre la incorporación de un PR, que parte de la principal publicada ([`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Incorporar un PR"), y un REQ sin publicar del clon principal, conserva el número lo que se publica primero, aunque el otro haya hecho commit antes: la principal publicada no se reescribe. El otro se renumera al actualizarse, como la segunda sesión.

@@ -13,3 +13,4 @@ Pasos prácticos secuenciales: fases (1–9), gates, comandos, convenciones de a
 7. [Version control](version-control.md) — concretización **git** del mecanismo de versionamiento: formato de commits, push, rama principal por profile, CHANGELOG fragmentado y operaciones git de la autonomía sobre `.md`.
 8. [Change control gate](change-control-gate.md) — gate de autorización antes de confirmar cambios (Fase 4).
 9. [Roles invocation](roles-invocation.md) — selección de roles por contexto, algoritmo de detección, modo de anuncio, cobertura mínima por fase.
+10. [Upstream contribution](upstream-contribution.md) — aporte al núcleo por pull request cuando el dev no tiene permiso de escritura en su repo. *(Fase 9)*

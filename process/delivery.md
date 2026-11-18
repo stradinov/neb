@@ -15,6 +15,7 @@ Aplican sobre el ENUM de estados (ver [`../methodology/vocabulary.md`](../method
 - **Validación implícita** (sin artefactos: docs, metodología): `En progreso` → `Cerrado` directo. Se omiten `En validación` y `Listo para aprobación`.
 - **Cambios sin ambiente de revisión pero con artefactos** (scripts, migraciones, CLI): `En progreso` → `En validación` → `Cerrado`. Se omite `Listo para aprobación`.
 - **Validación falla**: `En validación` → `En progreso` sin formalizar.
+- **Aporte al núcleo e incorporación de un PR**: no abren registro ni recorren estados. El aporte es parte de la Fase 9 del REQ que lo originó ([`upstream-contribution.md`](upstream-contribution.md)); la incorporación tiene sus gates en [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Incorporar un PR".
 
 ## Confirmación del cambio y entrega
 
