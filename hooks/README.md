@@ -169,7 +169,7 @@ Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` regi
     - Si el plugin no corre desde el caché de plugins (`--plugin-dir`, un clon), de cuya ruta salen el marketplace y el dir de configuración (supuesto R27).
     - Si alguno de los dos archivos no se puede leer.
     - Si el settings de usuario no trae la entrada del marketplace, porque ahí `enable` y `disable` no escriben y la oferta no se podría contestar.
-    - Si el dir que sale de esa ruta no es el dir de configuración en uso (`CLAUDE_CONFIG_DIR` o `~/.claude`, supuesto R26), como pasa cuando `CLAUDE_CODE_PLUGIN_CACHE_DIR` fija otra raíz `plugins/` o cuando el ayudante se corre a mano con otro `CLAUDE_CONFIG_DIR` que el de la sesión: el settings ya no se deduce de la ruta, y `enable` y `disable` rechazan sin nombrar ningún settings.
+    - Si el dir que sale de la ruta del caché de plugins no es el dir de configuración en uso (`CLAUDE_CONFIG_DIR` o `~/.claude`, supuesto R26), como pasa cuando `CLAUDE_CODE_PLUGIN_CACHE_DIR` fija otra raíz `plugins/` o cuando el ayudante se corre a mano con otro `CLAUDE_CONFIG_DIR` que el de la sesión: el settings ya no se deduce de la ruta, y `enable` y `disable` rechazan sin nombrar ningún settings.
   - **Qué hace el arranque.** Solo lee. El aviso mide 800 unidades UTF-16 o menos y va en la parte 1.
   - **`hooks/lib/autoupdate.py`** aplica la decisión, con el OK del dev. Lo que ve el usuario: [`../docs/user-guide.md`](../docs/user-guide.md) § "Mantener Neb al día".
     - `enable` deja `autoUpdate: true` en la entrada del marketplace del settings de usuario; `disable`, `false`; `status` muestra el estado y no escribe.
