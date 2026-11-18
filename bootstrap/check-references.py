@@ -16,12 +16,13 @@ Qué se verifica:
   encabezado o con una etiqueta en negrita al inicio de línea (igual, prefijo seguido de
   separador, citado dentro del encabezado o tras «: »), sin distinguir mayúsculas,
   backticks ni numeración.
-- Archivo de la cita: el enlace o la ruta .md (en código o suelta) adyacente, con «del repo»,
-  «en el repo `x`» o «(repo x)» de por medio; el que sigue (§ "T" de/en <ruta>); el de
-  «su § "T"»; el de la cita previa encadenada (§ "A" y § "B"); el del final de la línea
-  anterior si la línea abre con la cita; los .md de profiles/x/ con «profile `x`». Una «§»
-  sin archivo nombrado se verifica contra el propio archivo («§ sin archivo»); «sección "T"»
-  sin archivo no se verifica (suele nombrar una sección genérica del change MD).
+- Archivo de la cita: el enlace o la ruta .md (en código o suelta, también justo después de
+  un paréntesis de apertura) adyacente, con «del repo», «en el repo `x`» o «(repo x)» de por
+  medio; el que sigue (§ "T" de/en <ruta>); el de «su § "T"»; el de la cita previa encadenada
+  (§ "A" y § "B"); el del final de la línea anterior si la línea abre con la cita; los .md de
+  profiles/x/ con «profile `x`». Una «§» a la que ninguna de estas formas le atribuye archivo
+  se verifica contra el propio archivo («§ sin archivo»), aunque la línea nombre otro;
+  «sección "T"» sin archivo no se verifica (suele nombrar una sección genérica del change MD).
 - Una ruta se resuelve contra el directorio del archivo y sus ancestros hasta la raíz del
   repo, la raíz de neb y, si no, por sufijo único entre los archivos recorridos. Si no se
   localiza (otro repo, memoria, ruta ambigua), sale como «aviso» y no cuenta.
@@ -49,7 +50,7 @@ SECTION = re.compile(r'(?:§|\bsecci[oó]n)\s*(?:"([^"]+)"|«([^»]+)»|“([^�
                      r'|(?<=\)) (?:"([^"]+)"|«([^»]+)»)')
 CODE = re.compile(r"(`+)(.+?)\1")
 MDPATH = re.compile(r"^[\w./~<>-]*\.md(?:\.template)?(?::\d+(?:-\d+)?)?$")
-BARE_MD = re.compile(r"(?<![\w`/.\-\[(])((?:[\w.-]+/)*[\w-]+\.md)\b(?!`)")
+BARE_MD = re.compile(r"(?<![\w`/.\-\[])((?:[\w.-]+/)*[\w-]+\.md)\b(?!`)")
 BOLD = re.compile(r"^\s*(?:[-*]|\d+\.)?\s*\*\*([^*]+?)\*\*")
 FENCE = re.compile(r"^\s*(```|~~~)")
 ADJACENT = re.compile(r"[\s()\]*_,]*"
