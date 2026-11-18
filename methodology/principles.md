@@ -133,9 +133,9 @@ Editar la metodología es aplicarla (ver § "Características" — Reflexiva): e
 
 **Criterio de corte**: si eliminar una frase no cambia el comportamiento esperado del **consumidor**, no escribirla; si ya está, eliminarla. El consumidor es por defecto el agente (redacción normativa, austera); la documentación de cara al adoptante —`docs/` (excepción de § "Capas del repo y test de pertenencia") y el `README.md`— tiene como consumidor a un humano y **admite** más contexto, ejemplos y analogías moderadas (no es lineamiento que el agente aplique en el flujo).
 
-**Señal de longitud**: un párrafo, viñeta o fila de más de 600 caracteres es señal para que quien lo edita lo revise, no un tope; si se lee claro, se queda.
-
 El criterio tiene además un **piso inferior**: la suficiencia (§ "Claridad") — no cortar por debajo de lo que el consumidor necesita para actuar.
+
+**Señal de longitud**: un párrafo, viñeta o fila de más de 600 caracteres es señal para que quien lo edita lo revise, no un tope; si se lee claro, se queda.
 
 ### Eliminar
 

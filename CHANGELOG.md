@@ -10,17 +10,17 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ### Added
 - **`methodology/principles.md`** § "Lineamientos para editar MDs":
-  - «Señal de longitud», junto al «Criterio de corte»: un párrafo, viñeta o fila de más de 600 caracteres es señal para que quien lo edita lo revise, no un tope; si se lee claro, se queda.
+  - «Señal de longitud», tras el «Criterio de corte» y su piso inferior: un párrafo, viñeta o fila de más de 600 caracteres es señal para que quien lo edita lo revise, no un tope; si se lee claro, se queda.
   - § "Eliminar": la historia de la regla (qué decía antes, desde qué versión rige, qué requerimiento la introdujo) vive en el CHANGELOG o en el registro del requerimiento, y la saca quien edita el párrafo, la viñeta o la fila que la contiene. Se conserva lo que hoy obliga por compatibilidad, sin el relato. La evidencia con que se verificó un supuesto de plataforma no es historia.
   - § "Conservar": al escribir o editar un párrafo o una lista, tres o más casos con los mismos campos van en tabla.
 
 ## [6.37.2] - 2026-11-18
 
-> **Patch**: redacción de las reglas que se leen al entrar a una fase, sin cambio de fuerza normativa. Segunda tanda del requerimiento de redacción breve: cada regla repetida queda en una sede y las demás la citan, las unidades largas se parten en casos o subviñetas con las mismas reglas, y la historia sale del texto. En los 19 archivos editados, las unidades de más de 600 caracteres bajan de 37 a 15.
+> **Patch**: redacción de las reglas que se leen al entrar a una fase, sin cambio de fuerza normativa. Segunda tanda del requerimiento de redacción breve: cada regla repetida queda en una sede y las demás la citan, los párrafos, viñetas y filas largos se parten en casos o subviñetas con las mismas reglas, y la historia sale del texto. En los 19 archivos editados, los párrafos, viñetas y filas de más de 600 caracteres bajan de 37 a 15.
 
 ### Changed
 - **Entrega temprana del registro, en una sede.** La condición y el momento quedan en `workflow/changes.md` § "Ciclo de vida del draft" (dos casos: entorno de validación compartido o no). El disparador de «entorno compartido» queda solo en `workflow/logbook.md` § "Entorno compartido (disparador opt-in por proyecto)", ahora en viñetas. Lo citan en vez de repetirlo: `process/version-control.md` § "Push", `methodology/change-control-policy.md` § "Ownership de archivos `.md`", `process/delivery.md` § "Cierre del requerimiento" (paso 5, en subviñetas), `profiles/self-applied/deployment.md` § "Entrega temprana del registro (relevo cross-dev)" y la viñeta de `changes.md` en `workflow/logbook.md`. La fila «Definición de done + entrega del registro» de `methodology/vocabulary.md` enlaza la sede.
-- **Unidades largas partidas, con las mismas reglas** (cambian rótulos y el orden de algunas oraciones):
+- **Párrafos y viñetas largos partidos, con las mismas reglas** (cambian rótulos y el orden de algunas oraciones):
   - `process/execution.md` § "Cierre de Fase 4 (gate de subagente)" y `process/delivery.md` § "Pre-ejecución de Fase 7 (gate de subagente)": «Condición de paso» y «Mecanismo vigente» en párrafos separados.
   - `methodology/principles.md`: § "Suposiciones explícitas antes de afirmar" (los dos usos del hallazgo de un rol delegado, como casos; la viñeta «Corrección de un artefacto del REQ», con subviñetas), § "Lineamientos para editar MDs" (el «Criterio de corte» en su propio párrafo) y «Sujeto de una obligación» (subviñetas «A quién le toca», «Límites» y «Cuándo aplica»).
   - `workflow/metrics.md`: Re-entregas en un profile de proceso (empieza / falla / no cuentan) e «Incidencias surgidas» (cuenta / cuenta uno / no cuenta).
