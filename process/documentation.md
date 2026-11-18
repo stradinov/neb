@@ -12,6 +12,6 @@ Qué documentar al cerrar un requerimiento. Paths concretos en [workflow/](../wo
 
 ## Qué NO se documenta
 
-Los criterios de exclusión (cambios triviales, listas de archivos modificados, estado temporal, decisiones evidentes del código, logs de "qué hicimos hoy") viven en [`../methodology/principles.md`](../methodology/principles.md) § Anti-patrones.
+Los criterios de exclusión (cambios triviales, listas de archivos modificados, estado temporal, decisiones evidentes del código, logs de "qué hicimos hoy") viven en [`../methodology/principles.md`](../methodology/principles.md) § "Anti-patrones".
 
 (El cierre formal del requerimiento — pregunta al usuario y push final — vive en [delivery.md](delivery.md). Esta fase ejecuta solo la documentación pendiente.)

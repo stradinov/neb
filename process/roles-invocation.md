@@ -13,9 +13,9 @@ Claude propone los roles en Fase 3 (Propuesta) antes de generar el plan inicial.
 | Profile | Rol principal | Revisores default | Detalle |
 |---|---|---|---|
 | `self-applied` | Process Architect | QA Process Engineer + Process Improvement Analyst | [profiles/self-applied/roles.md](../profiles/self-applied/roles.md) |
-| `profile-authoring` | Profile Author | QA Process Engineer (F3/F4/F7) + Process Improvement Analyst (F9/Incidentes) | [profiles/profile-authoring/roles.md](../profiles/profile-authoring/roles.md) |
+| `profile-authoring` | Profile Author | QA Process Engineer (Fases 3, 4 y 7) + Process Improvement Analyst (Fase 9 e Incidentes) | [profiles/profile-authoring/roles.md](../profiles/profile-authoring/roles.md) |
 | `skill-authoring` | Skill Author | Skill QA Engineer (Fase 5) + Skill Maintainer (periódico) | [profiles/skill-authoring/roles.md](../profiles/skill-authoring/roles.md) |
-| `research` | Process Architect | Fact-Check Reviewer (F4 condicional + F7 siempre) | [profiles/research/roles.md](../profiles/research/roles.md) |
+| `research` | Process Architect | Fact-Check Reviewer (Fase 4 condicional + Fase 7 siempre) | [profiles/research/roles.md](../profiles/research/roles.md) |
 | Otros profiles de software (futuros) | Software Engineer | Code Reviewer | — |
 | Profile desconocido | (Claude pregunta al dev) | — | — |
 
@@ -69,9 +69,9 @@ Además de los revisores de fase (tablas anteriores), existen **agentes funciona
 
 ### Matriz de cobertura por profile × fase (subagentes específicos del profile)
 
-Las fases 1, 2, 6, 8 se omiten (nunca tienen subagente). `—` = fase conducida solo por persona. Esta matriz lista únicamente los subagentes **específicos del profile**; el revisor transversal `context-completeness-reviewer` se invoca adicionalmente en F3/F4/F7 según las condiciones de [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`".
+Las fases 1, 2, 6, 8 se omiten (nunca tienen subagente). `—` = fase conducida solo por persona. Esta matriz lista únicamente los subagentes **específicos del profile**; el revisor transversal `context-completeness-reviewer` se invoca adicionalmente en Fases 3, 4 y 7 según las condiciones de [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`".
 
-| Profile | F3 Plan-review | F4 Cierre (gate) | F5 Validación | F7 Pre-ejecución (gate) | F9 Diagnóstico | Incidentes P1/P2 |
+| Profile | Fase 3 · Plan-review | Fase 4 · Cierre (gate) | Fase 5 · Validación | Fase 7 · Pre-ejecución (gate) | Fase 9 · Diagnóstico | Incidentes P1/P2 |
 |---|---|---|---|---|---|---|
 | `self-applied` | `qa-process-engineer` + `process-improvement-analyst` | `qa-process-engineer` | — | `qa-process-engineer` | `process-improvement-analyst` | `process-improvement-analyst` |
 | `profile-authoring` | `qa-process-engineer` + `process-improvement-analyst` | `qa-process-engineer` | — | `qa-process-engineer` | `process-improvement-analyst` | `process-improvement-analyst` |
@@ -79,8 +79,8 @@ Las fases 1, 2, 6, 8 se omiten (nunca tienen subagente). `—` = fase conducida 
 | `research` | `qa-process-engineer` + `process-improvement-analyst` (si `propósito = decisión`) | `fact-check-reviewer` (si `propósito = decisión` o divergencia material no resuelta en `[crítico]`) | — | `fact-check-reviewer` (siempre) | `process-improvement-analyst` | `process-improvement-analyst` |
 | Profiles de software (futuros) | por dim.: Code Reviewer / Security Reviewer / Database Engineer | Code Reviewer (+ paralelos por dim.) | Security Reviewer (si auth/pagos críticos) | Code Reviewer default | `process-improvement-analyst` | `process-improvement-analyst` |
 
-`process-improvement-analyst` es universal en F9 e Incidentes (no por profile).
+`process-improvement-analyst` es universal en Fase 9 e Incidentes (no por profile).
 
-Adicionalmente, `context-completeness-reviewer` se invoca de forma **transversal** (todos los profiles) en F3/F4/F7 según las condiciones de [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`". No reemplaza a los revisores específicos del profile — los complementa auditando suposiciones que el autor no verificó (estado concreto local o dominio sin antecedente).
+Adicionalmente, `context-completeness-reviewer` se invoca de forma **transversal** (todos los profiles) en Fases 3, 4 y 7 según las condiciones de [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`". No reemplaza a los revisores específicos del profile — los complementa auditando suposiciones que el autor no verificó (estado concreto local o dominio sin antecedente).
 
 Ver detalle de cada gate en [`execution.md`](execution.md) (Fase 4) y [`delivery.md`](delivery.md) (Fase 7).

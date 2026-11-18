@@ -1,6 +1,6 @@
 # Pendientes — backend, brújula y priorización
 
-Recurso del módulo `hooks/lib/pendings.py` que opera los **pendientes del dev** sobre la misma DB SQLite del logbook (`~/.claude/neb.db`; resolver dual-mode `neb.db ∨ neb-logbook.db`). El skill que lo conduce es [`../skills/pendings-review/SKILL.md`](../skills/pendings-review/SKILL.md); el modelo de datos (6 tablas) vive en [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql) y los change MD de los REQ (`neb-pendings-sqlite`, `pendings-taxonomia-cliente-topico`). Aquí: los **ejes curados** (cliente · tópico) y la curaduría, la **brújula `compas.md`**, la **jerarquía de fuentes** de priorización y la **normalización slug↔subsistema**.
+Recurso del módulo `hooks/lib/pendings.py` que opera los **pendientes del dev** sobre la misma DB SQLite del logbook (`~/.claude/neb.db`; resolver dual-mode `neb.db ∨ neb-logbook.db`). El skill que lo conduce es [`../skills/pendings-review/SKILL.md`](../skills/pendings-review/SKILL.md); el modelo de datos (6 tablas) vive en [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql) y los Change MD de los REQ (`neb-pendings-sqlite`, `pendings-taxonomia-cliente-topico`). Aquí: los **ejes curados** (cliente · tópico) y la curaduría, la **brújula `compas.md`**, la **jerarquía de fuentes** de priorización y la **normalización slug↔subsistema**.
 
 ## Ejes curados (cliente · tópico) y curaduría
 
@@ -73,7 +73,7 @@ PD show alpha-pem-ppk  # por slug: 1º columna pending.slug (kind `slug`) → 2�
 
 El slug se fija con `PD curate <id> --slug <s>` (o lo siembra el pase); `PD backfill-slugs` rellena la columna desde el tag inicial `[slug]` de los pendientes viejos **solo cuando el tag es único** (los repetidos quedan `NULL` y siguen resolviendo por el fallback).
 
-**El `#NNN` del `pendings.md` histórico queda RETIRADO como cita de pendiente.** Esa numeración del markdown plano **no es clave en `neb.db`**: la migración asignó `id` autoincrement y descartó el número del `.md` (sobrevive solo como texto en el prefijo `NN.` de `context_origin`). Por eso `#NNN` colisiona (un mismo número apunta a varios items) y `show NNN` resolvería al item equivocado. Al citar un pendiente —en chat, memorias, change MDs— usar `[slug]` (y `PD-<id>` si se necesita el número). Nunca `#NNN`.
+**El `#NNN` del `pendings.md` histórico queda RETIRADO como cita de pendiente.** Esa numeración del markdown plano **no es clave en `neb.db`**: la migración asignó `id` autoincrement y descartó el número del `.md` (sobrevive solo como texto en el prefijo `NN.` de `context_origin`). Por eso `#NNN` colisiona (un mismo número apunta a varios items) y `show NNN` resolvería al item equivocado. Al citar un pendiente —en chat, memorias, Change MDs— usar `[slug]` (y `PD-<id>` si se necesita el número). Nunca `#NNN`.
 
 ## Jerarquía de fuentes de priorización
 

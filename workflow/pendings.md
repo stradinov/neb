@@ -1,52 +1,23 @@
-# pendings.md
+# Pendientes
 
-Archivo global del dev con ítems de seguimiento que no bloquean el cierre pero requieren acción futura.
+Ítems de seguimiento del dev que no bloquean el cierre de un REQ pero piden acción futura. Viven en `neb.db` (`~/.claude/neb.db`). El archivo plano `~/.claude/pendings.md` ya no lleva pendientes: conserva § "Sesiones pausadas" y los avisos que un mecanismo del adoptante le anexe.
 
-> **Backend migrado a `neb.db` (2026-06-15, REQ `neb-pendings-sqlite`).** Los pendientes viven en SQLite; el `pendings.md` plano quedó como puntero/histórico. Las secciones "Formato", "Asignación de IDs" y la numeración `NNN.` de abajo describen el **modelo plano obsoleto** y se conservan solo como referencia del histórico — no se asignan números nuevos a mano. La creación/consulta va por el skill [`pendings-review`](../skills/pendings-review/SKILL.md) sobre `neb.db` (backend en [`../tooling/pendings.md`](../tooling/pendings.md)).
->
-> **Cita canónica de un pendiente: su `[slug]`** (no `#NNN`), persistido en `pending.slug` desde el REQ `pendings-taxonomia-cliente-topico` (2026-09-22; el tag en `context_origin` queda como fallback histórico). El número, si se usa, es el `id` de `neb.db` como `PD-<id>`. El `#NNN` del markdown histórico **no resuelve** contra `neb.db` (colisiona; numeración muerta). Contrato de resolución en [`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente".
->
-> **Clasificación en dos ejes curados** — cada pendiente abierto **curado** lleva un `cliente` y un `tópico` (jerarquía `topic.parent_id`), decididos por el dev (`PD curate`); los que faltan por curar los propone el skill en cada pase y el matching por keywords solo sugiere para lo no curado. La banda curada manda sobre la brújula `compas.md`. Ver [`../tooling/pendings.md`](../tooling/pendings.md) § "Ejes curados".
+## Dónde viven y cómo se citan
 
-## Path
-
-```
-~/.claude/pendings.md
-```
-
-Editar directamente sin pedir confirmación al dev
-
-## Formato
-
-```markdown
-## <Proyecto>
-
-1. **[nombre-req]** Descripción del ítem pendiente
-2. **[nombre-req]** Descripción del ítem pendiente
-```
-
-Numerado. `[nombre-req]` identifica el requerimiento de origen.
-
-## Asignación de IDs
-
-Los IDs numerados son **globales al archivo** (no por sección de proyecto) y deben ser únicos. Antes de agregar un nuevo ítem, verificar el ID máximo actualmente en uso para evitar colisiones con ítems pre-existentes en otras secciones:
-
-```bash
-grep -oE '^[0-9]+\.' ~/.claude/pendings.md | sort -t. -k1 -n | tail -1
-```
-
-Asignar al nuevo ítem el **siguiente entero libre** (típicamente `máx + 1`, pero también vale cualquier hueco si el dev numera con saltos por convención).
-
-**Por qué la regla**: el archivo se edita desde múltiples sesiones; una sesión que asume "voy por el siguiente número después del último que veo" colisiona con otra sección ya existente.
+- **Backend:** tabla `pending` de `neb.db`, operada por `hooks/lib/pendings.py` (detalle en [`../tooling/pendings.md`](../tooling/pendings.md)).
+- **Alta:** `PD create task "[<slug>] <contexto>"`, sin pedir confirmación al dev. `PD` es `hooks/lib/pendings.py` del núcleo en uso; el skill `pendings-review` trae la forma de resolverlo desde cualquier proyecto.
+- **Consulta:** la del dev se sirve por el skill [`pendings-review`](../skills/pendings-review/SKILL.md), que prioriza por banda y por la brújula `compas.md`; el `list` del CLI es acceso de bajo nivel.
+- **Cita canónica:** el `[slug]` del pendiente y, si se necesita el número, el `id` de `neb.db` como `PD-<id>`; nunca `#NNN`. Contrato de resolución en [`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente".
+- **Clasificación:** cada pendiente curado lleva un cliente y un tópico, decididos por el dev; la banda curada manda sobre la brújula. Ver [`../tooling/pendings.md`](../tooling/pendings.md) § "Ejes curados".
 
 ## Cuándo Claude lo escribe / lee
 
 - **Escribe**: al cerrar sin confirmación de prod (ver [delivery.md](../process/delivery.md)) o ítems sin urgencia identificados durante el requerimiento.
-- **Lee**: cuando el dev pide pendientes o al saludar (ver [communication.md](../general/communication.md)) — la consulta se sirve por el skill [`pendings-review`](../skills/pendings-review/SKILL.md) sobre `neb.db` (capa de valor: prioriza por banda + brújula `compas.md`), no leyendo el `.md` plano.
+- **Lee**: cuando el dev pide pendientes o al saludar (ver [communication.md](../general/communication.md)), por el skill `pendings-review`.
 
-## Sección "Sesiones pausadas"
+## Sesiones pausadas
 
-Heading dedicado en `pendings.md` para sesiones Claude nombradas con `/rename` (supuesto R10 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) cuando el dev anuncia pausa/continuación posterior. Permite recuperar el comando de reanudación sin que el dev recuerde el nombre.
+Sección `## Sesiones pausadas` de `~/.claude/pendings.md` para sesiones Claude nombradas con `/rename` (supuesto R10 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) cuando el dev anuncia pausa/continuación posterior. Permite recuperar el comando de reanudación sin que el dev recuerde el nombre.
 
 Esto cubre **reanudar la propia sesión local** (mismo dev, misma máquina). Para **relevo cross-dev / cross-máquina** (otro dev continúa, u otra máquina) ver la [bitácora de relevo](logbook.md), que además registra sesiones automáticamente sin depender del anuncio de pausa.
 
@@ -58,10 +29,10 @@ Formato:
 - **`<nombre-sesion>`** — <descripción del hilo, 1–2 líneas>. Reanudar: `claude --resume <nombre-sesion>`.
 ```
 
-No numerado (los ítems numerados son pendientes accionables; estos son recuperables). Procedimiento completo en [`process/execution.md`](../process/execution.md) §"Pausar y reanudar la misma sesión Claude".
+Claude edita la sección sin pedir confirmación al dev. Procedimiento completo en [`process/execution.md`](../process/execution.md) § "Pausar y reanudar la misma sesión Claude".
 
-**Cuándo Claude escribe**: al detectar el anuncio de pausa (ver [`general/communication.md`](../general/communication.md) §"Handoff de sesión").
+**Cuándo Claude escribe**: al detectar el anuncio de pausa (ver [`general/communication.md`](../general/communication.md) § "Handoff de sesión").
 
-**Cuándo Claude elimina**: al reanudar la sesión vía `--resume <nombre>` (paso 5 de [`process/execution.md`](../process/execution.md) §"Retomar una sesión interrumpida"), o si el dev anuncia descarte explícito.
+**Cuándo Claude elimina**: al reanudar la sesión vía `--resume <nombre>` (paso 5 de [`process/execution.md`](../process/execution.md) § "Retomar una sesión interrumpida"), o si el dev anuncia descarte explícito.
 
 **Ventana de 30 días**: si una sesión pausada no se reanuda en 30 días, Claude pregunta al dev antes de eliminar el ítem (no asume descarte implícito — el hilo puede seguir siendo útil).

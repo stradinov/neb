@@ -99,7 +99,7 @@ desactiva la inyección para ese repo.
 
 Dos variables fijan los paths del entorno: `NEB_HOME` (el checkout de neb; con solo
 el plugin no se establece, porque el plugin resuelve su propio directorio) y `NEB_WORKSPACE` (la raíz del espacio de trabajo, donde
-viven el overlay y `personal/`). Cómo establecerlas: [user-guide § Configurar el entorno](user-guide.md).
+viven el overlay y `personal/`). Cómo establecerlas: [user-guide](user-guide.md) § "Configurar el entorno".
 
 ---
 
@@ -109,7 +109,7 @@ viven el overlay y `personal/`). Cómo establecerlas: [user-guide § Configurar 
 |---|---|---|
 | Change MD (registro del requerimiento) | `<proyecto>/changes/<fecha>-<nombre>.md` | Sí, en el repo del proyecto |
 | Plan aprobado | `~/.claude/approved-plans/<ts>-<proyecto>-<slug>.md` | No (histórico cross-proyecto) |
-| Pendientes | `~/.claude/pendings.md` | No (seguimiento cross-sesión) |
+| Pendientes | `~/.claude/neb.db` | No (seguimiento cross-sesión) |
 | Bitácora de relevo | `~/.claude/neb.db` (local) + central opcional | No (relevo cross-dev de sesiones a medias) |
 
 Cada registro del requerimiento documenta: contexto y objetivo, decisiones tomadas,

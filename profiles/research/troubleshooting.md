@@ -43,7 +43,7 @@
 
 **Síntomas**: la fuente, el motor o la URL a consultar no responde, está bloqueado, o requiere autenticación de pago.
 
-**Diagnóstico**: verificar si hay alternativa equivalente disponible (ver jerarquía de motor en [conventions.md](conventions.md) §Mecanismo recomendado — p. ej. degradar de `deep-research` al piso `WebSearch`/`WebFetch`).
+**Diagnóstico**: verificar si hay alternativa equivalente disponible (ver jerarquía de motor en [conventions.md](conventions.md) § "Mecanismo recomendado" — p. ej. degradar de `deep-research` al piso `WebSearch`/`WebFetch`).
 
 **Solución**: sustituir por la alternativa disponible. Documentar en el frontmatter `llms_consultados` qué se usó en reemplazo y por qué.
 

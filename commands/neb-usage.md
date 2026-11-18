@@ -21,8 +21,8 @@ Argumentos (`$ARGUMENTS`), los de `hooks/lib/usage-tracker.py report`:
 
 - sin argumentos — los últimos 14 días, con el gasto por REQ;
 - `--days N` — otra ventana;
-- `--req <slug>` — solo el REQ `<slug>` (nombre de su change MD sin la fecha);
-- `--write <change MD>` — además escribe el bloque de uso entre `<!-- usage-tracker-start -->` y `<!-- usage-tracker-end -->` del change MD (el slug sale de su nombre). Es el paso del Reporte de cierre ([`workflow/metrics.md`](../workflow/metrics.md) § "Tokens, costo y breakdown por modelo").
+- `--req <slug>` — solo el REQ `<slug>` (nombre de su Change MD sin la fecha);
+- `--write <change MD>` — además escribe el bloque de uso entre `<!-- usage-tracker-start -->` y `<!-- usage-tracker-end -->` del Change MD (el slug sale de su nombre). Es el paso del Reporte de cierre ([`workflow/metrics.md`](../workflow/metrics.md) § "Tokens, costo y breakdown por modelo").
 
 ```bash
 py "$NEB_SRC/hooks/lib/usage-tracker.py" report $ARGUMENTS   # o python / python3

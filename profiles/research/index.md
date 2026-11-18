@@ -16,15 +16,15 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 
 | Término | Significado |
 |---|---|
-| **Entregable** | Documento markdown de investigación: síntesis destilada + frontmatter YAML (ver [conventions.md](conventions.md) §Trazabilidad) |
-| **Entrega para revisión** | Síntesis destilada presentada al dev en la sesión; la calidad ya pasó el gate F4 (`fact-check-reviewer`) |
+| **Entregable** | Documento markdown de investigación: síntesis destilada + frontmatter YAML (ver [conventions.md](conventions.md) § "Trazabilidad") |
+| **Entrega para revisión** | Síntesis destilada presentada al dev en la sesión; la calidad ya pasó el gate de Fase 4 (`fact-check-reviewer`) |
 | **Entrega final** | Commit del documento en su ubicación según scope + cita en el change que lo originó |
-| **Ambiente de revisión** | Gate F4 (`fact-check-reviewer`) + presentación al dev; la utilidad posterior es señal de Fase 9 |
-| **Estado aprobado** | Research entregado tras gate F4 (calidad verificada) — `vigente` |
-| **Dependientes** | Documentos o archivos que citan este research (ver §Trazabilidad en conventions.md) |
-| **Flujos críticos** | Sub-preguntas marcadas `[crítico]` cuando el propósito es una decisión — foco del gate F4 (su divergencia no resuelta lo dispara) |
+| **Ambiente de revisión** | Gate Fase 4 (`fact-check-reviewer`) + presentación al dev; la utilidad posterior es señal de Fase 9 |
+| **Estado aprobado** | Research entregado tras gate de Fase 4 (calidad verificada) — `vigente` |
+| **Dependientes** | Documentos o archivos que citan este research (ver § "Trazabilidad" en conventions.md) |
+| **Flujos críticos** | Sub-preguntas marcadas `[crítico]` cuando el propósito es una decisión — foco del gate de Fase 4 (su divergencia no resuelta lo dispara) |
 | **Síntesis** | Output destilado por el Process Architect — nunca recitar respuestas crudas de las fuentes |
-| **Divergencia material** | Dos o más fuentes entregan respuestas contradictorias en claims centrales. Si el Process Architect no la resuelve con una fuente autoritativa adicional en una dimensión `[crítico]`, activa el Fact-Check Reviewer en F4 |
+| **Divergencia material** | Dos o más fuentes entregan respuestas contradictorias en claims centrales. Si el Process Architect no la resuelve con una fuente autoritativa adicional en una dimensión `[crítico]`, activa el Fact-Check Reviewer en Fase 4 |
 
 > Overlay sobre `self-applied`: los términos del vocabulario abstracto no listados (Elaboración asistida/autónoma, Entrega base) se heredan de [`self-applied`](../self-applied/index.md). La tabla concretiza los que difieren en el dominio de investigación + términos propios.
 
@@ -36,7 +36,7 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 | **Fase 2 — Estimación** | Baja: ≤2 fuentes, búsqueda directa · Media: multi-fuente con cruce · Alta: multi-fuente + verificación adversarial (voz externa Gemini si `exploratorio`) |
 | **Fase 3 — Propuesta** | Plan = fuentes/motor a consultar + prompts + dimensiones + criterio de éxito. Plan de pruebas = dimensiones esperadas (criterio de éxito) + flujos `[crítico]` si `propósito = decisión`. Plan-review obligatorio cuando `propósito = decisión` |
 | **Fase 4 — Ejecución** | Ejecutar el motor de investigación (`WebSearch`/`WebFetch` de piso; `deep-research` opcional; Gemini inline si `exploratorio`), capturar síntesis destilada. Gate: `fact-check-reviewer` si `propósito = decisión` o divergencia no resuelta en dimensión `[crítico]` |
-| **Fase 5 — Validación** | La calidad de claims se validó en el gate F4 (`fact-check-reviewer`); no hay matriz formal adicional. La síntesis se presenta al dev. La utilidad del research en decisiones posteriores es retroalimentación de Fase 9, no un gate de cierre |
+| **Fase 5 — Validación** | La calidad de claims se validó en el gate de Fase 4 (`fact-check-reviewer`); no hay matriz formal adicional. La síntesis se presenta al dev. La utilidad del research en decisiones posteriores es retroalimentación de Fase 9, no un gate de cierre |
 | **Fase 6 — Control de cambios** | Estado `Listo para aprobación`: dev autoriza el commit/entrega del research (la utilidad no es gate — es señal de Fase 9) |
 | **Fase 7 — Entrega final** | Commit en ubicación según scope + cita desde el change originador. Gate: `fact-check-reviewer` pre-commit |
 | **Fase 8 — Documentación** | Change MD del REQ + actualizar memoria del proyecto (decisión derivada, no el research entero). Bump SemVer solo si el research modifica la metodología directamente |
@@ -47,7 +47,7 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 | Propósito | Archivo |
 |---|---|
 | Convenciones: disparo, formato, trazabilidad, síntesis | [profiles/research/conventions.md](conventions.md) |
-| Entrega: commit, cita, ubicación por scope, gate F7 | [profiles/research/deployment.md](deployment.md) |
+| Entrega: commit, cita, ubicación por scope, gate de Fase 7 | [profiles/research/deployment.md](deployment.md) |
 | Roles: Process Architect (principal) + Fact-Check Reviewer (revisor) | [profiles/research/roles.md](roles.md) |
 | Troubleshooting | [profiles/research/troubleshooting.md](troubleshooting.md) |
 | Skills del profile | [profiles/research/skills.md](skills.md) |

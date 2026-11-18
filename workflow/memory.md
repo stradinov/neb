@@ -16,7 +16,7 @@ Dos tipos de archivo en `~/.claude/projects/.../memory/` (contexto activo que Cl
 
 ## Contenido
 
-Estructura del contexto duradero: ver [`templates/project-memory.md.template`](../templates/project-memory.md.template). Estructura de un REQ activo: ver [`templates/active-req.md.template`](../templates/active-req.md.template) y la sección "Requerimientos activos" abajo.
+Estructura del contexto duradero: ver [`templates/project-memory.md.template`](../templates/project-memory.md.template). Estructura de un REQ activo: ver [`templates/active-req.md.template`](../templates/active-req.md.template) y § "Requerimientos activos" abajo.
 
 ## Requerimientos activos
 

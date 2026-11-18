@@ -1,6 +1,6 @@
 # Inventario de skills
 
-Single source of truth de los skills de Claude Code disponibles. Cualquier REQ que cree, actualice o deprecate un skill actualiza esta tabla en Fase 8 (Documentation).
+fuente única de los skills de Claude Code disponibles. Cualquier REQ que cree, actualice o deprecate un skill actualiza esta tabla en Fase 8 (Documentation).
 
 ## Skills disponibles
 

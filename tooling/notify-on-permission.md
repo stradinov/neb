@@ -27,7 +27,7 @@ Claude pide permiso o idle > 60s → Notification hook
                                   └─ Reproducir 1 chime async (sin scaling, sin walk-back)
 ```
 
-Sin walk-back de transcript: el evento `Notification` no corresponde a "cierre de turno con duración medible", por lo que no aplica la heurística de scaling de [`notify-on-stop.md § 4`](notify-on-stop.md). Siempre 1 chime fijo.
+Sin walk-back de transcript: el evento `Notification` no corresponde a "cierre de turno con duración medible", por lo que no aplica la heurística de scaling de [`notify-on-stop.md`](notify-on-stop.md) § "Modos (`scaling`)". Siempre 1 chime fijo.
 
 ## 3. Configuración personal default
 
@@ -51,7 +51,7 @@ Cualquier campo ausente cae al default hardcoded en el script. Si el archivo no 
 
 ## 4. Activación
 
-Manual, mismo procedimiento que [`notify-on-stop.md § 6`](notify-on-stop.md).
+Manual, mismo procedimiento que [`notify-on-stop.md`](notify-on-stop.md) § "Activación".
 
 1. Agregar `notify-on-permission` a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json` (el plugin ya registra el hook; en una lista ya existente, va separado por comas y sin espacios). En Windows requiere Git Bash.
 
@@ -110,7 +110,7 @@ Escenarios 1–7, 9–10, 12 corren en máquina Windows. Escenario 11 (Linux/Mac
 
 ## Referencias
 
-- [`tooling/notify-on-stop.md`](notify-on-stop.md) — hook hermano (`Stop`). Detalles compartidos: guard de subsesión interna (§ 7), heurística de skip (§ 8), limitaciones y restricciones técnicas (§ 9), cuándo desactivar (§ 10).
+- [`tooling/notify-on-stop.md`](notify-on-stop.md) § "Guard de subsesión interna", § "Heurística de skip", § "Limitaciones y alcances" y § "Cuándo desactivarlo" — hook hermano (`Stop`); detalles compartidos.
 - [`tooling/prompt-preprocessing.md`](prompt-preprocessing.md) — hook que origina la necesidad del guard de subsesión interna via `NEB_INTERNAL_SUBSESSION` (alias legacy `CLAUDE_PREPROCESS_RECURSION`).
 - [`hooks/README.md`](../hooks/README.md) — catálogo de los hooks + filosofía (idempotencia, < 100 ms, defensivos, sin secretos, cross-OS).
 - Documentación oficial de `Notification`: [Anthropic Claude Code hooks](https://docs.claude.com/en/docs/claude-code/hooks).

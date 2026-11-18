@@ -1,6 +1,6 @@
 # <título descriptivo del requerimiento>
 
-<!-- Estado: ENUM canónico en workflow/index.md "Estados del requerimiento".
+<!-- Estado: ENUM canónico en workflow/index.md § "Estados del requerimiento".
      Valores: En progreso | En validación | Listo para aprobación | Cerrado.
      Bloqueado se anota como sufijo: "En progreso (bloqueado por X)". -->
 
@@ -9,7 +9,7 @@
 **Fecha cierre:** —
 **Complejidad estimada:** baja | media | alta
 **Complejidad real:** —
-**Riesgo de regresión:** bajo | medio | alto  <!-- ver [planning.md](../process/planning.md) "Riesgo de regresión" -->
+**Riesgo de regresión:** bajo | medio | alto  <!-- ver [planning.md](../process/planning.md) § "Riesgo de regresión" -->
 
 
 ## Contexto
@@ -45,7 +45,7 @@
 **Validador:** dev (default; nombrar solo si fue Claude o validación delegada)
 **SHA validado:** `<hash>` (commit cuyo contenido se probó; lo usa la integración autónoma, ver `process/version-control.md` § "Integración a la rama principal")
 
-Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/delivery.md) "Definición de done").
+Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/delivery.md) § "Definición de done").
 
 **Riesgo medio/alto** requiere ≥1 fila con prefijo `[crítico]` (flujos sensibles a re-validar). Si una fila `[crítico]` está ❌, el cierre se bloquea.
 
@@ -83,7 +83,7 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 ## Diagnóstico de defectos
 
 <!-- Opcional. Completar solo si este REQ detectó defectos durante o post-cierre.
-     Ver [improvement.md](../process/improvement.md) "Diagnóstico de origen del defecto".
+     Ver [improvement.md](../process/improvement.md) § "Diagnóstico de origen del defecto".
      Patrón / aislado: solo `aislado` o `≥3 similares` (este dispara la revisión de familia de
      improvement.md § "Recurrencia por familia"); el detalle va tras el valor:
      «`≥3 similares`: A, B, C» o «`aislado` (2 casos: …)». -->
@@ -94,12 +94,12 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 
 ## Trazabilidad
 
-- **Plan aprobado:** `~/.claude/approved-plans/<archivo>.md` (media/alta: hook en plan mode, o el path del `Write` conversacional; `—` en trivial/baja/no-formal)
+- **Plan aprobado:** `~/.claude/approved-plans/<archivo>.md` (media/alta: lo guarda el hook en plan mode si está activado, o Claude con `Write`; `—` en trivial/baja/no-formal)
 - **Rama:** `<rama>` (la que el dev nombró en el plan aprobado; sin campo = la principal)
 - **Commits:** `esta confirmación` (si cierras el registro en el mismo commit que el entregable) o `<hash>` / `<hash-inicial>..<hash-final>` (si ya se entregó antes). Con confirmación o integración autónoma: un SHA por línea, marcado (autónomo), (OK) o (registro); un rango no sirve
 - **Diff mostrado al dev:** `<sha>`, … (`<gate>`, `<fecha>`) — confirmaciones autónomas que el dev vio antes de que salieran del clon local (ver `process/change-control-gate.md`); una línea por gate
 - **Integración:** `<rama>` `<sha>` (`<fecha>`) — punta remota tras la integración (ver `process/version-control.md` § "Integración a la rama principal")
-- **Pendientes generados:** ver `~/.claude/pendings.md` tag `[<slug>]` (o `ninguno`)
+- **Pendientes generados:** `[<slug>]` (`PD-<id>`) por pendiente (o `ninguno`)
 
 ## Métricas
 

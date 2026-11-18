@@ -102,7 +102,7 @@ echo '{"enabled": true, "wav": null, "min_seconds": 10, "max_chimes": 5, "scalin
 
 ### Migración desde una entrada de settings
 
-Si tu `~/.claude/settings.json` invoca este hook desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esa entrada `Stop` y agrega `notify-on-stop` a `NEB_HOOKS` (§ 6); si conservas las dos, suena dos veces.
+Si tu `~/.claude/settings.json` invoca este hook desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esa entrada `Stop` y agrega `notify-on-stop` a `NEB_HOOKS` (§ "Activación"); si conservas las dos, suena dos veces.
 
 ## 7. Guard de subsesión interna
 
@@ -115,7 +115,7 @@ Mecanismo: `preprocess-prompt.py` marca el entorno del subproceso con `NEB_INTER
 
 Sin este guard, cada prompt no trivial del dev produce 2 chimes: uno del subproceso Haiku (fantasma) y otro del turno real al final.
 
-Es **un caso del contrato general** "hooks inertes en subsesión interna del corrector" — definido en [`prompt-preprocessing.md`](prompt-preprocessing.md) § 9 y compartido vía [`hooks/lib/subsession.py`](../hooks/lib/subsession.py).
+Es **un caso del contrato general** "hooks inertes en subsesión interna del corrector" — definido en [`prompt-preprocessing.md`](prompt-preprocessing.md) § "Limitaciones y alcances" y compartido vía [`hooks/lib/subsession.py`](../hooks/lib/subsession.py).
 
 ## 8. Heurística de skip
 
@@ -150,7 +150,7 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 - **Cross-OS**: bajo el plugin, el hook corre en Git Bash en Windows y el dispatcher elige el `.ps1`; en macOS y Linux, el `.sh`. Una entrada de settings con clon declara `"shell": "powershell"` con `$env:VAR` en Windows.
 - **Linux/Mac**: `jq` es requisito blando — sin `jq`, el script cae a valores por defecto completos y solo puede emitir 1 chime de cortesía (no calcula duración).
 - **Múltiples hooks `Stop`**: Claude Code los ejecuta en paralelo; convive con otros hooks `Stop` del repo (p. ej. `logbook-sync`).
-- **Coexistencia con `Notification`** (`notify-on-permission`): eventos semánticamente distintos. Si el dev activa ambos, suenan chimes en secuencia (permission → approve → tool corre → cierre de turno). Ver [`tooling/notify-on-permission.md`](notify-on-permission.md) § 5.
+- **Coexistencia con `Notification`** (`notify-on-permission`): eventos semánticamente distintos. Si el dev activa ambos, suenan chimes en secuencia (permission → approve → tool corre → cierre de turno). Ver [`tooling/notify-on-permission.md`](notify-on-permission.md) § "Coexistencia con `notify-on-stop`".
 - **Sin secretos**: no lee ni escribe credenciales.
 
 ## 10. Cuándo desactivarlo

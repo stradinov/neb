@@ -1,6 +1,6 @@
 # Bitácora de relevo — backend y captura (opcional)
 
-Recurso del hook que alimenta la [bitácora de relevo](../workflow/logbook.md). Lo registra el plugin y es de activación voluntaria (`NEB_HOOKS` / `NEB_PROJECT_HOOKS`, § "Activación"). El artefacto y su modelo de ownership viven en [`../workflow/logbook.md`](../workflow/logbook.md); el protocolo de uso en [`../process/execution.md`](../process/execution.md) §"Gestión de sesiones (handoff)"; aquí la mecánica.
+Recurso del hook que alimenta la [bitácora de relevo](../workflow/logbook.md). Lo registra el plugin y es de activación voluntaria (`NEB_HOOKS` / `NEB_PROJECT_HOOKS`, § "Activación"). El artefacto y su modelo de ownership viven en [`../workflow/logbook.md`](../workflow/logbook.md); el protocolo de uso en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)"; aquí la mecánica.
 
 ## Backend pluggable
 
@@ -38,7 +38,7 @@ Con solo SQLite local (un dev, una DB): `tomar`/`liberar` son **informativos** (
 
 ## Retención
 
-Un `work` cerrado se **archiva** (`archived_at`), no se borra — preserva el corpus para auditoría futura. El borrado real es purga **intencional y manual** del central: el `purge.py --before <fecha> [--apply]` del backend central (`--dry-run` por defecto; ver la doc de su repositorio § Retención).
+Un `work` cerrado se **archiva** (`archived_at`), no se borra — preserva el corpus para auditoría futura. El borrado real es purga **intencional y manual** del central: el `purge.py --before <fecha> [--apply]` del backend central (`--dry-run` por defecto; ver la doc de su repositorio § "Retención").
 
 ## Activación
 

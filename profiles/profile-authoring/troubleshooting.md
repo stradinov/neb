@@ -54,4 +54,4 @@
 
 **Diagnóstico**: cambios en la tabla sin actualizar la política de detección runtime, o viceversa.
 
-**Solución**: actualizar ambos en el mismo commit. `profiles/index.md` es la single source of truth de la heurística; `general/profile-detection.md` define cuándo y cómo Claude la aplica en tiempo de ejecución. Ver nota en `profiles/index.md`.
+**Solución**: actualizar ambos en el mismo commit. `profiles/index.md` es la fuente única de la heurística; `general/profile-detection.md` define cuándo y cómo Claude la aplica en tiempo de ejecución. Ver nota en `profiles/index.md`.

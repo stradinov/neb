@@ -17,7 +17,7 @@ El **Change MD** es el **eje documental**: registra al REQ y todo enlace entre a
 |---|---|---|---|
 | Plan aprobado | sección Trazabilidad → `**Plan aprobado:**` | Change MD | [approved-plans.md](approved-plans.md) |
 | Change MD | `**Commits:**` (`<hash>` o rango `<a>..<b>`) | git | [changes.md](changes.md) |
-| Change MD | `**Pendientes generados:**` (puntero por tag) | `pendings.md` | [pendings.md](pendings.md) |
+| Change MD | `**Pendientes generados:**` (cita `[slug]` (`PD-<id>`)) | pendiente en `neb.db` | [pendings.md](pendings.md) |
 | Memoria del proyecto (`active_*.md`) | `Draft changes MD:` | Change MD (inverso) | [memory.md](memory.md) |
 | Incidente | `Originado por:` | Change MD original (inverso) | [`../general/incidents.md`](../general/incidents.md) |
 | Defecto (Fase 9) | tabla Diagnóstico → `REQ derivado` | REQ que lo corrige | [`../process/improvement.md`](../process/improvement.md) |
@@ -26,15 +26,15 @@ La estructura de la sección Trazabilidad del Change MD es canónica en [`../tem
 
 ### El plan aprobado: persistencia y direccionalidad
 
-**Persistencia.** El artefacto en `~/.claude/approved-plans/` se persiste por **dos vías** (ver [approved-plans.md](approved-plans.md)): el hook `save-approved-plan` al aprobar en plan mode, o un `Write` de Claude al aprobar **conversacionalmente** un plan media/alta. En consecuencia:
+**Persistencia.** El artefacto en `~/.claude/approved-plans/` se persiste por **dos vías** (ver [approved-plans.md](approved-plans.md)): el hook `save-approved-plan` al aprobar en plan mode, si está activado, o un `Write` de Claude al aprobar **conversacionalmente** un plan media/alta o cuando el hook no lo guardó. En consecuencia:
 
 - **No opcional en media/alta**: todo plan de esa complejidad deja artefacto (por hook o por Write).
 - **Ausente** en REQs **triviales** (una línea/texto, van directo a propuesta), **baja** (solo plan de pruebas) o **no-formales** (sin trigger de formalización) — ahí el campo es `**Plan aprobado:** —`. Ver [`../process/planning.md`](../process/planning.md) § "Cuándo aplica cada aprobación".
 
 **Direccionalidad.** La trazabilidad plan↔Change MD es **unidireccional por diseño**:
 
-- `Change MD → plan` **soportado**: campo `**Plan aprobado:**` (lo deja el hook en plan mode, o Claude en la vía conversacional).
-- `plan → Change MD` **no soportado por diseño**: el artefacto del plan no apunta de vuelta. El Change MD es el **eje documental** (todo enlace pasa por él): se parte del Change MD para llegar al plan, no al revés. No es deuda — el hook persiste el plan antes de que el Change MD exista, así que no podría inyectar el enlace inverso, y el slug del plan y el `<nombre>` del Change MD pueden diferir (no se adoptó naming coordinado).
+- `Change MD → plan` **soportado**: campo `**Plan aprobado:**` (lo llena Claude con el path del archivo, lo haya escrito el hook o Claude con `Write`).
+- `plan → Change MD` **no soportado por diseño**: el artefacto del plan no apunta de vuelta. El Change MD es el **eje documental** (todo enlace pasa por él): se parte del Change MD para llegar al plan, no al revés. No es deuda — en plan mode el plan se persiste antes de que el Change MD exista, así que no puede llevar el enlace inverso, y el slug del plan y el `<nombre>` del Change MD pueden diferir (no se adoptó naming coordinado).
 
 Por eso la **cadena mínima trazable es `Change MD → commits`**: el Change MD es el único eslabón (casi) siempre presente. "Plan aprobado" como *momento* (cuando nace el draft del Change MD, al entrar a Fase 4) es distinto del *artefacto* plan aprobado: el momento siempre ocurre; el artefacto existe en media/alta y se navega desde el Change MD.
 
@@ -42,8 +42,8 @@ Por eso la **cadena mínima trazable es `Change MD → commits`**: el Change MD 
 
 El último eslabón es la confirmación del cambio (ver [`../process/change-control-gate.md`](../process/change-control-gate.md)). En **profiles versionados con git** (cualquier profile de software/datos y `self-applied`) es el commit, y es bidireccional:
 
-- **REQ → commit**: al cierre (Fase 8), el campo `**Commits:**` del Change MD se completa con el/los hash(es) — un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos. (Con entrega temprana del registro, el change MD pudo entregarse antes con `**Commits:**` aún vacío — ver [`changes.md`](changes.md) § "Ciclo de vida del draft"; el campo se completa igualmente al cierre.)
-- **commit → REQ**: el mensaje del commit nombra el tipo y el tema del REQ (`tipo: descripción`, ver [`../process/version-control.md`](../process/version-control.md) "Commits"). Permite ir de un hash suelto al REQ sin partir del Change MD.
+- **REQ → commit**: al cierre (Fase 8), el campo `**Commits:**` del Change MD se completa con el/los hash(es) — un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos. (Con entrega temprana del registro, el Change MD pudo entregarse antes con `**Commits:**` aún vacío — ver [`changes.md`](changes.md) § "Ciclo de vida del draft"; el campo se completa igualmente al cierre.)
+- **commit → REQ**: el mensaje del commit nombra el tipo y el tema del REQ (`tipo: descripción`, ver [`../process/version-control.md`](../process/version-control.md) § "Commits"). Permite ir de un hash suelto al REQ sin partir del Change MD.
 
 El draft del Change MD nace sin hashes (estado `En progreso`); el campo `**Commits:**` se llena cuando los commits ya existen. Mientras tanto, el cross-link inverso `Draft changes MD:` en el `active_*.md` del REQ mantiene la trazabilidad de la sesión en curso.
 

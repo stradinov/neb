@@ -1,4 +1,4 @@
-# Improvement
+# Retroalimentación de la metodología
 
 Última fase de cada requerimiento.
 
@@ -9,14 +9,14 @@ Al cerrar, Claude se hace estas preguntas:
 - ¿Alguna fase generó fricción o fue innecesaria?
 - ¿Hubo retrabajo que una regla podría haber evitado?
 - ¿Se descubrió un patrón, convención o restricción del proyecto que debería quedar documentado?
-- ¿Hubo errores de implementación o faltas de contexto durante el REQ? (ver definiciones en [`workflow/metrics.md`](../workflow/metrics.md) "Definiciones operativas")
-- ¿Hubo un defecto que ningún rol revisor cazó? Si sí: ¿era responsabilidad de un rol existente cuyo foco debe expandirse, o requiere un rol nuevo? (ver [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) "Evolución de roles")
+- ¿Hubo errores de implementación o faltas de contexto durante el REQ? (ver definiciones en [`workflow/metrics.md`](../workflow/metrics.md) § "Definiciones operativas")
+- ¿Hubo un defecto que ningún rol revisor cazó? Si sí: ¿era responsabilidad de un rol existente cuyo foco debe expandirse, o requiere un rol nuevo? (ver [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) § "Evolución de roles")
 
 ## Disparadores cuantitativos
 
-Además de las preguntas reflexivas, Claude verifica las métricas del MD contra los umbrales de [`workflow/metrics.md`](../workflow/metrics.md) "Cuándo accionar". Si alguna métrica supera su umbral, propone la acción correspondiente como ajuste a la metodología.
+Además de las preguntas reflexivas, Claude verifica las métricas del MD contra los umbrales de [`workflow/metrics.md`](../workflow/metrics.md) § "Cuándo accionar". Si alguna métrica supera su umbral, propone la acción correspondiente como ajuste a la metodología.
 
-El **Reporte de cierre** (presentado al dev en Fase 8, sección `## Reporte de cierre` del change MD) se escanea en Fase 9 como input adicional:
+El **Reporte de cierre** (presentado al dev en Fase 8, sección `## Reporte de cierre` del Change MD) se escanea en Fase 9 como input adicional:
 
 - Si "Complejidad estimada / real" diverge en 2+ niveles Y el costo en tokens es consistentemente mayor al esperado para esa complejidad → reforzar criterio de estimación (acción redundante con el umbral de `Complejidad real ≠ estimada`, pero el costo sirve como evidencia cuantitativa).
 - Si el costo del REQ es notablemente alto para su complejidad real → anotar como hipótesis en el registro de aprendizaje del dev. No deriva acción de metodología por sí solo.
@@ -29,7 +29,7 @@ En la misma Fase 9, Claude chequea el disparador de la revisión agregada (§ "R
 
 ## Diagnóstico de origen del defecto
 
-El **Process Improvement Analyst** diagnostica el origen del defecto cuando se detecta (vía métrica, patch retrospectivo o reporte de uso post-cierre). El output va en la sección "Diagnóstico de defectos" del change MD, según el formato de la tabla siguiente.
+El **Process Improvement Analyst** diagnostica el origen del defecto cuando se detecta (vía métrica, patch retrospectivo o reporte de uso post-cierre). El output va en la sección "Diagnóstico de defectos" del Change MD, según el formato de la tabla siguiente.
 
 ### Tabla de orígenes y mejoras derivadas
 
@@ -57,7 +57,7 @@ Cuando el campo **Patrón / aislado** del Diagnóstico se marca **≥3 similares
 
 REQ derivado de mejora con plan-review formal. CHANGELOG entry del REQ derivado cita explícitamente: *"tras diagnóstico del defecto X (origen Fase Y, tipo Z) en REQ W"*.
 
-El diagnóstico vive en el change MD del REQ que detectó el defecto, sub-sección "Diagnóstico de defectos" (ver [`templates/change.md.template`](../templates/change.md.template)).
+El diagnóstico vive en el Change MD del REQ que detectó el defecto, sub-sección "Diagnóstico de defectos" (ver [`templates/change.md.template`](../templates/change.md.template)).
 
 ## Revisión agregada
 
@@ -69,7 +69,7 @@ La revisión vence al **cambio de mes calendario**: cuando la última revisión 
 
 **Cuándo se chequea.** En la Fase 9 de cada REQ, junto a los disparadores cuantitativos. Si vence y no está abierto el pendiente `[revision-agregada-<YYYY-MM>]` del mes en curso, Claude propone abrirla como REQ. Si el dev la pospone, Claude da de alta ese pendiente; la revisión, al correr, cierra los pendientes `[revision-agregada-*]` que encuentre abiertos. El dev también puede pedirla en cualquier momento.
 
-**Registro.** Cada revisión agregada es un REQ. Su change MD va en el `changes/` de la raíz del espacio de trabajo del adoptante (`NEB_WORKSPACE`), y lleva:
+**Registro.** Cada revisión agregada es un REQ. Su Change MD va en el `changes/` de la raíz del espacio de trabajo del adoptante (`NEB_WORKSPACE`), y lleva:
 
 - la línea `**Revisión agregada:** <YYYY-MM-DD>`, con la fecha en que armó la lista;
 - los `changes/` que abarcó y cómo contó cada REQ una vez (en git, las copias de un worktree son el mismo registro);
@@ -82,7 +82,7 @@ Lo que la revisión analiza sale de los REQs de esa lista. La última revisión 
 - Métricas agregadas de los REQs que cubre contra umbrales de [`workflow/metrics.md`](../workflow/metrics.md): ¿hay una métrica que se dispara repetidamente (ej. 5 de 10 cierran con re-entregas=3), o una que no disparó en el período y ya no aporta?
 - Patrones cualitativos de fricción recurrente: incidencias del mismo tipo, fases que consistentemente exceden turnos, decisiones que se reabren.
 - Pertinencia de cada rol revisor, en cada profile donde está declarado (un rol transversal, en todos). Con las líneas «Aporte de roles» de los REQs que cubren esta revisión y la anterior: ¿un rol que no se despachó en ningún REQ de las dos, aunque su profile tuvo REQs? ¿Uno despachado solo con *sin hallazgos*? ¿Uno con *debió cazar* en más de un REQ? Si su despacho es condicional, la revisión dice si la condición se dio, o que no es determinable. Si hay un rol así, propone deprecarlo, ajustar su foco o redefinir su pertinencia (ver [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) § "Evolución de roles"). Las anotaciones anteriores con Δ cuentan como etiquetas: +1 es *aportó*, −0.1 *sin hallazgos* y −1 *debió cazar*.
-- **Análisis longitudinal de costo por modelo** (si hay datos de uso de API en los change MDs): comparar cost-per-REQ a complejidad constante entre versiones de Claude. Dos señales posibles:
+- **Análisis longitudinal de costo por modelo** (si hay datos de uso de API en los Change MDs): comparar cost-per-REQ a complejidad constante entre versiones de Claude. Dos señales posibles:
   - Costo baja manteniendo calidad → Claude mejoró o la metodología es más eficiente.
   - Costo sube o se mantiene con calidad baja → investigar si el tipo de REQ cambió o si hay uso ineficiente del modelo (ej. Opus para tareas que Sonnet resolvería igual).
   Registrar el análisis aunque no derive propuesta — es evidencia longitudinal.

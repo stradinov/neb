@@ -60,7 +60,7 @@ Cada campo opcional es **condicional** — se agrega solo en su caso, se omite e
 | Campo | Aplica cuando | Se omite cuando |
 |---|---|---|
 | `descripción_propósito` | `propósito = decisión` (describe la decisión que alimenta) | `propósito = exploratorio` |
-| `req_originador` | el research nació de un REQ/change (lo cita) | research abierto manualmente por el dev — entonces aplica [deployment.md](deployment.md) §Gate F7 punto 3 (1 línea de justificación en el cuerpo) |
+| `req_originador` | el research nació de un REQ/change (lo cita) | research abierto manualmente por el dev — entonces aplica [deployment.md](deployment.md) § "Gate de Fase 7 (pre-commit)", punto 3 (1 línea de justificación en el cuerpo) |
 | `supersedes` | este research reemplaza a uno anterior | research nuevo sin predecesor (el caso normal) |
 | `superseded_by` | este research fue reemplazado por uno posterior (recíproco de `supersedes`) | mientras siga `vigente` |
 | `deprecated_at` | el research pasa a `status: deprecated` | mientras siga `vigente` o `superseded` |
@@ -159,7 +159,7 @@ El motor de research debe cubrir cuatro capacidades: **fan-out de búsqueda + fe
 | **Orquestación grande** | workflows multi-agente | Research amplio que justifica fan-out paralelo. Acotar el número de agentes y preferir salida en texto sobre `schema` forzado (ver modo de fallo arriba) |
 | **Voz externa (LLM)** | **Gemini** (modelo propietario de Google) | **Solo en research `propósito = exploratorio`**, inline en el mismo turno que el `WebSearch` de Claude — segunda voz independiente para ampliar cobertura y reducir sesgo de modelo. No en `decisión`. Groq / Ollama / OpenRouter quedan fuera del profile |
 
-`deep-research` es la implementación **recomendada-hoy**, no un contrato: si cambia o se retira, el piso `WebSearch`/`WebFetch` sigue cumpliendo la capacidad. El campo `llms_consultados` del frontmatter registra el motor realmente usado (ver §Formato del documento).
+`deep-research` es la implementación **recomendada-hoy**, no un contrato: si cambia o se retira, el piso `WebSearch`/`WebFetch` sigue cumpliendo la capacidad. El campo `llms_consultados` del frontmatter registra el motor realmente usado (ver § "Formato del documento").
 
 #### Criterio de re-evaluación
 

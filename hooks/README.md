@@ -15,16 +15,16 @@ Hooks de Neb. El plugin registra en `hooks/hooks.json` el `SessionStart` y los h
 
 ### PreCompact legacy (retirados en 6.30.0)
 
-La plantilla de settings del dev traía dos hooks `PreCompact`: un agente (`matcher: "auto"`) que copiaba el estado del REQ activo al draft del change MD antes de compactar, y una guardia (`matcher: "manual"`) que frenaba `/compact` si el draft tenía más de 15 minutos sin cambios. Desde 5.0.0 buscaban el formato legacy (`## Requerimiento activo` en `project_*.md`) y no los `active_*.md`, así que no encontraban el REQ de la sesión, y el agente se lanzaba en cada compactación automática. Se retiraron: el estado del REQ sobrevive a la compactación porque vive en su `active_*.md`, `logbook-sync` lo captura en `PreCompact`, el arranque se reinyecta y [`general/compaction.md`](../general/compaction.md) le dice al resumen qué conservar. El draft lo actualiza Claude en cada fase mayor ([`workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft").
+La plantilla de settings del dev traía dos hooks `PreCompact`: un agente (`matcher: "auto"`) que copiaba el estado del REQ activo al draft del Change MD antes de compactar, y una guardia (`matcher: "manual"`) que frenaba `/compact` si el draft tenía más de 15 minutos sin cambios. Desde 5.0.0 buscaban el formato legacy (`## Requerimiento activo` en `project_*.md`) y no los `active_*.md`, así que no encontraban el REQ de la sesión, y el agente se lanzaba en cada compactación automática. Se retiraron: el estado del REQ sobrevive a la compactación porque vive en su `active_*.md`, `logbook-sync` lo captura en `PreCompact`, el arranque se reinyecta y [`general/compaction.md`](../general/compaction.md) le dice al resumen qué conservar. El draft lo actualiza Claude en cada fase mayor ([`workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft").
 
 Si tu `~/.claude/settings.json` todavía los tiene, quítalos; el `PreCompact` de `logbook-sync` se queda.
 
 ### Medidor de uso (`/neb-usage`) — antes hook `usage-tracker`
 
-No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `apply`) y el comando [`/neb-usage`](../commands/neb-usage.md). Lee los transcripts de `~/.claude/projects` y reporta tokens y USD a precio de API, por REQ o por ventana de días. El bloque de uso del change MD se escribe al cerrar el REQ con `/neb-usage --write <change MD>` ([`workflow/metrics.md`](../workflow/metrics.md) § "Tokens, costo y breakdown por modelo").
+No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `apply`) y el comando [`/neb-usage`](../commands/neb-usage.md). Lee los transcripts de `~/.claude/projects` y reporta tokens y USD a precio de API, por REQ o por ventana de días. El bloque de uso del Change MD se escribe al cerrar el REQ con `/neb-usage --write <change MD>` ([`workflow/metrics.md`](../workflow/metrics.md) § "Tokens, costo y breakdown por modelo").
 
 - **Qué cuenta**: el hilo principal y los subagentes, incluidos los agentes de workflow, cada uno con su `agentType`. Cuenta una llamada por `message.id` y deduplica entre archivos (copias de `--resume` y forks); separa la escritura de caché de 5 min y de 1 h. El formato del transcript del que depende es el supuesto R21 de [`methodology/platform-assumptions.md`](../methodology/platform-assumptions.md).
-- **Atribución**: una llamada del hilo principal va al último REQ cuyo change MD o `active_*.md` editó la sesión hasta ese momento (`Write`/`Edit`); un `active_*.md` cuenta para el change MD de su campo `Draft changes MD` (o `Change MD`; si no, la primera ruta `changes/AAAA-MM-DD-<slug>.md` que cite) o, si no cita ninguno, para el slug de su nombre de archivo. Las llamadas previas al primer toque van al primer REQ tocado; una sesión sin toques queda «sin REQ». Una llamada de subagente va al REQ vigente en el hilo principal a su misma hora. Las ediciones hechas por Bash o desde un subagente no atribuyen.
+- **Atribución**: una llamada del hilo principal va al último REQ cuyo Change MD o `active_*.md` editó la sesión hasta ese momento (`Write`/`Edit`); un `active_*.md` cuenta para el Change MD de su campo `Draft changes MD` (o `Change MD`; si no, la primera ruta `changes/AAAA-MM-DD-<slug>.md` que cite) o, si no cita ninguno, para el slug de su nombre de archivo. Las llamadas previas al primer toque van al primer REQ tocado; una sesión sin toques queda «sin REQ». Una llamada de subagente va al REQ vigente en el hilo principal a su misma hora. Las ediciones hechas por Bash o desde un subagente no atribuyen.
 - **Señales**: % de llamadas del hilo principal con más de 300k de contexto (y la mediana), compactaciones por disparo y relecturas del transcript completo tras compactar.
 - **Precios**: `hooks/pricing.yml`, tabla manual; actualizarla cuando Anthropic publique un modelo o cambie un precio. Un modelo sin precio deja el total marcado como parcial.
 - **Escritura**: `--write` solo reemplaza lo que hay entre `<!-- usage-tracker-start -->` y `<!-- usage-tracker-end -->`; sin marcadores no escribe. No guarda estado propio.
@@ -48,7 +48,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **`SessionEnd` al salir**: Claude Code da 1.5 s a los hooks de `SessionEnd`, y el `timeout` de un hook de plugin no amplía ese presupuesto. La captura de `Stop` y `PreCompact` ya cubre el último turno.
 - **Central (opcional)**: con `NEB_LOGBOOK_ENDPOINT` + `NEB_LOGBOOK_TOKEN` en el entorno y el marcador en el `CLAUDE.md` del cwd, la captura lanza `logbook.py sync` **detached** (`subprocess.Popen`, cross-OS) que publica al central solo lo que tiene opt-in (regla en [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador") — los wrappers `.sh`/`.ps1` no cambian. El cliente usa solo stdlib (`urllib`); **PyMySQL es solo del servidor** (distribuido en un repositorio dedicado).
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
-- **Windows, entrada de settings con clon**: declarar `"shell": "powershell"` con `logbook-sync.ps1` (ver §Filosofía).
+- **Windows, entrada de settings con clon**: declarar `"shell": "powershell"` con `logbook-sync.ps1` (ver § "Filosofía").
 - **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea.
 - **Fallos del sync, visibles**: el wrapper descarta `stderr` y el sync corre detached, así que un rechazo del central no se ve en pantalla. Se persiste sin cortar el reintento: el de publicación en el `work` local (`last_error`) y el del transcript en la sesión (`session_sync.transcript_error`). Lo lista `logbook.py sync-status` (`/logbook estado-sync`). Detalle en [`tooling/logbook.md`](../tooling/logbook.md).
 - **Subida del transcript por sesión** (desde 6.12): cada sesión tiene su propio cursor (`session_sync`) y sube **una sola vez**, atribuida a un work, aunque toque varios REQ. Ninguna captura le quita la cola a otra sesión.
@@ -73,7 +73,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, player ausente), `exit 0` silencioso.
 - **Configurable** en `~/.claude/notify-on-permission.json`: `enabled`, `wav`. Por defecto: 1 chime fijo. Sin scaling ni `min_seconds` (el evento no tiene duración medible).
 - **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), igual que `notify-on-stop`.
-- **Coexiste con `Stop`** (`notify-on-stop`): eventos semánticamente distintos; pueden disparar chimes en secuencia. Ver `tooling/notify-on-permission.md` § 5.
+- **Coexiste con `Stop`** (`notify-on-stop`): eventos semánticamente distintos; pueden disparar chimes en secuencia. Ver `tooling/notify-on-permission.md` § "Coexistencia con `notify-on-stop`".
 
 ### notify-on-stop.{ps1,sh}
 
@@ -87,7 +87,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **Output**: ninguno (reproduce audio async en background process).
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0` silencioso.
 - **Configurable** en `~/.claude/notify-on-stop.json`: `enabled`, `wav`, `min_seconds`, `max_chimes`, `scaling` (`per-minute` o `fixed`). Por defecto: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
-- **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) y abandona — evita el "chime fantasma" del subproceso `claude -p` invocado por [`preprocess-prompt.py`](#preprocess-promptpy). Cross-link en `tooling/notify-on-stop.md` § Guard de subsesión interna.
+- **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) y abandona — evita el "chime fantasma" del subproceso `claude -p` invocado por [`preprocess-prompt.py`](#preprocess-promptpy). Cross-link en `tooling/notify-on-stop.md` § "Guard de subsesión interna".
 
 ### preprocess-prompt.py
 

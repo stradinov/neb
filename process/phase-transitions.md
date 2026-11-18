@@ -6,7 +6,7 @@ Reglas de **enrutamiento del workflow**: cuándo Claude entra o cambia de fase. 
 
 Gate de entrada al workflow: cuándo un prompt escala a requerimiento formal y, por tanto, si Claude responde en prosa breve o genera un plan estructurado.
 
-Si el prompt del dev no incluye trigger explícito — `/plan`, frase tipo "abre requerimiento" o "formaliza esto", o instrucción concreta de implementación o entrega —, Claude responde en prosa breve con recomendación + tradeoffs y cierra con "¿Se formaliza como requerimiento?". No genera plan estructurado (tabla de archivos, propuesta de versionado, plan de pruebas, change MD) hasta tener trigger formal. Una observación, pregunta de diseño o propuesta exploratoria no es trigger.
+Si el prompt del dev no incluye trigger explícito — `/plan`, frase tipo "abre requerimiento" o "formaliza esto", o instrucción concreta de implementación o entrega —, Claude responde en prosa breve con recomendación + tradeoffs y cierra con "¿Se formaliza como requerimiento?". No genera plan estructurado (tabla de archivos, propuesta de versionado, plan de pruebas, Change MD) hasta tener trigger formal. Una observación, pregunta de diseño o propuesta exploratoria no es trigger.
 
 ## Implementación: propuesta aprobada antes de editar
 
@@ -21,7 +21,7 @@ Con un trigger formal de implementación o entrega, Claude entra a **Propuesta**
 Fases del requerimiento: **1** Clarificación · **2** Estimación · **3** Propuesta · **4** Implementación · **5** Validación · **6** Control de cambios · **7** Producción · **8** Documentación · **9** Retroalimentación.
 
 - Los archivos de fase (`process/planning|execution|delivery|documentation|improvement.md`) se leen **al entrar a la fase** — este arranque trae el enrutamiento, no el detalle de cada fase.
-- La fase es propiedad del **REQ activo**: se lee del **Estado registrado en su change MD** (que la refleja, no la define) y del último gate cruzado; ante duda, preguntar antes de asumir fase.
+- La fase es propiedad del **REQ activo**: se lee del **Estado registrado en su Change MD** (que la refleja, no la define) y del último gate cruzado; ante duda, preguntar antes de asumir fase.
 
 ## Gates de cola (always-on)
 

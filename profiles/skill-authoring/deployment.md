@@ -26,7 +26,7 @@ O `claude plugin update <plugin>` para tomar la versión publicada. Una sesión 
 Abrir sesión nueva de Claude Code en un directorio cubierto por el skill. Ejecutar `/skills`. Confirmar que el skill aparece en la lista cargada.
 
 Si no aparece:
-- Ver `troubleshooting.md` §"Skill no aparece en /skills".
+- Ver `troubleshooting.md` § "Skill no aparece en /skills".
 
 ### 2. Casos de validación
 

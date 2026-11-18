@@ -1,4 +1,4 @@
-# Planning
+# Planeación
 
 Cubre clarificación, estimación, plan, plan de pruebas, propuesta.
 
@@ -11,7 +11,7 @@ Antes de clarificar y planear, cargar el contexto relevante:
 
 ## Trigger de formalización
 
-Gate de entrada al workflow. Contenido canónico en [`phase-transitions.md`](phase-transitions.md) § "Trigger de formalización" — cargado al arranque vía `@import` desde `../general/startup.md`. En resumen: sin trigger explícito (`/plan`, "abre requerimiento"/"formaliza esto", o instrucción concreta de implementación o entrega), Claude responde en prosa breve y ofrece formalizar; no genera plan estructurado (tabla de archivos, versionado, plan de pruebas, change MD) hasta tener el trigger.
+Gate de entrada al workflow. Contenido canónico en [`phase-transitions.md`](phase-transitions.md) § "Trigger de formalización" — cargado al arranque vía `@import` desde `../general/startup.md`. En resumen: sin trigger explícito (`/plan`, "abre requerimiento"/"formaliza esto", o instrucción concreta de implementación o entrega), Claude responde en prosa breve y ofrece formalizar; no genera plan estructurado (tabla de archivos, versionado, plan de pruebas, Change MD) hasta tener el trigger.
 
 ## Clarificación
 
@@ -32,7 +32,7 @@ Si el prompt es ambiguo o cumple algún criterio de [execution.md](execution.md)
 
 ## Selección de roles (paso 0 antes del plan inicial)
 
-Si el REQ activa plan-review (ver [process/plan-review.md](plan-review.md) "Cuándo aplica"), Claude analiza el plan de archivos de la propuesta y propone los roles antes de generar el plan inicial. Algoritmo de detección automática en [process/roles-invocation.md](roles-invocation.md); catálogo de dimensiones en [methodology/roles-catalog.md](../methodology/roles-catalog.md) § "Dimensiones del plan". Para casos rutinarios usa por defecto sin preguntar; para casos especiales pregunta al dev.
+Si el REQ activa plan-review (ver [process/plan-review.md](plan-review.md) § "Cuándo aplica"), Claude analiza el plan de archivos de la propuesta y propone los roles antes de generar el plan inicial. Algoritmo de detección automática en [process/roles-invocation.md](roles-invocation.md); catálogo de dimensiones en [methodology/roles-catalog.md](../methodology/roles-catalog.md) § "Dimensiones del plan". Para casos rutinarios usa por defecto sin preguntar; para casos especiales pregunta al dev.
 
 ## Estimación, plan y plan de pruebas
 
@@ -59,7 +59,7 @@ El plan de pruebas incluye: flujos a validar, criterios de éxito, orden, y qui�
 
 Cierre: **"¿De acuerdo con este plan?"**
 
-Al recibir aprobación, Claude crea o actualiza la memoria del proyecto y el MD del requerimiento. Ver [workflow/memory.md](../workflow/memory.md) y [workflow/changes.md](../workflow/changes.md). En complejidad **media/alta aprobada sin plan mode**, además persiste el plan literal en `~/.claude/approved-plans/` vía `Write` (en plan mode lo hace el hook) — ver [workflow/approved-plans.md](../workflow/approved-plans.md) § "Persistencia conversacional".
+Al recibir aprobación, Claude crea o actualiza la memoria del proyecto y el MD del requerimiento. Ver [workflow/memory.md](../workflow/memory.md) y [workflow/changes.md](../workflow/changes.md). En complejidad **media/alta aprobada sin plan mode**, además persiste el plan literal en `~/.claude/approved-plans/` vía `Write` (en plan mode lo guarda el hook `save-approved-plan` si está activado; si no dejó archivo, también va por `Write`) — ver [workflow/approved-plans.md](../workflow/approved-plans.md) § "Persistencia conversacional".
 
 ## Propuesta de implementación
 
@@ -76,10 +76,10 @@ Resumen de los criterios dispersos en este archivo y en `communication.md` / `tr
 
 | Situación | ¿Plan? | ¿Aprobación del plan? | ¿Se persiste? | Canónico |
 |---|---|---|---|---|
-| Trivial (1 línea, typo, renombre obvio) | No | N/A | No | § Clarificación (arriba) |
+| Trivial (1 línea, typo, renombre obvio) | No | N/A | No | § "Clarificación" (arriba) |
 | No-formal (sin trigger de formalización) | No (prosa) | N/A | No | [`phase-transitions.md`](phase-transitions.md) § "Trigger de formalización" |
-| Baja (≤2 elementos) | Solo plan de pruebas | Implícita o explícita | No | § Estimación + § Propuesta de implementación (arriba) |
-| Media/alta vía plan mode | Sí | Explícita (`ExitPlanMode`) | Sí — hook | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
+| Baja (≤2 elementos) | Solo plan de pruebas | Implícita o explícita | No | § "Estimación" + § "Propuesta de implementación" (arriba) |
+| Media/alta vía plan mode | Sí | Explícita (`ExitPlanMode`) | Sí — hook si está activado; si no, `Write` | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
 | Media/alta conversacional | Sí | Explícita ("¿De acuerdo con este plan?") | Sí — `Write` | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
 
 La **aprobación del plan** (esta tabla) es gate distinto de la **aprobación de implementación** (escribir código), que admite forma implícita — ver § "Propuesta de implementación" arriba. Opcionalidad del artefacto y direccionalidad de la trazabilidad: [`workflow/traceability.md`](../workflow/traceability.md).

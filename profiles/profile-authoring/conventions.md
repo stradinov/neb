@@ -12,7 +12,7 @@ profiles/<nombre>/
 └── skills.md         # Opcional (stub si no hay skills propios)
 ```
 
-Ver `methodology/profiles.md` "Archivos del profile" para criterios de cuándo omitir archivos estándar.
+Ver `methodology/profiles.md` § "Archivos del profile" para criterios de cuándo omitir archivos estándar.
 
 ## Secciones obligatorias de `index.md`
 
@@ -28,7 +28,7 @@ Secciones adicionales permitidas si el profile las necesita (e.g. "Agregar un pr
 
 ## Reglas para la heurística de detección
 
-La heurística vive en `profiles/index.md` (single source of truth); `general/profile-detection.md` define cuándo y cómo Claude la aplica en tiempo de ejecución. Ambos deben estar sincronizados.
+La heurística vive en `profiles/index.md` (fuente única); `general/profile-detection.md` define cuándo y cómo Claude la aplica en tiempo de ejecución. Ambos deben estar sincronizados.
 
 - **Solo existencia de paths**: existencia de directorios/archivos o match de pattern sobre el path absoluto. Sin leer contenido de archivos (solo si es estrictamente necesario).
 - **Idempotente**: aplicar la heurística sobre el mismo directorio N veces → mismo resultado.
@@ -60,4 +60,4 @@ Si una adaptación es específica del profile → documentarla en el profile, si
 - Nuevo archivo en el profile: minor.
 - Renombrar archivo importado desde proyectos cliente: major (rompe imports).
 
-Ver tabla completa en `methodology/profiles.md` "Versionado".
+Ver tabla completa en `methodology/profiles.md` § "Versionado".

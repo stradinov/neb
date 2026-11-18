@@ -2,7 +2,7 @@
 
 Roles fijos — sin detección por dimensiones de código. El entregable es markdown puro.
 
-> **Nota sobre nombres de rol**: los nombres "Process Architect", "QA Process Engineer" y "Process Improvement Analyst" (y sus agentes `qa-process-engineer`, `process-improvement-analyst`) conservan la palabra "Process". Aquí "Process" se refiere al concepto general de **proceso de metodología** (Process Architect = arquitecto del proceso metodológico), no al nombre actual del profile. La etiqueta sobrevive al renombre del profile por inercia conceptual; el renombre de roles se evalúa en REQ separado si aparece fricción real (ver `process/roles-invocation.md` "Nota sobre nombres de rol").
+> **Nota sobre nombres de rol**: los nombres "Process Architect", "QA Process Engineer" y "Process Improvement Analyst" (y sus agentes `qa-process-engineer`, `process-improvement-analyst`) conservan la palabra "Process". Aquí "Process" se refiere al concepto general de **proceso de metodología** (Process Architect = arquitecto del proceso metodológico), no al nombre actual del profile. La etiqueta sobrevive al renombre del profile por inercia conceptual; el renombre de roles se evalúa en REQ separado si aparece fricción real (ver `process/roles-invocation.md` § "Nota sobre nombres de rol").
 
 ## Rol principal — Process Architect — `persona`
 
@@ -15,14 +15,14 @@ Rol persistente al trabajar sobre la metodología (`methodology` o MDs cargados 
 
 ## Revisores — subagentes
 
-Se invocan como subagentes reales en plan-review (ver [plan-review.md](../../process/plan-review.md) sección "Plantilla de briefing"). Sus archivos de definición se distribuyen en el plugin (`agents/`), auto-descubiertos al instalarlo.
+Se invocan como subagentes reales en plan-review (ver [plan-review.md](../../process/plan-review.md) § "Plantilla de briefing"). Sus archivos de definición se distribuyen en el plugin (`agents/`), auto-descubiertos al instalarlo.
 
 ### QA Process Engineer — `subagente` (`agents/qa-process-engineer.md`)
 
 Foco:
 
 - Consistencia entre archivos.
-- Verificabilidad de criterios y aceptación, incluido a quién le toca cada obligación ([principles.md](../../methodology/principles.md) § Claridad, «Sujeto de una obligación»).
+- Verificabilidad de criterios y aceptación, incluido a quién le toca cada obligación ([principles.md](../../methodology/principles.md) § "Claridad", «Sujeto de una obligación»).
 - Casos borde.
 - Alineación con políticas existentes, incluido el `deployment.md` del profile del REQ.
 - **Vocabulario canónico** (dos caras): *(a) agnóstico del profile* — estados, fases y artefactos no asumen un profile ni tipo de proyecto particular (verificar contra los 3 tipos de validación de [delivery.md](../../process/delivery.md) y el principio "agnóstica del profile en su core" de [principles.md](../../methodology/principles.md)); *(b) precisión terminológica* — cada término canónico en una acepción, sin mezclar conceptos vecinos ni sinónimos no declarados; oráculo: § "Índice de términos canónicos" de [vocabulary.md](../../methodology/vocabulary.md) (columnas "No confundir con" y "Sinónimos").

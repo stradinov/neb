@@ -35,7 +35,7 @@ Con eso el REQ **cierra de inmediato** (sin esperar N sesiones). La observación
 
 ## Entrega temprana del registro (relevo cross-dev)
 
-El **registro del requerimiento** (change MD — ver [`../../methodology/vocabulary.md`](../../methodology/vocabulary.md) § "Registro del requerimiento") puede confirmarse y **entregarse** (`git push`) desde que existe el draft (entrada a Fase 4), independiente del cierre del entregable. Es autónomo: el delta es solo `.md` y aplica el ownership (ver [`../../methodology/change-control-policy.md`](../../methodology/change-control-policy.md) § "Ownership de archivos `.md`"); no requiere OK del dev.
+El **registro del requerimiento** (Change MD — ver [`../../methodology/vocabulary.md`](../../methodology/vocabulary.md) § "Registro del requerimiento") puede confirmarse y **entregarse** (`git push`) desde que existe el draft (entrada a Fase 4), independiente del cierre del entregable. Es autónomo: el delta es solo `.md` y aplica el ownership (ver [`../../methodology/change-control-policy.md`](../../methodology/change-control-policy.md) § "Ownership de archivos `.md`"); no requiere OK del dev.
 
 **Cuándo**: cuando el **entorno es compartido** — señal determinista desde el backend central del logbook (`NEB_LOGBOOK_ENDPOINT` + opt-in `<!-- neb-logbook: central -->`; ver [`../../workflow/logbook.md`](../../workflow/logbook.md)): el `work` se publica a la bitácora compartida y su registro debe estar **entregado** para que el puntero resuelva en la máquina que releva. Si el entorno no es compartido, el registro se entrega en el cierre del REQ (que ya no se difiere).
 
@@ -53,7 +53,7 @@ El script polea `git fetch` + working dir limpio cada 60 s. Al detectar que la c
 
 Timeout default: 8 h (configurable con `--timeout <sec>`). Si expira (exit 124), Claude notifica al dev para que decida.
 
-Ver también [`../../process/version-control.md`](../../process/version-control.md) § Push.
+Ver también [`../../process/version-control.md`](../../process/version-control.md) § "Push".
 
 ## Si surge fricción
 

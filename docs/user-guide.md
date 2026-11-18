@@ -88,9 +88,9 @@ Los agents se auto-descubren del plugin: basta con crear el `agents/<nombre>.md`
 
 ## Versionar tu configuración personal
 
-`personal/<usuario>.md` guarda tus preferencias, atajos y overrides individuales (qué son y su contrato "estrecha o agrega, nunca relaja": ver [how-it-works § Personalización](how-it-works.md) y [`methodology/personal-vs-team.md`](../methodology/personal-vs-team.md)). Viene **ignorada por Git** — tu configuración no se publica ni sale del plugin.
+`personal/<usuario>.md` guarda tus preferencias, atajos y overrides individuales (qué son y su contrato "estrecha o agrega, nunca relaja": ver [how-it-works](how-it-works.md) § "Personalización sin modificar el núcleo" y [`methodology/personal-vs-team.md`](../methodology/personal-vs-team.md)). Viene **ignorada por Git** — tu configuración no se publica ni sale del plugin.
 
-Si quieres versionarla (respaldo, portabilidad entre máquinas), quita la regla `personal/` de **tu** `.gitignore` (no del de `neb/`) y haz commit de ella en tu repo privado. Excluye binarios (`*.wav` y similares). Sus cambios se trazan con el commit normal; no llevan change MD.
+Si quieres versionarla (respaldo, portabilidad entre máquinas), quita la regla `personal/` de **tu** `.gitignore` (no del de `neb/`) y haz commit de ella en tu repo privado. Excluye binarios (`*.wav` y similares). Sus cambios se trazan con el commit normal; no llevan Change MD.
 
 ## Retomar y relevar trabajo (bitácora de relevo)
 

@@ -22,7 +22,7 @@ Para un pendiente individual (o un grupo de relacionados) que el skill te pasa c
 
 ## Herramientas disponibles
 
-`Read`, `Grep`, `Glob` para inspeccionar el `context_origin`, el change MD ligado y el estado real del repo. Sin escritura ni red: el agente razona sobre material existente.
+`Read`, `Grep`, `Glob` para inspeccionar el `context_origin`, el Change MD ligado y el estado real del repo. Sin escritura ni red: el agente razona sobre material existente.
 
 ## Output
 

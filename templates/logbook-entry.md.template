@@ -8,7 +8,7 @@
 - **Lock:** <owned | released | takeover_requested>
 - **Estado del REQ:** <ENUM de estados del requerimiento>  <!-- ortogonal al lock -->
 - **Branch / HEAD:** <branch> / <head_commit>
-- **Change MD:** <ruta del change MD>
+- **Change MD:** <ruta del Change MD>
 - **Sesión Claude:** <claude_session_id>  <!-- válido solo en la máquina origen -->
 
 ## Estado semántico (payload)

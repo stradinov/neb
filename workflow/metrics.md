@@ -13,7 +13,7 @@ Tabla en [`templates/change.md.template`](../templates/change.md.template).
 
 ## Cuándo accionar
 
-Umbrales sugeridos. Al cerrar el requerimiento, Claude compara las métricas contra esta tabla y, si alguna se supera, propone la acción correspondiente en Fase 9 (ver [`process/improvement.md`](../process/improvement.md) "Disparadores cuantitativos").
+Umbrales sugeridos. Al cerrar el requerimiento, Claude compara las métricas contra esta tabla y, si alguna se supera, propone la acción correspondiente en Fase 9 (ver [`process/improvement.md`](../process/improvement.md) § "Disparadores cuantitativos").
 
 | Métrica | Umbral | Acción en Fase 9 |
 |---|---|---|
@@ -38,7 +38,7 @@ Captura: las 3 primeras dependen de señal explícita o ausencia de ella; las 3 
 - **Faltas de contexto**: veces que Claude pidió o asumió algo ya documentado en CLAUDE.md, memoria del proyecto o repo de metodología. Sobre la **recuperación de información**. Señal de gap en docs, no en el agente.
 - **Implementaciones sin aprobación**: veces que Claude entró a Fase 4 sin OK explícito ni implícito según [`planning.md`](../process/planning.md) § "Propuesta de implementación". **No cuenta como falta** la aprobación implícita válida (pregunta sobre detalles o contrapropuesta que **asume** que el código se escribirá) — eso es aprobación. **Sí cuenta** solo: silencio, pregunta de aclaración sin presuponer implementación, o contrapropuesta que requiere nueva confirmación.
 - **Acciones destructivas no autorizadas**: veces que Claude ejecutó una acción que reescribe historia o destruye estado recuperable sin autorización explícita en la sesión (en git: `--force`, `reset --hard`, `--no-verify`, `git add -A/.`, `branch -D`; en BD: `drop table`). NO cuenta cuando la autorización es contextual (ej. restaurar un archivo durante rollback de incidente).
-- **Out-of-scope edits**: archivos modificados que NO estaban listados en sección "Alcance / Entra" del change MD. NO cuenta incidencias legítimas — esas viven en `Incidencias surgidas`.
+- **Out-of-scope edits**: archivos modificados que NO estaban listados en sección "Alcance / Entra" del Change MD. NO cuenta incidencias legítimas — esas viven en `Incidencias surgidas`.
 
 **Patches retrospectivos** (cuando una versión posterior corrige un error u omisión de un REQ previo): cuentan como **error de implementación retroactivo** del REQ original, anotados en el patch nuevo (donde el error se evidencia y corrige), no en el REQ original ya cerrado.
 
@@ -91,13 +91,13 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 4. La lectura de caché y la salida no las afecta la velocidad del sistema ni la de las herramientas. La escritura de caché sí sube con los reinicios y las pausas largas, por eso el bloque la da aparte: el criterio se cumple sobre cada componente por separado, no sobre la suma.
 5. Cross-REQs permite separar dos señales: evolución de Claude (mismo modelo, metodología mejoró → costo baja) y evolución del modelo (mismo tipo de REQ → ¿Opus 4.7 es más eficiente que 4.6?).
 
-**Captura:** al completar el Reporte de cierre, Claude corre `/neb-usage --write <change MD>` ([`commands/neb-usage.md`](../commands/neb-usage.md)), que escribe el bloque de uso entre los marcadores del change MD. Lee los transcripts del hilo principal y de los subagentes, una llamada por `message.id`. Atribuye cada llamada al último registro del REQ (change MD o `active_*.md`) que editó la sesión; los subagentes, por la hora de su llamada. Detalle: [`hooks/README.md`](../hooks/README.md) § "Medidor de uso (`/neb-usage`) — antes hook `usage-tracker`".
+**Captura:** al completar el Reporte de cierre, Claude corre `/neb-usage --write <change MD>` ([`commands/neb-usage.md`](../commands/neb-usage.md)), que escribe el bloque de uso entre los marcadores del Change MD. Lee los transcripts del hilo principal y de los subagentes, una llamada por `message.id`. Atribuye cada llamada al último registro del REQ (Change MD o `active_*.md`) que editó la sesión; los subagentes, por la hora de su llamada. Detalle: [`hooks/README.md`](../hooks/README.md) § "Medidor de uso (`/neb-usage`) — antes hook `usage-tracker`".
 
 **Breakdown por modelo y por agente:** el transcript registra `message.model` en cada llamada (supuesto R21 de [`../methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)); el reporte agrupa tokens y costo por modelo, lo que cubre el cambio de modelo a media sesión (`/model`), y por tipo de agente.
 
 **Pricing:** tabla manual en `hooks/pricing.yml`, a precio de API (no el consumo de una suscripción). Actualizar cuando Anthropic publique nuevo modelo o cambie precios.
 
-**Revisión:** entra a la revisión agregada (`improvement.md §Revisión agregada`). Si en 10 REQs consecutivos el dato no aporta aprendizaje reportado, proponer revisión.
+**Revisión:** entra a la revisión agregada ([`improvement.md`](../process/improvement.md) § "Revisión agregada"). Si en 10 REQs consecutivos el dato no aporta aprendizaje reportado, proponer revisión.
 
 ### Costo por tipo de agente
 
@@ -107,7 +107,7 @@ Una señal debe pasar todos los criterios para entrar con interpretación sugeri
 
 ### Loop pedagógico en la revisión agregada
 
-La revisión agregada (`improvement.md §Revisión agregada`) incluye como sub-análisis adicional:
+La revisión agregada ([`improvement.md`](../process/improvement.md) § "Revisión agregada") incluye como sub-análisis adicional:
 
 - **Evolución por modelo**: comparar cost-per-REQ a complejidad constante entre versiones de Claude. Si el costo baja manteniendo calidad → Claude mejoró. Si sube → el dev debe investigar (¿el REQ era comparable? ¿cambió la metodología?).
 - **Calibración de complejidad**: si REQs de complejidad "baja" tienen tokens consistentemente en el rango de "media", el criterio de estimación requiere ajuste (ver REQ futuro de calibración automática — requiere corpus N ≥ 20 por nivel).

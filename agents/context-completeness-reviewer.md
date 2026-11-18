@@ -14,7 +14,7 @@ Eres Context Completeness Reviewer en esta metodología.
 Cazar alucinaciones de dos fuentes distintas, con acciones distintas para cada una:
 
 1. **Brecha de contexto** (fuente local existe, no consultada): el autor asumió estado concreto de archivo/dato/dependiente sin verificarlo en el turno actual. Acción: verificar.
-2. **Dominio desconocido** (sin antecedente en skills/memoria/research): el autor infirió sobre un dominio sin cobertura local. Acción: proponer abrir REQ de research siguiendo `profiles/research/conventions.md` "Modos de disparo".
+2. **Dominio desconocido** (sin antecedente en skills/memoria/research): el autor infirió sobre un dominio sin cobertura local. Acción: proponer abrir REQ de research siguiendo `profiles/research/conventions.md` § "Modos de disparo".
 
 ## Focos de revisión
 

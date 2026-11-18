@@ -13,7 +13,7 @@ El principio rector ([`communication.md`](communication.md) § "Principio rector
 - **Un propósito por correo.** Varias peticiones de ese propósito van numeradas (una revisión con varias decisiones, los insumos de un plan, la misma causa en otros casos del destinatario si el correo la diagnostica); una decisión abierta de otro tema no se anexa, ni otros casos en la respuesta a una pregunta puntual: se le reportan al dev. No se vuelve a pedir lo ya decidido o aceptado. Si el correo mezcla tipos, su estructura la fija el propósito: lo que no lo sirve se reduce o sale.
 - **Sin índice del contenido** en el primer párrafo («También va …», «Las opciones van al final»). Remitir a una sección que existe («con los pasos de abajo») sí.
 - **Sin rótulos de la técnica**: ni el asunto ni el cuerpo nombran la técnica de estructura («BLUF», «TL;DR», «Bottom line») ni rotulan el primer párrafo («Resumen:», «Resumen ejecutivo:», «Conclusión:», «Summary:»); el primer párrafo abre con su contenido. Un rótulo así expone jerga interna al destinatario.
-- **Sin jerga del método que el destinatario no usa** (fases, estados, IDs o slugs de pendientes, «REQ», «gate», «change MD»): se sustituye por su equivalente llano. Las preferencias de presentación del chat declaradas en el overlay o en `personal/<usuario>.md` no se trasladan al cuerpo.
+- **Sin jerga del método que el destinatario no usa** (fases, estados, IDs o slugs de pendientes, «REQ», «gate», «Change MD»): se sustituye por su equivalente llano. Las preferencias de presentación del chat declaradas en el overlay o en `personal/<usuario>.md` no se trasladan al cuerpo.
 
 ## Idioma y registro
 

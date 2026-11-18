@@ -1,6 +1,6 @@
 # Incidencias en producción
 
-Política transversal para incidentes detectados **post-entrega final**. Para cambios menores que surgen durante el trabajo (pre-entrega final), ver [`../process/execution.md`](../process/execution.md) sección "Incidencias durante el trabajo".
+Política transversal para incidentes detectados **post-entrega final**. Para cambios menores que surgen durante el trabajo (pre-entrega final), ver [`../process/execution.md`](../process/execution.md) § "Incidencias durante el trabajo".
 
 ## Detección
 
@@ -21,7 +21,7 @@ Ambigüedad entre niveles → tratar como P1. Bugs visuales o edge cases bajo tr
 
 Pre-condición: el punto de restauración previo a la entrega final debe existir (regla en [`../process/delivery.md`](../process/delivery.md) § "Pre-condiciones de entrega final" y [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md) § "Punto de restauración").
 
-Pasos específicos por profile: `profiles/<profile>/deployment.md` sección "Rollback".
+Pasos específicos por profile: `profiles/<profile>/deployment.md` § "Rollback".
 
 ### P2 — Fix forward
 

@@ -9,7 +9,7 @@ Meta-instrucciones para Claude cuando edita la metodología misma.
 ## Al editar este repo
 
 - **Eres recursivo**: la metodología que editas es la que aplicas. Sigue las fases (clarificación → propuesta → implementación → commit) usando la metodología actual.
-- **Cualquier cambio entra al `CHANGELOG.md`** antes del tag. El CHANGELOG se gestiona vía fragmentos en `changelog.d/<version>.md` ensamblados por `bootstrap/assemble-changelog.py` — ver flujo en [`process/version-control.md`](process/version-control.md) "CHANGELOG fragmentado".
+- **Cualquier cambio entra al `CHANGELOG.md`** antes del tag. El CHANGELOG se gestiona vía fragmentos en `changelog.d/<version>.md` ensamblados por `bootstrap/assemble-changelog.py` — ver flujo en [`process/version-control.md`](process/version-control.md) § "CHANGELOG fragmentado".
 - **Versionado SemVer**:
   - Patch (1.0.0 → 1.0.1): redacción, typos, aclaraciones.
   - Minor (1.0.x → 1.1.0): nuevos lineamientos, profiles, hooks.
@@ -18,7 +18,7 @@ Meta-instrucciones para Claude cuando edita la metodología misma.
 ## Convenciones internas
 
 - Archivos: `kebab-case.md`, sin prefijos numéricos.
-- Cada carpeta tiene su `index.md` con orden de lectura.
+- Cada carpeta de lineamientos (`general/`, `methodology/`, `process/`, `workflow/`, `tooling/`, `profiles/` y cada `profiles/<profile>/`) tiene su `index.md` con orden de lectura. Las demás llevan `README.md` (`skills/`, `hooks/`, `research/`) o ninguno (`agents/`, `commands/`, `docs/`, `bootstrap/`, `templates/`).
 - Imports internos: paths relativos (`../methodology/principles.md`). Los del propio `CLAUDE.md` también son relativos — funcionan en cualquier ubicación del clon.
 - Proyectos externos **no importan el framework**: lo inyecta el plugin (hook `SessionStart`).
 
@@ -70,20 +70,15 @@ Para profiles con **subproyectos anidados** que necesitan init propio:
 
 Ver lineamiento completo en `methodology/skills.md`.
 
-Para profiles que viven como **subproyectos anidados** dentro de otro repo:
-- Crear también `bootstrap/init-<nombre>-subproject.sh` para inicializar el subproyecto.
-- Actualizar la heurística de detección por path en `profiles/index.md` + `general/profile-detection.md` paso 0 (regla de overlay y fila prioritaria en `profiles/index.md`).
-- Bump **major** si el nuevo profile introduce cambios en el ENUM de estados o vocabulario de `general/`.
-
 ## Agregar un subagente
 
-1. Crear `agents/<nombre>.md` con frontmatter `name`, `description` (cuándo invocarlo) y `tools: [Read, Grep, Glob]` (ampliar solo si el rol necesita una capacidad fuera de ese set — escritura, o lectura de red como `WebFetch` para `fact-check-reviewer` — justificándola en el body). Body = prompt de sistema del rol, que cita o referencia el foco ya definido en `methodology/roles-catalog.md` o `profiles/<profile>/roles.md` — sin duplicar contenido; la metodología sigue siendo single source of truth. Bajo el plugin, el agente se expone solo por existir en `agents/<nombre>.md` (auto-discovery; no hay registro en un script).
+1. Crear `agents/<nombre>.md` con frontmatter `name`, `description` (cuándo invocarlo) y `tools: [Read, Grep, Glob]` (ampliar solo si el rol necesita una capacidad fuera de ese set — escritura, o lectura de red como `WebFetch` para `fact-check-reviewer` — justificándola en el body). Body = prompt de sistema del rol, que cita o referencia el foco ya definido en `methodology/roles-catalog.md` o `profiles/<profile>/roles.md` — sin duplicar contenido; la metodología sigue siendo fuente única. Bajo el plugin, el agente se expone solo por existir en `agents/<nombre>.md` (auto-discovery; no hay registro en un script).
 2. En `methodology/roles-catalog.md` tabla "Resumen de roles": cambiar columna "Impl." de `persona` a `**subagente** (\`<nombre>\`)` para el rol correspondiente.
 3. En `profiles/<profile>/roles.md` del profile que usa el subagente: anotar `— \`subagente\` (\`agents/<nombre>.md\`)` junto al nombre del rol.
 4. Verificar que `process/plan-review.md` paso 2 cubra la lógica de despacho para el nuevo subagente (no debería requerir cambio si el algoritmo ya distingue por presencia de `.md` en `agents/`).
 5. Bump minor + nuevo fragmento `changelog.d/<version>.md` + correr `py bootstrap/assemble-changelog.py`.
 
-Ver definición técnica del modelo persona/subagente en [`methodology/roles-catalog.md`](methodology/roles-catalog.md) sección "Implementación de roles".
+Ver definición técnica del modelo persona/subagente en [`methodology/roles-catalog.md`](methodology/roles-catalog.md) § "Implementación de roles".
 
 ## Cambiar paths o nombres de archivos importados
 

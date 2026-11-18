@@ -41,7 +41,7 @@ dev tipea prompt → UserPromptSubmit hook
 
 ## 4. Modos
 
-**El modo por defecto es `off`**: el hook se instala pero arranca **inerte** (no llama a Haiku ni inyecta contexto). El dev lo enciende cuando quiere con `/preprocess full|fast` o fijándolo en su `preprocess.json` (§5).
+**El modo por defecto es `off`**: el hook se instala pero arranca **inerte** (no llama a Haiku ni inyecta contexto). El dev lo enciende cuando quiere con `/preprocess full|fast` o fijándolo en su `preprocess.json` (§ "Configuración personal default").
 
 | Modo | Corrección | Eco | Confirmación | Cuándo usar |
 |---|---|---|---|---|
@@ -88,7 +88,7 @@ Manual. El plugin ya registra el hook (ver [`hooks/README.md`](../hooks/README.m
 1. Agregar `preprocess-prompt` a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json` (en una lista ya existente, va separado por comas y sin espacios). En Windows requiere Git Bash.
 
 2. El comando viene con el plugin como `/neb:preprocess`. Para tenerlo también como `/preprocess`, copia [`commands/preprocess.md`](../commands/preprocess.md) a `~/.claude/commands/`.
-3. Crear `~/.claude/preprocess.json` con el esquema completo (ver §5).
+3. Crear `~/.claude/preprocess.json` con el esquema completo (ver § "Configuración personal default").
 4. Verificar Python 3 en PATH:
    - **Windows**: `py --version` o `python --version`.
    - **Linux/Mac**: `python3 --version`.

@@ -14,7 +14,7 @@ description: >
 
 # Skill: pendings-review (revisión, curaduría y priorización de pendientes)
 
-Opera el pase unificado de pendientes sobre `neb.db`. El modelo de datos vive en el change MD
+Opera el pase unificado de pendientes sobre `neb.db`. El modelo de datos vive en el Change MD
 `2026-06-14-neb-pendings-sqlite-nucleo.md` y en `2026-09-22-pendings-taxonomia-cliente-topico.md`;
 la mecánica del backend (ejes curados, `curated`, columna `slug`, `compas.md` v2, jerarquía de
 prioridad) en [`../../tooling/pendings.md`](../../tooling/pendings.md). Este skill **ejecuta** — no

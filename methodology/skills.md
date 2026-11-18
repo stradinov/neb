@@ -37,7 +37,7 @@ Ver detalle de convenciones en `profiles/skill-authoring/conventions.md`.
 
 Cada skill se registra en dos lugares:
 
-1. `skills/README.md` — inventario maestro (single source of truth del catálogo del equipo).
+1. `skills/README.md` — inventario maestro (fuente única del catálogo del equipo).
 2. `profiles/<profile>/skills.md` del profile donde aplica.
 
 Un skill puede asociarse a múltiples profiles.
@@ -46,7 +46,7 @@ Un skill puede asociarse a múltiples profiles.
 
 El skill se valida **al entregar** (Fase 5): smoke load + `validation-prompts.md` — cubre los casos previstos al escribirlo. Con eso el REQ **cierra**.
 
-Los gaps que aparecen en sesiones reales posteriores (no previstos al escribir) son **retroalimentación de Fase 9**, no un gate que difiera el cierre: cada uno entra como REQ de patch (ver § siguiente). No se mantiene un pendiente de "validación en uso" abierto indefinidamente.
+Los gaps que aparecen en sesiones reales posteriores (no previstos al escribir) son **retroalimentación de Fase 9**, no un gate que difiera el cierre: cada uno entra como REQ de patch (ver § "Procesamiento de un gap detectado en uso"). No se mantiene un pendiente de "validación en uso" abierto indefinidamente.
 
 ### Procesamiento de un gap detectado en uso
 

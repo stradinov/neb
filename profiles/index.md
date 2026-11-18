@@ -17,7 +17,7 @@ Metodologías específicas por tipo de proyecto. Abstrae lo que NO es universal:
 
 ## Heurística de detección
 
-Single source of truth — consumida por:
+fuente única — consumida por:
 
 - Claude al iniciar trabajo y al re-evaluar profile durante la sesión (ver [`general/profile-detection.md`](../general/profile-detection.md)).
 

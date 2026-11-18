@@ -15,7 +15,7 @@ type: project
 - **Nombre:** <slug del requerimiento>
 - **Path del proyecto:** <path absoluto local>
 - **Draft changes MD:** changes/YYYY-MM-DD-<req>.md
-- **Estado:** En progreso | En validación | Listo para aprobación | Cerrado (ver [`workflow/index.md`](../workflow/index.md) "Estados del requerimiento")
+- **Estado:** En progreso | En validación | Listo para aprobación | Cerrado (ver [`workflow/index.md`](../workflow/index.md) § "Estados del requerimiento")
 - **Plan resumido:** <3-5 líneas del plan aprobado>
 - **Archivos modificados hasta ahora:** lista
 - **Próximos pasos:** lista

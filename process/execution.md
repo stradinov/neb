@@ -1,4 +1,4 @@
-# Execution
+# Implementación
 
 Estándares de implementación, plan mode, gate de cierre de Fase 4, incidencias.
 
@@ -17,7 +17,7 @@ Los estándares de código (baseline: sin comentarios salvo WHY no obvio, saniti
 
 - Solo acciones read-only y edición del archivo de plan.
 - Cierra con `ExitPlanMode` (aprobación del usuario).
-- Cada plan aprobado en plan mode se guarda automáticamente vía hook; los aprobados conversacionalmente (media/alta) se persisten vía `Write` (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
+- Un plan aprobado en plan mode lo guarda el hook `save-approved-plan` si está activado. Si tras `ExitPlanMode` no hay un archivo nuevo en `~/.claude/approved-plans/`, Claude lo persiste con `Write`, igual que los aprobados conversacionalmente (media/alta) (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
 
 Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquitectónicas, o conviene ver el plan antes de gastar tiempo en código.
 
@@ -29,11 +29,11 @@ Antes de cada confirmación del cambio que toque el entregable del proyecto dest
 
 ## Cierre de Fase 4 (gate de subagente)
 
-Antes de declarar Fase 4 terminada y transicionar a Fase 5, el rol principal (persona) invoca al menos un subagente del profile como gate adversarial del **artefacto implementado** — no del plan. El subagente recibe un briefing explícito con el artefacto final usando la misma plantilla que Fase 3 (ver [`process/plan-review.md`](plan-review.md) "Plantilla de briefing"), adaptando la sección "Plan propuesto" para describir el artefacto producido.
+Antes de declarar Fase 4 terminada y transicionar a Fase 5, el rol principal (persona) invoca al menos un subagente del profile como gate adversarial del **artefacto implementado** — no del plan. El subagente recibe un briefing explícito con el artefacto final usando la misma plantilla que Fase 3 (ver [`process/plan-review.md`](plan-review.md) § "Plantilla de briefing"), adaptando la sección "Plan propuesto" para describir el artefacto producido.
 
 **Condición de paso**: cero hallazgos abiertos — cada hallazgo corregido y re-revisado por un subagente del profile, o descartado con OK del dev. **Mecanismo vigente**: el subagente corre en su propio contexto, sin la conversación, y se lanza con la herramienta Agent o, si el dev pidió un workflow, como agente del workflow con `agentType` del mismo subagente (supuestos R11, R12, R16 y R18 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). El revisor corre con el modelo y el esfuerzo de la sesión (supuesto R20); bajarlos pide OK del dev. El rol principal simulando al revisor en su propio contexto (persona) no cumple este gate.
 
-Qué subagente por profile (por defecto + paralelos por dimensión): ver la matriz columna **F4** en [`roles-invocation.md`](roles-invocation.md) § "Cobertura mínima por fase". Si el profile no tiene subagente formalizado, el dev declara override explícito antes de avanzar a Fase 5.
+Qué subagente por profile (por defecto + paralelos por dimensión): ver la matriz columna **Fase 4** en [`roles-invocation.md`](roles-invocation.md) § "Cobertura mínima por fase". Si el profile no tiene subagente formalizado, el dev declara override explícito antes de avanzar a Fase 5.
 
 **Adicional transversal**: el `context-completeness-reviewer` se invoca en este gate cuando el artefacto producido difiere del plan aprobado en ≥1 archivo no listado o ≥1 sección no descrita, o cuando el rol principal detecta que hubo decisiones tomadas en implementación que no estaban en el plan. Aplica a cualquier profile. Output: tabla de suposiciones contexto/dominio; si hay filas no resueltas, el cierre del gate queda bloqueado hasta resolver. Ver [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`".
 
@@ -47,7 +47,7 @@ Al retomar un requerimiento interrumpido:
 2. Leer el MD del requerimiento (`<proyecto>/changes/<fecha>-<nombre>.md`) para ver estado.
 3. Si el `active_*.md` tiene "Pendiente de entrega" → atender primero.
 4. Si la última fase no está cerrada → continuar desde ahí.
-5. Si la sesión se reanudó vía `claude --resume <nombre>`, eliminar la entrada correspondiente en `~/.claude/pendings.md` §"Sesiones pausadas".
+5. Si la sesión se reanudó vía `claude --resume <nombre>`, eliminar la entrada correspondiente en `~/.claude/pendings.md` § "Sesiones pausadas".
 
 Resumir el estado en una línea al inicio:
 
@@ -55,7 +55,7 @@ Resumir el estado en una línea al inicio:
 
 ### Pausar y reanudar la misma sesión Claude
 
-Cuando el dev anuncia que pausará para continuar después en otra sesión, la sesión actual debe quedar recuperable por nombre — `claude --continue` solo recupera la última, y si el dev abre una sesión intermedia se pierde el hilo. La **acción de Claude** al detectar el anuncio de pausa (nombrar la sesión, registrar en `pendings.md`, confirmar) vive en [`../general/communication.md`](../general/communication.md) §"Handoff de sesión".
+Cuando el dev anuncia que pausará para continuar después en otra sesión, la sesión actual debe quedar recuperable por nombre — `claude --continue` solo recupera la última, y si el dev abre una sesión intermedia se pierde el hilo. La **acción de Claude** al detectar el anuncio de pausa (nombrar la sesión, registrar en `pendings.md`, confirmar) vive en [`../general/communication.md`](../general/communication.md) § "Handoff de sesión".
 
 **Comandos disponibles para el dev**:
 
@@ -69,9 +69,9 @@ Para retomar trabajo **en otra máquina o por otro dev** (lo que `--resume` no p
 
 - **Publicar (automático).** El hook publica/actualiza la entrada del `work` en cada `Stop`/`SessionEnd`/`PreCompact`. Al pausar deliberadamente, Claude redacta en el estado semántico el bloque **"Trabajo en vuelo"**: cómo **relanzar** agentes/scripts que quedaron a medias — es prosa que Claude escribe (los procesos no se serializan; el hook no los introspecta), junto a "próximos pasos".
 - **Retomar.** En la otra máquina/cuenta: `/logbook search`/`list` (contra el central) lista los `work` relevables; el dev **toma el mando** (`tomar`, atómico en el central) y abre una **sesión nueva** (no `--resume` cross-machine) alimentada con el transcript como contexto + el índice semántico. **Continúa el mismo `change_md`** que apunta la entrada (no crea uno nuevo): el registro ya está entregado por la entrega temprana. Relanza el trabajo en vuelo desde lo materializado.
-- **Relevar.** El owner **libera** al pausar; otro dev **solicita el mando** si está `owned`; **`liberar --forzado`** (con confirmación) cubre el caso de owner ausente (corte sin liberar). Estados y reglas: [`../workflow/logbook.md`](../workflow/logbook.md) §"Modelo de ownership".
-- **Reconciliación al volver a un `work` ya relevado.** Si un dev retoma una sesión cuyo `work` otro ya tomó/cerró, su `publish` recibe **`409`** (marca `conflict` local) y `/logbook` lo reporta (aviso al listar; detalle en `estado-sync`). El registro (change MD) de quien cerró es **canónico** — Claude avisa y el dev reconcilia su trabajo local (código no pusheado) sobre el head publicado, **no lo duplica** (el `--resume` cross-machine no transfiere el working tree; ver [`../workflow/logbook.md`](../workflow/logbook.md)).
-- **Modo exploratorio** (sin REQ formal): se reanuda con **`--resume` local** del mismo dev; con **entorno compartido** también se publica al catálogo (visibilidad/búsqueda), pero no es relevable cross-dev hasta formalizarse en REQ (ver [`../workflow/logbook.md`](../workflow/logbook.md) §"Dos modos" y §"Entorno compartido").
+- **Relevar.** El owner **libera** al pausar; otro dev **solicita el mando** si está `owned`; **`liberar --forzado`** (con confirmación) cubre el caso de owner ausente (corte sin liberar). Estados y reglas: [`../workflow/logbook.md`](../workflow/logbook.md) § "Modelo de ownership".
+- **Reconciliación al volver a un `work` ya relevado.** Si un dev retoma una sesión cuyo `work` otro ya tomó/cerró, su `publish` recibe **`409`** (marca `conflict` local) y `/logbook` lo reporta (aviso al listar; detalle en `estado-sync`). El registro (Change MD) de quien cerró es **canónico** — Claude avisa y el dev reconcilia su trabajo local (código no pusheado) sobre el head publicado, **no lo duplica** (el `--resume` cross-machine no transfiere el working tree; ver [`../workflow/logbook.md`](../workflow/logbook.md)).
+- **Modo exploratorio** (sin REQ formal): se reanuda con **`--resume` local** del mismo dev; con **entorno compartido** también se publica al catálogo (visibilidad/búsqueda), pero no es relevable cross-dev hasta formalizarse en REQ (ver [`../workflow/logbook.md`](../workflow/logbook.md) § "Dos modos" y § "Entorno compartido").
 
 ## Incidencias durante el trabajo
 
@@ -81,7 +81,7 @@ Cambios menores que surgen durante el trabajo (renombre de columna, archivo SQL 
 
 Claude propone el cambio en una línea y procede con aprobación implícita o explícita. **No vuelve a clarificación ni genera estimado nuevo.**
 
-**No califica como incidencia** un cambio de **configuración global / alto radio de impacto**: uno cuyos dependientes no son los callers de un símbolo sino una **clase dispersa de consumidores** (p. ej. una directiva que altera cómo se resuelve un comportamiento transversal —rutas/referencias, codificación, enrutamiento—). Aunque el diff sea de una línea y lo dispare un incidente, **exige volver a Fase 3** (plan-review + enumeración de dependientes); tramitarlo como incidencia salta esos gates. Cada profile concreta qué patrones cuentan como config global (ver `profiles/<profile>/roles.md` § disparadores de alcance).
+**No califica como incidencia** un cambio de **configuración global / alto radio de impacto**: uno cuyos dependientes no son los callers de un símbolo sino una **clase dispersa de consumidores** (p. ej. una directiva que altera cómo se resuelve un comportamiento transversal —rutas/referencias, codificación, enrutamiento—). Aunque el diff sea de una línea y lo dispare un incidente, **exige volver a Fase 3** (plan-review + enumeración de dependientes); tramitarlo como incidencia salta esos gates. Cada profile concreta qué patrones cuentan como config global (ver los disparadores de alcance en `profiles/<profile>/roles.md`).
 
 Al resolver, documentar de inmediato en la memoria del proyecto (lo duradero en `project_<nombre>.md`; lo propio del REQ en su `active_<proyecto>_<slug>.md`):
 - Qué fue (una línea).
