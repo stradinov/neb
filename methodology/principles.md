@@ -133,6 +133,8 @@ Editar la metodología es aplicarla (ver § "Características" — Reflexiva): e
 
 **Criterio de corte**: si eliminar una frase no cambia el comportamiento esperado del **consumidor**, no escribirla; si ya está, eliminarla. El consumidor es por defecto el agente (redacción normativa, austera); la documentación de cara al adoptante —`docs/` (excepción de § "Capas del repo y test de pertenencia") y el `README.md`— tiene como consumidor a un humano y **admite** más contexto, ejemplos y analogías moderadas (no es lineamiento que el agente aplique en el flujo).
 
+**Señal de longitud**: un párrafo, viñeta o fila de más de 600 caracteres es señal para que quien lo edita lo revise, no un tope; si se lee claro, se queda.
+
 El criterio tiene además un **piso inferior**: la suficiencia (§ "Claridad") — no cortar por debajo de lo que el consumidor necesita para actuar.
 
 ### Eliminar
@@ -143,13 +145,14 @@ El criterio tiene además un **piso inferior**: la suficiencia (§ "Claridad") �
 - Encabezados y separadores `---` ornamentales que no abren contenido nuevo.
 - Listas tipo "Cuándo leer esto" / "Para qué sirven" cuando son obvias del nombre o contexto.
 - Re-explicaciones de reglas ya enunciadas en el mismo archivo.
+- Historia de la regla: qué decía antes, desde qué versión rige o qué requerimiento la introdujo (no la evidencia con que se verificó un supuesto de plataforma). Vive en el CHANGELOG o en el registro del requerimiento, y la saca quien edita el párrafo, la viñeta o la fila que la contiene. Se conserva lo que hoy obliga por compatibilidad —un término anterior que los registros viejos siguen usando, un formato que el código aún lee—, sin el relato.
 - Ejemplos que solo re-ilustran una regla ya clara. Antes de cortar un ejemplo aplica la tría: si carga un matiz de conducta aún no enunciado, conviértelo en norma (eleva el matiz a regla); si solo re-ilustra, córtalo; si es una cita literal que Claude debe emitir, consérvala (§ "Conservar").
 - Redundancias entre archivos — una sola fuente de verdad, enlazar desde el resto.
 
 ### Conservar
 
 - Comandos exactos, paths, snippets de código.
-- Tablas (alta densidad de información, quick-lookup).
+- Tablas (alta densidad de información, quick-lookup). Al escribir o editar un párrafo o una lista, tres o más casos con los mismos campos van en tabla.
 - Frontmatter YAML (`name`, `description`, `type`).
 - Citas literales que Claude debe emitir (entre `>`).
 - Enlaces relativos a otros archivos.
