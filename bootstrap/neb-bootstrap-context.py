@@ -76,10 +76,11 @@ HEADER = "# Arranque de Neb — parte %d de %d · huella %s\n\n"
 ENV_NOTICE = "\n> **Aviso de Neb (entorno):** %s\n"
 AUTOUPDATE_NOTICE_MAX = 800  # unidades UTF-16 del aviso de actualización automática, con su envoltura
 AUTOUPDATE_NOTICE = (
-    "la actualización automática del plugin de Neb no está decidida (marketplace `%s`): viene apagada y Neb "
-    "se queda en la versión instalada. Si hay una persona presente, ofrécele encenderla al cierre de tu "
+    "la actualización automática del plugin de Neb no está decidida (marketplace `%s`): viene apagada. "
+    "Si hay una persona presente, ofrécele encenderla al cierre de tu "
     "primera respuesta, como menú y una sola vez por conversación. El menú dice que cada versión publicada "
-    "llegará en una sesión posterior y que en la app de escritorio se escribe además "
+    "llegará en una sesión posterior, que vale para todos los plugins de ese marketplace y que en la app de "
+    "escritorio se escribe además "
     "`FORCE_AUTOUPDATE_PLUGINS=1`, que aplica a todos sus marketplaces con actualización automática. "
     "Con su OK, %s; si la rechaza, con `disable`. Solo escribe su `settings.json`, con respaldo. "
     "Detalle: `docs/user-guide.md` § \"Mantener Neb al día\".")
