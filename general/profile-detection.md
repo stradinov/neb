@@ -24,8 +24,6 @@ Al entrar a un directorio de proyecto, Claude detecta el profile:
 | **Profile pendiente** (listado sin `profiles/<X>/`) | Aviso: *"Se detectó el profile `<X>` (Pendiente). Sin convenciones específicas. ¿Crear el profile siguiendo el patrón de `profiles/self-applied/` (ver [CLAUDE.md interno del repo](../CLAUDE.md) § "Agregar un profile nuevo") o continuar genérico?"* |
 | **Profile desconocido** (ningún indicador match) | Aviso: *"No se detectó un profile conocido. ¿Seguir genérico, agregar heurística + nuevo profile, o marcar este dir como sin-profile (`neb-profile: none`) para no volver a sugerirlo?"* |
 
-Heurísticas y prioridad: orden de tabla en [`profiles/index.md`](../profiles/index.md).
-
 ### Oferta pasiva del recorrido (onboarding)
 
 Única fuente del disparador; el recorrido y sus opciones viven en [`onboarding.md`](onboarding.md).
@@ -40,18 +38,18 @@ Sin preámbulo, sin interrumpir el trabajo. El recorrido es opcional.
 
 ## Marcadores de proyecto (opt-out de profile/Neb · opt-in de logbook central)
 
-Un proyecto puede declarar, mediante un **marcador en su `CLAUDE.md`**, que no quiere sugerencias de profile o que no use Neb. El marcador es persistente (sobrevive entre sesiones) y se respeta **antes** de sugerir nada — evita que Claude vuelva a proponer un profile en cada sesión sobre un dir que el dev ya decidió dejar genérico.
+Un proyecto declara con un **marcador en su `CLAUDE.md`** que no quiere sugerencias de profile, que no usa Neb o que publica su trabajo al catálogo central. El marcador persiste entre sesiones y se respeta **antes** de sugerir nada.
 
-| Marcador (en el `CLAUDE.md` del proyecto) | Semántica | Quién lo consume |
+| Marcador | Efecto | Quién lo consume |
 |---|---|---|
-| `<!-- neb-profile: none -->` | El proyecto **usa Neb** pero no tiene profile: trabajo genérico. Claude no vuelve a sugerir detectar/crear profile en ese dir. | Esta detección (pasos 2 y 4). |
-| `<!-- neb: skip -->` | El proyecto **no usa Neb**: el hook `SessionStart` detecta el marcador en el `CLAUDE.md` del proyecto activo y **no inyecta el arranque**. Para proyectos ajenos a Neb donde la metodología no debe actuar. | El hook `SessionStart` (`bootstrap/neb-bootstrap-context.py`, vía `CLAUDE_PROJECT_DIR`) — activo desde v2.0.0 |
-| `<!-- neb-logbook: central -->` | El proyecto **publica su trabajo al catálogo central** (relevo cross-dev + corpus buscable) cuando hay `NEB_LOGBOOK_ENDPOINT` — opt-**in** de compartición **por proyecto**. Sin el marcador la bitácora queda local-only (el default; la local ya cubre el relevo del propio dev). *(Opt-in por perfil: futuro.)* | El hook `logbook-sync` (`hooks/lib/logbook.py`); ver [`../workflow/logbook.md`](../workflow/logbook.md) § "Entorno compartido" |
+| `<!-- neb-profile: none -->` | El proyecto **usa Neb** sin profile: trabajo genérico. Claude no vuelve a sugerir detectar o crear profile en ese dir | Esta detección (pasos 2 y 4) |
+| `<!-- neb: skip -->` | El proyecto **no usa Neb**: el arranque no se inyecta | El hook `SessionStart` (`bootstrap/neb-bootstrap-context.py`, vía `CLAUDE_PROJECT_DIR`) |
+| `<!-- neb-logbook: central -->` | El proyecto **publica su trabajo al catálogo central** (opt-in por proyecto) si se cumple el disparador de [`../workflow/logbook.md`](../workflow/logbook.md) § "Entorno compartido (disparador opt-in por proyecto)"; sin el marcador, la bitácora queda local | El hook `logbook-sync` (`hooks/lib/logbook.py`) |
 
 Reglas del marcador:
 
-- **Independientes, `neb: skip` prevalece**: si ambos marcadores están presentes, `neb: skip` gana — apaga toda la inyección del arranque, lo que vuelve irrelevante a `neb-profile: none` (que solo apaga las sugerencias de profile).
-- **Idempotente**: si el marcador ya está presente, no se duplica.
+- **Independientes, `neb: skip` prevalece**: si están los dos marcadores de opt-out, `neb: skip` gana; apaga toda la inyección del arranque y vuelve irrelevante a `neb-profile: none`, que solo apaga las sugerencias de profile.
+- **Idempotente**: un marcador ya presente no se duplica.
 - **Respeta contenido humano**: se inserta en una zona neutra del `CLAUDE.md`, nunca dentro de bloques `<!-- human -->` … `<!-- /human -->` (ver [`../methodology/change-control-policy.md`](../methodology/change-control-policy.md)).
 - **Sin `CLAUDE.md`**: si el proyecto no tiene `CLAUDE.md` y el dev elige marcarlo sin-profile, Claude crea uno mínimo con el marcador.
 - **Reversible**: el dev revierte el opt-out borrando el marcador.
@@ -86,5 +84,3 @@ No disparan re-detección: saludos, conversación trivial, preguntas meta sin pa
 - **Prompt menciona dos profiles** — anunciar ambigüedad y preguntar cuál es driver antes de actuar. No asumir.
 - **cwd en el directorio raíz del clon (sin repo detectado)** — `none`; el primer path en el prompt resuelve.
 - **Path mencionado pero archivo no existe** — la heurística es estructural (matchea por patrón de path/nombre), no requiere `stat`.
-
-La heurística de [`profiles/index.md`](../profiles/index.md) es la **fuente única**; esta política la consume sin duplicarla.

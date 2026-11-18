@@ -1,6 +1,6 @@
 # Arranque
 
-Punto de entrada de la metodología. Reúne vía `@import` las reglas operativas que Claude aplica **desde el primer prompt**, independientes de fase. Esas reglas están completas en el contexto antes de la primera respuesta de cada sesión. Hoy las entrega el hook `SessionStart` del plugin, en partes que caben en el tope de salida de la plataforma (supuesto R1 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). Reemplaza la antigua sección declarativa "lectura obligatoria al iniciar sesión".
+Punto de entrada de la metodología. Reúne vía `@import` las reglas operativas que Claude aplica **desde el primer prompt**, independientes de fase. Esas reglas están completas en el contexto antes de la primera respuesta de cada sesión. Hoy las entrega el hook `SessionStart` del plugin, en partes que caben en el tope de salida de la plataforma (supuesto R1 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)).
 
 @communication.md
 @profile-detection.md
