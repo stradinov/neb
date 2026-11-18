@@ -51,7 +51,10 @@ Si el defecto se detecta tiempo después, en uso post-cierre: la **etapa de orig
 
 ### Recurrencia por familia (≥3 similares)
 
-Cuando el campo **Patrón / aislado** del Diagnóstico se marca **≥3 similares** (el defecto es el 3.º o posterior de una misma clase / causa raíz), el REQ derivado NO se limita a un parche puntual del caso: **dispara una revisión-de-familia obligatoria** — consolidar el **invariante común** de la clase y un **checklist de regresión reutilizable** que gatee las próximas ocurrencias. Esto es **independiente del disparador de la revisión agregada** (§ "Revisión agregada"): basta con marcar ≥3 similares en un solo Diagnóstico. El campo admite solo `aislado` o `≥3 similares`, con el detalle tras el valor ([`templates/change.md.template`](../templates/change.md.template)); otro valor no dispara la revisión de familia. Rompe el patrón "cada bug de la familia se parcha en aislamiento sin abstraer nunca la clase".
+Cuando el campo **Patrón / aislado** del Diagnóstico se marca **≥3 similares** (el defecto es el 3.º o posterior de una misma clase / causa raíz), el REQ derivado NO se limita a un parche puntual del caso: **dispara una revisión-de-familia obligatoria** — consolidar el **invariante común** de la clase y un **checklist de regresión reutilizable** que gatee las próximas ocurrencias. Rompe el patrón "cada bug de la familia se parcha en aislamiento sin abstraer nunca la clase".
+
+- **Independiente del disparador de la revisión agregada** (§ "Revisión agregada"): basta con marcar ≥3 similares en un solo Diagnóstico.
+- **Valores del campo**: solo `aislado` o `≥3 similares`, con el detalle tras el valor ([`templates/change.md.template`](../templates/change.md.template)); otro valor no dispara la revisión de familia.
 
 ### Salida
 
@@ -81,7 +84,9 @@ Lo que la revisión analiza sale de los REQs de esa lista. La última revisión 
 
 - Métricas agregadas de los REQs que cubre contra umbrales de [`workflow/metrics.md`](../workflow/metrics.md): ¿hay una métrica que se dispara repetidamente (ej. 5 de 10 cierran con re-entregas=3), o una que no disparó en el período y ya no aporta?
 - Patrones cualitativos de fricción recurrente: incidencias del mismo tipo, fases que consistentemente exceden turnos, decisiones que se reabren.
-- Pertinencia de cada rol revisor, en cada profile donde está declarado (un rol transversal, en todos). Con las líneas «Aporte de roles» de los REQs que cubren esta revisión y la anterior: ¿un rol que no se despachó en ningún REQ de las dos, aunque su profile tuvo REQs? ¿Uno despachado solo con *sin hallazgos*? ¿Uno con *debió cazar* en más de un REQ? Si su despacho es condicional, la revisión dice si la condición se dio, o que no es determinable. Si hay un rol así, propone deprecarlo, ajustar su foco o redefinir su pertinencia (ver [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) § "Evolución de roles"). Las anotaciones anteriores con Δ cuentan como etiquetas: +1 es *aportó*, −0.1 *sin hallazgos* y −1 *debió cazar*.
+- Pertinencia de cada rol revisor, en cada profile donde está declarado (un rol transversal, en todos), con las líneas «Aporte de roles» de los REQs que cubren esta revisión y la anterior. Las anotaciones anteriores con Δ cuentan como etiquetas: +1 es *aportó*, −0.1 *sin hallazgos* y −1 *debió cazar*.
+  - ¿Un rol que no se despachó en ningún REQ de las dos, aunque su profile tuvo REQs? ¿Uno despachado solo con *sin hallazgos*? ¿Uno con *debió cazar* en más de un REQ? Si hay un rol así, la revisión propone deprecarlo, ajustar su foco o redefinir su pertinencia (ver [`methodology/roles-catalog.md`](../methodology/roles-catalog.md) § "Evolución de roles").
+  - Si su despacho es condicional, la revisión dice si la condición se dio, o que no es determinable.
 - **Análisis longitudinal de costo por modelo** (si hay datos de uso de API en los Change MDs): comparar cost-per-REQ a complejidad constante entre versiones de Claude. Dos señales posibles:
   - Costo baja manteniendo calidad → Claude mejoró o la metodología es más eficiente.
   - Costo sube o se mantiene con calidad baja → investigar si el tipo de REQ cambió o si hay uso ineficiente del modelo (ej. Opus para tareas que Sonnet resolvería igual).

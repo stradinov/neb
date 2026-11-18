@@ -67,7 +67,12 @@ Jerarquía: skills disponibles → research vigente → inferencia de Claude.
 
 ## Suposiciones explícitas antes de afirmar
 
-Toda afirmación se respalda en evidencia del turno actual o se declara como suposición. Evidencia del turno es la fuente que quien afirma leyó y cita; el hallazgo de un **rol delegado** (un subagente o un paso de workflow) es una afirmación a respaldar, no evidencia propia. Cuando sostiene una pregunta o una opción al dev («deliberado», «decisión de negocio», «no corre»), lleva la fuente que el rol principal leyó o va marcado `[asumido]`. Cuando sostiene la corrección de un artefacto del REQ (el plan, el registro, el entregable o el changelog), la corrección se apoya en la fuente que el rol principal leyó, no en el reporte del rol; si el rol principal no la encuentra, el hallazgo no se aplica y pasa al dev como pregunta. Si el gate exige re-revisión (cierre de Fase 4, pre-ejecución de Fase 7), su briefing cita la fuente de cada corrección. Hay dos clases de suposición a vigilar:
+Toda afirmación se respalda en evidencia del turno actual o se declara como suposición. Evidencia del turno es la fuente que quien afirma leyó y cita; el hallazgo de un **rol delegado** (un subagente o un paso de workflow) es una afirmación a respaldar, no evidencia propia:
+
+- Sostiene una pregunta o una opción al dev («deliberado», «decisión de negocio», «no corre») → lleva la fuente que el rol principal leyó o va marcado `[asumido]`.
+- Sostiene la corrección de un artefacto del REQ (el plan, el registro, el entregable o el changelog) → la corrección se apoya en la fuente que el rol principal leyó, no en el reporte del rol; si el rol principal no la encuentra, el hallazgo no se aplica y pasa al dev como pregunta. Si el gate exige re-revisión (cierre de Fase 4, pre-ejecución de Fase 7), su briefing cita la fuente de cada corrección.
+
+Hay dos clases de suposición a vigilar:
 
 - **Estado concreto sin verificar** (brecha de contexto): afirmar sobre un archivo, dato, dependiente, configuración o el motivo de un estado existente, cuya fuente existe localmente pero no fue consultada en el turno actual. Acción: verificar (lectura, grep, LSP, consulta a memoria/skill vigente).
 - **Dominio sin antecedente** (dominio desconocido): inferir sobre un dominio sin cobertura en skills, memoria del proyecto o research vigente. Acción: aplicar "Contexto especializado antes de inferir" — proponer abrir REQ de research si el impacto es medio/alto (ver [`../profiles/research/conventions.md`](../profiles/research/conventions.md) § "Modos de disparo").
@@ -76,7 +81,9 @@ Output esperado:
 
 - Plan (Fase 3): el plan separa dependientes/datos **verificados** (con la fuente: grep `X`, lectura de `Y:Z-W`, LSP, skill `<nombre>`, memoria `<archivo>`) de los **asumidos sin verificar** (con la razón y la acción pendiente). Cuando la Re-verificación alcanza a un supuesto de plataforma del diseño, lo que de él se puede probar en una sesión desechable no cabe entre los asumidos ([platform-assumptions.md](platform-assumptions.md) § "Mantenimiento").
 - Cierre de edit (Fase 4): Claude menciona qué fuentes consultó vs cuáles dio por entendidas por contexto previo.
-- Corrección de un artefacto del REQ (cualquier fase): quien corrige una regla, un criterio, una cifra o una afirmación que el REQ ya había escrito en uno de sus artefactos actualiza, antes de presentar la corrección al dev o a una re-revisión, lo que depende de lo corregido en los artefactos de ese REQ: los pasajes que lo aplican o lo repiten, y las cifras, listas y órdenes calculados con el valor anterior. Sin eso, el dependiente sigue afirmando lo que la corrección desmintió. La actualización no alcanza lo que registra un momento, como el plan ya aprobado o una entrada fechada del registro. En `self-applied`, los punteros a un archivo o una sección que se mueve o se renombra siguen el eje 3 de § "Coherencia global sobre cambio mínimo".
+- Corrección de un artefacto del REQ (cualquier fase): quien corrige una regla, un criterio, una cifra o una afirmación que el REQ ya había escrito en uno de sus artefactos actualiza, antes de presentar la corrección al dev o a una re-revisión, lo que depende de lo corregido en los artefactos de ese REQ: los pasajes que lo aplican o lo repiten, y las cifras, listas y órdenes calculados con el valor anterior. Sin eso, el dependiente sigue afirmando lo que la corrección desmintió.
+  - La actualización no alcanza lo que registra un momento, como el plan ya aprobado o una entrada fechada del registro.
+  - En `self-applied`, los punteros a un archivo o una sección que se mueve o se renombra siguen el eje 3 de § "Coherencia global sobre cambio mínimo".
 - Respuesta exploratoria (cualquier fase): si un hecho citado no se verificó en el turno actual, marcarlo `[asumido]`, `[memoria sin re-verificar]` o `[dominio sin research]`.
 - Correo a terceros (antes de pasárselo al dev): cada afirmación de hecho con su fuente primaria, sin marcadores en el cuerpo; contrato en [`../general/correspondence.md`](../general/correspondence.md) § "Verificación de los hechos".
 - Pregunta o menú al dev (cualquier fase): la premisa se verifica antes del menú o se marca; contrato, y caso del motivo de un estado que parece deliberado, en [`../general/communication.md`](../general/communication.md) § "Elecciones: menú de selección".
@@ -94,7 +101,7 @@ Una regla del núcleo —una **regla de proceso** o un punto de customización�
 - **El costo es del mecanismo.** Modelo y esfuerzo se eligen en el mecanismo; ninguna regla cambia por ellos. En un gate (plan-review de Fase 3, cierre de Fase 4 y pre-ejecución de Fase 7), bajar el modelo o el esfuerzo del revisor respecto de la sesión pide OK del dev (supuesto R20 de [platform-assumptions.md](platform-assumptions.md)). El número de revisores de un gate no es costo: lo fija la cobertura mínima por fase ([`../process/roles-invocation.md`](../process/roles-invocation.md)).
 - **Si un supuesto cambia, cambia el mecanismo.** Si un supuesto ya no se cumple, el REQ que se apoya en él ajusta el mecanismo y conserva la condición de paso o el output de la regla.
 
-Una regla que fija el mecanismo como si fuera lo exigido queda desactualizada con cada versión de la plataforma, o limita a Claude: la regla de no-anidamiento llegó a ser falsa sin que nada lo señalara.
+Una regla que fija el mecanismo como si fuera lo exigido queda desactualizada con cada versión de la plataforma, o limita a Claude, sin que nada lo señale.
 
 ## Anti-patrones
 
@@ -122,7 +129,11 @@ El prompt de sistema base de Claude prescribe cambio mínimo: no refactor, no cl
 
 ## Lineamientos para editar MDs
 
-Editar la metodología es aplicarla (ver § "Características" — Reflexiva): estos lineamientos son núcleo, no periferia de un profile. **Criterio de corte**: si eliminar una frase no cambia el comportamiento esperado del **consumidor**, no escribirla; si ya está, eliminarla. El consumidor es por defecto el agente (redacción normativa, austera); la documentación de cara al adoptante —`docs/` (excepción de § "Capas del repo y test de pertenencia") y el `README.md`— tiene como consumidor a un humano y **admite** más contexto, ejemplos y analogías moderadas (no es lineamiento que el agente aplique en el flujo). El criterio tiene además un **piso inferior**: la suficiencia (§ "Claridad") — no cortar por debajo de lo que el consumidor necesita para actuar.
+Editar la metodología es aplicarla (ver § "Características" — Reflexiva): estos lineamientos son núcleo, no periferia de un profile.
+
+**Criterio de corte**: si eliminar una frase no cambia el comportamiento esperado del **consumidor**, no escribirla; si ya está, eliminarla. El consumidor es por defecto el agente (redacción normativa, austera); la documentación de cara al adoptante —`docs/` (excepción de § "Capas del repo y test de pertenencia") y el `README.md`— tiene como consumidor a un humano y **admite** más contexto, ejemplos y analogías moderadas (no es lineamiento que el agente aplique en el flujo).
+
+El criterio tiene además un **piso inferior**: la suficiencia (§ "Claridad") — no cortar por debajo de lo que el consumidor necesita para actuar.
 
 ### Eliminar
 
@@ -150,7 +161,10 @@ Editar la metodología es aplicarla (ver § "Características" — Reflexiva): e
 - **Término canónico, una sola acepción** (cara redaccional de § "Coherencia global sobre cambio mínimo" eje 1 — vocabulario canónico): no lo reuses en su sentido coloquial (p.ej. "foco", "hilo") ni prestes el marco de un concepto para nombrar otra distinción.
 - **Claridad sobre compresión.** Cortar relleno no es empacar condición + acción + opciones en una etiqueta telegráfica densa. Si una frase obliga al lector a reconstruir el referente, desempácala.
 - **Suficiencia: condición, acción y consecuencia.** Contrapeso de § "Eliminar": una regla normativa está completa cuando enuncia su condición de aplicación, la acción/output esperado y qué se rompe si se omite. Cortar por debajo de ese piso es *escuetez falsa*, no austeridad — el "por qué" que se conserva es el que determina decisiones en edge cases (§ "Conservar").
-- **Sujeto de una obligación.** Una obligación deja en su misma oración a quién le toca: lo nombra su sujeto o lo identifica su disparador. Salvo la que nombra como sujeto a todo REQ de su alcance, o a cada fase, turno o fecha, le toca a quien cambia su objeto —la regla, el supuesto o el artefacto que protege— o se apoya en él: lo cita, usa su output o depende de su comportamiento. Un evento del objeto, como un supuesto que deja de cumplirse, no la acota por sí solo. Editar el archivo que la contiene no la dispara, salvo que su objeto sea la edición misma (§ "Coherencia global sobre cambio mínimo"); usar el mecanismo vigente de un gate no dispara la que protege el supuesto de ese mecanismo. Aplica al agregar, mover, partir o corregir una obligación; las anteriores a esta regla se ajustan cuando un REQ cambie la regla que las contiene. Sin esto, la regla hereda pasos a quien no la toca.
+- **Sujeto de una obligación.** Una obligación deja en su misma oración a quién le toca: lo nombra su sujeto o lo identifica su disparador. Sin esto, la regla hereda pasos a quien no la toca.
+  - **A quién le toca.** Salvo la que nombra como sujeto a todo REQ de su alcance, o a cada fase, turno o fecha, le toca a quien cambia su objeto —la regla, el supuesto o el artefacto que protege— o se apoya en él: lo cita, usa su output o depende de su comportamiento.
+  - **Límites.** Un evento del objeto, como un supuesto que deja de cumplirse, no la acota por sí solo. Editar el archivo que la contiene no la dispara, salvo que su objeto sea la edición misma (§ "Coherencia global sobre cambio mínimo"); usar el mecanismo vigente de un gate no dispara la que protege el supuesto de ese mecanismo.
+  - **Cuándo aplica.** Al agregar, mover, partir o corregir una obligación; las anteriores a esta regla se ajustan cuando un REQ cambie la regla que las contiene.
 
 ### No tocar
 

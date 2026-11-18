@@ -42,7 +42,16 @@ El modo exploratorio registra automáticamente la sesión (aunque el dev no anun
 
 ## Entorno compartido (disparador opt-in por proyecto)
 
-El **disparador** de "entorno compartido" es **determinista** y **opt-in por proyecto**: el trabajo se publica al catálogo central **solo** cuando hay `NEB_LOGBOOK_ENDPOINT` configurado **y** el proyecto lo declara explícitamente con el marcador `<!-- neb-logbook: central -->` en su `CLAUDE.md` (el hook lo lee antes de publicar; análogo a `<!-- neb-profile: none -->`). Sin endpoint o sin marcador → la bitácora queda **local-only**, que es el **default**. El filtro rige también al drenar el outbox de la máquina: sale solo lo que tiene opt-in propio (el work de un REQ, por su repo; la sesión, por el dir donde arrancó) — regla completa en [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador", que además separa **qué se publica** (el marcador) de **contra qué opera el CLI** `/logbook` (las variables). El default es local porque la **bitácora local (REQ A) ya cubre el relevo del propio dev** ([`pendings.md`](pendings.md) § "Sesiones pausadas" + `--resume`); el central se reserva a los proyectos que deliberadamente comparten su trabajo con el equipo (relevo cross-dev + corpus buscable). *(Opt-in por perfil: requerimiento futuro.)* Publicar el `work` a un entorno compartido **habilita la Entrega temprana del registro** (ver "Relación con otros artefactos" abajo).
+El entorno es **compartido** —el trabajo se publica al catálogo central— **solo** cuando se cumplen las dos condiciones; el disparador es **determinista** y **opt-in por proyecto**:
+
+- hay `NEB_LOGBOOK_ENDPOINT` configurado, **y**
+- el proyecto lo declara explícitamente con el marcador `<!-- neb-logbook: central -->` en su `CLAUDE.md` (el hook lo lee antes de publicar; análogo a `<!-- neb-profile: none -->`).
+
+Sin endpoint o sin marcador → la bitácora queda **local-only**, que es el **default**: la bitácora local ya cubre el relevo del propio dev ([`pendings.md`](pendings.md) § "Sesiones pausadas" + `--resume`), y el central se reserva a los proyectos que deliberadamente comparten su trabajo con el equipo (relevo cross-dev + corpus buscable). *(Opt-in por perfil: requerimiento futuro.)*
+
+El filtro rige también al drenar el outbox de la máquina: sale solo lo que tiene opt-in propio (el work de un REQ, por su repo; la sesión, por el dir donde arrancó) — regla completa en [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador", que además separa **qué se publica** (el marcador) de **contra qué opera el CLI** `/logbook` (las variables).
+
+Publicar el `work` a un entorno compartido **habilita la Entrega temprana del registro** (ver "Relación con otros artefactos" abajo).
 
 ## Entrada de la bitácora
 
@@ -66,4 +75,4 @@ El esquema concreto (SQLite local / central) vive en [`../hooks/logbook-schema.s
 
 - [`pendings.md`](pendings.md) § "Sesiones pausadas" + `--resume`: reanudar **la propia sesión local** (mismo dev, misma máquina). La bitácora **no lo reemplaza** — lo complementa con el **relevo cross-dev** y, en modo exploratorio, automatiza el registro para `--resume`.
 - [`memory.md`](memory.md) (`active_<proyecto>_<slug>.md` — uno por REQ — y su "Pendiente de entrega"): **fuente de verdad** local del estado del REQ. La bitácora la deriva.
-- [`changes.md`](changes.md): el Change MD (registro del requerimiento — ver [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Registro del requerimiento") da la trazabilidad del REQ; la entrada de bitácora **apunta** a él, no lo duplica. Si el `work` se publica a una bitácora **compartida** (backend central, relevo cross-dev), su registro debe estar **entregado** (en git: pusheado) para que el puntero resuelva en la máquina que releva — publicar el `work` a un entorno compartido **habilita la Entrega temprana del registro** (ver [`changes.md`](changes.md) § "Ciclo de vida del draft"). En backend local-only el registro sigue el ciclo por defecto.
+- [`changes.md`](changes.md): el Change MD (registro del requerimiento — ver [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Registro del requerimiento") da la trazabilidad del REQ; la entrada de bitácora **apunta** a él, no lo duplica. Con el `work` publicado a una bitácora **compartida** (backend central, relevo cross-dev), su registro debe estar **entregado** (en git: pusheado) para que el puntero resuelva en la máquina que releva: es la **Entrega temprana del registro** ([`changes.md`](changes.md) § "Ciclo de vida del draft"). En backend local-only el registro sigue el ciclo por defecto.

@@ -34,7 +34,9 @@ Foco: valor agregado vs fricción introducida, alineación con [principles.md](.
 
 ### Context Completeness Reviewer — `subagente` (`agents/context-completeness-reviewer.md`) — transversal
 
-Revisor transversal (no exclusivo de `self-applied` — aplica a todos los profiles). En `self-applied` se invoca cuando el plan introduce concepto/término nuevo, referencia archivo no leído en la sesión, o agrega regla con efecto cross-file. Foco: detectar suposiciones del autor que no se verificaron — estado concreto local sin lectura/grep (brecha de contexto) o dominio sin antecedente en skills/memoria/research vigente (dominio desconocido). Complementa al `qa-process-engineer` (que audita lo escrito) auditando lo que NO se leyó/investigó. Ver [`../../process/plan-review.md`](../../process/plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`" para criterios de invocación por fase y frontera con `qa-process-engineer`.
+Revisor transversal (no exclusivo de `self-applied` — aplica a todos los profiles). Foco: detectar suposiciones del autor que no se verificaron — estado concreto local sin lectura/grep (brecha de contexto) o dominio sin antecedente en skills/memoria/research vigente (dominio desconocido). Complementa al `qa-process-engineer` (que audita lo escrito) auditando lo que NO se leyó/investigó.
+
+En `self-applied` se invoca cuando el plan introduce concepto/término nuevo, referencia archivo no leído en la sesión, o agrega regla con efecto cross-file. Criterios de invocación por fase y frontera con `qa-process-engineer`: [`../../process/plan-review.md`](../../process/plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`".
 
 ## Subagentes por fase
 

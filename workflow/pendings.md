@@ -1,6 +1,6 @@
 # Pendientes
 
-Ítems de seguimiento del dev que no bloquean el cierre de un REQ pero piden acción futura. Viven en `neb.db` (`~/.claude/neb.db`). El archivo plano `~/.claude/pendings.md` ya no lleva pendientes: conserva § "Sesiones pausadas" y los avisos que un mecanismo del adoptante le anexe.
+Ítems de seguimiento del dev que no bloquean el cierre de un REQ pero piden acción futura. Viven en `neb.db` (`~/.claude/neb.db`). El archivo plano `~/.claude/pendings.md` no lleva pendientes: conserva § "Sesiones pausadas" y los avisos que un mecanismo del adoptante le anexe.
 
 ## Dónde viven y cómo se citan
 

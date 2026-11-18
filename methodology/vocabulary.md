@@ -36,7 +36,7 @@ Mapa operativo de los conceptos que **cambian comportamiento**. La fuente de ver
 | **Aporte al núcleo** | forma de aplicar un ajuste de Fase 9 | La mejora al núcleo que un adoptante sin permiso de escritura propone por pull request. Es parte de la Fase 9 del REQ que la originó, no un REQ nuevo. | REQ · ajuste en el overlay · issue | — | [`../process/upstream-contribution.md`](../process/upstream-contribution.md) |
 | **Mantenedor** | quien publica el núcleo | Quien tiene permiso de escritura en el repo del núcleo y publica sus versiones. | adoptante (usa el núcleo y lo extiende en su overlay) | ✗ "maintainer" (anglicismo) | [`../CONTRIBUTING.md`](../CONTRIBUTING.md) |
 | **Confirmación autónoma** | excepción del gate | Confirmar un cambio del entregable sin un OK por confirmación, dentro del plan aprobado y con el piso del núcleo; solo el adoptante la activa. | confirmación del cambio · integración | — | [`../process/change-control-gate.md`](../process/change-control-gate.md) § "Autorización de la confirmación del cambio" |
-| **Perfil (profile)** *(anglicismo)* | concretización por tipo de proyecto | El conjunto de reglas que adapta la metodología a un tipo de proyecto (build, convenciones de commit, roles…). (*profile* = perfil) | rol · ficha de destinatario ([`../general/correspondence.md`](../general/correspondence.md)) | → "perfil"; histórico "stack" (renombrado en 3.0.0) | [`profiles.md`](profiles.md) |
+| **Perfil (profile)** *(anglicismo)* | concretización por tipo de proyecto | El conjunto de reglas que adapta la metodología a un tipo de proyecto (build, convenciones de commit, roles…). (*profile* = perfil) | rol · ficha de destinatario ([`../general/correspondence.md`](../general/correspondence.md)) | → "perfil"; histórico "stack" | [`profiles.md`](profiles.md) |
 | **Rol** | foco de revisión/autoría | Un enfoque especializado (persona o subagente) que revisa o redacta una dimensión del trabajo. | perfil | → "revisor" / "*reviewer*" (cuando es subagente) | [`roles-catalog.md`](roles-catalog.md) |
 | **Validación** | mecanismo de aceptación (4 tipos) | Cómo se comprueba que el entregable sirve antes de cerrar: en QA, local con artefactos, ciclo con cliente, o implícita. | gate de cierre · entrega | — | [§ "Tipos de validación"](#tipos-de-validación) |
 | **Riesgo de regresión** | eje ortogonal a la complejidad | Qué tan probable es que el cambio rompa algo que ya funcionaba (Bajo/Medio/Alto), aparte de qué tan grande sea. (*regresión* = una falla vieja que reaparece) | complejidad | — | [§ "Niveles de riesgo de regresión"](#niveles-de-riesgo-de-regresión) |
@@ -65,7 +65,9 @@ Identidad estable cross-máquina: `project + req_slug` (ver [`../workflow/logboo
 
 ### Relación 1↔1 con su registro
 
-A cada REQ **le corresponde** un único **registro** (su Change MD): proyección documental versionada, eje **documental** de la trazabilidad (todo enlace entre artefactos pasa por él — ver [`../workflow/traceability.md`](../workflow/traceability.md)). El Change MD **registra** el REQ; no **es** el REQ. La **cardinalidad 1↔1 se preserva incluso cross-repo**: un único Change MD en el repo central, con commits listados por repo ([`../workflow/traceability.md`](../workflow/traceability.md) § "Multi-proyecto"). **Excepción**: `changes_old/` documenta retrospectivamente cambios lógicos reconstruidos del historial git, fuera del flujo normal (no es excepción a la 1↔1, es trazabilidad hacia atrás — ver [`../workflow/changes.md`](../workflow/changes.md) y [`../workflow/traceability.md`](../workflow/traceability.md) § "Casos especiales").
+A cada REQ **le corresponde** un único **registro** (su Change MD): proyección documental versionada, eje **documental** de la trazabilidad (todo enlace entre artefactos pasa por él — ver [`../workflow/traceability.md`](../workflow/traceability.md)). El Change MD **registra** el REQ; no **es** el REQ. La **cardinalidad 1↔1 se preserva incluso cross-repo**: un único Change MD en el repo central, con commits listados por repo ([`../workflow/traceability.md`](../workflow/traceability.md) § "Multi-proyecto").
+
+**Excepción**: `changes_old/` documenta retrospectivamente cambios lógicos reconstruidos del historial git, fuera del flujo normal (no es excepción a la 1↔1, es trazabilidad hacia atrás — ver [`../workflow/changes.md`](../workflow/changes.md) y [`../workflow/traceability.md`](../workflow/traceability.md) § "Casos especiales").
 
 ### Propiedades del REQ (punteros canónicos)
 
@@ -80,7 +82,7 @@ A cada REQ **le corresponde** un único **registro** (su Change MD): proyección
 | Cross-repo: un solo Change MD (repo central) | [`../workflow/traceability.md`](../workflow/traceability.md) § "Multi-proyecto" |
 | Trazabilidad unidireccional plan→Change MD; plan opcional, pruebas obligatorio | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) |
 | Eslabón Change MD↔commit (bidireccional) | [`../workflow/traceability.md`](../workflow/traceability.md) § "Eslabón Change MD ↔ confirmación" |
-| Definición de done + entrega del registro (temprana si entorno compartido, o atómica al cierre — push `.md`-only del Change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento" |
+| Definición de done + entrega del registro (temprana si entorno compartido, o atómica al cierre — push `.md`-only del Change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento", [`../workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft" |
 | Validación + cierre por mecanismo verificable del profile (sin gate diferido; señal-en-uso → Fase 9) | [§ "Tipos de validación"](#tipos-de-validación), [`../process/improvement.md`](../process/improvement.md) |
 
 ### Formas especiales
@@ -136,7 +138,7 @@ Estado y fase son propiedades del REQ (la unidad abstracta de trabajo); ningún 
 **Bloqueado** se anota como sufijo del estado activo: `En progreso (bloqueado por X)`. No es estado paralelo — no inventa transiciones nuevas.
 
 - El Change MD (registro canónico del REQ, relación 1↔1 incluso cross-repo) existe desde `Plan aprobado` (ver [`../workflow/changes.md`](../workflow/changes.md)); por convención registra `En progreso` como estado inicial. No hay estado "Propuesto".
-- Los changes históricos pueden contener vocabulario previo (`Propuesto`, `COMPLETADO`, `Listo para producción`); no se migran. `Listo para producción` es el término anterior de `Listo para aprobación` (renombrado en una versión anterior).
+- Los changes históricos pueden contener vocabulario previo (`Propuesto`, `COMPLETADO`, `Listo para producción`); no se migran. `Listo para producción` es el término anterior de `Listo para aprobación`.
 
 **ENUM de lock de la bitácora de relevo** (`owned` / `released` / `takeover_requested`, definido en [`../workflow/logbook.md`](../workflow/logbook.md) § "Modelo de ownership") es **ortogonal** a este ENUM: gobierna quién tiene el mando de un `work` para relevo entre devs, no el avance del requerimiento. Un `work` archivado al cerrar no altera el estado canónico del REQ.
 

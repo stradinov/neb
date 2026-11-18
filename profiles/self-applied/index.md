@@ -4,7 +4,7 @@ Proyectos auto-aplicados — la metodología que se edita es la que se aplica. C
 
 ## Por qué `self-applied` sin sufijo de dominio
 
-El nombre rompe deliberadamente los patrones de naming del repo (`<adjetivo>-<dominio>` como `<lenguaje>-<framework>`; `*-authoring` como `skill-authoring`). El sustantivo de dominio se omite porque el profile cubre cualquier marco auto-aplicado — metodología pura (principios, vocabulario, ENUMs), proceso puro (fases, gates, comandos), artefactos (changes, pendings, plans) — y no se restringe a un dominio. Nombrarlo `self-applied-methodology` o `self-applied-process` reintroduciría la asimetría que el renombre buscaba eliminar (ver [`methodology/principles.md`](../../methodology/principles.md)).
+El nombre rompe deliberadamente los patrones de naming del repo (`<adjetivo>-<dominio>` como `<lenguaje>-<framework>`; `*-authoring` como `skill-authoring`). El sustantivo de dominio se omite porque el profile cubre cualquier marco auto-aplicado — metodología pura (principios, vocabulario, ENUMs), proceso puro (fases, gates, comandos), artefactos (changes, pendings, plans) — y no se restringe a un dominio. Nombrarlo `self-applied-methodology` o `self-applied-process` reintroduciría la asimetría entre esos dominios que el nombre evita (ver [`methodology/principles.md`](../../methodology/principles.md)).
 
 La 4ª categoría de naming "Profiles auto-aplicados / reflexivos" está documentada en [`methodology/profiles.md`](../../methodology/profiles.md).
 
