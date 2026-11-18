@@ -9,12 +9,16 @@ LIMIT unidades UTF-16 o menos, una por entrada de hooks/hooks.json:
     parte fuera de rango, `neb: skip` y la subsesión interna no emiten nada; el aviso va en la última
   • --check-size (gate 6 del pre-push): pasa sobre el repo y falla con un núcleo inflado, en partes o en caracteres
   • main() dentro del proceso, con un stdout sin `.buffer`
+  • la oferta de actualización automática (hooks/lib/autoupdate.py): desde un caché simulado, sin decidir
+    avisa en la parte 1 y no escribe; decidido sale igual que fuera del caché; el tope del aviso; con los
+    cuatro avisos el arranque cabe
 
 Framework: unittest (stdlib). Árboles y workspaces temporales; nunca toca ~/.claude.
   py -m unittest discover -s hooks/tests -p test_bootstrap_context.py
 """
 import importlib.util
 import io
+import json
 import os
 import re
 import shutil
@@ -22,6 +26,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 NEB = os.path.abspath(os.path.join(HERE, "..", ".."))
@@ -33,7 +38,8 @@ _spec.loader.exec_module(nb)
 
 HEADER_RE = re.compile(r"^# Arranque de Neb — parte (\d+) de (\d+) · huella ([0-9a-f]{8})\n\n")
 CLEAN = ("NEB_HOME", "CLAUDE_PLUGIN_ROOT", "NEB_WORKSPACE", "NEB_HOOKS", "NEB_PROJECT_HOOKS",
-         "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION", "CLAUDE_PROJECT_DIR")
+         "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION", "CLAUDE_PROJECT_DIR",
+         "CLAUDE_CODE_PLUGIN_CACHE_DIR")
 
 
 def u16(s):
@@ -230,6 +236,154 @@ class TestMainEnProceso(unittest.TestCase):
     def test_sin_argumentos_y_con_parte(self):
         self.assertIn("Arranque de Neb (inyectado por el plugin)", self._main())
         self.assertIsNotNone(HEADER_RE.match(self._main(["--part", "1"])))
+
+
+class TestAvisoActualizacion(unittest.TestCase):
+    """La oferta de actualización automática: el script corre desde un caché de plugins simulado, que es
+    de donde saca el marketplace y el dir de configuración (hooks/lib/autoupdate.py). Nunca toca ~/.claude."""
+
+    AVISO = "la actualización automática del plugin de Neb no está decidida (marketplace `neb`)"
+
+    def setUp(self):
+        self.cfg = tempfile.mkdtemp(prefix="neb-test-cfg-")
+        self.addCleanup(shutil.rmtree, self.cfg, True)
+        self.root = os.path.join(self.cfg, "plugins", "cache", "neb", "neb", "9.9.9")
+        skip = shutil.ignore_patterns("tests", "__pycache__")
+        for d in ("bootstrap", "hooks"):
+            shutil.copytree(os.path.join(NEB, d), os.path.join(self.root, d), ignore=skip)
+        self.script = os.path.join(self.root, "bootstrap", "neb-bootstrap-context.py")
+        self.helper = os.path.join(self.root, "hooks", "lib", "autoupdate.py")
+
+    def _config(self, settings=None, known=None):
+        for path, value in ((os.path.join(self.cfg, "settings.json"), settings),
+                            (os.path.join(self.cfg, "plugins", "known_marketplaces.json"), known)):
+            entry = {"source": {"source": "github", "repo": "acme/neb"}}
+            if value is not None:
+                entry["autoUpdate"] = value
+            data = {"neb": entry} if path.endswith("known_marketplaces.json") else {"extraKnownMarketplaces": {"neb": entry}}
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(data, f)
+
+    def _snapshot(self):
+        out = {}
+        for base, _, files in os.walk(self.cfg):
+            for name in files:
+                p = os.path.join(base, name)
+                with open(p, "rb") as f:
+                    out[os.path.relpath(p, self.cfg)] = f.read()
+        return out
+
+    def _out(self, *args, script=None, **env):
+        e = {k: v for k, v in os.environ.items() if k not in CLEAN}
+        e["NEB_HOME"] = NEB
+        e["PYTHONDONTWRITEBYTECODE"] = "1"
+        e["CLAUDE_CONFIG_DIR"] = self.cfg       # el dir de configuración en uso es el de la prueba
+        e.update(env)
+        r = subprocess.run([sys.executable, script or self.script] + [str(a) for a in args], env=e,
+                           capture_output=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8"))
+        return r.stdout.decode("utf-8")
+
+    def _partes(self, **env):
+        outs = [self._out("--part", k, **env) for k in range(1, nb.MAX_PARTS + 1)]
+        llenas = [o for o in outs if o]
+        heads = [HEADER_RE.match(o) for o in llenas]
+        self.assertTrue(all(heads))
+        self.assertEqual(len({m.group(3) for m in heads}), 1, "todas las partes llevan la misma huella")
+        self.assertEqual({int(m.group(2)) for m in heads}, {len(llenas)})
+        for o in llenas:
+            self.assertLessEqual(u16(o), nb.LIMIT)
+            self.assertNotIn("el arranque no cupo", o)
+        return llenas
+
+    def test_sin_decidir_avisa_en_la_parte_1_y_no_escribe(self):
+        self._config()
+        antes = self._snapshot()
+        partes = self._partes()
+        self.assertIn("**Aviso de Neb (entorno):** " + self.AVISO, partes[0])
+        # La forma con la ruta del ayudante, si cabe en el tope; si no (dir temporal largo), la que no la trae.
+        larga = "corre con Python `%s` con `enable`" % self.helper.replace("\\", "/")
+        corta = "corre con Python `hooks/lib/autoupdate.py` del plugin con `enable`"
+        cabe = u16(nb.ENV_NOTICE % (nb.AUTOUPDATE_NOTICE % ("neb", larga))) <= 800
+        self.assertIn(larga if cabe else corta, partes[0])
+        self.assertEqual(sum(self.AVISO in p for p in partes), 1)
+        self.assertEqual(self._snapshot(), antes)
+
+    def test_sin_la_entrada_en_el_settings_no_avisa(self):
+        # Ahí `enable` y `disable` rechazan: una oferta que no se puede contestar volvería en cada sesión.
+        self._config()
+        settings = os.path.join(self.cfg, "settings.json")
+        with open(settings, "w", encoding="utf-8") as f:
+            json.dump({"env": {}, "extraKnownMarketplaces": {"otro": {}}}, f)
+        self.assertNotIn(self.AVISO, self._out())
+        os.remove(settings)
+        self.assertNotIn(self.AVISO, self._out())
+
+    def test_cache_fuera_del_dir_de_configuracion_no_avisa(self):
+        # El settings solo se deduce de la ruta si el caché cuelga del dir de configuración en uso
+        # (CLAUDE_CODE_PLUGIN_CACHE_DIR fija otra raíz, y puede no estar en el entorno del proceso).
+        self._config()
+        self.assertIn(self.AVISO, self._out())
+        otro = tempfile.mkdtemp(prefix="neb-test-otro-")
+        self.addCleanup(shutil.rmtree, otro, True)
+        self.assertNotIn(self.AVISO, self._out(CLAUDE_CONFIG_DIR=otro))
+        self.assertNotIn(self.AVISO, self._out(CLAUDE_CONFIG_DIR=otro,
+                                               CLAUDE_CODE_PLUGIN_CACHE_DIR=os.path.join(self.cfg, "plugins")))
+
+    def test_decidido_sale_igual_que_fuera_del_cache(self):
+        fuera = self._out(script=SCRIPT)
+        self.assertNotIn(self.AVISO, fuera)
+        for settings, known in ((True, None), (False, None), (None, True), (None, False), (False, True)):
+            self._config(settings, known)
+            self.assertEqual(self._out(), fuera, (settings, known))
+
+    def test_archivo_ilegible_o_marketplace_desconocido_no_avisa(self):
+        self._config()
+        with open(os.path.join(self.cfg, "settings.json"), "w", encoding="utf-8") as f:
+            f.write("{ roto")
+        self.assertNotIn(self.AVISO, self._out())
+        os.remove(os.path.join(self.cfg, "settings.json"))
+        os.remove(os.path.join(self.cfg, "plugins", "known_marketplaces.json"))
+        self.assertNotIn(self.AVISO, self._out())
+
+    def test_sin_el_modulo_no_avisa(self):
+        self._config()
+        os.remove(self.helper)
+        out = self._out()
+        self.assertNotIn(self.AVISO, out)
+        self.assertIn("Arranque de Neb (inyectado por el plugin)", out)
+
+    def test_con_los_cuatro_avisos_cabe(self):
+        self._config()
+        viejo = os.path.join(self.cfg, "plugins", "cache", "neb", "neb", "6.0.0")
+        partes = self._partes(NEB_HOME=viejo, CLAUDE_PLUGIN_ROOT=NEB, NEB_HOOKS="usage-tracker,Notify")
+        self.assertLessEqual(len(partes), nb.MAX_PARTS)
+        todo = "".join(partes)
+        for texto in ("`NEB_HOME` apunta al cache del plugin", "retirados que siguen activados",
+                      "no reconoce", self.AVISO):
+            self.assertIn(texto, todo)
+        self.assertEqual(todo.count("**Aviso de Neb (entorno):**"), 4)
+
+    def test_tope_del_aviso(self):
+        self.assertEqual(nb.AUTOUPDATE_NOTICE_MAX, 800)
+        for marketplace in ("neb", "m" * 40):
+            for largo in (10, 60, 100, 140, 400):
+                bootstrap_dir = os.path.join(os.sep + "x" * largo, "bootstrap")
+                with mock.patch.object(nb, "pending_offer", return_value=marketplace):
+                    aviso = nb._autoupdate_offer(bootstrap_dir)
+                self.assertIsNotNone(aviso, (marketplace, largo))
+                self.assertLessEqual(u16(nb.ENV_NOTICE % aviso), nb.AUTOUPDATE_NOTICE_MAX, (marketplace, largo))
+                self.assertIn("`%s`" % marketplace, aviso)
+                self.assertNotIn("\\", aviso)
+                if largo >= 140:
+                    self.assertIn("`hooks/lib/autoupdate.py` del plugin", aviso)
+                elif largo <= 60 and marketplace == "neb":
+                    self.assertIn("x/hooks/lib/autoupdate.py` con `enable`", aviso)
+
+    def test_fuera_del_cache_no_hay_oferta(self):
+        if "plugins" in NEB and "cache" in NEB:
+            self.skipTest("el repo vive dentro de un caché de plugins")
+        self.assertIsNone(nb._autoupdate_offer(os.path.join(NEB, "bootstrap")))
 
 
 if __name__ == "__main__":

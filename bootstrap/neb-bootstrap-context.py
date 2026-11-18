@@ -56,6 +56,14 @@ except ImportError:
     def stale_neb_home(env=None):
         return ''
 
+# Decisión sobre la actualización automática del plugin: clave `autoUpdate` del marketplace, supuesto R28 de
+# methodology/platform-assumptions.md (hooks/lib/autoupdate.py). Sin el módulo, sin aviso.
+try:
+    from autoupdate import pending_offer
+except ImportError:
+    def pending_offer(script_path):
+        return None
+
 
 LIMIT = 9000            # unidades UTF-16 por parte, cabecera incluida (tope de la plataforma: 10,000)
 MAX_PARTS = 12          # entradas por matcher SessionStart de hooks/hooks.json (las cuenta test_hooks_json.py)
@@ -65,6 +73,16 @@ NUCLEUS_MAX_CHARS = 40000  # gate 6: caracteres del arranque del nucleo con la r
 LONG_ROOT = 100         # raiz de instalacion que simula el gate 6 (los enlaces se reescriben a absolutos)
 NOTICE_RESERVE = 1000   # lugar que deja la ultima parte para el aviso de desbordamiento
 HEADER = "# Arranque de Neb — parte %d de %d · huella %s\n\n"
+ENV_NOTICE = "\n> **Aviso de Neb (entorno):** %s\n"
+AUTOUPDATE_NOTICE_MAX = 800  # unidades UTF-16 del aviso de actualización automática, con su envoltura
+AUTOUPDATE_NOTICE = (
+    "la actualización automática del plugin de Neb no está decidida (marketplace `%s`): viene apagada y Neb "
+    "se queda en la versión instalada. Si hay una persona presente, ofrécele encenderla al cierre de tu "
+    "primera respuesta, como menú y una sola vez por conversación. El menú dice que cada versión publicada "
+    "llegará en una sesión posterior y que en la app de escritorio se escribe además "
+    "`FORCE_AUTOUPDATE_PLUGINS=1`, que aplica a todos sus marketplaces con actualización automática. "
+    "Con su OK, %s; si la rechaza, con `disable`. Solo escribe su `settings.json`, con respaldo. "
+    "Detalle: `docs/user-guide.md` § \"Mantener Neb al día\".")
 
 # Puntos de corte, del mas grueso al mas fino: seccion, subseccion, parrafo, linea.
 _LEVELS = (re.compile(r'^# ', re.M), re.compile(r'^## ', re.M), re.compile(r'\n\n'), re.compile(r'\n'))
@@ -133,7 +151,28 @@ def _env_notices(bootstrap_dir):
             "Valores que el gate de los hooks opcionales no reconoce, y que por eso no corren: %s. "
             "Van separados por comas y sin espacios; nombres validos: %s. Avisa al dev."
             % (', '.join('`%s` en `%s`' % (t, v) for v, t in invalid), names))
-    return ["\n> **Aviso de Neb (entorno):** %s\n" % n for n in notices]
+    offer = _autoupdate_offer(bootstrap_dir)
+    if offer:
+        notices.append(offer)
+    return [ENV_NOTICE % n for n in notices]
+
+
+def _autoupdate_offer(bootstrap_dir):
+    """El aviso que ofrece encender la actualización automática del plugin, o None: el script no corre desde
+    el caché de plugins, la decisión ya está tomada, el settings no trae la entrada donde escribirla o el texto
+    no cabe en AUTOUPDATE_NOTICE_MAX. Solo lee. El texto nombra FORCE_AUTOUPDATE_PLUGINS (supuesto R29)."""
+    marketplace = pending_offer(os.path.join(bootstrap_dir, 'neb-bootstrap-context.py'))
+    if not marketplace:
+        return None
+    # Con `/`: la ruta sirve igual en Git Bash, en PowerShell y en sh.
+    helper = os.path.join(os.path.dirname(bootstrap_dir), 'hooks', 'lib', 'autoupdate.py').replace('\\', '/')
+    how = ("corre con Python `%s` con `enable`" % helper,
+           "corre con Python `hooks/lib/autoupdate.py` del plugin con `enable`")
+    for run in how:
+        text = AUTOUPDATE_NOTICE % (marketplace, run)
+        if _u16(ENV_NOTICE % text) <= AUTOUPDATE_NOTICE_MAX:
+            return text
+    return None
 
 
 def _project_opts_out():
