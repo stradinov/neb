@@ -19,7 +19,7 @@ El plugin no se actualiza solo hasta que lo decidas: ver [Mantener Neb al día](
 
 ## Mantener Neb al día
 
-Según la documentación de Claude Code, la actualización automática viene **apagada** en los marketplaces de terceros, y el de Neb es uno de ellos. Mientras no la enciendas, tu instalación se queda en la versión que instalaste. La misma documentación no da a `marketplace.json` un campo para encenderla: la decides tú, una vez por máquina.
+Según la documentación de Claude Code, la actualización automática viene **apagada** en los marketplaces de terceros, y el de Neb es uno de ellos. Mientras no la enciendas, tu instalación se queda en la versión que instalaste. La misma documentación no da a `marketplace.json` un campo para encenderla: la decides tú, una vez por máquina. Según la misma documentación, la decisión es del marketplace, no del plugin: si recibes Neb por un marketplace que trae otros plugins, también esos se actualizarán solos.
 
 **Encenderla.** Hay tres vías:
 
