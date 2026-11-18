@@ -32,7 +32,7 @@ SKIP_DIRS = {"changelog.d", "node_modules", "__pycache__", "personal"}
 
 RULES = (
     ("V1", re.compile(r"\bchange MDs?\b"), "Change MD"),
-    ("V2", re.compile(r"(?<![\w.])F[1-9](?![\w.])"), "Fase <n>"),
+    ("V2", re.compile(r"(?<![\w.])F[1-9](?!\w|\.\w)"), "Fase <n>"),
     ("V3", re.compile(r"single source of truth", re.I), "fuente única"),
     ("C1", re.compile(r"§(?! \")(?!»)"), '§ "Título"'),
     ("C2", re.compile(r"\]\([^)\s]+\) [\"«]"), '[t](ruta) § "Título"'),

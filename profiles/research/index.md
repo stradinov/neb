@@ -55,7 +55,7 @@ Si el REQ también toca la metodología general (`general/`, `methodology/`, `pr
 
 ## Documentos
 
-1. [Deployment](deployment.md) — cómo se commitea + ubicación según scope + gate F7.
+1. [Deployment](deployment.md) — cómo se commitea + ubicación según scope + gate de Fase 7.
 2. [Conventions](conventions.md) — modos de disparo, formato del documento, trazabilidad, síntesis.
 3. [Troubleshooting](troubleshooting.md) — divergencia entre fuentes, fuente no verificable, alucinación.
 4. [Roles](roles.md) — Process Architect (principal) + Fact-Check Reviewer (subagente revisor).

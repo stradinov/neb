@@ -53,6 +53,8 @@ class CheckStyleTest(unittest.TestCase):
             ("V1", "Dos change MDs.\n"),
             ("V2", "El gate de F4 corre antes.\n"),
             ("V2", "Revisores en F3/F4.\n"),
+            ("V2", "El gate corre en F7.\n"),
+            ("V2", "Tras F4, sigue la validación.\n"),
             ("V3", "Es la single source of truth.\n"),
             ("V3", "Es la Single Source Of Truth.\n"),
             ("C1", 'Ver §"Contexto".\n'),
@@ -73,7 +75,7 @@ class CheckStyleTest(unittest.TestCase):
         text = ('El Change MD registra el REQ en Fase 4; `vocabulary.md` es la fuente única.\n'
                 'Ver [plan](plan.md) § "Contexto" y § "Alcance". Una «§» sin archivo cita al propio.\n'
                 'La tabla [§ "Estados"](#estados) y el enlace [con título](plan.md "título") pasan.\n'
-                "Un exchange MD5 no es una variante, ni PDF1 ni F10 ni v1.F2.\n")
+                "Un exchange MD5 no es una variante, ni PDF1 ni F10 ni v1.F2 ni el archivo F4.md.\n")
         rc, found = self.rules(text)
         self.assertEqual((rc, found), (0, []))
 
