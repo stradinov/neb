@@ -1,16 +1,10 @@
 # Onboarding
 
-Política transversal. Define el comportamiento de Claude al detectar un usuario nuevo y qué ofrece el recorrido de bienvenida disponible vía `/wakeup`. Los **pasos** de la configuración (instalar, montar overlay, definir profile) viven en [`../docs/user-guide.md`](../docs/user-guide.md); este archivo define **cuándo** Claude ofrece el recorrido y **qué opciones** presenta — no los pasos en sí.
+Política transversal, fuera del arranque. Define qué ofrece el recorrido de bienvenida; el flujo que lo ejecuta lo lleva el skill `wakeup`. Los **pasos** de la configuración (instalar, montar overlay, definir profile) viven en [`../docs/user-guide.md`](../docs/user-guide.md); este archivo define **qué opciones** presenta el recorrido — no los pasos en sí.
 
 ## Trigger de oferta pasiva
 
-**Condición**: el profile activo es `self-applied` (el cwd está en el repo de neb) Y el contexto de la sesión no incluye contenido de `personal/<usuario>.md` — sin sección de preferencias personales, atajos ni paths absolutos de la máquina del dev en el contexto cargado.
-
-**Acción**: al cierre del primer turno que cumpla la condición, Claude agrega:
-
-> "Para un recorrido de Neb (3-5 min), invoca `/wakeup`."
-
-Sin preámbulo, sin interrumpir el trabajo. El recorrido es opcional.
+El disparador (condición, acción y cita) vive en [`profile-detection.md`](profile-detection.md) § "Oferta pasiva del recorrido (onboarding)", que se carga al arranque.
 
 **Re-invocación**: `/wakeup` corre el recorrido completo en cualquier momento y contexto, independientemente de si ya existe `personal/<usuario>.md`.
 

@@ -15,7 +15,8 @@ Uso:
   neb-bootstrap-context.py                          el arranque completo, sin partes (pruebas, diagnostico)
   neb-bootstrap-context.py --part <k>               la parte k; nada si el arranque tiene menos partes
   neb-bootstrap-context.py --check-size --root <d>  gate 6 del pre-push: el arranque del nucleo de <d>
-                                                    cabe en NUCLEUS_MAX_PARTS partes (exit 1 si no)
+                                                    cabe en NUCLEUS_MAX_PARTS partes y en NUCLEUS_MAX_CHARS
+                                                    caracteres (exit 1 si no)
 
 Variables de entorno (provistas por Claude Code / el usuario):
   NEB_HOME                     working copy de neb (prioridad — permite editar y usar a la vez, D4).
@@ -60,6 +61,7 @@ LIMIT = 9000            # unidades UTF-16 por parte, cabecera incluida (tope de 
 MAX_PARTS = 12          # entradas por matcher SessionStart de hooks/hooks.json (las cuenta test_hooks_json.py)
 OVERLAY_PARTS = 4       # partes que el gate 6 reserva al overlay y a la configuracion personal
 NUCLEUS_MAX_PARTS = MAX_PARTS - OVERLAY_PARTS  # gate 6: partes que puede ocupar el arranque del nucleo
+NUCLEUS_MAX_CHARS = 40000  # gate 6: caracteres del arranque del nucleo con la raiz LONG_ROOT; subirlo pide OK del dev
 LONG_ROOT = 100         # raiz de instalacion que simula el gate 6 (los enlaces se reescriben a absolutos)
 NOTICE_RESERVE = 1000   # lugar que deja la ultima parte para el aviso de desbordamiento
 HEADER = "# Arranque de Neb — parte %d de %d · huella %s\n\n"
@@ -320,7 +322,8 @@ def _overflow_notice(blocks, missing_from, rest):
 
 
 def _check_size(root):
-    """Gate 6 del pre-push: el arranque del nucleo de root cabe en NUCLEUS_MAX_PARTS partes.
+    """Gate 6 del pre-push: el arranque del nucleo de root cabe en NUCLEUS_MAX_PARTS partes y en
+    NUCLEUS_MAX_CHARS caracteres. Las partes aseguran que llega completo; los caracteres, que no crece sin decision.
 
     Mide el arbol en root, que el pre-push extrae del commit publicado (no NEB_HOME ni NEB_WORKSPACE, sin los guards del hook) y simula
     una raiz de instalacion de LONG_ROOT caracteres, porque el ensamblador reescribe los enlaces a absolutos."""
@@ -336,10 +339,10 @@ def _check_size(root):
         text = text.replace(real, long_root)
     parts, _ = split_parts(text, max_parts=len(text))
     biggest = max(_u16(HEADER % (len(parts), len(parts), 'f' * 8)) + _u16(p) for p in parts)
-    ok = len(parts) <= NUCLEUS_MAX_PARTS and biggest <= LIMIT
+    ok = len(parts) <= NUCLEUS_MAX_PARTS and biggest <= LIMIT and len(text) <= NUCLEUS_MAX_CHARS
     (sys.stdout if ok else sys.stderr).write(
-        "arranque del núcleo: %d caracteres con una raíz de %d; %d partes (tope %d de %d); la mayor mide %d de %d\n"
-        % (len(text), LONG_ROOT, len(parts), NUCLEUS_MAX_PARTS, MAX_PARTS, biggest, LIMIT))
+        "arranque del núcleo: %d caracteres (tope %d) con una raíz de %d; %d partes (tope %d de %d); la mayor mide %d de %d\n"
+        % (len(text), NUCLEUS_MAX_CHARS, LONG_ROOT, len(parts), NUCLEUS_MAX_PARTS, MAX_PARTS, biggest, LIMIT))
     return 0 if ok else 1
 
 

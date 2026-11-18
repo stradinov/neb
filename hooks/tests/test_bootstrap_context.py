@@ -7,7 +7,7 @@ LIMIT unidades UTF-16 o menos, una por entrada de hooks/hooks.json:
     corte duro de una línea larga, caracteres fuera del BMP, desbordamiento con lugar para el aviso
   • el script como lo corre el hook: --part k reconstruye la salida completa con la misma huella y sin CR;
     parte fuera de rango, `neb: skip` y la subsesión interna no emiten nada; el aviso va en la última
-  • --check-size (gate 6 del pre-push): pasa sobre el repo y falla con un núcleo inflado
+  • --check-size (gate 6 del pre-push): pasa sobre el repo y falla con un núcleo inflado, en partes o en caracteres
   • main() dentro del proceso, con un stdout sin `.buffer`
 
 Framework: unittest (stdlib). Árboles y workspaces temporales; nunca toca ~/.claude.
@@ -178,6 +178,23 @@ class TestPartesDelArranque(unittest.TestCase):
         rc, _, err = self._run("--check-size", "--root", self.tmp)
         self.assertEqual(rc, 1)
         self.assertIn("tope %d de %d" % (nb.NUCLEUS_MAX_PARTS, nb.MAX_PARTS), err)
+
+    def _nucleo(self, secciones):
+        os.makedirs(os.path.join(self.tmp, "general"), exist_ok=True)
+        with open(os.path.join(self.tmp, "general", "startup.md"), "w", encoding="utf-8") as f:
+            f.write("# Arranque\n\n" + "".join(seccion("S%d" % i, 4, 2000) for i in range(secciones)))
+        return self._run("--check-size", "--root", self.tmp)
+
+    def test_check_size_falla_por_caracteres_aunque_quepa_en_partes(self):
+        # Cada seccion mide ~8,100 caracteres y cabe en una parte.
+        justo_arriba = nb.NUCLEUS_MAX_CHARS // 8100 + 1
+        rc, _, err = self._nucleo(justo_arriba)
+        self.assertEqual(rc, 1)
+        self.assertIn("(tope %d)" % nb.NUCLEUS_MAX_CHARS, err)
+        partes = int(re.search(r"; (\d+) partes", err).group(1))
+        self.assertLessEqual(partes, nb.NUCLEUS_MAX_PARTS)
+        rc, _, err = self._nucleo(justo_arriba - 2)
+        self.assertEqual(rc, 0, err)
 
     def test_check_size_sin_raiz_falla(self):
         rc, _, err = self._run("--check-size")

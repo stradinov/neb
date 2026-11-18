@@ -8,16 +8,16 @@ Este archivo es el **índice/mapa** de la metodología: orden de lectura y flujo
 
 Transversales **inyectadas al arranque** (vía [`startup.md`](startup.md), completas en el contexto desde el primer prompt de cada sesión; hoy, por el hook `SessionStart` en partes, supuesto R1):
 
-- [Communication](communication.md) — comunicación dev↔Claude: BLUF, menús, idioma, hilo conductor, handoff.
-- [Correspondence](correspondence.md) — correos a terceros: estructura a la medida del destinatario, verificación de los hechos, formato HTML, idioma y registro.
-- [Profile detection](profile-detection.md) — detección del profile al iniciar y profile activo durante la sesión.
+- [Communication](communication.md) — comunicación dev↔Claude: BLUF, menús, idioma, hilo conductor, handoff; espejo de los correos a terceros.
+- [Profile detection](profile-detection.md) — detección del profile al iniciar, profile activo durante la sesión y oferta pasiva del recorrido `/wakeup`.
 - [Phase transitions](../process/phase-transitions.md) — enrutamiento del workflow: trigger de formalización, anti-desviación, mapa de fases, gates de cola, conflictos normativos.
 - [Compaction](compaction.md) — qué conserva el resumen al compactar y cómo se recupera el detalle después.
-- [Onboarding](onboarding.md) — oferta del recorrido `/wakeup`.
 - [Workflow index](../workflow/index.md) — mapa de artefactos + ENUM de estados.
 
 Transversales **on-demand** (su cláusula base viaja espejada en el arranque; el detalle se carga al disparador):
 
+- [Correspondence](correspondence.md) — antes de redactar o corregir un correo a un tercero (estructura a la medida del destinatario, verificación de los hechos, formato HTML, idioma y registro); espejo en [communication.md](communication.md) § "Correos a terceros".
+- [Onboarding](onboarding.md) — al cambiar qué ofrece el recorrido `/wakeup` (el flujo lo lleva el skill `wakeup`); su disparador viaja en [profile-detection.md](profile-detection.md) § "Oferta pasiva del recorrido (onboarding)".
 - [Agents](agents.md) — al despachar subagentes (tipos y mapeo a fases).
 - [Incidents](incidents.md) — al detectar una incidencia post-entrega a producción.
 - [Change control gate](../process/change-control-gate.md) — al confirmar cambios (Fase 4); núcleo espejado en [phase-transitions.md](../process/phase-transitions.md) § "Gates de cola"; ownership de `.md` y punto de restauración en [methodology/change-control-policy.md](../methodology/change-control-policy.md).

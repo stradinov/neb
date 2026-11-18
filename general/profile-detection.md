@@ -26,6 +26,18 @@ Al entrar a un directorio de proyecto, Claude detecta el profile:
 
 Heurísticas y prioridad: orden de tabla en [`profiles/index.md`](../profiles/index.md).
 
+### Oferta pasiva del recorrido (onboarding)
+
+Única fuente del disparador; el recorrido y sus opciones viven en [`onboarding.md`](onboarding.md).
+
+**Condición**: el profile activo es `self-applied` (el cwd está en el repo de neb) Y el contexto de la sesión no incluye contenido de `personal/<usuario>.md` — sin sección de preferencias personales, atajos ni paths absolutos de la máquina del dev en el contexto cargado.
+
+**Acción**: al cierre del primer turno que cumpla la condición, Claude agrega:
+
+> "Para un recorrido de Neb (3-5 min), invoca `/wakeup`."
+
+Sin preámbulo, sin interrumpir el trabajo. El recorrido es opcional.
+
 ## Marcadores de proyecto (opt-out de profile/Neb · opt-in de logbook central)
 
 Un proyecto puede declarar, mediante un **marcador en su `CLAUDE.md`**, que no quiere sugerencias de profile o que no use Neb. El marcador es persistente (sobrevive entre sesiones) y se respeta **antes** de sugerir nada — evita que Claude vuelva a proponer un profile en cada sesión sobre un dir que el dev ya decidió dejar genérico.

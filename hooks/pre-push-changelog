@@ -18,7 +18,8 @@
 #      congelado bloquea 'claude plugin update' en silencio para todos los marketplace).
 #   6. Tamaño del arranque: el arranque del núcleo cabe en las partes del hook SessionStart
 #      (neb-bootstrap-context.py --check-size; la plataforma topa cada salida en 10,000
-#      caracteres y lo que pasa de ahí no llega completo a Claude — supuesto R1).
+#      caracteres y lo que pasa de ahí no llega completo a Claude — supuesto R1) y no pasa
+#      de NUCLEUS_MAX_CHARS caracteres (no crece sin una decisión explícita).
 # Los gates 1, 2, 5 y 6 dependen solo del árbol: corren una vez por commit. El 3 y el 4
 # dependen de los archivos que cambia cada ref: corren por ref.
 #
@@ -160,7 +161,9 @@ tree_gates() {
          "$(head -3 "$dir/size_err" 2>/dev/null)" \
          "Lo que no cabe no llega completo a Claude (R1). Adelgaza el arranque o, con OK del dev," \
          "sube MAX_PARTS en bootstrap/neb-bootstrap-context.py junto con las entradas de hooks/hooks.json" \
-         "y los textos que citan 12 y 8 partes (R1, hooks/README.md, docs/how-it-works.md)."
+         "y los textos que citan 12 y 8 partes (R1, hooks/README.md, docs/how-it-works.md)." \
+         "Si lo que falla es el tope de caracteres, adelgaza el arranque o, con OK del dev, sube NUCLEUS_MAX_CHARS" \
+         "en el mismo script junto con el valor que cita hooks/README.md."
   fi
 
   : > "$dir/tree-ok"

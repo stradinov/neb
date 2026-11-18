@@ -128,7 +128,7 @@ Encadena 6 gates:
 3. Fragmento obligatorio para cambios normativos.
 4. Sincronía `CHANGELOG.md` ↔ `changelog.d/`. Su detalle está en [`process/version-control.md`](../process/version-control.md) § "Gate pre-push".
 5. Sincronía `plugin.json.version` ↔ `VERSION`.
-6. El arranque del núcleo cabe en las partes del `SessionStart` (`neb-bootstrap-context.py --check-size --root <árbol>`). Mide el árbol del commit publicado, no `NEB_HOME`, con una raíz de instalación larga. Falla si el núcleo ocupa más de 8 de las 12 partes, lo que deja lugar al overlay y a la configuración personal.
+6. El arranque del núcleo cabe en las partes del `SessionStart` (`neb-bootstrap-context.py --check-size --root <árbol>`). Mide el árbol del commit publicado, no `NEB_HOME`, con una raíz de instalación larga. Falla si el núcleo ocupa más de 8 de las 12 partes, lo que deja lugar al overlay y a la configuración personal, o si pasa de 40,000 caracteres (`NUCLEUS_MAX_CHARS`), el tope que impide que el arranque crezca sin una decisión explícita.
 
 ## Activación en un proyecto
 
@@ -149,7 +149,7 @@ Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` regi
   - Por eso hay 12 entradas por matcher (`startup`, `clear` y `compact`), que corren al iniciar, tras `/clear` y al compactar; `clear` está sin verificar en sesión interactiva (R1). Cada entrada corre el script con `--part k`.
   - El arranque usa tantas partes como necesite, hasta 12, cada una de 9,000 caracteres o menos y con la cabecera «parte k de n · huella». Las entradas que sobran no emiten nada.
   - Si el arranque no cabe en las 12 partes, la parte 12 termina con un aviso: qué bloques faltan y de qué archivo leerlos.
-  - Costo: cada sesión carga el arranque completo (unos 25–30 k tokens, estimado), y las 12 entradas suman entre 0.6 y 1 s al iniciar.
+  - Costo: cada sesión carga el arranque completo (el núcleo mide unos 38 mil caracteres, 10–11 k tokens estimados; el overlay y la configuración personal se suman), y las 12 entradas suman entre 0.6 y 1 s al iniciar.
   - No consume stdin.
 - **Los hooks opcionales de este README**: `save-approved-plan`, `logbook-sync`, `notify-on-stop`, `notify-on-permission`, `ops-capture` y `preprocess-prompt`. Hay una entrada por hook, y cada entrada abre con un gate en el shell. Si el hook no está activado, la entrada termina ahí, sin arrancar Python (~50 ms por entrada en Windows). Si está activado, llama a `hooks/neb-hook.py <hook>`. Ese dispatcher lee el JSON del evento y corre el hook con el código del propio plugin: la versión instalada, sin `NEB_HOME`.
 

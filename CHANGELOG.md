@@ -4,6 +4,27 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.34.0] - 2026-11-17
+
+> **Minor**: el arranque del núcleo baja de 49,209 a 37,857 caracteres (medidos por el gate 6). `general/correspondence.md` y `general/onboarding.md` dejan de cargarse en toda sesión: el arranque conserva un espejo de cada uno (su disparador y qué rige sin la lectura), el patrón de `process/phase-transitions.md` § "Gates de cola (always-on)".
+>
+> - **Endurecimiento declarado (correos a terceros)**: antes de redactar o corregir un correo, Claude lee `correspondence.md` y el addendum de correspondencia del overlay; antes del primer correo posterior a una compactación, los vuelve a leer; **sin esa lectura en la sesión no le pasa un correo al dev**. Aplica también al acuse de una o dos líneas.
+> - **Gate 6 con tope en caracteres**: el arranque del núcleo no pasa de `NUCLEUS_MAX_CHARS` (40,000); subirlo es una decisión explícita. El tope de 8 partes sigue como respaldo.
+> - **Adoptantes**: un overlay con addendum de correspondencia lo declara en su arranque (un `@import`, o una cláusula que diga cuándo leerlo); sin esa declaración Claude no tiene cómo saber que existe. `onboarding.md` ya no está en el contexto: las opciones del recorrido las lleva el skill `wakeup`.
+
+### Added
+- **`general/communication.md`** § "Correos a terceros": espejo de `correspondence.md`.
+- **`general/profile-detection.md`** § "Oferta pasiva del recorrido (onboarding)": el disparador de la oferta de `/wakeup` (condición, acción y cita), movido sin cambios desde `onboarding.md`; es su única fuente.
+- **`bootstrap/neb-bootstrap-context.py`**: `NUCLEUS_MAX_CHARS` y su verificación en `--check-size`; el mensaje del gate reporta el tope.
+- **`hooks/tests/test_bootstrap_context.py`**: caso de un núcleo que cabe en partes y pasa el tope de caracteres.
+
+### Changed
+- **`general/startup.md`**: deja de importar `correspondence.md` y `onboarding.md`.
+- **`general/onboarding.md`**: § "Trigger de oferta pasiva" remite a `profile-detection.md`; conserva la re-invocación y § "Opciones del recorrido".
+- **`general/index.md`**: Correspondence y Onboarding pasan a «on-demand», con su disparador.
+- **`docs/how-it-works.md`**: la lista de reglas *always-on* ya no nombra el onboarding.
+- **`hooks/README.md`** y **`hooks/pre-push-changelog`**: el gate 6 nombra el tope en caracteres; el costo del arranque, con el valor medido.
+
 ## [6.33.0] - 2026-11-17
 
 > **Minor**: cada afirmación de hecho de un correo a un tercero se cruza con su **fuente primaria** antes de pasárselo al dev, y si el correo **atribuye una causa**, un revisor adversarial nuevo, `correspondence-fact-checker`, coteja las afirmaciones y busca otra causa que produzca el mismo dato. Tras el defecto del correo de un adoptante (17-nov-2026), que afirmó «el servidor devolvió una respuesta vacía» desde un campo que el sistema deja vacío también cuando la conexión falla; el log del error, que discriminaba, no se consultó. El rol se crea tras ≥4 revisiones adversariales de correos ad hoc con subagente (`methodology/roles-catalog.md` § "Criterio para promover un rol de persona a subagente", punto 3). No encaja como sub-foco de `fact-check-reviewer`, acotado a research, ni de `context-completeness-reviewer`, que audita planes y artefactos del REQ en los gates de fase.

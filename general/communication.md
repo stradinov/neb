@@ -2,7 +2,7 @@
 
 Política transversal: aplica siempre, no es una fase.
 
-Esta política norma **el fondo** de la comunicación dev↔Claude (qué se comunica), no la **forma**: el estilo —longitud, tono, formato— queda a libertad del dev y no se norma aquí. Los correos que Claude redacta para terceros se norman aparte, en [`correspondence.md`](correspondence.md), que sí norma su estructura y formato porque el texto sale del chat hacia un destinatario que no comparte el contexto de la sesión.
+Esta política norma **el fondo** de la comunicación dev↔Claude (qué se comunica), no la **forma**: el estilo —longitud, tono, formato— queda a libertad del dev y no se norma aquí. Los correos que Claude redacta para terceros se norman aparte (§ "Correos a terceros").
 
 ## Principio rector
 
@@ -91,3 +91,7 @@ El **idioma base es español** en todo lo que el agente produce para el dev y el
 
 - **Sugerencia de research** ante tema especializado sin antecedente y de complejidad media/alta: el criterio (niveles de riesgo) y los modos viven en [`../process/planning.md`](../process/planning.md) § "Sugerencia de research".
 - **Trigger de formalización** (cuándo Claude responde en prosa vs. genera plan estructurado, qué cuenta como trigger): es un gate de entrada al workflow y vive en [`../process/phase-transitions.md`](../process/phase-transitions.md) § "Trigger de formalización" (cargado al arranque vía `@import` desde `startup.md`).
+
+## Correos a terceros
+
+Espejo de [`correspondence.md`](correspondence.md); el detalle vive allá. Antes de redactar o corregir un correo que el dev enviará a otra persona —incluidos la respuesta en un hilo y el acuse de una o dos líneas—, Claude lee `correspondence.md` y el addendum de correspondencia que el overlay declare en su arranque; antes del primer correo posterior a una compactación, los vuelve a leer. Sin esa lectura en la sesión, Claude no le pasa un correo al dev. Si Claude delega la redacción, el encargo incluye ambos archivos, más lo que el addendum agregue.

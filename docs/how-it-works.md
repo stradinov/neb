@@ -80,7 +80,7 @@ de deploy. Aplican a todos los integrantes que utilicen el profile.
 Neb se instala como **plugin de Claude Code**. Al iniciar cada sesión, un hook
 `SessionStart` del plugin inyecta el arranque con **peso vinculante** (Claude lo
 respeta como un `CLAUDE.md` de proyecto): las reglas *always-on* —políticas de
-comunicación, detección de profile, onboarding— ensambladas desde
+comunicación, detección de profile, transiciones de fase— ensambladas desde
 `general/startup.md`, más el overlay y la configuración personal del adoptante.
 El resto del contenido se carga on-demand según lo que el contexto requiera.
 
