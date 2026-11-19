@@ -32,6 +32,8 @@ Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estru
 - **Próximos pasos:** lista
 ```
 
+`Nombre` lleva el `<nombre>` del Change MD del REQ, sin la fecha ([`changes.md`](changes.md) § "Path"): es el mismo identificador del trailer `Req:` de sus commits y del archivo de su plan aprobado, y de ahí lo toma la bitácora como `req_slug`.
+
 Un REQ está **bien-formado** (y entra a la bitácora) si tiene al menos `Nombre` y `Path del proyecto`. Se elimina el archivo completo al cerrar el REQ. `Path del proyecto` decide además si el REQ se publica al central: cuenta su primer path absoluto (puede llevar texto después) y el marcador del `CLAUDE.md` de ese repo — ver [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador".
 
 > **Compatibilidad:** la bitácora también lee el formato legacy (sección `## Requerimiento activo` dentro de `project_<nombre>.md`); si un REQ aparece en ambos formatos, gana el `active_*.md`. Migración natural: al próximo update del REQ, escribir el `active_*.md` y quitar la sección legacy.

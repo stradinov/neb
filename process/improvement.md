@@ -37,7 +37,7 @@ El **Process Improvement Analyst** diagnostica el origen del defecto cuando se d
 |---|---|---|---|
 | **Plan defectuoso** | Fase 3 | Plan no enumeró dependientes críticos; alcance vago; dimensión faltante; criterios ambiguos | Ajuste a Process Architect / criterios de [`planning.md`](planning.md) / template |
 | **Ejecución defectuosa** | Fase 4 | Claude se desvió del plan claro; introdujo regresión; violación de convención | Ajuste a lineamiento aplicado o sub-foco del rol revisor que debió cazar |
-| **Validación insuficiente** | Fase 5 | Plan de pruebas no cubrió flujo crítico que falló post-deploy | Ajuste a riesgo de regresión / matriz de Resultado del template |
+| **Validación insuficiente** | Fase 5 | Plan de pruebas no cubrió flujo crítico que falló post-deploy | Ajuste a riesgo de regresión / criterios del plan de pruebas ([`planning.md`](planning.md) § "Estimación, plan y plan de pruebas"; en media/alta, del plan aprobado) / matriz de Resultado del template |
 | **Comportamiento inesperado post-entrega** | Fase 7 | Comportamiento en uso real no previsto en validación; paridad de ambientes incompleta o criterios de aceptación vagos | Ajuste a paridad / criterios de validación |
 | **Documentación faltante** | Fase 8 | Cambio no reflejado en CLAUDE.md / memoria del proyecto / metodología | Ajuste a [`documentation.md`](documentation.md) / memoria |
 | **Loop tardío** | Fase 9 | Patrón persistente no detectado por revisión agregada o disparadores | Ajuste a este archivo / disparadores cuantitativos |

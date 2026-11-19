@@ -4,6 +4,9 @@
 **Sesión:** <session_id>
 **CWD:** <ruta completa>
 
-<!-- Referencia visual. El hook save-approved-plan (hooks/lib/approved_plan.py bajo el plugin) sobreescribe el archivo entero con el contenido del plan aprobado, no usa esta plantilla literalmente. -->
+<!-- Referencia visual. El hook save-approved-plan (hooks/lib/approved_plan.py bajo el plugin) sobreescribe el archivo entero con el contenido del plan aprobado, no usa esta plantilla literalmente.
+     La copia del repo (`changes/plans/<YYYY-MM-DD>-<nombre>.md`) no lleva la línea `**CWD:**`.
+     Un plan de complejidad media/alta trae la sección obligatoria `## Plan de pruebas`
+     (process/planning.md § "Estimación, plan y plan de pruebas"). -->
 
 <contenido completo del plan que pasó a ExitPlanMode>

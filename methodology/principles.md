@@ -107,7 +107,7 @@ Una regla que fija el mecanismo como si fuera lo exigido queda desactualizada co
 
 - Documentación que repite el código. **No documentar** (criterio para Fase 8, ver [`../process/documentation.md`](../process/documentation.md)): cambios triviales (typo, una línea), listas de archivos modificados (el VCS ya las tiene), estado temporal (ramas, PRs en revisión), decisiones evidentes leyendo el código, logs de "qué hicimos hoy".
 - Reglas absolutas sin "por qué".
-- Versionado por fecha en el nombre del archivo (git ya tiene historial). *Excepción*: artefactos donde el orden cronológico es información de valor primaria (`<proyecto>/changes/`, `~/.claude/approved-plans/`) — la fecha en el nombre permite ordenar/filtrar sin abrir git log y resiste renombres.
+- Versionado por fecha en el nombre del archivo (git ya tiene historial). *Excepción*: artefactos donde el orden cronológico es información de valor primaria (`<proyecto>/changes/`, incluido `changes/plans/`) — la fecha en el nombre permite ordenar/filtrar sin abrir git log y resiste renombres.
 - Sincronizar manualmente entre proyectos (por eso este repo existe).
 - **Instruir a Claude cómo razonar o ejecutar internamente, en lugar de qué producir.** Algoritmos paso a paso para tareas de inferencia natural, ciclos de self-management (cambiar modelo, restaurar modelo, etc.) o duplicación de instrucciones del prompt de sistema consumen contexto sin agregar valor — Claude ya las hace solo. Especificar el output esperado o asignar la responsabilidad a un rol.
 

@@ -5,7 +5,7 @@ Cómo se "deploya" un cambio en un proyecto auto-aplicado, y cómo se valida.
 ## Deploy
 
 0. Claude corre `py bootstrap/assemble-changelog.py --check`. Si retorna 1: `py bootstrap/assemble-changelog.py`, `git add CHANGELOG.md`, commit como commit final del REQ.
-1. `git commit` + `git push` al remote. Profile `self-applied` produce casi exclusivamente `.md`: por `methodology/change-control-policy.md` § "Ownership de archivos `.md`" (operaciones git en `process/version-control.md`), commits y pushes `.md`-only son autónomos. Para commits/pushes mixtos `.md` + código (ej. `bootstrap/*.py`, `bootstrap/*.sh`), aplica el gate del componente de código (OK, o confirmación autónoma si el adoptante la activa y se cumple su piso; ver `process/change-control-gate.md`).
+1. `git commit` + `git push` al remote. Cada commit del REQ, incluido el del paso 0, lleva el trailer `Req: <nombre>` con su comprobación en el mismo comando ([`../../process/version-control.md`](../../process/version-control.md) § "Trailer `Req:` — del commit al REQ"). Profile `self-applied` produce casi exclusivamente `.md`: por `methodology/change-control-policy.md` § "Ownership de archivos `.md`" (operaciones git en `process/version-control.md`), commits y pushes `.md`-only son autónomos. Para commits/pushes mixtos `.md` + código (ej. `bootstrap/*.py`, `bootstrap/*.sh`), aplica el gate del componente de código (OK, o confirmación autónoma si el adoptante la activa y se cumple su piso; ver `process/change-control-gate.md`).
 2. `git pull` en cada proyecto cliente que importe la metodología vía `@~/.claude/neb/...`.
 
 No hay servidor QA ni producción tradicional. La metodología aplica desde el momento en que un dev hace pull en un proyecto cliente.
@@ -45,7 +45,7 @@ Con eso el REQ **cierra de inmediato** (sin esperar N sesiones). La observación
 
 El **registro del requerimiento** (Change MD — ver [`../../methodology/vocabulary.md`](../../methodology/vocabulary.md) § "Registro del requerimiento") puede confirmarse y **entregarse** (`git push`) desde que existe el draft (entrada a Fase 4), independiente del cierre del entregable. Es autónomo: el delta es solo `.md` y aplica el ownership (ver [`../../methodology/change-control-policy.md`](../../methodology/change-control-policy.md) § "Ownership de archivos `.md`"); no requiere OK del dev.
 
-**Cuándo**: desde el draft si el **entorno es compartido**, para que el puntero del `work` resuelva en la máquina que releva; si no, en el cierre del REQ. Condición y momento: [`../../workflow/changes.md`](../../workflow/changes.md) § "Ciclo de vida del draft"; disparador de «entorno compartido»: [`../../workflow/logbook.md`](../../workflow/logbook.md) § "Entorno compartido (disparador opt-in por proyecto)".
+**Cuándo**: desde el draft si el **entorno es compartido**, para que el puntero del `work` resuelva en la máquina que releva; si no, en el cierre del REQ. Al relevar, en cualquiera de los dos entornos, el registro y su plan aprobado se entregan de inmediato ([`../../workflow/changes.md`](../../workflow/changes.md) § "Relevo"). Condición y momento: [`../../workflow/changes.md`](../../workflow/changes.md) § "Ciclo de vida del draft"; disparador de «entorno compartido»: [`../../workflow/logbook.md`](../../workflow/logbook.md) § "Entorno compartido (disparador opt-in por proyecto)".
 
 ## Incorporar un PR
 
@@ -91,7 +91,7 @@ Un pull request abierto por quien no tiene permiso de escritura (su lado: [`../.
    5. **Push.** Tras el gate de Fase 7: `git fetch origin main` y `git -C <dir> merge-base --is-ancestor origin/main HEAD`. Si termina en 0, un solo push con OK del dev: `git -C <dir> push origin HEAD:refs/heads/main`. Si no termina en 0, la principal avanzó: Claude descarta el worktree con `git worktree remove --force <dir>` y repite **Incorporar** desde su bloque de comandos, con la validación, el commit, la gobernanza y los dos gates. Si el remoto rechaza el push, Claude lo reporta y pide OK; no reintenta con otra estrategia.
 6. **Cerrar.** `gh pr close <n> --comment "<SHA incorporado y versión>"` con OK del dev, y `git worktree remove <dir>`. El PR queda cerrado, no fusionado: el squash cambia los SHA.
 
-El registro de una incorporación es el commit, el fragmento del CHANGELOG y el comentario de cierre; no abre Change MD.
+El registro de una incorporación es el commit, el fragmento del CHANGELOG y el comentario de cierre; no abre Change MD, por eso sus commits no llevan trailer `Req:`.
 
 ## Cuando el dev pausa esperando otra sesión paralela
 

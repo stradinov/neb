@@ -1,8 +1,17 @@
 # Planes aprobados
 
-Un plan aprobado puede persistirse como artefacto en `~/.claude/approved-plans/` por **dos vías**: el hook `save-approved-plan`, si está activado, cuando se aprueba en plan mode (`ExitPlanMode`), o un `Write` de Claude cuando se aprueba conversacionalmente o cuando el hook no lo guardó (ver § "Persistencia conversacional"). Bitácora cross-proyecto consultable entre sesiones.
+En complejidad media/alta, el plan aprobado se guarda como archivo versionado en el repo del proyecto, junto al Change MD que registra su REQ. Viaja por git con el registro, así que llega a la máquina que releva.
 
 ## Path
+
+```
+<proyecto>/changes/plans/<YYYY-MM-DD>-<nombre>.md
+```
+
+- Mismo nombre de archivo que el Change MD del REQ ([changes.md](changes.md) § "Path"): el `<nombre>` enlaza plan y registro en los dos sentidos ([traceability.md](traceability.md)).
+- El campo `**Plan aprobado:**` del Change MD lleva esa ruta desde la raíz del repo, en formato código: `changes/plans/<YYYY-MM-DD>-<nombre>.md`.
+
+**Lugar de caída.** El hook `save-approved-plan` corre antes de que exista el Change MD y no conoce el repo; deja el plan en una carpeta global, no versionada, que sirve solo de tránsito:
 
 ```
 ~/.claude/approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md
@@ -10,33 +19,43 @@ Un plan aprobado puede persistirse como artefacto en `~/.claude/approved-plans/`
 
 - `<proyecto>` = último segmento del cwd; cada `<>:"|?*` → `-`, sin `-` en los extremos; `unknown` si queda vacío.
 - `<slug>` = primera línea del plan, normalizada: sin `#` ni espacios al inicio, minúsculas, sin acentos (`ñ` → `n`), cada tramo que no sea `a-z0-9` → `-`, máx 50 chars, `plan` si queda vacío (criterio de `slugify` en `hooks/lib/approved_plan.py`).
-- Carpeta global, no versionada.
 
 ## Contenido
 
-Formato: ver [`templates/approved-plan.md.template`](../templates/approved-plan.md.template) — header (`Proyecto` / `Sesión` / `CWD`) + plan literal.
+Formato: ver [`templates/approved-plan.md.template`](../templates/approved-plan.md.template) — header (`Proyecto` / `Sesión`) + plan literal. El archivo del repo no lleva la línea `**CWD:**` que escribe el hook: es una ruta absoluta de la máquina del dev.
+
+El plan trae la sección obligatoria `## Plan de pruebas` ([`process/planning.md`](../process/planning.md) § "Estimación, plan y plan de pruebas").
+
+## Ciclo de vida
+
+| Momento | Acción |
+|---|---|
+| Aprobación | Claude deja el plan en `changes/plans/` (§ "Vías de persistencia"), crea el Change MD y confirma el plan con commit local **antes de la primera confirmación del entregable**; el Change MD sigue [changes.md](changes.md) § "Ciclo de vida del draft" |
+| Re-aprobación | Commit nuevo sobre el mismo archivo. La versión anterior queda en el historial de git y rige el último plan aprobado |
+| Entrega | Con el mismo ciclo y los mismos gates que su registro ([changes.md](changes.md) § "Ciclo de vida del draft"), incluida la entrega inmediata al relevar |
+
+Entre aprobaciones el archivo no se edita: un cambio de plan es una aprobación nueva. Los desvíos menores van en el Change MD (`## Plan de elaboración` y `## Incidencias`).
 
 ## Vías de persistencia
 
-Ambas vías producen el **mismo artefacto** (mismo path, naming y formato); difieren en disparo y alcance:
+Las dos vías dejan el **mismo archivo** en el repo; difieren en disparo y en quién escribe primero:
 
-| Vía | Disparo | Escribe | Anuncio | Niveles | Conoce el Change MD |
-|---|---|---|---|---|---|
-| **Plan mode** | `ExitPlanMode` | hook `save-approved-plan` (silencioso) si está activado; si no, Claude vía `Write` | no (hook) · 1 línea (`Write`) | los que entren a plan mode | no (corre antes de que nazca el Change MD) |
-| **Conversacional** | Aprobación explícita en chat ("¿De acuerdo con este plan?" → sí), **sin** plan mode | Claude vía `Write` | 1 línea | media/alta | sí |
+| Vía | Disparo | Cómo llega al repo | Anuncio | Niveles |
+|---|---|---|---|---|
+| **Plan mode** | `ExitPlanMode` | Si el hook `save-approved-plan` está activado, deja el plan en el lugar de caída; al crear el Change MD, Claude lo mueve a `changes/plans/`, le quita `**CWD:**` y borra la copia del lugar de caída. Si el hook no dejó archivo, Claude lo escribe directo en el repo | 1 línea | los que entren a plan mode |
+| **Conversacional** | Aprobación explícita en chat ("¿De acuerdo con este plan?" → sí), **sin** plan mode | Claude lo escribe directo en el repo | 1 línea | media/alta |
 
 ### Persistencia conversacional (sin plan mode)
 
-Cuando un plan de complejidad **media/alta** se aprueba en conversación (sin pasar por plan mode), el artefacto a producir es el mismo archivo `approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md` que generaría el hook. Convenciones de paridad:
+Cuando un plan de complejidad **media/alta** se aprueba en conversación (sin pasar por plan mode), Claude escribe el archivo en `changes/plans/` con el mismo formato:
 
 - `**Sesión:**` = `unknown` si no hay `session_id` disponible (igual que el hook `save-approved-plan`).
-- El anuncio es una línea: `Plan persistido: approved-plans/<archivo>`.
-- En las dos vías, Claude llena el campo `**Plan aprobado:**` del Change MD con el path del archivo (el hook no conoce el Change MD; ver [traceability.md](traceability.md)).
+- El anuncio es una línea: `Plan persistido: changes/plans/<archivo>`.
 
 Casos borde:
 
-- **Re-aprobación** en la misma sesión: nuevo archivo por timestamp (igual que el hook genera uno por cada `ExitPlanMode`); el último es el vigente.
-- **Plan mode sin archivo y no-duplicación**: tras `ExitPlanMode`, Claude busca en `approved-plans/` un archivo creado después de la aprobación. Si existe, el hook ya guardó y no se duplica (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md): el hook termina de escribir antes de que Claude siga). Si no existe (p. ej., el hook no está activado), Claude lo persiste con `Write` bajo estas mismas convenciones. Ante duda (p. ej. tras compactación), la misma búsqueda va antes de escribir.
+- **No-duplicación**: antes de escribir el plan (tras `ExitPlanMode`, o ante duda tras una compactación), Claude busca primero `changes/plans/<YYYY-MM-DD>-<nombre>.md` en el repo y después, en el lugar de caída, un archivo creado después de la aprobación. Si está en el repo, no se duplica. Si está en el lugar de caída, el hook ya guardó (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md): el hook termina de escribir antes de que Claude siga) y Claude lo mueve. Si no está en ninguno, Claude lo escribe en el repo.
+- **Sin repo** (el proyecto no usa control de versiones): el plan queda en `changes/plans/` del proyecto, sin commit.
 
 Niveles **baja / trivial / no-formal** no persisten artefacto (ver [`process/planning.md`](../process/planning.md) § "Cuándo aplica cada aprobación").
 
@@ -44,4 +63,4 @@ Niveles **baja / trivial / no-formal** no persisten artefacto (ver [`process/pla
 
 El plugin registra el hook `save-approved-plan`, de **activación voluntaria**: corre si está en `NEB_PROJECT_HOOKS` (`env` del `settings.json` versionado del proyecto; base en `settings.template.json`) o en `NEB_HOOKS` (personal). Detalle en [hooks/README.md](../hooks/README.md) § "Bajo el plugin de Neb". El hook guarda solo planes aprobados **vía plan mode** (`PostToolUse` solo dispara al éxito de `ExitPlanMode`) — es una de las dos vías; la otra es la persistencia conversacional de arriba.
 
-No es sustituto de la memoria del proyecto ni del Change MD — es bitácora histórica complementaria.
+No es sustituto de la memoria del proyecto ni del Change MD.

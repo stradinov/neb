@@ -17,7 +17,7 @@ Los estándares de código (baseline: sin comentarios salvo WHY no obvio, saniti
 
 - Solo acciones read-only y edición del archivo de plan.
 - Cierra con `ExitPlanMode` (aprobación del usuario).
-- Un plan aprobado en plan mode lo guarda el hook `save-approved-plan` si está activado (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). Si tras `ExitPlanMode` no hay un archivo nuevo en `~/.claude/approved-plans/`, Claude lo persiste con `Write`, igual que los aprobados conversacionalmente (media/alta) (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
+- Un plan aprobado en plan mode lo deja el hook `save-approved-plan`, si está activado, en `~/.claude/approved-plans/` (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)); al crear el Change MD, Claude lo mueve a `changes/plans/` del repo. Si tras `ExitPlanMode` no hay un archivo nuevo ahí, Claude lo escribe directo en el repo con `Write`, igual que los aprobados conversacionalmente (media/alta) (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
 
 Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquitectónicas, o conviene ver el plan antes de gastar tiempo en código.
 
@@ -46,7 +46,7 @@ Qué subagente por profile (por defecto + paralelos por dimensión): ver la matr
 Al retomar un requerimiento interrumpido:
 
 1. Leer la memoria del proyecto (`project_<nombre>.md` para contexto duradero + el `active_<proyecto>_<slug>.md` del REQ).
-2. Leer el MD del requerimiento (`<proyecto>/changes/<fecha>-<nombre>.md`) para ver estado.
+2. Leer el MD del requerimiento (`<proyecto>/changes/<fecha>-<nombre>.md`) para ver estado y, si los tiene, su `## Relevo` y su plan aprobado (`changes/plans/`).
 3. Si el `active_*.md` tiene "Pendiente de entrega" → atender primero.
 4. Si la última fase no está cerrada → continuar desde ahí.
 5. Si la sesión se reanudó vía `claude --resume <nombre>`, eliminar la entrada correspondiente en `~/.claude/pendings.md` § "Sesiones pausadas".
@@ -69,8 +69,8 @@ Cuando el dev anuncia que pausará para continuar después en otra sesión, la s
 
 Para retomar trabajo **en otra máquina o por otro dev** (lo que `--resume` no permite cross-machine), Neb usa la **bitácora de relevo**. El artefacto y su modelo de ownership viven en [`../workflow/logbook.md`](../workflow/logbook.md); la mecánica (backend, hook, config) en [`../tooling/logbook.md`](../tooling/logbook.md). El protocolo:
 
-- **Publicar (automático).** El hook publica/actualiza la entrada del `work` en cada `Stop`/`SessionEnd`/`PreCompact`. Al pausar deliberadamente, Claude redacta en el estado semántico el bloque **"Trabajo en vuelo"**: cómo **relanzar** agentes/scripts que quedaron a medias — es prosa que Claude escribe (los procesos no se serializan; el hook no los introspecta), junto a "próximos pasos".
-- **Retomar.** En la otra máquina/cuenta: `/logbook search`/`list` (contra el central) lista los `work` relevables; el dev **toma el mando** (`tomar`, atómico en el central) y abre una **sesión nueva** (no `--resume` cross-machine) alimentada con el transcript como contexto + el índice semántico. **Continúa el mismo `change_md`** que apunta la entrada (no crea uno nuevo): el registro ya está entregado por la entrega temprana. Relanza el trabajo en vuelo desde lo materializado.
+- **Publicar (automático).** El hook publica/actualiza la entrada del `work` en cada `Stop`/`SessionEnd`/`PreCompact`. Al pausar para un relevo, Claude escribe en `## Relevo` del Change MD los próximos pasos y el **"Trabajo en vuelo"**: cómo **relanzar** agentes/scripts que quedaron a medias — es prosa que Claude escribe (los procesos no se serializan; el hook no los introspecta). Después entrega de inmediato el registro y su plan aprobado ([`../workflow/changes.md`](../workflow/changes.md) § "Relevo").
+- **Retomar.** En la otra máquina/cuenta: `/logbook search`/`list` (contra el central) lista los `work` relevables; el dev **toma el mando** (`tomar`, atómico en el central) y abre una **sesión nueva** (no `--resume` cross-machine) alimentada con el transcript como contexto + el índice semántico. **Continúa el mismo `change_md`** que apunta la entrada (no crea uno nuevo): el registro ya está entregado (entrega temprana, o entrega al relevar). Relanza el trabajo en vuelo desde `## Relevo` del registro. Sin central, o sin `work` en la bitácora, se retoma desde el registro: `/logbook retomar <ruta-del-Change-MD>` lee el Change MD, su `## Relevo` y su plan aprobado.
 - **Relevar.** El owner **libera** al pausar; otro dev **solicita el mando** si está `owned`; **`liberar --forzado`** (con confirmación) cubre el caso de owner ausente (corte sin liberar). Estados y reglas: [`../workflow/logbook.md`](../workflow/logbook.md) § "Modelo de ownership".
 - **Reconciliación al volver a un `work` ya relevado.** Si un dev retoma una sesión cuyo `work` otro ya tomó/cerró, su `publish` recibe **`409`** (marca `conflict` local) y `/logbook` lo reporta (aviso al listar; detalle en `estado-sync`). El registro (Change MD) de quien cerró es **canónico** — Claude avisa y el dev reconcilia su trabajo local (código no pusheado) sobre el head publicado, **no lo duplica** (el `--resume` cross-machine no transfiere el working tree; ver [`../workflow/logbook.md`](../workflow/logbook.md)).
 - **Modo exploratorio** (sin REQ formal): se reanuda con **`--resume` local** del mismo dev; con **entorno compartido** también se publica al catálogo (visibilidad/búsqueda), pero no es relevable cross-dev hasta formalizarse en REQ (ver [`../workflow/logbook.md`](../workflow/logbook.md) § "Dos modos" y § "Entorno compartido (disparador opt-in por proyecto)").

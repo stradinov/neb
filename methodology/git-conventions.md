@@ -2,7 +2,7 @@
 
 Formato y tipos del mensaje de commit. Son invariantes del estilo de commit del equipo; las **operaciones** git (push, gate de confirmación en Fase 4, autonomía sobre `.md`, CHANGELOG fragmentado) viven en [`../process/version-control.md`](../process/version-control.md).
 
-> **Punto de customización**: el formato del mensaje de commit es lo que un adoptante adapta con más frecuencia a su contexto (p. ej. [Conventional Commits](https://www.conventionalcommits.org/) en inglés, scopes obligatorios, gitmoji). Reemplazá esta convención en `personal/<usuario>.md` o `profiles/<profile>/deployment.md` sin tocar las operaciones git del proceso.
+> **Punto de customización**: el formato del mensaje de commit es lo que un adoptante adapta con más frecuencia a su contexto (p. ej. [Conventional Commits](https://www.conventionalcommits.org/) en inglés, scopes obligatorios, gitmoji). Reemplazá esta convención en `personal/<usuario>.md` o `profiles/<profile>/deployment.md` sin tocar las operaciones git del proceso. El trailer `Req: <nombre>`, que liga cada commit con su REQ, es una de esas operaciones y no parte de este formato: se conserva aunque el formato se reemplace ([`../process/version-control.md`](../process/version-control.md) § "Trailer `Req:` — del commit al REQ").
 
 ## Formato
 
@@ -13,7 +13,7 @@ tipo: descripción corta en español   (máx. 72 caracteres)
 Tipos: `feat` · `fix` · `refactor` · `chore` · `docs`
 
 - Un commit por conjunto lógico, no por archivo.
-- Si varios requerimientos deben subirse juntos, agrupar.
+- Si varios requerimientos deben subirse juntos, agrupar; el commit lleva un trailer `Req:` por cada uno.
 - Stagear archivos por nombre, no `git add -A` (evita filtrar `.env`, credenciales, binarios).
 
 ## Prohibiciones (no relajables)

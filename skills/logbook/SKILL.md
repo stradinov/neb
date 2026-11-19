@@ -43,8 +43,10 @@ El fallo del transcript es **por sesión** (desde 6.12): varias sesiones alterna
 
 ### Retomar — `retomar <id>`
 Corre `LB show <id>` y actúa según `mode`:
-- **`req`**: (1) `LB claim <id>` (tomar el mando); (2) `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica); (3) abre una **sesión nueva** y reconstruye contexto leyendo el `transcript_path` (Read) + el `change_md`; (4) relanza lo descrito en **"Trabajo en vuelo"** del `payload_json`. **No** uses `--resume` (no funciona cross-machine — capa B2 descartada).
+- **`req`**: (1) `LB claim <id>` (tomar el mando); (2) `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica); (3) abre una **sesión nueva** y reconstruye contexto leyendo el `transcript_path` (Read) + el `change_md`; (4) relanza lo descrito en **"Trabajo en vuelo"** de `## Relevo` del `change_md` (si el registro no trae esa sección, desde `next_steps` del `payload_json`, que copia la línea «Próximos pasos» del `active_*.md`). **No** uses `--resume` (no funciona cross-machine — capa B2 descartada).
 - **`exploratory`**: entrega al dev `claude --resume <claude_session_id>` (reanuda local; válido **solo** en la máquina origen, `origin_machine`).
+
+**Sin `work` en la bitácora** (sin central, o el REQ nunca se publicó): `retomar <ruta-del-Change-MD>`. No hay `claim` ni transcript: Claude lee el Change MD, su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`), hace `git checkout` de la rama anotada en `**Rama:**` y continúa desde los próximos pasos.
 
 ### Lock
 - `tomar <id>` → `LB claim <id>`.

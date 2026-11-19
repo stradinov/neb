@@ -41,7 +41,7 @@ Usa `Read`, `Grep` y `Glob` para verificar afirmaciones de la categoría brecha 
 
 ## Filtro de materialidad
 
-No reportar suposiciones de dominio público del repo cuyo costo de verificación es nulo y la respuesta es estable: ENUM canónico de estados (`workflow/index.md`), paths estándar (`<proyecto>/changes/`, `~/.claude/approved-plans/`), formato de templates conocidos, convenciones de naming establecidas. Verifica directamente y omite el reporte si la respuesta confirma la suposición. Reportar solo cuando la verificación es no trivial o el resultado contradice la suposición.
+No reportar suposiciones de dominio público del repo cuyo costo de verificación es nulo y la respuesta es estable: ENUM canónico de estados (`workflow/index.md`), paths estándar (`<proyecto>/changes/`, `<proyecto>/changes/plans/`), formato de templates conocidos, convenciones de naming establecidas. Verifica directamente y omite el reporte si la respuesta confirma la suposición. Reportar solo cuando la verificación es no trivial o el resultado contradice la suposición.
 
 ## Output
 

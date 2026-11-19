@@ -26,8 +26,10 @@
 
 ## Plan de pruebas
 
-<!-- Flujos a validar, datos de entrada, criterios de éxito, orden.
-     En profile `self-applied` (cambios a la metodología): walkthroughs mentales aquí + revisión de roles + coherencia; cierre inmediato (la fricción en uso es señal de Fase 9). -->
+<!-- Complejidad baja: checklist aquí (flujos a validar, datos de entrada, criterios de éxito, orden); no hay plan aprobado.
+     Complejidad media/alta: la definición de cada flujo vive en `## Plan de pruebas` del plan aprobado
+     (ver `**Plan aprobado:**` en Trazabilidad); aquí queda solo `### Resultado`, sin el checklist.
+     En profile `self-applied` (cambios a la metodología): walkthroughs mentales en el plan de pruebas (aquí en baja; en el plan aprobado en media/alta) + revisión de roles + coherencia; cierre inmediato (la fricción en uso es señal de Fase 9). -->
 
 - [ ] ...
 - [ ] ...
@@ -35,6 +37,9 @@
 ### Resultado
 
 (Obligatorio en complejidad media/alta. Para baja, marcar el checklist arriba con `[x]` basta.)
+
+<!-- Una fila por flujo del plan de pruebas: su número y su nombre corto, con el prefijo `[crítico]` copiado del plan.
+     Un flujo agregado o cambiado durante la implementación se anota en `## Incidencias` y entra aquí como fila `(agregada)`. -->
 
 | # | Flujo | Resultado |
 |---|-------|-----------|
@@ -47,11 +52,12 @@
 
 Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/delivery.md) § "Definición de done").
 
-**Riesgo medio/alto** requiere ≥1 fila con prefijo `[crítico]` (flujos sensibles a re-validar). Si una fila `[crítico]` está ❌, el cierre se bloquea.
+**Riesgo medio/alto** requiere ≥1 fila con prefijo `[crítico]` (flujos sensibles a re-validar); en media/alta el prefijo se copia del plan de pruebas del plan aprobado. Si una fila `[crítico]` está ❌, el cierre se bloquea.
 
 ## Plan de elaboración
 
-<!-- Una línea por elemento. Riesgos identificados. El profile determina qué son "elementos" (archivos, secciones del documento, etc.). -->
+<!-- Complejidad baja: una línea por elemento y riesgos identificados. El profile determina qué son "elementos" (archivos, secciones del documento, etc.).
+     Complejidad media/alta: enlace al plan aprobado y solo los desvíos respecto de él, sin la tabla. -->
 
 | Elemento | Cambio |
 |---|---|
@@ -64,6 +70,12 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 ## Incidencias
 
 <!-- Cambios menores surgidos durante la implementación. Qué fue, cómo se resolvió, impacto en deploy. -->
+
+## Relevo
+
+<!-- Solo al relevar (otro dev u otra máquina continúa); sin relevo, se omite la sección.
+     Próximos pasos · Trabajo en vuelo (cómo relanzar lo que quedó a medias) · «relevado por <dev>, <fecha>».
+     Al escribirla, el registro y su plan aprobado se entregan de inmediato (workflow/changes.md § "Relevo"). -->
 
 ## Entregas
 
@@ -94,7 +106,7 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 
 ## Trazabilidad
 
-- **Plan aprobado:** `~/.claude/approved-plans/<archivo>.md` (media/alta: lo guarda el hook en plan mode si está activado, o Claude con `Write`; `—` en trivial/baja/no-formal)
+- **Plan aprobado:** `changes/plans/<YYYY-MM-DD>-<nombre>.md` (media/alta: ruta desde la raíz del repo, mismo nombre de archivo que este registro; `—` en trivial/baja/no-formal)
 - **Rama:** `<rama>` (la que el dev nombró en el plan aprobado; sin campo = la principal)
 - **Commits:** `esta confirmación` (si cierras el registro en el mismo commit que el entregable) o `<hash>` / `<hash-inicial>..<hash-final>` (si ya se entregó antes). Con confirmación o integración autónoma: un SHA por línea, marcado (autónomo), (OK) o (registro); un rango no sirve
 - **Diff mostrado al dev:** `<sha>`, … (`<gate>`, `<fecha>`) — confirmaciones autónomas que el dev vio antes de que salieran del clon local (ver `process/change-control-gate.md`); una línea por gate

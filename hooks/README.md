@@ -9,7 +9,7 @@ Hooks de Neb. El plugin registra en `hooks/hooks.json` el `SessionStart` y los h
 `PostToolUse` con matcher `ExitPlanMode`. Solo guarda planes **aprobados** (`PostToolUse` solo dispara al éxito; `ExitPlanMode` solo "tiene éxito" cuando el usuario aprueba). Cubre la vía **plan mode**; los planes aprobados conversacionalmente (media/alta) se persisten vía `Write` — ver [`workflow/approved-plans.md`](../workflow/approved-plans.md) § "Persistencia conversacional".
 
 - **Output**: `~/.claude/approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md`.
-- **Carpeta**: única global, fuera de cualquier repo, no versionada.
+- **Carpeta**: única global, fuera de cualquier repo, no versionada. Es solo el lugar de caída: al crear el Change MD, Claude mueve el plan a `changes/plans/` del repo (ver [`workflow/approved-plans.md`](../workflow/approved-plans.md) § "Vías de persistencia").
 - **Bajo el plugin**: lo corre `hooks/lib/approved_plan.py` (Python, sin `jq`). El slug es ASCII completo (`ñ` → `n`, símbolos → `-`).
 - **Entrada de settings con clon** (`save-approved-plan.sh`): requiere `bash`, `jq`, `iconv` y `NEB_HOME` apuntando al clon. En Git Bash, `iconv //TRANSLIT` trunca el slug en el primer carácter no ASCII.
 

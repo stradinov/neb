@@ -108,12 +108,13 @@ viven el overlay y `personal/`). Cómo establecerlas: [user-guide](user-guide.md
 | Artefacto | Ubicación | Versionado |
 |---|---|---|
 | Change MD (registro del requerimiento) | `<proyecto>/changes/<fecha>-<nombre>.md` | Sí, en el repo del proyecto |
-| Plan aprobado | `~/.claude/approved-plans/<ts>-<proyecto>-<slug>.md` | No (histórico cross-proyecto) |
+| Plan aprobado (media/alta) | `<proyecto>/changes/plans/<fecha>-<nombre>.md` | Sí, en el repo del proyecto, junto a su Change MD |
 | Pendientes | `~/.claude/neb.db` | No (seguimiento cross-sesión) |
 | Bitácora de relevo | `~/.claude/neb.db` (local) + central opcional | No (relevo cross-dev de sesiones a medias) |
 
 Cada registro del requerimiento documenta: contexto y objetivo, decisiones tomadas,
-plan de pruebas, historial de estados y estado final. Constituye el rastro
+plan de pruebas (en media/alta, solo su resultado: lo define el plan aprobado),
+historial de estados y estado final. Constituye el rastro
 auditable de qué se realizó y por qué.
 
 ---

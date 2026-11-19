@@ -15,8 +15,10 @@ El **Change MD** es el **eje documental**: registra al REQ y todo enlace entre a
 
 | Desde | Campo de enlace | Hacia | Doc canónico |
 |---|---|---|---|
-| Plan aprobado | sección Trazabilidad → `**Plan aprobado:**` | Change MD | [approved-plans.md](approved-plans.md) |
-| Change MD | `**Commits:**` (`<hash>` o rango `<a>..<b>`) | git | [changes.md](changes.md) |
+| Change MD | sección Trazabilidad → `**Plan aprobado:**` (ruta desde la raíz del repo) | Plan aprobado | [approved-plans.md](approved-plans.md) |
+| Plan aprobado | mismo nombre de archivo (`changes/plans/<YYYY-MM-DD>-<nombre>.md`) | Change MD (inverso) | [approved-plans.md](approved-plans.md) |
+| Change MD | `**Commits:**` (`esta confirmación`, `<hash>` o rango `<a>..<b>`) | git | [changes.md](changes.md) |
+| Commit | trailer `Req: <nombre>` (o `Confirmacion-autonoma: <nombre>`) | Change MD (inverso) | [`../process/version-control.md`](../process/version-control.md) § "Trailer `Req:` — del commit al REQ" |
 | Change MD | `**Pendientes generados:**` (cita `[slug]` (`PD-<id>`)) | pendiente en `neb.db` | [pendings.md](pendings.md) |
 | Memoria del proyecto (`active_*.md`) | `Draft changes MD:` | Change MD (inverso) | [memory.md](memory.md) |
 | Incidente | `Originado por:` | Change MD original (inverso) | [`../general/incidents.md`](../general/incidents.md) |
@@ -26,26 +28,26 @@ La estructura de la sección Trazabilidad del Change MD es canónica en [`../tem
 
 ### El plan aprobado: persistencia y direccionalidad
 
-**Persistencia.** El artefacto en `~/.claude/approved-plans/` se persiste por **dos vías** (ver [approved-plans.md](approved-plans.md)): el hook `save-approved-plan` al aprobar en plan mode, si está activado (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)), o un `Write` de Claude al aprobar **conversacionalmente** un plan media/alta o cuando el hook no lo guardó. En consecuencia:
+**Persistencia.** En complejidad media/alta el plan aprobado se guarda en el repo del proyecto, en `changes/plans/<YYYY-MM-DD>-<nombre>.md`, con el mismo nombre de archivo que el Change MD (ver [approved-plans.md](approved-plans.md)). Llega ahí por **dos vías**: Claude lo escribe directo al aprobarse **conversacionalmente**, o lo mueve desde `~/.claude/approved-plans/` cuando el hook `save-approved-plan`, si está activado, lo dejó ahí al aprobar en plan mode (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). En consecuencia:
 
-- **No opcional en media/alta**: todo plan de esa complejidad deja artefacto (por hook o por Write).
+- **No opcional en media/alta**: todo plan de esa complejidad queda en el repo, confirmado antes de la primera confirmación del entregable.
 - **Ausente** en REQs **triviales** (una línea/texto, van directo a propuesta), **baja** (solo plan de pruebas) o **no-formales** (sin trigger de formalización) — ahí el campo es `**Plan aprobado:** —`. Ver [`../process/planning.md`](../process/planning.md) § "Cuándo aplica cada aprobación".
 
-**Direccionalidad.** La trazabilidad plan↔Change MD es **unidireccional por diseño**:
+**Direccionalidad.** El plan y el Change MD se enlazan **en los dos sentidos por el nombre**:
 
-- `Change MD → plan` **soportado**: campo `**Plan aprobado:**` (lo llena Claude con el path del archivo, lo haya escrito el hook o Claude con `Write`).
-- `plan → Change MD` **no soportado por diseño**: el artefacto del plan no apunta de vuelta. El Change MD es el **eje documental** (todo enlace pasa por él): se parte del Change MD para llegar al plan, no al revés. No es deuda — en plan mode el plan se persiste antes de que el Change MD exista, así que no puede llevar el enlace inverso, y el slug del plan y el `<nombre>` del Change MD pueden diferir (no se adoptó naming coordinado).
+- `Change MD → plan`: campo `**Plan aprobado:**`, con la ruta del archivo desde la raíz del repo.
+- `plan → Change MD`: el archivo del plan lleva el mismo `<YYYY-MM-DD>-<nombre>` que el Change MD y vive en `plans/`, dentro de la carpeta `changes/` del registro.
 
-Por eso la **cadena mínima trazable es `Change MD → commits`**: el Change MD es el único eslabón (casi) siempre presente. "Plan aprobado" como *momento* (cuando nace el draft del Change MD, al entrar a Fase 4) es distinto del *artefacto* plan aprobado: el momento siempre ocurre; el artefacto existe en media/alta y se navega desde el Change MD.
+El Change MD sigue siendo el **eje documental** (todo enlace pasa por él), y la **cadena mínima trazable es `Change MD → commits`**: el Change MD es el único eslabón (casi) siempre presente. "Plan aprobado" como *momento* (cuando nace el draft del Change MD, al entrar a Fase 4) es distinto del *artefacto* plan aprobado: el momento siempre ocurre; el artefacto existe en media/alta y se navega desde el Change MD.
 
 ## Eslabón Change MD ↔ confirmación del cambio
 
 El último eslabón es la confirmación del cambio (ver [`../process/change-control-gate.md`](../process/change-control-gate.md)). En **profiles versionados con git** (cualquier profile de software/datos y `self-applied`) es el commit, y es bidireccional:
 
-- **REQ → commit**: al cierre (Fase 8), el campo `**Commits:**` del Change MD se completa con el/los hash(es) — un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos. (Con entrega temprana del registro, el Change MD pudo entregarse antes con `**Commits:**` aún vacío — ver [`changes.md`](changes.md) § "Ciclo de vida del draft"; el campo se completa igualmente al cierre.)
-- **commit → REQ**: el mensaje del commit nombra el tipo y el tema del REQ (`tipo: descripción`, ver [`../process/version-control.md`](../process/version-control.md) § "Commits"). Permite ir de un hash suelto al REQ sin partir del Change MD.
+- **REQ → commit**: al cierre (Fase 8) se completa el campo `**Commits:**` del Change MD. Lleva `esta confirmación` cuando el registro cierra en el mismo commit que el entregable; el/los hash(es) cuando el entregable ya se entregó antes (un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos); y un SHA por línea con confirmación o integración autónomas (ver [`changes.md`](changes.md) § "Ciclo de vida del draft"). Además, sin depender de ese campo, la consulta por trailer lista desde cualquier clon los commits entregados del REQ ([`../process/version-control.md`](../process/version-control.md) § "Trailer `Req:` — del commit al REQ").
+- **commit → REQ**: el trailer `Req: <nombre>` (o `Confirmacion-autonoma: <nombre>`) del commit lleva el `<nombre>` del Change MD; el mensaje (`tipo: descripción`) da el tipo y el tema. Permite ir de un hash suelto al REQ sin partir del Change MD.
 
-El draft del Change MD nace sin hashes (estado `En progreso`); el campo `**Commits:**` se llena cuando los commits ya existen. Mientras tanto, el cross-link inverso `Draft changes MD:` en el `active_*.md` del REQ mantiene la trazabilidad de la sesión en curso.
+El draft del Change MD nace sin hashes (estado `En progreso`); el campo `**Commits:**` se llena al cierre. Mientras tanto, el cross-link inverso `Draft changes MD:` en el `active_*.md` del REQ mantiene la trazabilidad de la sesión en curso.
 
 ## Proyecto único
 
@@ -60,7 +62,7 @@ Cuando un requerimiento toca un repo central y/o varios proyectos sincronizados,
   - proyecto-a `79c6e417c` · proyecto-b `09ef92bd` · proyecto-c `315fa000` · …
 ```
 
-Así, `commit → REQ` desde cualquier proyecto se resuelve por el mensaje del commit (que nombra el REQ) y converge al único Change MD del repo central. No se crea un MD por proyecto: a cada requerimiento le corresponde un único Change MD que lo registra (1↔1), también cross-repo.
+Así, `commit → REQ` desde cualquier proyecto se resuelve por el trailer del commit, que lleva el `<nombre>` del registro central en todos los repos, y converge al único Change MD del repo central. No se crea un MD por proyecto: a cada requerimiento le corresponde un único Change MD que lo registra (1↔1), también cross-repo.
 
 > La regla operativa de "dónde abrir el Change MD cross-repo" vive en el `CLAUDE.md` del repo central. Este documento es el modelo de trazabilidad que esa regla concreta.
 

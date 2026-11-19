@@ -55,6 +55,8 @@ git commit -m "skill-authoring: <descripción del cambio>"
 git push
 ```
 
+Como commit de un REQ, lleva además el trailer `Req: <nombre>` con su comprobación ([`../../process/version-control.md`](../../process/version-control.md) § "Trailer `Req:` — del commit al REQ").
+
 El Skill Maintainer (asignado en `personal/<usuario>.md`) es quien hace commit de las **baselines de contenido autogenerado** (`<!-- autogen-start/end -->`). De los demás cambios pueden hacer commit los Skill Authors autorizados.
 
 ## Distribución al equipo

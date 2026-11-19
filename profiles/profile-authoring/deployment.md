@@ -10,6 +10,8 @@ git commit -m "profiles(<nombre>): <descripción>"
 git push
 ```
 
+Como commit de un REQ, lleva además el trailer `Req: <nombre>` con su comprobación ([`../../process/version-control.md`](../../process/version-control.md) § "Trailer `Req:` — del commit al REQ").
+
 En los repos cliente que importan el profile via `@~/.claude/neb/profiles/<nombre>/index.md`: `git pull` en `neb` — el nuevo profile queda disponible en la próxima sesión de Claude.
 
 ## Verificación post-creación

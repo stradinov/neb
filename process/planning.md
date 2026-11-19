@@ -36,7 +36,10 @@ Si el REQ activa plan-review (ver [process/plan-review.md](plan-review.md) § "C
 
 ## Estimación, plan y plan de pruebas
 
-El **plan de pruebas es obligatorio** en cualquier nivel.
+El **plan de pruebas es obligatorio** en cualquier nivel. Dónde se define:
+
+- **Media/alta**: en la sección `## Plan de pruebas` del plan aprobado, que es obligatoria ([`../workflow/approved-plans.md`](../workflow/approved-plans.md)). El Change MD no lo repite: conserva solo `### Resultado`.
+- **Baja**: como checklist en `## Plan de pruebas` del Change MD (no hay plan aprobado).
 
 | Nivel | Criterio | Acción |
 |-------|----------|--------|
@@ -51,15 +54,15 @@ El plan de elaboración incluye: rango de tiempo, elementos del entregable con u
 El catálogo de niveles (Bajo/Medio/Alto con criterios y ejemplos) vive en [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Niveles de riesgo de regresión". Reglas de proceso que lo aplican al plan:
 
 - Riesgo `bajo` no requiere flujo crítico identificado.
-- Riesgo `medio`/`alto` exige ≥1 fila con prefijo `[crítico]` en la tabla `### Resultado` del [`change.md.template`](../templates/change.md.template). Una fila `[crítico]` con ❌ bloquea el cierre (ver [`../methodology/done-criteria.md`](../methodology/done-criteria.md)).
+- Riesgo `medio`/`alto` exige ≥1 fila con prefijo `[crítico]` en el plan de pruebas. Cada fila de la tabla `### Resultado` del [`change.md.template`](../templates/change.md.template) copia ese prefijo, y ahí lo lee el gate de cierre: una fila `[crítico]` con ❌ bloquea el cierre (ver [`../methodology/done-criteria.md`](../methodology/done-criteria.md)).
 - Antes de aprobar el plan con riesgo medio/alto: enumerar dependientes (escritura/procesamiento y lectura/display) — vía grep, LSP, lectura directa o inferencia de contexto conocido.
 - Si el plan lee o escribe registros con un campo de estado (columna `status`, ENUM, bandera como `dirty`): listar todos los valores del estado y declarar qué hace el flujo con cada uno, incluidos los que no toca. Declarar también si un registro ya procesado puede volver a entrar o seguir cambiando. Un estado que el plan no menciona es un dependiente sin enumerar.
 
-El plan de pruebas incluye: flujos a validar, criterios de éxito, orden, y quién ejecuta cada uno. El usuario valida directamente o delega a Claude (Claude solicita los datos necesarios — ver [delivery.md](delivery.md)).
+El plan de pruebas incluye: flujos a validar, criterios de éxito, orden, y quién ejecuta cada uno. El usuario valida directamente o delega a Claude (Claude solicita los datos necesarios — ver [delivery.md](delivery.md)). Un flujo agregado o cambiado durante la implementación se anota en `## Incidencias` del Change MD y entra a `### Resultado` como fila `(agregada)`.
 
 Cierre: **"¿De acuerdo con este plan?"**
 
-Al recibir aprobación, Claude crea o actualiza la memoria del proyecto y el MD del requerimiento. Ver [workflow/memory.md](../workflow/memory.md) y [workflow/changes.md](../workflow/changes.md). En complejidad **media/alta aprobada sin plan mode**, además persiste el plan literal en `~/.claude/approved-plans/` vía `Write` (en plan mode lo guarda el hook `save-approved-plan` si está activado, supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md); si no dejó archivo, también va por `Write`) — ver [workflow/approved-plans.md](../workflow/approved-plans.md) § "Persistencia conversacional".
+Al recibir aprobación, Claude crea o actualiza la memoria del proyecto y el MD del requerimiento. Ver [workflow/memory.md](../workflow/memory.md) y [workflow/changes.md](../workflow/changes.md). En complejidad **media/alta**, además persiste el plan literal en `changes/plans/` del repo, junto al Change MD, y lo confirma antes de la primera confirmación del entregable. Aprobado sin plan mode, lo escribe vía `Write`; en plan mode, el hook `save-approved-plan`, si está activado, lo deja primero en `~/.claude/approved-plans/` (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) y Claude lo mueve al repo; si no dejó archivo, también va por `Write` — ver [workflow/approved-plans.md](../workflow/approved-plans.md) § "Vías de persistencia".
 
 ## Propuesta de implementación
 
@@ -78,8 +81,8 @@ Resumen de los criterios dispersos en este archivo y en `communication.md` / `tr
 |---|---|---|---|---|
 | Trivial (1 línea, typo, renombre obvio) | No | N/A | No | § "Clarificación" (arriba) |
 | No-formal (sin trigger de formalización) | No (prosa) | N/A | No | [`phase-transitions.md`](phase-transitions.md) § "Trigger de formalización" |
-| Baja (≤2 elementos) | Solo plan de pruebas | Implícita o explícita | No | § "Estimación" + § "Propuesta de implementación" (arriba) |
-| Media/alta vía plan mode | Sí | Explícita (`ExitPlanMode`) | Sí — hook si está activado; si no, `Write` | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
-| Media/alta conversacional | Sí | Explícita ("¿De acuerdo con este plan?") | Sí — `Write` | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
+| Baja (≤2 elementos) | Solo plan de pruebas (checklist en el Change MD) | Implícita o explícita | No | § "Estimación" + § "Propuesta de implementación" (arriba) |
+| Media/alta vía plan mode | Sí | Explícita (`ExitPlanMode`) | Sí, en `changes/plans/` del repo — llega del hook si está activado; si no, `Write` | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
+| Media/alta conversacional | Sí | Explícita ("¿De acuerdo con este plan?") | Sí, en `changes/plans/` del repo — `Write` | [`workflow/approved-plans.md`](../workflow/approved-plans.md) |
 
 La **aprobación del plan** (esta tabla) es gate distinto de la **aprobación de implementación** (escribir código), que admite forma implícita — ver § "Propuesta de implementación" arriba. Opcionalidad del artefacto y direccionalidad de la trazabilidad: [`workflow/traceability.md`](../workflow/traceability.md).

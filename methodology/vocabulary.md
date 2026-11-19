@@ -55,13 +55,16 @@ Un prompt escala a REQ solo al cruzar el **trigger de formalización** (`/plan`,
 
 ### Identidad y nombre
 
-Identidad estable cross-máquina: `project + req_slug` (ver [`../workflow/logbook.md`](../workflow/logbook.md) § "Unidad y backend"). En **Fase 1 no hay nombre formal** — solo un tema conversacional; el nombre nace **al aprobar el plan**, cuando se crea el registro. Tres formas del nombre **pueden diferir** (no se adoptó naming coordinado — ver [`../workflow/traceability.md`](../workflow/traceability.md) § "persistencia y direccionalidad"):
+Identidad estable cross-máquina: `project + req_slug` (ver [`../workflow/logbook.md`](../workflow/logbook.md) § "Unidad y backend"). En **Fase 1 no hay nombre formal** — solo un tema conversacional; el nombre nace **al aprobar el plan**, cuando se crea el registro. El `<nombre>` del Change MD es el **identificador único del REQ**; las demás formas lo repiten (ver [`../workflow/changes.md`](../workflow/changes.md) § "Path"):
 
 | Forma | Dónde | Notas |
 |---|---|---|
-| `<slug>` del plan aprobado | `~/.claude/approved-plans/<ts>-<proyecto>-<slug>.md` | existe en media/alta |
-| `<nombre>` del Change MD | `<proyecto>/changes/<YYYY-MM-DD>-<nombre>.md` | siempre presente |
-| `req_slug` de la bitácora / `[slug]` del pendiente | bitácora + pendientes en `neb.db` | identidad de relevo / seguimiento |
+| `<nombre>` del Change MD | `<proyecto>/changes/<YYYY-MM-DD>-<nombre>.md` | siempre presente; forma `[a-z0-9-]+`, único en el `changes/` del proyecto |
+| Archivo del plan aprobado | `<proyecto>/changes/plans/<YYYY-MM-DD>-<nombre>.md` | existe en media/alta |
+| Trailer del commit | `Req: <nombre>` o `Confirmacion-autonoma: <nombre>` | liga cada commit con su REQ |
+| `req_slug` de la bitácora | campo `Nombre` del `active_*.md`, de donde lo toma la bitácora | identidad de relevo; lleva el mismo `<nombre>` |
+
+El `[slug]` de un pendiente es otra cosa: identifica al pendiente, no al REQ ([`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente").
 
 ### Relación 1↔1 con su registro
 
@@ -80,9 +83,9 @@ A cada REQ **le corresponde** un único **registro** (su Change MD): proyección
 | Riesgo de regresión (eje ortogonal) | [§ "Niveles de riesgo de regresión"](#niveles-de-riesgo-de-regresión) (abajo) |
 | Dos ejes: momento nace-MD vs artefacto persiste-plan | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) § "persistencia y direccionalidad" |
 | Cross-repo: un solo Change MD (repo central) | [`../workflow/traceability.md`](../workflow/traceability.md) § "Multi-proyecto" |
-| Trazabilidad unidireccional plan→Change MD; plan opcional, pruebas obligatorio | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) |
+| Enlace plan ↔ Change MD por nombre, en los dos sentidos; plan solo en media/alta, plan de pruebas siempre | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) |
 | Eslabón Change MD↔commit (bidireccional) | [`../workflow/traceability.md`](../workflow/traceability.md) § "Eslabón Change MD ↔ confirmación" |
-| Definición de done + entrega del registro (temprana si entorno compartido, o atómica al cierre — push `.md`-only del Change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento", [`../workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft" |
+| Definición de done + entrega del registro (temprana si entorno compartido, inmediata al relevar, o atómica al cierre — push `.md`-only del Change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento", [`../workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft" |
 | Validación + cierre por mecanismo verificable del profile (sin gate diferido; señal-en-uso → Fase 9) | [§ "Tipos de validación"](#tipos-de-validación), [`../process/improvement.md`](../process/improvement.md) |
 
 ### Formas especiales

@@ -11,6 +11,8 @@ type: project
 > duradero del proyecto (Profile, Convenciones, Bugs resueltos) vive en `project_<nombre>.md`.
 > **Se elimina al cerrar el requerimiento.** Es la fuente de verdad local del estado del REQ
 > (la bitácora `work` lo lee, y Claude lo relee tras compactar).
+> `Nombre` lleva el `<nombre>` del Change MD del REQ, sin la fecha: el mismo identificador
+> del trailer `Req:` de sus commits y del archivo de su plan aprobado.
 
 - **Nombre:** <slug del requerimiento>
 - **Path del proyecto:** <path absoluto local>

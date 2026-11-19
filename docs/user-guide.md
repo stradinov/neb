@@ -157,6 +157,7 @@ Con el comando `/logbook`:
 
 - **`/logbook`** — lista tus trabajos a medias (con REQ y sesiones exploratorias) con su contexto.
 - **`/logbook retomar <id>`** — reconstruye el contexto: para un REQ, toma el mando y abre una sesión nueva con el transcript; para una exploración, te entrega el `claude --resume`.
+- **`/logbook retomar <ruta-del-Change-MD>`** — cuando el REQ no tiene trabajo en la bitácora: sin tomar el mando ni transcript, lee el Change MD, su `## Relevo` y su plan aprobado, y continúa desde ahí ([`skills/logbook/SKILL.md`](../skills/logbook/SKILL.md)).
 - **`/logbook tomar | liberar | solicitar <id>`** — opera el "mando" del trabajo (un solo dueño a la vez).
 - **`/logbook search <texto>`** — busca en el corpus de transcripts (el local; con central, el del equipo).
 - **`/logbook renombrar <id> <nuevo-slug>`** — renombre gobernado del REQ (con central, preserva su historial en el catálogo del equipo).
