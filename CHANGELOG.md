@@ -4,6 +4,31 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.42.0] - 2026-11-19
+
+> **Minor**: principio nuevo «Fuente de verdad: el repo y el estado actual» y regla «Intención sobre letra». **Cambia fuerza normativa**: la memoria y los skills dejan de contar como verificación por sí solos, y un plan que persiste un dato sobre el estado del repo o de un sistema declara de qué clase es.
+>
+> - **Qué se persiste.** Lo que se lee sin salir de la máquina (el clon, sus archivos, `neb.db`) se lee de la fuente al momento y no se copia. Como evidencia solo se persiste la **constancia de un momento** (lo que la fuente no conserva: qué se validó, qué aprobó el dev, qué se desplegó) o el **dato verificado** (de un ambiente o de un tercero, por indicación del dev y con su marca `verificado: AAAA-MM-DD` + `Fuente:`).
+> - **Sin marca no es evidencia.** Un dato de un ambiente anotado sin marca orienta dónde leer; para afirmar se lee la fuente o se marca `[memoria sin re-verificar]`. El umbral de 30 días ya no basta sin marca.
+> - **Intención sobre letra.** Si el pedido nombra una pieza con costo propio y Claude ve una alternativa que cubre lo esencial sin ella, la alternativa va como opción propia en la respuesta y en cada menú que fije esa pieza, hasta que el dev la descarte.
+> - **Adoptantes**: no hay migración. Las copias que una regla o plantilla vigente ya pide (el campo `**Commits:**`, los campos del `active_*.md`) siguen hasta que un REQ las retire. Los datos operativos de un overlay que se usen como evidencia entre sesiones necesitan la marca de verificación.
+> - **Arranque**: `general/communication.md` crece 657 caracteres (37 273 → 37 930 de 40 000).
+
+### Added
+- **`methodology/principles.md`** § "Fuente de verdad: el repo y el estado actual": el principio, sus dos clases (constancia de un momento, dato verificado), la marca de verificación y las cláusulas «Sin marca no es evidencia», «Almacén con regla propia» (supuestos de plataforma y research), «Lector sin acceso a la fuente», «Copias anteriores» y «Fuera de alcance».
+- **`general/communication.md`** § "Avance del trabajo: ejecuta-y-reporta vs. gate": viñeta «Intención sobre letra».
+- **`process/planning.md`** § "Estimación, plan y plan de pruebas": el plan declara la clase de cada dato que persiste; lo derivable va como decisión del dev, con la variante que no lo persiste como opción.
+- **`methodology/vocabulary.md`**: términos canónicos «Fuente de verdad» y «Marca de verificación».
+- **`agents/context-completeness-reviewer.md`**: viñeta «Dato que el plan persiste».
+
+### Changed
+- **`methodology/principles.md`** § "Suposiciones explícitas antes de afirmar": verificar es leer la fuente; la memoria y los skills cuentan solo en los términos del principio nuevo.
+- **`process/planning.md`**: la reformulación del requerimiento separa el efecto que el dev busca del medio que el pedido nombra.
+- **`process/plan-review.md`**: una alternativa que un revisor reporta contra la letra del pedido llega al dev como opción, o el plan dice por qué no con una razón que no sea la letra, un plan previo ni el criterio de un rol. El briefing lo dice a los revisores, y un revisor que corre en un workflow recibe el mismo briefing.
+- **`agents/context-completeness-reviewer.md`**: «Memoria sin re-verificar» remite al principio (antes aceptaba memorias de menos de 30 días sin datos volátiles); la `description` dice «no consultó la fuente».
+- **`workflow/memory.md`**, **`workflow/logbook.md`**, **`methodology/vocabulary.md`** y **`templates/active-req.md.template`**: el `active_*.md` lleva el estado vivo del REQ en la máquina del dev; ya no se le llama «fuente de verdad». `workflow/memory.md` § "Qué NO va": el estado que git responde se lee de git, y un dato de un ambiente sin marca solo orienta.
+- **`general/correspondence.md`** § "Verificación de los hechos": en un correo no basta la memoria, tenga o no marca de verificación.
+
 ## [6.41.0] - 2026-11-19
 
 > **Minor**: se retiran del núcleo la subida de transcripts al central, el corpus local de sesiones con su búsqueda (`/logbook search`) y el hook `ops-capture`. La fuente de verdad es el repo y el estado actual del sistema; la bitácora conserva el relevo de works y el REQ vinculado, y ya no guarda ni sube el texto de las sesiones. Va como Minor por decisión del mantenedor: retira comportamiento, pero ningún import cambia de ruta y lo retirado no era parte del relevo.
