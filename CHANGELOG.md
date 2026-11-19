@@ -17,7 +17,7 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 ### Added
 - **`methodology/principles.md`** § "Fuente de verdad: el repo y el estado actual": el principio, sus dos clases (constancia de un momento, dato verificado), la marca de verificación y las cláusulas «Sin marca no es evidencia», «Almacén con regla propia» (supuestos de plataforma y research), «Lector sin acceso a la fuente», «Copias anteriores» y «Fuera de alcance».
 - **`general/communication.md`** § "Avance del trabajo: ejecuta-y-reporta vs. gate": viñeta «Intención sobre letra».
-- **`process/planning.md`** § "Estimación, plan y plan de pruebas": si el plan agrega un almacén o un campo que guarda un dato sobre el estado del repo o de un sistema (una tabla o una columna de `neb.db`, un campo de la memoria o de la plantilla de un artefacto), declara la clase de cada uno; lo derivable va como decisión del dev, con la variante que no lo persiste como opción.
+- **`process/planning.md`** § "Estimación, plan y plan de pruebas": si el plan agrega un almacén o un campo que guarda un dato sobre el estado del repo o de un sistema (una tabla o una columna de `neb.db`, un campo de la memoria o de la plantilla de un artefacto), declara la clase de cada uno; del derivable, el plan nombra la consulta que lo da y, si aun así propone persistirlo, lo presenta como decisión del dev, con su tradeoff y con la variante que no lo persiste como opción.
 - **`methodology/vocabulary.md`**: términos canónicos «Fuente de verdad» y «Marca de verificación».
 - **`agents/context-completeness-reviewer.md`**: viñeta «Dato que el plan persiste».
 
