@@ -4,6 +4,32 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.41.0] - 2026-11-19
+
+> **Minor**: se retiran del núcleo la subida de transcripts al central, el corpus local de sesiones con su búsqueda (`/logbook search`) y el hook `ops-capture`. La fuente de verdad es el repo y el estado actual del sistema; la bitácora conserva el relevo de works y el REQ vinculado, y ya no guarda ni sube el texto de las sesiones. Va como Minor por decisión del mantenedor: retira comportamiento, pero ningún import cambia de ruta y lo retirado no era parte del relevo.
+>
+> - **Adoptantes**: actualizar juntos el clon y el plugin. Al abrir la base, la migración borra sola `transcript_local`, `transcript_fts` y `transcript_cursor`; no toca `work`, `event` ni los pendientes. El espacio en disco se recupera con un `VACUUM` manual, que la migración no corre.
+> - **Convivencia con 6.40**: mientras una máquina tenga sesiones con el código anterior y otras con este, un REQ desvinculado puede volver a vincularse; se corrige con `/logbook desvincular`.
+> - **`ops-capture`**: si sigue en `NEB_HOOKS` o `NEB_PROJECT_HOOKS`, el arranque avisa que está retirado. Una entrada directa en `settings.json` que invoque `hooks/ops-capture.py` se quita a mano: el archivo ya no existe.
+> - **Central**: el cliente ya no llama a las rutas `/transcript` ni `/search`; el servidor puede retirarlas.
+> - **Privacidad**: de la conversación solo viaja al central el resumen del work exploratorio (los primeros 120 caracteres del primer mensaje), y solo en proyectos con el marcador `neb-logbook: central`.
+
+### Removed
+- **`hooks/ops-capture.py`** y **`hooks/lib/ops_inbox.py`**: el hook de captura de conocimiento operativo y su bandeja. Sin reemplazo en el núcleo; el conocimiento operativo se registra a mano desde la sesión.
+- **`hooks/lib/logbook.py`**: la subida de transcripts (`_drain_transcripts` y el cursor de subida), el corpus local (`_index_local`, el índice FTS5) y la búsqueda (`_search_local`). El verbo `search` queda solo para avisar el retiro. `sync-status` ya no reporta `sessions`.
+- **`hooks/logbook-schema.sql`**: tablas `transcript_local` y `transcript_cursor`.
+- **`hooks/tests/test_ops_capture.py`** y **`hooks/tests/test_transcript_local.py`**, y las pruebas de la subida y de la búsqueda en las demás suites del logbook.
+
+### Added
+- **`hooks/lib/_db_shared.py`**: columna `session_sync.read_byte`, el cursor de lectura del `.jsonl` que usa el REQ vinculado. La migración la siembra desde `transcript_local` antes de borrarla, en su propia transacción, para que una sesión viva no se relea desde el inicio. Un fallo de la limpieza avisa por stderr y se reintenta en la siguiente conexión; nunca impide abrir la base, y mientras `transcript_local` siga ahí el lector toma de ella el cursor.
+- **`hooks/tests/test_logbook_migracion_retiro.py`**: pruebas de la migración (siembra, borrado, idempotencia, base bloqueada, SQLite sin FTS5, lector con la limpieza pendiente).
+
+### Changed
+- **`hooks/lib/logbook.py`**: el hook lee el tramo nuevo del `.jsonl` sin guardarlo (`_read_new_chunk`) y lo entrega al REQ vinculado; `sync` drena solo works. `session_sync` se conserva como registro de sesión (ruta del `.jsonl`, `root_cwd`, cursor de lectura); sus columnas de subida, `work_id` incluida, quedan heredadas.
+- **`hooks/neb-hook.py`**, **`hooks/hooks.json`** y **`hooks/settings.template.json`**: sin `ops-capture`, que pasa a la lista de hooks retirados.
+- **`bootstrap/seed-pendings-taxonomy.py`**: la lista de tablas del logbook ya no incluye las de transcripts.
+- **`workflow/logbook.md`**, **`tooling/logbook.md`**, **`skills/logbook/SKILL.md`**, **`commands/logbook.md`**, **`hooks/README.md`**, **`docs/user-guide.md`**, **`process/execution.md`**, **`methodology/platform-assumptions.md`**, **`tooling/pendings.md`** y **`templates/logbook-entry.md.template`**: describen la bitácora sin transcripts ni búsqueda, y acotan qué viaja al central.
+
 ## [6.40.0] - 2026-11-19
 
 > **Minor**: la bitácora local sabe qué sesiones trabajaron cada REQ y junta en una consulta sus commits publicados. La base no guarda commits: los lee de git al consultar, por el trailer `Req:`. Todo es local; nada viaja al central ni cambia las entradas de la bitácora.
