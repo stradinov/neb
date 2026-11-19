@@ -2,7 +2,7 @@
 
 Tabla de los comportamientos de Claude Code de los que depende Neb. Cuándo entra, se re-verifica, se cita y sale una fila lo define § "Mantenimiento", abajo; el principio del que nace la tabla está en [principles.md](principles.md) § "Reglas de proceso y mecanismos de plataforma".
 
-Cada fila nombra el comportamiento, quién lo usa en Neb (con el término de grep para encontrar más consumidores), en qué versión, interfaz (CLI, app de escritorio o IDE) y fuente se verificó, y cómo repetir la prueba. Una prueba en sesión desechable corre desde un directorio sin el marcador `neb-logbook: central`, para que su transcript no suba al catálogo central ([`../workflow/logbook.md`](../workflow/logbook.md) § "Entorno compartido (disparador opt-in por proyecto)"). «Sin verificar» no significa falso: significa que no hay evidencia todavía. Los S*n* remiten al [spike del 2026-11-04](../research/2026-11-04-orquestacion-subagentes-workflows-spike.md).
+Cada fila nombra el comportamiento, quién lo usa en Neb (con el término de grep para encontrar más consumidores), en qué versión, interfaz (CLI, app de escritorio o IDE) y fuente se verificó, y cómo repetir la prueba. Una prueba en sesión desechable corre desde un directorio sin el marcador `neb-logbook: central`, para que la sesión no se publique como trabajo exploratorio al catálogo central ([`../workflow/logbook.md`](../workflow/logbook.md) § "Entorno compartido (disparador opt-in por proyecto)"). «Sin verificar» no significa falso: significa que no hay evidencia todavía. Los S*n* remiten al [spike del 2026-11-04](../research/2026-11-04-orquestacion-subagentes-workflows-spike.md).
 
 | ID | Supuesto | Consumidores (grep) | Verificado (versión · interfaz · fecha · fuente) | Cómo probarlo |
 |---|---|---|---|---|

@@ -149,26 +149,25 @@ Cuando una sesión queda a medias —tokens agotados, corte de luz/red, o porque
 { "env": { "NEB_HOOKS": "logbook-sync" } }
 ```
 
-Con eso aplica a todos tus proyectos, desde la siguiente sesión. Para activarlo solo en un proyecto para todo el equipo, usa `NEB_PROJECT_HOOKS` en su `.claude/settings.json` versionado. Corre con el código del plugin instalado, sin `NEB_HOME`. En Windows requiere Git Bash (Git for Windows). Los demás hooks opcionales (`save-approved-plan`, `notify-on-stop`, `notify-on-permission`, `ops-capture`, `preprocess-prompt`) se activan igual: ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb". Si tu `settings.json` todavía invoca hooks desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esas entradas al activarlos, o correrán dos veces.
+Con eso aplica a todos tus proyectos, desde la siguiente sesión. Para activarlo solo en un proyecto para todo el equipo, usa `NEB_PROJECT_HOOKS` en su `.claude/settings.json` versionado. Corre con el código del plugin instalado, sin `NEB_HOME`. En Windows requiere Git Bash (Git for Windows). Los demás hooks opcionales (`save-approved-plan`, `notify-on-stop`, `notify-on-permission`, `preprocess-prompt`) se activan igual: ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb". Si tu `settings.json` todavía invoca hooks desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esas entradas al activarlos, o correrán dos veces.
 
 El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb.db`) en cada cierre de turno, sin que tengas que anunciar la pausa.
 
 Con el comando `/logbook`:
 
 - **`/logbook`** — lista tus trabajos a medias (con REQ y sesiones exploratorias) con su contexto.
-- **`/logbook retomar <id>`** — reconstruye el contexto: para un REQ, toma el mando y abre una sesión nueva con el transcript; para una exploración, te entrega el `claude --resume`.
-- **`/logbook retomar <ruta-del-Change-MD>`** — cuando el REQ no tiene trabajo en la bitácora: sin tomar el mando ni transcript, lee el Change MD, su `## Relevo` y su plan aprobado, y continúa desde ahí ([`skills/logbook/SKILL.md`](../skills/logbook/SKILL.md)).
+- **`/logbook retomar <id>`** — reconstruye el contexto: para un REQ, toma el mando y abre una sesión nueva con su Change MD, su `## Relevo` y su plan aprobado; para una exploración, te entrega el `claude --resume`.
+- **`/logbook retomar <ruta-del-Change-MD>`** — cuando el REQ no tiene trabajo en la bitácora: sin tomar el mando, lee el Change MD, su `## Relevo` y su plan aprobado, y continúa desde ahí ([`skills/logbook/SKILL.md`](../skills/logbook/SKILL.md)).
 - **`/logbook tomar | liberar | solicitar <id>`** — opera el "mando" del trabajo (un solo dueño a la vez).
-- **`/logbook search <texto>`** — busca en el corpus de transcripts (el local; con central, el del equipo).
 - **`/logbook renombrar <id> <nuevo-slug>`** — renombre gobernado del REQ (con central, preserva su historial en el catálogo del equipo).
 - **`/logbook estado-sync`** — qué trabajos siguen sin publicarse al central, cuáles están en conflicto y cuáles tienen un fallo de sync vigente (con su causa y desde cuándo). `/logbook` sin argumentos te avisa si hay conflictos o fallos vigentes. Lee siempre tu bitácora local.
 - **`/logbook vincular <ruta>`** — vincula un REQ en tu bitácora local a partir de su Change MD (escribir el Change MD ya lo vincula); con `--repo <dir>` declaras otro repo del REQ, uno por llamada.
 - **`/logbook traza <nombre>`** — muestra los commits publicados con trailer `Req:` (o `Confirmacion-autonoma:`) en los repos declarados del REQ, leídos de git al consultar, y las sesiones de esta máquina que lo trabajaron, con su transcript. Sin nombre, lista tus REQ vinculados.
 - **`/logbook desvincular <id|nombre|ruta>`** — quita un REQ vinculado por error, con sus repos y sesiones; para corregir un repo mal declarado, desvincula y vuelve a vincular. Nada de esto viaja al central ([`workflow/logbook.md`](../workflow/logbook.md) § "REQ vinculado").
 
-Por defecto la bitácora es **local** (tu máquina) — si trabajas solo, no necesitas nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva, con búsqueda de texto completo del corpus— lo habilita el **backend central** del equipo (servidor opcional, distribuido en un repositorio dedicado).
+Por defecto la bitácora es **local** (tu máquina) — si trabajas solo, no necesitas nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva— lo habilita el **backend central** del equipo (servidor opcional, distribuido en un repositorio dedicado).
 
-**Privacidad**: la bitácora es **local por defecto** —nada se publica al equipo salvo que lo pidas, aunque tengas el central configurado—. Para que un proyecto comparta su trabajo al catálogo central (works **y sesiones exploratorias**, con el transcript de las sesiones que abras en ese proyecto —el cliente lo envía crudo, salidas de herramientas incluidas; la búsqueda indexa solo el texto sin ellas—), agrega `<!-- neb-logbook: central -->` a su `CLAUDE.md` (**de activación voluntaria por proyecto**). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
+**Privacidad**: la bitácora es **local por defecto** —nada se publica al equipo salvo que lo pidas, aunque tengas el central configurado—. Para que un proyecto comparta su trabajo al catálogo central (works **y sesiones exploratorias**; de tus conversaciones solo viaja el resumen del exploratorio, su primer mensaje recortado a 120 caracteres), agrega `<!-- neb-logbook: central -->` a su `CLAUDE.md` (**de activación voluntaria por proyecto**). Detalle: [`workflow/logbook.md`](../workflow/logbook.md) y [`tooling/logbook.md`](../tooling/logbook.md).
 
 ## Contribuir al núcleo
 

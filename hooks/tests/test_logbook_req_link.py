@@ -334,7 +334,7 @@ class _Base(unittest.TestCase):
     def assertCapturaIntacta(self, sid):
         self.assertGreaterEqual(_count(self.home, "work"), 1)
         self.assertEqual(_count(self.home, "session_sync", "WHERE session_id=?", (sid,)), 1)
-        self.assertGreaterEqual(_count(self.home, "transcript_local", "WHERE session_id=?", (sid,)), 1)
+        self.assertEqual(_count(self.home, "session_sync", "WHERE session_id=? AND read_byte > 0", (sid,)), 1)
 
     def assertSinVinculo(self):
         for t in ("req_link", "req_repo", "req_session"):
@@ -344,7 +344,7 @@ class _Base(unittest.TestCase):
 # =========================================================================== fila 2: esquema
 
 BASE_TABLES = {"event", "pending", "pending_link", "pending_note", "pending_topic", "session_sync", "topic",
-               "topic_link", "transcript_cursor", "transcript_local", "work"}
+               "topic_link", "work"}
 WORK_COLS = ["id", "mode", "project", "req_slug", "owner", "lock_state", "takeover_by", "locked_at", "req_state",
              "branch", "head_commit", "repo_path", "change_md", "payload_json", "payload_version", "origin_dev",
              "origin_machine", "claude_session_id", "claude_session_name", "transcript_path", "created_at",

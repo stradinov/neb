@@ -1,6 +1,6 @@
 # Bitácora de relevo (logbook)
 
-Registro de trabajos a medias para **relevo entre devs y máquinas**. Cubre el caso que `pendings.md` § "Sesiones pausadas" y la memoria del proyecto no cubren: una sesión interrumpida (tokens agotados, corte de energía/internet, o handoff a otro dev) que debe continuar **en otra máquina con otra cuenta**, conservando el contexto vía el transcript.
+Registro de trabajos a medias para **relevo entre devs y máquinas**. Cubre el caso que `pendings.md` § "Sesiones pausadas" y la memoria del proyecto no cubren: una sesión interrumpida (tokens agotados, corte de energía/internet, o handoff a otro dev) que debe continuar **en otra máquina con otra cuenta**, conservando el contexto vía el Change MD, su `## Relevo` y su plan aprobado.
 
 La **mecánica** (backend pluggable, hook de captura, config, modos de fallo) vive en [`../tooling/logbook.md`](../tooling/logbook.md); el **protocolo operativo** (pasos para publicar/retomar/relevar) en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)". Este archivo cubre el **artefacto**: su modelo, ciclo de vida y relación con el resto.
 
@@ -35,10 +35,10 @@ Este ENUM de lock es **ortogonal** al ENUM de estados del requerimiento ([`../me
 
 | Modo | Cuándo | Identidad | Reanudación |
 |---|---|---|---|
-| **Con-REQ** | hay ≥1 `active_<proyecto>_<slug>.md` en memoria (o sección legacy) | `project + req_slug` | **relevo cross-dev** (lock atómico); estado + transcript al central |
-| **Exploratorio** | sin REQ formal (exploración previa) | `session_id` (entrada liviana, sin lock) | **`--resume` local** del mismo dev. Si el proyecto activa el central (opt-in), también se publica al catálogo (visibilidad/búsqueda); **no** relevable cross-dev (`claude_session_id` solo vale en su máquina origen) |
+| **Con-REQ** | hay ≥1 `active_<proyecto>_<slug>.md` en memoria (o sección legacy) | `project + req_slug` | **relevo cross-dev** (lock atómico); estado al central |
+| **Exploratorio** | sin REQ formal (exploración previa) | `session_id` (entrada liviana, sin lock) | **`--resume` local** del mismo dev. Si el proyecto activa el central (opt-in), también se publica al catálogo (visibilidad); **no** relevable cross-dev (`claude_session_id` solo vale en su máquina origen) |
 
-El modo exploratorio registra automáticamente la sesión (aunque el dev no anuncie pausa) con un resumen y el `transcript_path` local, para que `/logbook` la localice entre muchas y entregue el comando `--resume`. **Si el proyecto activa el central (opt-in)**, la sesión exploratoria también se publica al catálogo —para visibilidad y búsqueda del corpus—, pero **no es relevable cross-dev**: que **otro** dev la retome exige formalizarla en REQ antes. Al **formalizarse en REQ**, pasa a un `work` `req` y entra al relevo cross-dev con lock.
+El modo exploratorio registra automáticamente la sesión (aunque el dev no anuncie pausa) con un resumen y el `transcript_path` local, para que `/logbook` la localice entre muchas y entregue el comando `--resume`. **Si el proyecto activa el central (opt-in)**, la sesión exploratoria también se publica al catálogo —para visibilidad—, pero **no es relevable cross-dev**: que **otro** dev la retome exige formalizarla en REQ antes. Al **formalizarse en REQ**, pasa a un `work` `req` y entra al relevo cross-dev con lock.
 
 ## REQ vinculado
 
@@ -63,9 +63,9 @@ El entorno es **compartido** —el trabajo se publica al catálogo central— **
 - hay `NEB_LOGBOOK_ENDPOINT` configurado, **y**
 - el proyecto lo declara explícitamente con el marcador `<!-- neb-logbook: central -->` en su `CLAUDE.md` (el hook lo lee antes de publicar; análogo a `<!-- neb-profile: none -->`).
 
-Sin endpoint o sin marcador → la bitácora queda **local-only**, que es el **default**: la bitácora local ya cubre el relevo del propio dev ([`pendings.md`](pendings.md) § "Sesiones pausadas" + `--resume`), y el central se reserva a los proyectos que deliberadamente comparten su trabajo con el equipo (relevo cross-dev + corpus buscable). *(Opt-in por perfil: requerimiento futuro.)*
+Sin endpoint o sin marcador → la bitácora queda **local-only**, que es el **default**: la bitácora local ya cubre el relevo del propio dev ([`pendings.md`](pendings.md) § "Sesiones pausadas" + `--resume`), y el central se reserva a los proyectos que deliberadamente comparten su trabajo con el equipo (relevo cross-dev). *(Opt-in por perfil: requerimiento futuro.)*
 
-El filtro rige también al drenar el outbox de la máquina: sale solo lo que tiene opt-in propio (el work de un REQ, por su repo; la sesión, por el dir donde arrancó) — regla completa en [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador", que además separa **qué se publica** (el marcador) de **contra qué opera el CLI** `/logbook` (las variables).
+El filtro rige también al drenar el outbox de la máquina: sale solo lo que tiene opt-in propio (el work de un REQ, por su repo; el exploratorio, por el dir donde arrancó su sesión) — regla completa en [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador", que además separa **qué se publica** (el marcador) de **contra qué opera el CLI** `/logbook` (las variables).
 
 Publicar el `work` a un entorno compartido **habilita la Entrega temprana del registro** (ver "Relación con otros artefactos" abajo).
 
@@ -75,7 +75,7 @@ Se **deriva** de la memoria del proyecto (los `active_<proyecto>_<slug>.md` — 
 
 - Metadatos: `project`, `req_slug`, `owner`, `lock_state`, estado del REQ, `branch`, `head_commit`, `origin_machine`, `claude_session_id` (válido solo en su máquina origen).
 - Estado semántico (`payload_json`): plan resumido, archivos, próximos pasos y "Pendiente de entrega". El **Trabajo en vuelo** de un relevo —prosa sobre **cómo relanzar** agentes/scripts— y sus próximos pasos no viajan aquí: viven en `## Relevo` del Change MD al que la entrada apunta ([`changes.md`](changes.md) § "Relevo").
-- Transcript: referencia local (`transcript_path`); con central, fragmentos de texto buscables (ver REQ central). Sin scrub — el contenido se preserva íntegro para reproducibilidad; el corpus es interno del equipo.
+- Transcript: solo la referencia local (`transcript_path`), informativa y válida en la máquina de origen. De la conversación, la bitácora solo guarda, y con opt-in sube al central, el resumen del exploratorio (los primeros 120 caracteres del primer mensaje); el resto no se guarda ni viaja.
 
 El esquema concreto (SQLite local / central) vive en [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql); la plantilla de entrada en [`../templates/logbook-entry.md.template`](../templates/logbook-entry.md.template).
 
@@ -85,7 +85,7 @@ El esquema concreto (SQLite local / central) vive en [`../hooks/logbook-schema.s
 |---|---|
 | Sesión en curso | El hook publica/actualiza la entrada en cada `Stop`/`SessionEnd`/`PreCompact` (ver [`../tooling/logbook.md`](../tooling/logbook.md)) |
 | Relevo | Otro dev `tomar`/`solicitar` el mando; retoma en sesión nueva (ver protocolo en `execution.md`) |
-| Cierre del REQ | El `work` se marca `archived` (`/logbook archivar <id>`) — **se preserva, no se borra** (corpus de auditoría). El borrado real es purga intencional del backend central |
+| Cierre del REQ | El `work` se marca `archived` (`/logbook archivar <id>`) — **se preserva, no se borra** (historial de auditoría). El borrado real es purga intencional del backend central |
 
 ## Relación con otros artefactos (frontera, no duplicar)
 

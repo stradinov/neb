@@ -45,7 +45,7 @@ Respaldo (--apply): sqlite3.connect(db) PLANO (sin _connect: no migra nada) + Co
   (con -wal/-shm sueltos sería inconsistente).
 Rollback (--rollback <bak>): ATTACH del respaldo y, en una with_write_tx, restaura pending.slug y
   pending.last_reviewed_at, pending_topic, topic, topic_link y pending_link desde el respaldo;
-  work/event/transcript_* quedan intactos. Pendientes creados después del respaldo conservan su fila
+  work, event y session_sync quedan intactos. Pendientes creados después del respaldo conservan su fila
   y sus notas, pero pierden temas, slug y vínculos creados después del respaldo (el siguiente
   `PD triage` los vuelve a sugerir). Un respaldo tomado ANTES de la migración (sin `slug`/`curated`)
   también sirve: esas columnas se restauran a NULL / 0.
@@ -76,7 +76,7 @@ _SCHEMA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 BAND_BY_PRIORITY = {"P0": ("high", 95.0), "P1": ("high", 75.0), "P2": ("medium", 50.0), "P3": ("low", 20.0)}
 ALIVE_VERDICTS = ("vigente", "requiere_verificacion")   # veredicto_final que sigue vivo en el dataset
 PENDING_TABLES = ("pending", "pending_note", "pending_link", "topic", "topic_link", "pending_topic")
-LOGBOOK_TABLES = ("work", "event", "transcript_cursor", "session_sync", "transcript_local")
+LOGBOOK_TABLES = ("work", "event", "session_sync")
 ALL_TABLES = LOGBOOK_TABLES + PENDING_TABLES
 SEED_TABLES = ("pending", "pending_topic", "topic", "topic_link", "pending_link")   # lo que toca el seed/rollback
 AXIS_NAMES = {"cliente": "Cliente", "topico": "Tópico"}
@@ -416,7 +416,7 @@ def backup_db(db_path, dst_path):
 def rollback(db_path, bak_path):
     """Restauración LÓGICA de las tablas del seed desde el respaldo (ATTACH), en una transacción:
     pending.slug + pending.last_reviewed_at, pending_topic, topic, topic_link y pending_link.
-    work/event/transcript_* no se tocan. Devuelve conteos restaurados."""
+    work, event y session_sync no se tocan. Devuelve conteos restaurados."""
     _require_db(db_path)
     if not os.path.isfile(bak_path):
         raise RuntimeError(f"no existe el respaldo {bak_path}")

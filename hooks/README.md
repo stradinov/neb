@@ -41,22 +41,19 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 
 ### logbook-sync
 
-`Stop` + `SessionEnd` + `PreCompact` — publica/actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo** (SQLite local). Si el proyecto activa el central (`NEB_LOGBOOK_ENDPOINT` y el marcador opt-in `<!-- neb-logbook: central -->` en su `CLAUDE.md`), tras la captura lanza un **sync detached** que drena el outbox + sube el transcript al backend central. Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
+`Stop` + `SessionEnd` + `PreCompact` — publica/actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo** (SQLite local). Si el proyecto activa el central (`NEB_LOGBOOK_ENDPOINT` y el marcador opt-in `<!-- neb-logbook: central -->` en su `CLAUDE.md`), tras la captura lanza un **sync detached** que drena el outbox al backend central. De la conversación solo se guarda, y con opt-in se sube, el resumen del exploratorio (los primeros 120 caracteres del primer mensaje); el resto no se guarda ni se sube. Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
 
 - **Tipo**: `command`. Bajo el plugin, `hooks/neb-hook.py` llama directo a `hooks/lib/logbook.py`. Para una entrada de settings con clon hay dos wrappers hermanos: `logbook-sync.sh` (Linux/Mac, requiere `jq`) y `logbook-sync.ps1` (Windows).
 - **Requiere**: Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib). Los wrappers requieren además `NEB_HOME`.
+- **Búsqueda por nombre**: si la ruta guardada del `.jsonl` ya no existe, se busca por nombre en `~/.claude/projects/*/` para recuperar el `cwd` de arranque (opt-in de los exploratorios).
 - **`SessionEnd` al salir**: Claude Code da 1.5 s a los hooks de `SessionEnd`, y el `timeout` de un hook de plugin no amplía ese presupuesto. La captura de `Stop` y `PreCompact` ya cubre el último turno.
 - **REQ vinculado**: en `Stop` y `PreCompact`, después del commit de la captura, liga la sesión a los REQ vinculados cuyo Change MD escribió, o sobre los que corrió `vincular` (`link <ruta>`), y registra los nuevos ([`workflow/logbook.md`](../workflow/logbook.md) § "REQ vinculado"). Tiene un límite de 4 s, nunca corre `git log` y no corre en `SessionEnd`. Nunca bloquea la captura: corre cuando la captura ya está confirmada, y un fallo suyo se descarta.
 - **Central (opcional)**: con `NEB_LOGBOOK_ENDPOINT` + `NEB_LOGBOOK_TOKEN` en el entorno y el marcador en el `CLAUDE.md` del cwd, la captura lanza `logbook.py sync` **detached** (`subprocess.Popen`, cross-OS) que publica al central solo lo que tiene opt-in (regla en [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador") — los wrappers `.sh`/`.ps1` no cambian. El cliente usa solo stdlib (`urllib`); **PyMySQL es solo del servidor** (distribuido en un repositorio dedicado).
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
 - **Windows, entrada de settings con clon**: declarar `"shell": "powershell"` con `logbook-sync.ps1` (ver § "Filosofía").
 - **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea.
-- **Fallos del sync, visibles**: el wrapper descarta `stderr` y el sync corre detached, así que un rechazo del central no se ve en pantalla. Se persiste sin cortar el reintento: el de publicación en el `work` local (`last_error`) y el del transcript en la sesión (`session_sync.transcript_error`). Lo lista `logbook.py sync-status` (`/logbook estado-sync`). Detalle en [`tooling/logbook.md`](../tooling/logbook.md).
-- **Subida del transcript por sesión** (desde 6.12): cada sesión tiene su propio cursor (`session_sync`) y sube **una sola vez**, atribuida a un work, aunque toque varios REQ. Ninguna captura le quita la cola a otra sesión.
-  - **Un sync a la vez:** usa un candado `neb-logbook-sync.lock` junto a la DB; uno de más de 10 min se considera rancio.
-  - **Tope y presupuesto:** cada envío pesa como máximo 6 MiB de cuerpo serializado, y cada sync manda como máximo 32 MiB, de menor a mayor pendiente. Una sesión que no cabe espera, visible en `estado-sync`.
-  - **Adopción:** una sesión que quedó sin work recibe un exploratorio propio (`payload_json.adopted`).
-  - **Búsqueda por nombre:** si la ruta guardada del `.jsonl` ya no existe, se busca por nombre en `~/.claude/projects/*/`.
+- **Fallos del sync, visibles**: el wrapper descarta `stderr` y el sync corre detached, así que un rechazo del central no se ve en pantalla. Se persiste sin cortar el reintento en el `work` local (`last_error`). Lo lista `logbook.py sync-status` (`/logbook estado-sync`). Detalle en [`tooling/logbook.md`](../tooling/logbook.md).
+- **Un sync a la vez:** usa un candado `neb-logbook-sync.lock` junto a la DB, para que dos syncs no publiquen el mismo work; uno de más de 10 min se considera rancio.
 - **Activación voluntaria**: `logbook-sync` en `NEB_HOOKS` (personal) o en `NEB_PROJECT_HOOKS` (proyecto); ver § "Bajo el plugin de Neb".
 - **Subsesión interna del corrector**: si `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), `exit 0` — no escribe la subsesión Haiku a la bitácora. Ver `hooks/lib/subsession.py`.
 - **Lógica completa**: `hooks/lib/logbook.py` (modo hook de captura + CLI del comando `/logbook`); el REQ vinculado (vínculo en la captura y los verbos `link`, `trace` y `unlink`) en `hooks/lib/req_link.py`.
@@ -102,20 +99,6 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **Configurable** en sesión vía `/preprocess full|fast|off`, prefijo `$$` por prompt o env var `CLAUDE_PREPROCESS_MODE`.
 - **Excepción a la filosofía "< 100ms"**: documentada explícitamente — la llamada inevitable a `claude -p` con Haiku justifica 13–25 s (medido localmente; el plan estimaba 2–4 s, la realidad fue mayor). Mitigaciones: timeout 30 s, filtros agresivos de skip, modo `off`, activación voluntaria y personal, guard de subsesión interna via env var `NEB_INTERNAL_SUBSESSION` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) que establece en el subproceso — consumida por todos los hooks de sesión vía `hooks/lib/subsession.py`.
 
-### ops-capture
-
-`SessionEnd` — captura asistida de **conocimiento operativo** descubierto en la sesión. Lee el transcript, aplica un **gate barato** (extrae fragmentos con señales operativas — ssh, mysql, deploy, IPs, DDL…; si no hay, no hace nada y no cuesta nada), e invoca un subagente vía `claude -p` que extrae **deltas propuestos** a un **inbox efímero** (`~/.claude/ops-inbox/`, configurable con `NEB_OPS_INBOX_DIR`). **NO toca ninguna fuente de verdad** — la aplicación de los deltas es **gated** por un comando de revisión definido por el adoptante en su overlay. Implementa la pieza 2a de la metodología (memoria operativa desde sesiones).
-
-- **Tipo**: `command` (Python cross-OS, `hooks/ops-capture.py`). Bajo el plugin, `hooks/neb-hook.py` lo lanza **desacoplado** y no lo espera: Claude Code da 1.5 s a los hooks de `SessionEnd` al salir, y su `claude -p` tarda más. En una entrada de settings con clon, Windows declara `"shell": "powershell"`. La lógica determinística (gate, naming, parse del transcript) vive en `hooks/lib/ops_inbox.py`, cubierta por `hooks/tests/test_ops_capture.py`.
-- **Requiere**: Python 3 (`py`/`python3`) y el `claude` CLI en PATH (sin CLI → `exit 0` silencioso).
-- **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
-- **Mecanismo genérico, dominio en el overlay**: el prompt de detección por defecto es genérico; el overlay lo especializa con `NEB_OPS_CAPTURE_PROMPT_FILE` (prompt con vocabulario de dominio) y `NEB_OPS_SIGNALS_EXTRA` (regex extra del gate). Modelo configurable con `NEB_OPS_CAPTURE_MODEL` (por defecto, Haiku).
-- **Defensivo**: ante cualquier falla (sin transcript, sin actividad operativa, sin CLI, timeout 120s) `exit 0` — nunca bloquea el cierre de sesión. El subagente tiene instrucción de **no volcar secretos** al inbox.
-- **Seguridad (decisión de diseño)**: el hook re-envía fragmentos del transcript a la API (vía `claude -p`) y **NO redacta/filtra secretos de entrada**. El transcript de la sesión ya pasó por la API durante la propia sesión (Claude Code), así que el hook no agrega exposición nueva. El manejo de credenciales es responsabilidad **operativa del equipo adoptante**, no del hook — por diseño, el skill no filtra contenido por seguridad.
-- **Activación voluntaria**: `ops-capture` en `NEB_HOOKS` o `NEB_PROJECT_HOOKS`, como `logbook-sync`.
-- **Guard de subsesión interna**: si `NEB_INTERNAL_SUBSESSION=1` → no captura — evita capturar la subsesión Haiku del corrector y la propia recursión (invoca `claude -p`). Ver `hooks/lib/subsession.py`.
-- **Lógica completa**: `hooks/ops-capture.py` + `hooks/lib/ops_inbox.py`.
-
 ### pre-push-changelog (git hook del repo, no Claude Code)
 
 `.git/hooks/pre-push` — git hook nativo del **clon del maintainer**. Se instala una sola vez la envoltura (`cp hooks/pre-push-wrapper .git/hooks/pre-push`), que ejecuta `hooks/pre-push-changelog` del clon principal, también desde un worktree (aunque el del worktree sea más nuevo), y escribe en stderr qué hook corrió; si el clon principal no trae el hook, avisa y no bloquea. Es el **único punto de enforcement bloqueante de neb** — ningún hook del plugin bloquea (todos son inyección/registro/UX).
@@ -151,7 +134,7 @@ Cuando Neb se instala como **plugin** de Claude Code, su `hooks/hooks.json` regi
   - Si el arranque no cabe en las 12 partes, la parte 12 termina con un aviso: qué bloques faltan y de qué archivo leerlos.
   - Costo: cada sesión carga el arranque completo (el núcleo mide unos 38 mil caracteres, 10–11 k tokens estimados; el overlay y la configuración personal se suman), y las 12 entradas suman entre 0.6 y 1 s al iniciar.
   - No consume stdin.
-- **Los hooks opcionales de este README**: `save-approved-plan`, `logbook-sync`, `notify-on-stop`, `notify-on-permission`, `ops-capture` y `preprocess-prompt`. Hay una entrada por hook, y cada entrada abre con un gate en el shell. Si el hook no está activado, la entrada termina ahí, sin arrancar Python (~50 ms por entrada en Windows). Si está activado, llama a `hooks/neb-hook.py <hook>`. Ese dispatcher lee el JSON del evento y corre el hook con el código del propio plugin: la versión instalada, sin `NEB_HOME`.
+- **Los hooks opcionales de este README**: `save-approved-plan`, `logbook-sync`, `notify-on-stop`, `notify-on-permission` y `preprocess-prompt`. Hay una entrada por hook, y cada entrada abre con un gate en el shell. Si el hook no está activado, la entrada termina ahí, sin arrancar Python (~50 ms por entrada en Windows). Si está activado, llama a `hooks/neb-hook.py <hook>`. Ese dispatcher lee el JSON del evento y corre el hook con el código del propio plugin: la versión instalada, sin `NEB_HOME`.
 
 **Activación voluntaria**, con dos listas separadas por comas y sin espacios, que se suman:
 

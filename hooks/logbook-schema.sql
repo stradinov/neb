@@ -34,7 +34,7 @@ CREATE TABLE IF NOT EXISTS work (
   -- ciclo de vida
   created_at      TEXT NOT NULL,
   updated_at      TEXT NOT NULL,
-  archived_at     TEXT,                               -- NULL = activo; se archiva al cerrar (no se borra: corpus de auditoría)
+  archived_at     TEXT,                               -- NULL = activo; se archiva al cerrar (no se borra: historial de auditoría)
   -- outbox hacia el central (solo local; el central es la autoridad y no los lleva)
   dirty           INTEGER NOT NULL DEFAULT 1,         -- pendiente de push
   synced_at       TEXT,
@@ -45,7 +45,7 @@ CREATE TABLE IF NOT EXISTS work (
   -- *_at = desde cuándo está vigente ese error (no se reescribe si el texto no cambia). Lo lee `logbook.py sync-status`.
   last_error          TEXT,                           -- canal /work/publish; NULL = sin fallo vigente
   last_error_at       TEXT,
-  transcript_error    TEXT,                           -- HEREDADO (≤ 6.11): el canal /transcript vive en session_sync; el sync lo limpia
+  transcript_error    TEXT,                           -- HEREDADO: canal de subida de transcripts, retirado; nada lo escribe ni lo limpia
   transcript_error_at TEXT
 );
 
@@ -57,7 +57,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_work_exploratory
 CREATE INDEX IF NOT EXISTS idx_work_dirty   ON work(dirty);
 CREATE INDEX IF NOT EXISTS idx_work_active  ON work(archived_at);
 
--- Historial de relevo (append-only). Acumula el volumen; alimenta el corpus de auditoría (REQ futuro).
+-- Historial de relevo (append-only). Acumula el volumen; alimenta el historial de auditoría (REQ futuro).
 CREATE TABLE IF NOT EXISTS event (
   id        INTEGER PRIMARY KEY,
   work_id   INTEGER NOT NULL REFERENCES work(id) ON DELETE CASCADE,
@@ -72,52 +72,24 @@ CREATE TABLE IF NOT EXISTS event (
 );
 CREATE INDEX IF NOT EXISTS idx_event_work ON event(work_id, ts);
 
--- Cursor de subida HEREDADO, por (sesión, work). Hasta 6.11 era la fuente del drenaje: subía solo la
--- sesión apuntada por cada work, y una sesión que otra pisaba en los works REQ perdía su cola. Desde 6.12
--- el drenaje usa `session_sync`; esta tabla la siembra (MAX por sesión) y se sigue escribiendo en cada 200
--- para que volver a un cliente anterior no re-envíe lo ya subido.
-CREATE TABLE IF NOT EXISTS transcript_cursor (
-  session_id  TEXT NOT NULL,
-  work_id     INTEGER NOT NULL REFERENCES work(id) ON DELETE CASCADE,
-  synced_byte INTEGER NOT NULL DEFAULT 0,             -- hasta qué byte del .jsonl ya se procesó/empujó
-  updated_at  TEXT NOT NULL,
-  PRIMARY KEY (session_id, work_id)
-);
-
--- Cursor de subida POR SESIÓN (fuente del drenaje de transcripts desde 6.12). Una fila por sesión: la
--- sesión sube UNA vez, atribuida a un solo work, aunque toque varios REQ. Ninguna captura le borra la
--- cola a otra sesión. La atribución se fija al crear la fila y solo cambia si aparece un work mejor
--- (el actual no está publicado, está en conflicto o ya no existe). synced_byte es monótono: solo sube (MAX).
+-- Registro de sesión: una fila por sesión de esta máquina. No guarda texto de la conversación.
+--   • transcript_path y root_cwd: el opt-in de los works exploratorios (_OptIn en logbook.py) decide con el
+--     cwd con el que arrancó la sesión; se guarda una sola vez porque el .jsonl puede borrarse después.
+--   • read_byte: cursor de lectura del .jsonl; cada captura lee solo el tramo nuevo (insumo del REQ vinculado).
+-- Las columnas marcadas HEREDADO son del canal de subida de transcripts, ya retirado: nada las escribe.
 CREATE TABLE IF NOT EXISTS session_sync (
   session_id          TEXT PRIMARY KEY,
-  work_id             INTEGER REFERENCES work(id) ON DELETE SET NULL,  -- work local al que se atribuye la subida
+  work_id             INTEGER REFERENCES work(id) ON DELETE SET NULL,  -- HEREDADO: work al que se atribuía la subida
   transcript_path     TEXT,                           -- última ruta conocida del .jsonl (NULL = buscar por nombre)
-  synced_byte         INTEGER NOT NULL DEFAULT 0,     -- hasta qué byte llegó al central
-  transcript_error    TEXT,                           -- fallo vigente del canal /transcript de esta sesión
-  transcript_error_at TEXT,                           -- desde cuándo (no se reescribe si el texto no cambia)
+  synced_byte         INTEGER NOT NULL DEFAULT 0,     -- HEREDADO: hasta qué byte llegó al central
+  transcript_error    TEXT,                           -- HEREDADO: fallo del canal de subida de esta sesión
+  transcript_error_at TEXT,                           -- HEREDADO
   updated_at          TEXT NOT NULL,
-  root_cwd            TEXT                            -- cwd con el que arrancó la sesión (opt-in al drenar; 6.14.2)
+  root_cwd            TEXT,                           -- cwd con el que arrancó la sesión (opt-in de exploratorios)
+  read_byte           INTEGER NOT NULL DEFAULT 0      -- hasta qué byte del .jsonl ya se leyó (solo sube)
 );
+-- Se conserva aunque work_id sea heredado: sirve a la FK ON DELETE SET NULL (borrar un work no recorre la tabla).
 CREATE INDEX IF NOT EXISTS idx_session_sync_work ON session_sync(work_id);
-
--- Corpus local buscable (SR-1, programa preservación-de-conocimiento).
--- Persiste el text_plain de las sesiones LOCALMENTE (el central lo tiene en su tabla
--- `transcript`; el .jsonl es efímero). Habilita al solitario buscar su corpus sin central.
--- Cursor local = MAX(byte_to) por session_id (no usa session_sync ni transcript_cursor, que son del sync).
--- Como lo llena toda captura, también es la lista de sesiones que el sync adopta si quedaron sin work.
--- El indice FTS5 (transcript_fts) se crea on-demand en logbook.py (SQLite sin FTS5 no rompe).
-CREATE TABLE IF NOT EXISTS transcript_local (
-  id          INTEGER PRIMARY KEY,
-  session_id  TEXT    NOT NULL,
-  work_id     INTEGER NULL,                            -- informativo (una sesion puede tocar varios works)
-  byte_from   INTEGER NOT NULL,
-  byte_to     INTEGER NOT NULL,                        -- MAX(byte_to) por session = cursor de indexado local
-  text_plain  TEXT    NOT NULL,                        -- user/assistant, sin tool_result (via _extract_text_plain)
-  created_at  TEXT    NOT NULL
-);
--- Idempotencia del tramo: re-indexar la misma sesion no duplica.
-CREATE UNIQUE INDEX IF NOT EXISTS uq_transcript_local ON transcript_local(session_id, byte_from, byte_to);
-CREATE INDEX IF NOT EXISTS idx_transcript_local_session ON transcript_local(session_id);
 
 -- ===========================================================================
 -- REQ vinculado (REQ neb-trazabilidad-indice-commits, E2). SOLO LOCAL: no viaja al central, no toca `work`
@@ -166,7 +138,7 @@ CREATE TABLE IF NOT EXISTS req_session (
 -- ===========================================================================
 
 -- Un pendiente del dev. type='task' = algo por hacer; type='session' = sesion pausada
--- (referencia un work exploratory por session_ref → contexto via su transcript local).
+-- (referencia un work exploratory por session_ref → contexto vía su .jsonl en la máquina de origen).
 CREATE TABLE IF NOT EXISTS pending (
   id               INTEGER PRIMARY KEY,                 -- autoincrement (reemplaza grep max+1)
   type             TEXT NOT NULL DEFAULT 'task',        -- 'task' | 'session'

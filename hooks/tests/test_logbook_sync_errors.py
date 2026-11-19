@@ -2,9 +2,8 @@
 """
 test_logbook_sync_errors.py — fallos de sync VISIBLES (REQ neb-logbook-sync-errores-visibles).
 
-Un rechazo del central que no sea 200 ya no es mudo: se persiste por canal en work.last_error
-(publish) / work.transcript_error (transcript) sin cortar el reintento (salvo el 409), y el verbo
-local `sync-status` lo expone.
+Un rechazo del central que no sea 200 ya no es mudo: se persiste en work.last_error sin cortar el
+reintento (salvo el 409), y el verbo local `sync-status` lo expone.
 
 Invariantes de esta suite:
   • TODAS las DBs son temporales (tempfile); NUNCA se toca ~/.claude/neb-logbook.db ni ~/.claude/neb.db.
@@ -33,7 +32,7 @@ import logbook
 
 
 # 6.14.2: el drenaje filtra por opt-in (marcador en el CLAUDE.md del repo o del dir donde arrancó la
-# sesión). Estos tests son anteriores y no prueban eso: aquí todo dir cuenta como marcado. El opt-in se
+# sesión). Estos tests no prueban eso: aquí todo dir cuenta como marcado. El opt-in se
 # prueba en test_logbook_cli_and_drain.py. Sin _maybe_spawn_sync: una captura no lanza un sync real.
 _OPTIN_PATCHES = (mock.patch.object(logbook, "_is_shared", lambda cwd: True),
                   mock.patch.object(logbook, "_maybe_spawn_sync", lambda *a, **k: None))
@@ -95,25 +94,11 @@ def _row(con, wid):
         other.close()
 
 
-def _sess(con, sid):
-    """Fila de session_sync leída con una conexión NUEVA (mismo motivo que _row)."""
-    path = con.execute("PRAGMA database_list").fetchone()[2]
-    other = sqlite3.connect(path, timeout=1.0)
-    other.row_factory = sqlite3.Row
-    try:
-        return other.execute("SELECT * FROM session_sync WHERE session_id=?", (sid,)).fetchone()
-    finally:
-        other.close()
-
-
 def _http_seq(responses, calls=None):
-    """_http falso: devuelve `responses` en orden (la última se repite). Registra (path, payload); un cuerpo
-    ya serializado (body=, como manda /transcript) se registra decodificado."""
+    """_http falso: devuelve `responses` en orden (la última se repite). Registra (path, payload)."""
     state = {"i": 0}
 
-    def fake(endpoint, token, path, method="GET", payload=None, body=None, timeout=5):
-        if payload is None and body is not None:
-            payload = json.loads(body)
+    def fake(endpoint, token, path, method="GET", payload=None):
         if calls is not None:
             calls.append((path, payload))
         r = responses[min(state["i"], len(responses) - 1)]
@@ -293,7 +278,7 @@ class TestDrainWorks(unittest.TestCase):
         self.assertTrue(_row(con, bad)["last_error"].startswith("publish 422 invalid"))
         self.assertEqual(_row(con, good)["dirty"], 0)
 
-    def test_token_enmascarado_en_los_tres_sitios_de_llamada(self):
+    def test_token_enmascarado_en_los_sitios_de_llamada(self):
         tok = "SECRETO-XYZ-0123456789"
         for code in (409, 500):
             con, _, d = _fresh_db()
@@ -301,14 +286,6 @@ class TestDrainWorks(unittest.TestCase):
             with mock.patch.object(logbook, "_http", _http_seq([(code, {"error": "e", "detail": "eco " + tok})])):
                 logbook._drain_works(con, "http://x", tok)
             self.assertNotIn(tok, _row(con, wid)["last_error"], code)
-        con, _, d = _fresh_db()
-        wid = _add_req(con, "t")
-        p = os.path.join(d, "t.jsonl"); open(p, "wb").write(b'{"type":"user"}\n')
-        con.execute("UPDATE work SET remote_id=50, transcript_path=?, dirty=0 WHERE id=?", (p, wid))
-        logbook._register_session(con, "sess-t", p, [wid]); con.commit()
-        with mock.patch.object(logbook, "_http", _http_seq([(413, {"error": "e", "detail": "eco " + tok})])):
-            logbook._drain_transcripts(con, "http://x", tok)
-        self.assertNotIn(tok, _sess(con, "sess-t")["transcript_error"])
         # frontera del truncado: el token pegado al corte de 500 no debe dejar ni un prefijo
         text = logbook._sync_error_text("publish", 500, {"error": "e", "detail": "x" * 470 + tok}, tok)
         self.assertNotIn(tok[:8], text)
@@ -382,146 +359,6 @@ class TestDrainWorks(unittest.TestCase):
         text = logbook._sync_error_text("publish", 500, {"error": "e", "detail": "x" * 5000})
         self.assertEqual(len(text), 500)
         self.assertTrue(text.startswith("publish 500 e: "))
-
-
-class TestDrainTranscripts(unittest.TestCase):
-    """Canal /transcript POR SESIÓN (6.12): el fallo vive en session_sync, no en el work."""
-
-    def _work_con_transcript(self, con, d, contenido=b'{"type":"user"}\n'):
-        wid = _add_req(con, "t")
-        p = os.path.join(d, "t.jsonl")
-        with open(p, "wb") as fh:
-            fh.write(contenido)
-        con.execute("UPDATE work SET remote_id=50, transcript_path=?, dirty=0 WHERE id=?", (p, wid))
-        logbook._register_session(con, "sess-t", p, [wid])            # lo que hace la captura
-        con.commit()
-        return wid, p
-
-    def test_no_200_no_avanza_cursor_y_registra_en_la_sesion(self):
-        con, _, d = _fresh_db()
-        wid, _p = self._work_con_transcript(con, d)
-        with mock.patch.object(logbook, "_http", _http_seq([(None, {"error": "TimeoutError", "detail": "timed out"})])):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertEqual(con.execute("SELECT count(*) FROM transcript_cursor").fetchone()[0], 0)
-        s = _sess(con, "sess-t")
-        self.assertEqual(s["synced_byte"], 0)
-        self.assertEqual(s["transcript_error"], "transcript sin respuesta HTTP TimeoutError: timed out")
-        self.assertIsNotNone(s["transcript_error_at"])
-        self.assertIsNone(_row(con, wid)["last_error"])             # no toca el canal de publish
-
-    def test_publish_500_y_transcript_caido_no_se_pisan(self):
-        """Ambos drenajes fallan en el mismo sync: cada canal conserva su causa."""
-        con, _, d = _fresh_db()
-        wid, _p = self._work_con_transcript(con, d)
-        con.execute("UPDATE work SET dirty=1 WHERE id=?", (wid,)); con.commit()
-
-        def fake(endpoint, token, path, method="GET", payload=None, body=None, timeout=5):
-            if path == "/work/publish":
-                return 500, {"error": "server_error", "detail": "causa raiz"}
-            return None, {"error": "URLError", "detail": "caido"}
-        with mock.patch.object(logbook, "_http", fake):
-            logbook._drain_works(con, "http://x", "tok")
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertEqual(_row(con, wid)["last_error"], "publish 500 server_error: causa raiz")
-        self.assertEqual(_sess(con, "sess-t")["transcript_error"], "transcript sin respuesta HTTP URLError: caido")
-
-    def test_200_avanza_cursor_limpia_su_error_y_escribe_el_heredado(self):
-        con, _, d = _fresh_db()
-        wid, p = self._work_con_transcript(con, d)
-        con.execute("UPDATE session_sync SET transcript_error='transcript 500 x', transcript_error_at='t'")
-        con.execute("UPDATE work SET last_error='publish 500 y', last_error_at='t' WHERE id=?", (wid,)); con.commit()
-        calls = []
-        with mock.patch.object(logbook, "_http", _http_seq([(200, {})], calls)):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        s = _sess(con, "sess-t")
-        self.assertIsNone(s["transcript_error"]); self.assertIsNone(s["transcript_error_at"])
-        self.assertEqual(s["synced_byte"], os.path.getsize(p))
-        self.assertEqual(_row(con, wid)["last_error"], "publish 500 y")   # el canal de publish queda intacto
-        # cursor heredado: un rollback a 6.11 no re-envía lo ya subido
-        self.assertEqual(tuple(con.execute("SELECT session_id, work_id, synced_byte FROM transcript_cursor").fetchone()),
-                         ("sess-t", wid, os.path.getsize(p)))
-        (path, payload), = calls
-        self.assertEqual((path, payload["work_id"], payload["byte_from"], payload["byte_to"]),
-                         ("/transcript", 50, 0, os.path.getsize(p)))
-
-    def test_archivo_ausente_limpia_el_fallo(self):
-        con, _, d = _fresh_db()
-        wid, p = self._work_con_transcript(con, d)
-        con.execute("UPDATE session_sync SET transcript_error='transcript 500 x', transcript_error_at='t'"); con.commit()
-        os.remove(p)
-        with mock.patch.object(logbook, "_http", _http_forbidden):
-            logbook._drain_transcripts(con, "http://x", "tok", logbook._JsonlIndex(d))
-        self.assertIsNone(_sess(con, "sess-t")["transcript_error"])
-
-    def test_al_dia_limpia_el_fallo_sin_hacer_red(self):
-        con, _, d = _fresh_db()
-        wid, p = self._work_con_transcript(con, d)
-        con.execute("UPDATE session_sync SET synced_byte=?, transcript_error='transcript 500 x', transcript_error_at='t'",
-                    (os.path.getsize(p),)); con.commit()
-        with mock.patch.object(logbook, "_http", _http_forbidden):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertIsNone(_sess(con, "sess-t")["transcript_error"])
-
-    def test_mismo_fallo_de_transcript_conserva_desde_cuando(self):
-        con, _, d = _fresh_db()
-        wid, p = self._work_con_transcript(con, d)
-        with mock.patch.object(logbook, "_http", _http_seq([(413, {"error": "too_large"})])):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        con.execute("UPDATE session_sync SET transcript_error_at='2026-01-01T00:00:00+00:00'"); con.commit()
-        with open(p, "ab") as fh:
-            fh.write(b'{"type":"user"}\n')                            # el archivo crece (sesión viva)
-        with mock.patch.object(logbook, "_http", _http_seq([(413, {"error": "too_large"})])):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertEqual(_sess(con, "sess-t")["transcript_error_at"], "2026-01-01T00:00:00+00:00")
-
-    def test_transcript_200_limpia_aunque_el_snapshot_no_viera_el_error(self):
-        """Carrera: otro sync registra el fallo DESPUÉS de que este leyó su snapshot (prev=None) y ANTES de su 200.
-        La limpieza del 200 no depende del snapshot: va en el mismo UPDATE que avanza el cursor."""
-        con, _, d = _fresh_db()
-        wid, p = self._work_con_transcript(con, d)
-
-        def fake(endpoint, token, path, method="GET", payload=None, body=None, timeout=5):
-            con.execute("UPDATE session_sync SET transcript_error='transcript 500 x', transcript_error_at='t'")
-            con.commit()
-            return 200, {}
-        with mock.patch.object(logbook, "_http", fake):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertIsNone(_sess(con, "sess-t")["transcript_error"])
-
-    def test_no_registra_si_el_cursor_avanzo_durante_el_post(self):
-        con, _, d = _fresh_db()
-        wid, p = self._work_con_transcript(con, d)
-
-        def fake(endpoint, token, path, method="GET", payload=None, body=None, timeout=5):
-            con.execute("UPDATE session_sync SET synced_byte=?", (os.path.getsize(p),)); con.commit()  # otro sync lo subió
-            return None, {"error": "TimeoutError"}
-        with mock.patch.object(logbook, "_http", fake):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertIsNone(_sess(con, "sess-t")["transcript_error"])
-
-    def test_fila_sana_no_genera_escrituras(self):
-        """Limpieza CONDICIONAL: una sesión al día y sin fallo previo no debe emitir UPDATE."""
-        con, _, d = _fresh_db()
-        wid, p = self._work_con_transcript(con, d)
-        con.execute("UPDATE session_sync SET synced_byte=?", (os.path.getsize(p),)); con.commit()
-        before = con.total_changes
-        with mock.patch.object(logbook, "_http", _http_forbidden):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertEqual(con.total_changes, before)
-
-    def test_transcript_usa_timeout_largo_y_cuerpo_serializado(self):
-        con, _, d = _fresh_db()
-        self._work_con_transcript(con, d)
-        seen = {}
-
-        def fake(endpoint, token, path, method="GET", payload=None, body=None, timeout=5):
-            seen.update(payload=payload, body=body, timeout=timeout)
-            return 200, {}
-        with mock.patch.object(logbook, "_http", fake):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertIsNone(seen["payload"])
-        self.assertIsInstance(seen["body"], bytes)
-        self.assertEqual(seen["timeout"], logbook._TRANSCRIPT_TIMEOUT)
 
 
 class TestMigrate(unittest.TestCase):
@@ -617,10 +454,10 @@ class TestSyncStatus(unittest.TestCase):
         conf = _add_req(con, "conflicto-viejo")                               # conflict=1 y dirty=0: heredado
         con.execute("UPDATE work SET dirty=0, conflict=1 WHERE id=?", (conf,))
         tx = _add_req(con, "transcript-roto")
-        # El canal de transcript es POR SESIÓN: un transcript_error heredado en el work ya no se lista.
+        # transcript_error es heredado del canal de subida retirado: un work publicado que lo trae no se lista.
         con.execute("UPDATE work SET dirty=0, remote_id=2, transcript_error='transcript 413 heredado', "
                     "transcript_error_at='t' WHERE id=?", (tx,))
-        logbook._register_session(con, "sess-roto", None, [tx])
+        logbook._register_session(con, "sess-roto", None, None)
         con.execute("UPDATE session_sync SET transcript_error='transcript 500 x', transcript_error_at='t' "
                     "WHERE session_id='sess-roto'")
         con.commit()
@@ -634,18 +471,12 @@ class TestSyncStatus(unittest.TestCase):
         for r in rows:
             self.assertNotIn("id", r)                          # nunca `id`: con central los ids son remotos
             self.assertIn("remote_id", r)
-            self.assertNotIn("transcript_error", r)            # el transcript se reporta por sesión
+            self.assertNotIn("transcript_error", r)            # heredado: sync-status no lo reporta
 
     def test_sin_central_no_lista_los_dirty_sin_fallo(self):
         con, ids = self._db()
         got = {r["local_id"] for r in logbook._sync_status_rows(con, central=False)}
         self.assertEqual(got, {ids["err"], ids["conf"]})
-
-    def test_sesion_con_error_se_lista(self):
-        con, ids = self._db()
-        (s,) = logbook._sync_status_sessions(con)
-        self.assertEqual((s["session_id"], s["status"], s["work_local_id"], s["work_remote_id"]),
-                         ("sess-roto", "error", ids["tx"], 2))
 
     def test_verbo_registrado_en_el_dispatcher(self):
         self.assertIn("sync-status", logbook.CLI_CMDS)         # si falta, cae a captura y sale mudo con rc=0
@@ -666,9 +497,9 @@ class TestSyncStatus(unittest.TestCase):
         out = json.loads(self._run_cli(con, FAKE_ENV).decode("ascii"))     # ASCII puro
         self.assertEqual(out["scope"], "local")
         self.assertTrue(out["endpoint_set"]); self.assertTrue(out["token_set"])
-        self.assertEqual(out["attention"], 3)                  # err + conf + sesión con error (el pendiente no cuenta)
+        self.assertEqual(out["attention"], 2)                  # err + conf (el pendiente no cuenta; las sesiones tampoco)
         self.assertEqual({w["local_id"] for w in out["works"]}, {ids["pend"], ids["err"], ids["conf"]})
-        self.assertEqual([s["session_id"] for s in out["sessions"]], ["sess-roto"])
+        self.assertNotIn("sessions", out)
         self.assertNotIn(FAKE_ENV["NEB_LOGBOOK_TOKEN"], json.dumps(out))   # booleanos, nunca el valor
 
     def test_cli_avisa_si_hay_endpoint_pero_falta_el_token(self):
@@ -719,18 +550,6 @@ class TestSyncStatus(unittest.TestCase):
                           "conflict": 0, "remote_id": 9, "synced_at": "S", "last_error": "LE", "last_error_at": "LEA",
                           "updated_at": "U", "archived_at": None})
 
-    def test_fila_completa_de_sesion(self):
-        con, _p, d = _fresh_db()
-        wid = _add_req(con, "r")
-        con.execute("UPDATE work SET remote_id=9 WHERE id=?", (wid,))
-        p = os.path.join(d, "s.jsonl"); open(p, "wb").write(b"x" * 10)
-        logbook._register_session(con, "s1", p, [wid])
-        con.execute("UPDATE session_sync SET synced_byte=4, transcript_error='TE', transcript_error_at='TEA'"); con.commit()
-        (row,) = logbook._sync_status_sessions(con)
-        self.assertEqual(row, {"session_id": "s1", "status": "error", "work_local_id": wid, "work_remote_id": 9,
-                               "synced_byte": 4, "pending_bytes": 6, "transcript_error": "TE",
-                               "transcript_error_at": "TEA"})
-
     def test_cli_no_queda_vacio_con_caracteres_fuera_de_cp1252(self):
         """En un pipe cp1252 de Windows, ensure_ascii=False + '↔' daba 0 bytes con rc=0: 'nada atascado'."""
         con, ids = self._db()
@@ -740,53 +559,14 @@ class TestSyncStatus(unittest.TestCase):
         out = json.loads(raw.decode("ascii"))
         self.assertIn("↔", [w for w in out["works"] if w["local_id"] == ids["err"]][0]["last_error"])
 
-    def test_pendiente_de_transcript_calculado_al_vuelo(self):
-        con, _path, d = _fresh_db()
-        wid = _add_req(con, "t")
-        p = os.path.join(d, "t.jsonl")
-        with open(p, "wb") as fh:
-            fh.write(b"x" * 1000)
-        con.execute("UPDATE work SET dirty=0, remote_id=3 WHERE id=?", (wid,))
-        con.execute("INSERT INTO transcript_cursor (session_id, work_id, synced_byte, updated_at) VALUES (?,?,?,?)",
-                    ("sess-t", wid, 400, "t"))
-        logbook._register_session(con, "sess-t", p, [wid])            # nace sembrada en 400
-        con.execute("UPDATE session_sync SET transcript_error='transcript 413', transcript_error_at='t'"); con.commit()
-        (row,) = logbook._sync_status_sessions(con)
-        self.assertEqual(row["pending_bytes"], 600)
-
-    def test_esperando_work_y_jsonl_ausente(self):
-        con, _path, d = _fresh_db()
-        sin_pub = _add_req(con, "sin-publicar")                      # remote_id NULL
-        p = os.path.join(d, "a.jsonl"); open(p, "wb").write(b"x" * 50)
-        logbook._register_session(con, "s-espera", p, [sin_pub])
-        pub = _add_req(con, "publicado")
-        con.execute("UPDATE work SET remote_id=8 WHERE id=?", (pub,))
-        logbook._register_session(con, "s-perdida", os.path.join(d, "borrado.jsonl"), [pub])
-        con.execute("INSERT INTO transcript_local (session_id, work_id, byte_from, byte_to, text_plain, created_at) "
-                    "VALUES ('s-perdida', NULL, 0, 300, 'hola', 't')")
-        logbook._register_session(con, "s-al-dia-sin-archivo", os.path.join(d, "otro.jsonl"), [pub])
-        con.commit()
-        got = {s["session_id"]: (s["status"], s["pending_bytes"])
-               for s in logbook._sync_status_sessions(con, logbook._JsonlIndex(d))}
-        self.assertEqual(got, {"s-espera": ("esperando-work", 50), "s-perdida": ("jsonl-ausente", 300)})
-
-
 class TestCandadoReal(unittest.TestCase):
     """Otra conexión (una 'captura' de otra sesión) toma el candado de escritura y ESCRIBE mientras el sync
     intenta registrar/limpiar. Con un candado real, no con un proxy que lanza antes de tocar SQLite."""
 
-    def _db(self, transcripts=False, slugs="ABC"):
+    def _db(self, slugs="ABC"):
         con, path, d = _fresh_db()
         for slug in slugs:
-            t = os.path.join(d, slug + ".jsonl")
-            with open(t, "wb") as fh:
-                fh.write(b'{"type":"user"}\n' * 5)
             _add_req(con, slug)
-            con.execute("UPDATE work SET transcript_path=? WHERE req_slug=?", (t, slug))
-        if transcripts:
-            con.execute("UPDATE work SET dirty=0, remote_id=id+100")
-            for wid, slug, t in con.execute("SELECT id, req_slug, transcript_path FROM work").fetchall():
-                logbook._register_session(con, "sess-" + slug, t, [wid])
         con.commit()
         con.execute("PRAGMA busy_timeout=150")           # no esperar 5 s por caso: el mecanismo es el mismo
         return con, path
@@ -821,44 +601,11 @@ class TestCandadoReal(unittest.TestCase):
         self.assertEqual(rows["C"]["dirty"], 0)              # el último, tras liberar el candado, se publicó
         self.assertEqual(rows["C"]["remote_id"], 9)
 
-    def test_transcripts_bajo_candado_no_tumban_el_drenaje(self):
-        """Con el candado tomado desde antes del drenaje: A está AL DÍA con un fallo previo (limpieza sin red),
-        B recibe 500 (registro), C recibe 200 (el INSERT del cursor choca). D se publica tras liberarlo.
-        Ninguna de las tres ramas puede abortar el lote."""
-        con, path = self._db(transcripts=True, slugs="ABCD")
-        con.execute("UPDATE session_sync SET transcript_error='transcript 500 viejo', transcript_error_at='t'")
-        ta = con.execute("SELECT transcript_path FROM work WHERE req_slug='A'").fetchone()[0]
-        con.execute("UPDATE session_sync SET synced_byte=? WHERE session_id='sess-A'",
-                    (os.path.getsize(ta),))                  # A al día ⇒ entra a la rama que limpia sin red
-        con.commit()
-        locker = sqlite3.connect(path, timeout=0.05, isolation_level=None)
-        self.addCleanup(locker.close)
-        locker.execute("BEGIN IMMEDIATE"); locker.execute("UPDATE work SET origin_machine='locked' WHERE req_slug='D'")
-        n = {"i": 0}
-
-        def http(ep, tok, p, method="GET", payload=None, body=None, timeout=5):
-            i = n["i"]; n["i"] += 1                          # i=0 → B, i=1 → C, i=2 → D (mismo pendiente: orden por id)
-            if i == 2:
-                locker.execute("COMMIT")                     # se libera antes del POST de D
-            return [(500, {"error": "server_error"}), (200, {}), (200, {})][min(i, 2)]
-        with mock.patch.object(logbook, "_http", http):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertFalse(con.in_transaction)
-        subidas = {r[0] for r in con.execute("SELECT session_id FROM session_sync WHERE synced_byte > 0")}
-        self.assertEqual(subidas, {"sess-A", "sess-D"})     # C chocó con el candado: se reintentará
-        self.assertIsNone(_sess(con, "sess-D")["transcript_error"])
-        # y un drenaje posterior sobre la MISMA conexión sigue funcionando (no quedó tx colgada)
-        with mock.patch.object(logbook, "_http", _http_seq([(200, {})])):
-            logbook._drain_transcripts(con, "http://x", "tok")
-        self.assertIsNone(_sess(con, "sess-A")["transcript_error"])   # ahora sí, sin candado, A quedó limpio
-        self.assertEqual(con.execute("SELECT count(*) FROM session_sync WHERE synced_byte > 0").fetchone()[0], 4)
-
-
 class TestSyncMainSobreDbMigrada(unittest.TestCase):
 
     def test_e2e_sobre_db_legacy_migrada(self):
-        """sync_main completo (ambos drenajes) sobre una DB creada con el DDL VIEJO: la migración corre en el
-        _connect del propio sync y el resultado se lee con otra conexión."""
+        """sync_main completo sobre una DB creada con el DDL VIEJO (con el cursor de subida retirado): la
+        migración corre en el _connect del propio sync y el resultado se lee con otra conexión."""
         home = tempfile.mkdtemp(prefix="neb-test-syncmain-")
         os.makedirs(os.path.join(home, ".claude"))
         path = os.path.join(home, ".claude", "neb-logbook.db")
@@ -875,10 +622,10 @@ class TestSyncMainSobreDbMigrada(unittest.TestCase):
         c.commit(); c.close()
         guide = os.path.join(HERE, "..", "..")                          # NEB_HOME de la copia: hooks/logbook-schema.sql
 
-        def fake(endpoint, token, path_, method="GET", payload=None, body=None, timeout=5):
+        def fake(endpoint, token, path_, method="GET", payload=None):
             if path_ == "/work/publish":
                 return 500, {"error": "server_error", "detail": "boom"}
-            return 200, {}
+            raise AssertionError("ruta inesperada " + path_)
         with mock.patch.dict(os.environ, FAKE_ENV), mock.patch.object(logbook, "_http", fake):
             logbook.sync_main([guide, home])
         other = sqlite3.connect(path); other.row_factory = sqlite3.Row
@@ -886,8 +633,9 @@ class TestSyncMainSobreDbMigrada(unittest.TestCase):
         malo = other.execute("SELECT dirty, last_error FROM work WHERE req_slug='malo'").fetchone()
         self.assertEqual(malo["dirty"], 1)
         self.assertEqual(malo["last_error"], "publish 500 server_error: boom")
-        cur = other.execute("SELECT synced_byte FROM transcript_cursor WHERE session_id='s-pub'").fetchone()
-        self.assertEqual(cur["synced_byte"], os.path.getsize(t))         # la 2ª mitad de sync_main también corrió
+        self.assertFalse(_db_shared._table_exists(other, "transcript_cursor"))   # la migración la borró
+        pub = other.execute("SELECT dirty, remote_id FROM work WHERE req_slug='publicado'").fetchone()
+        self.assertEqual(tuple(pub), (0, 44))                            # lo ya publicado no se reenvía
         rows = logbook._sync_status_rows(other, central=False)
         self.assertEqual([r["req_slug"] for r in rows], ["malo"])
         other.close()

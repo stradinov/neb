@@ -312,8 +312,14 @@ _WORK_MIGRATIONS = (
 
 # Columnas agregadas a `session_sync` (6.12) después de su esquema inicial. Mismo contrato.
 _SESSION_SYNC_MIGRATIONS = (
-    ("root_cwd", "ALTER TABLE session_sync ADD COLUMN root_cwd TEXT"),
+    ("root_cwd",  "ALTER TABLE session_sync ADD COLUMN root_cwd TEXT"),
+    ("read_byte", "ALTER TABLE session_sync ADD COLUMN read_byte INTEGER NOT NULL DEFAULT 0"),
 )
+
+# Tablas del corpus local y del cursor de subida de transcripts, retiradas. _migrate las borra si existen
+# (ver _drop_retired_transcript_tables). El índice FTS5 va al final y en su propia transacción: si su
+# módulo falta en este SQLite, su DROP falla sin retener las otras dos.
+_RETIRED_TRANSCRIPT_TABLES = ("transcript_local", "transcript_cursor", "transcript_fts")
 
 
 # Columnas agregadas a las tablas de pendings después de su esquema inicial (REQ pendings-taxonomia).
@@ -364,7 +370,9 @@ def _migrate(con):
     se propaga: _connect devuelve None y se conserva el invariante 'conexión devuelta = esquema completo'.
 
     Orden: `work` primero (siempre), luego `session_sync` y las tablas de pendings SOLO si existen de verdad
-    (una DB solo-logbook, sin pendings, no debe romper). Solo DDL: sin UPDATEs dependientes de datos."""
+    (una DB solo-logbook, sin pendings, no debe romper). Solo DDL: sin UPDATEs dependientes de datos.
+    La excepción es la limpieza de las tablas de transcripts retiradas, que va al final (necesita la
+    columna read_byte) y tiene su propio contrato: nunca propaga (ver _drop_retired_transcript_tables)."""
     cols = {r[1] for r in con.execute("PRAGMA table_info(work)").fetchall()}
     if not cols:
         return
@@ -393,6 +401,61 @@ def _migrate(con):
                 print(f"[logbook] aviso: uq_pending_slug no creado ({e}); saneá los slugs duplicados",
                       file=sys.stderr)
     con.commit()
+    _drop_retired_transcript_tables(con)
+
+
+def _drop_retired_transcript_tables(con):
+    """Borra transcript_fts, transcript_local y transcript_cursor si queda alguna (bases anteriores al retiro
+    de la subida de transcripts y del corpus local). Sin ninguna de ellas no escribe ni pide candado.
+    En transacciones explícitas separadas, para que un fallo no se lleve lo ya hecho:
+      1. Si existe transcript_local, siembra session_sync.read_byte con el MAX(byte_to) de cada sesión cuando
+         es mayor que el actual (y crea la fila mínima de las sesiones que no la tienen): una sesión viva no
+         se relee desde el byte 0, y un REQ que el dev desvinculó no se vuelve a vincular. Es idempotente
+         (solo sube el cursor), así que repetirla en un reintento no cambia nada.
+      2. DROP de transcript_local y transcript_cursor.
+      3. DROP de transcript_fts (arrastra sus tablas sombra). Si su módulo falta, solo ella se queda.
+    Nunca propaga: ante 'database is locked', 'no such module' (FTS5 ausente en este SQLite) o cualquier
+    otro error de SQLite revierte la transacción en curso, avisa por stderr y sigue; se reintenta en la
+    siguiente conexión. Así la limpieza nunca hace que _connect devuelva None. Si la siembra misma falla
+    (candado), transcript_local sigue en la base y el lector de la captura toma de ahí el cursor
+    (logbook._read_new_chunk)."""
+    try:
+        present = [t for t in _RETIRED_TRANSCRIPT_TABLES if _table_exists(con, t)]
+    except sqlite3.Error as e:
+        print(f"[logbook] aviso: no se pudo revisar las tablas de transcripts retiradas: {e}", file=sys.stderr)
+        return
+    if not present:
+        return
+    saved = con.isolation_level
+    try:
+        con.isolation_level = None                    # transacción explícita: el driver no inyecta BEGIN
+        if "transcript_local" in present and _table_exists(con, "session_sync"):
+            con.execute("BEGIN IMMEDIATE")
+            con.execute(
+                "UPDATE session_sync SET read_byte = (SELECT MAX(t.byte_to) FROM transcript_local t "
+                "WHERE t.session_id = session_sync.session_id) "
+                "WHERE read_byte < (SELECT COALESCE(MAX(t.byte_to), 0) FROM transcript_local t "
+                "WHERE t.session_id = session_sync.session_id)")
+            con.execute(
+                "INSERT OR IGNORE INTO session_sync (session_id, read_byte, updated_at) "
+                "SELECT session_id, MAX(byte_to), ? FROM transcript_local "
+                "WHERE session_id NOT IN (SELECT session_id FROM session_sync) GROUP BY session_id",
+                (now_iso(),))
+            con.execute("COMMIT")                     # la siembra queda aunque el DROP falle
+        for group in (("transcript_local", "transcript_cursor"), ("transcript_fts",)):
+            todo = [t for t in group if t in present]
+            if not todo:
+                continue
+            con.execute("BEGIN IMMEDIATE")
+            for table in todo:
+                con.execute(f"DROP TABLE IF EXISTS {table}")
+            con.execute("COMMIT")
+    except sqlite3.Error as e:
+        _safe_rollback(con)
+        print(f"[logbook] aviso: no se pudieron borrar las tablas de transcripts retiradas ({e}); "
+              "se reintenta en la siguiente conexión", file=sys.stderr)
+    finally:
+        con.isolation_level = saved
 
 
 # --------------------------------------------------------------------------- transacciones

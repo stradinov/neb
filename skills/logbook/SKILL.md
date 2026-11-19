@@ -25,21 +25,15 @@ LB() { py "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python "$NEB_SRC/h
 ### Listar (default, sin args)
 `LB list` → JSON de los trabajos activos. Presenta una tabla: **id · proyecto/req (o "exploratoria") · owner · lock · estado · antigüedad**. Separa los **con-REQ** (relevables cross-dev) de las **sesiones exploratorias** (reanudables con `--resume` por su dueño).
 
-**Siempre** corre además `LB sync-status` y, **antes** de la tabla, antepón un aviso cuando su salida traiga `attention > 0` (works en conflicto o con un fallo de publicación, o sesiones con un fallo de subida del transcript) o `endpoint_set: true` con `token_set: false` (el sync no está corriendo y no deja rastro). Una línea por work afectado (`local_id` · req · `last_error` · desde cuándo) y una por sesión con `status: error` (`session_id` · `transcript_error` · desde cuándo · `pending_bytes`). Sin este aviso un rechazo permanente del central es invisible: el dev solo se entera si pregunta. Si no hay nada que avisar, no digas nada. **Pero si la salida de `LB sync-status` viene vacía, no es JSON o no trae `attention`, antepón una línea: «no se pudo verificar el estado del sync (¿`NEB_HOME` desactualizado respecto al plugin?)»** — una salida vacía no significa «nada atascado».
+**Siempre** corre además `LB sync-status` y, **antes** de la tabla, antepón un aviso cuando su salida traiga `attention > 0` (works en conflicto o con un fallo de publicación) o `endpoint_set: true` con `token_set: false` (el sync no está corriendo y no deja rastro). Una línea por work afectado (`local_id` · req · `last_error` · desde cuándo). Sin este aviso un rechazo permanente del central es invisible: el dev solo se entera si pregunta. Si no hay nada que avisar, no digas nada. **Pero si la salida de `LB sync-status` viene vacía, no es JSON o no trae `attention`, antepón una línea: «no se pudo verificar el estado del sync (¿`NEB_HOME` desactualizado respecto al plugin?)»** — una salida vacía no significa «nada atascado».
 
 ### Estado del sync — `estado-sync`
 `LB sync-status` → estado del outbox hacia el central. Lee **siempre** la DB local y nunca hace red: ese estado no existe en el central.
 - **`works`:** works pendientes de publicar (`dirty`), en conflicto (`conflict`) o con un fallo de publicación (`last_error`).
-- **`sessions`:** sesiones cuyo transcript requiere atención, según `status`:
-  - `error`: hay un fallo vigente. Incluye «excede el tope por envío», que espera la subida fragmentada.
-  - `esperando-work`: tiene cola, pero su work no está publicado.
-  - `jsonl-ausente`: el archivo ya no existe y `pending_bytes` nunca llegó al central. Es una pérdida sin reintento posible.
 
-Cada fallo trae su `*_at` = **desde cuándo** falla; no se reescribe mientras el error sea el mismo. `pending_bytes` dice cuánto falta por subir.
+Cada fallo trae su `last_error_at` = **desde cuándo** falla; no se reescribe mientras el error sea el mismo.
 
 Un fallo de sync es **informativo**: el cliente sigue reintentando en cada sync, y cuando la causa se corrige el work se publica solo. Solo el conflicto (`409`) corta el reintento y exige reconciliar (`tomar`/`liberar-forzado`) antes de volver a publicar; con `conflict=1`, `last_error` guarda el motivo del 409. El aviso de un conflicto se apaga cuando una **captura posterior** (siguiente Stop en ese REQ) vuelve a publicar con éxito; reconciliar por sí solo no toca la fila local.
-
-El fallo del transcript es **por sesión** (desde 6.12): varias sesiones alternando sobre el mismo REQ ya no se pisan el aviso ni la cola.
 
 ### REQ vinculado — `vincular`, `traza`, `desvincular`
 Qué es un REQ vinculado y qué guarda: [`../../workflow/logbook.md`](../../workflow/logbook.md) § "REQ vinculado". Los tres verbos usan **siempre** la base local, con o sin central. Decide por `ok`, no por el código de salida: exige `"ok": true`. Si la salida viene vacía o no trae `ok`, no se hizo nada: el módulo es anterior a estos verbos (¿`NEB_HOME` desactualizado respecto al plugin?) o falló sin responder; dilo así. Con `"ok": false`, reporta el `motivo`.
@@ -55,24 +49,22 @@ Qué es un REQ vinculado y qué guarda: [`../../workflow/logbook.md`](../../work
 
 ### Retomar — `retomar <id>`
 Corre `LB show <id>` y actúa según `mode`:
-- **`req`**: (1) `LB claim <id>` (tomar el mando); (2) `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica); (3) abre una **sesión nueva** y reconstruye contexto leyendo el `transcript_path` (Read) + el `change_md`; (4) relanza lo descrito en **"Trabajo en vuelo"** de `## Relevo` del `change_md` (si el registro no trae esa sección, desde `next_steps` del `payload_json`, que copia la línea «Próximos pasos» del `active_*.md`). **No** uses `--resume` (no funciona cross-machine — capa B2 descartada).
+- **`req`**: (1) `LB claim <id>` (tomar el mando); (2) `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica); (3) abre una **sesión nueva** y reconstruye contexto desde el `change_md`: su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`); (4) relanza lo descrito en **"Trabajo en vuelo"** de `## Relevo` del `change_md` (si el registro no trae esa sección, desde `next_steps` del `payload_json`, que copia la línea «Próximos pasos» del `active_*.md`). **No** uses `--resume` (no funciona cross-machine — capa B2 descartada).
 - **`exploratory`**: entrega al dev `claude --resume <claude_session_id>` (reanuda local; válido **solo** en la máquina origen, `origin_machine`).
 
-**Sin `work` en la bitácora** (sin central, o el REQ nunca se publicó): `retomar <ruta-del-Change-MD>`. No hay `claim` ni transcript: Claude lee el Change MD, su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`), hace `git checkout` de la rama anotada en `**Rama:**` y continúa desde los próximos pasos.
+**Sin `work` en la bitácora** (sin central, o el REQ nunca se publicó): `retomar <ruta-del-Change-MD>`. No hay `claim`: Claude lee el Change MD, su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`), hace `git checkout` de la rama anotada en `**Rama:**` y continúa desde los próximos pasos.
 
 ### Lock
 - `tomar <id>` → `LB claim <id>`.
 - `liberar <id>` → `LB release <id>`.
 - `liberar-forzado <id>` → **pide confirmación humana explícita** (le quita el mando a otro dev), y con el OK: `LB forced-release <id>`. Queda auditado (`event forced_release`).
 - `solicitar <id>` → `LB request <id>`.
-- `renombrar <id> <nuevo-slug> [nuevo-project]` → `LB rename <id> <nuevo-slug>` (renombre gobernado: migra la fila preservando `event`/`transcript`; sin esto, un slug nuevo bifurca en otro work).
+- `renombrar <id> <nuevo-slug> [nuevo-project]` → `LB rename <id> <nuevo-slug>` (renombre gobernado: migra la fila preservando `event`; sin esto, un slug nuevo bifurca en otro work).
 - `archivar <id>` → `LB archive <id>` (cierre del REQ: marca el work archivado; se preserva para auditoría, la purga es manual en el backend central).
 
-### Buscar — `search <texto>`
-`LB search <texto>`: con central, FULLTEXT sobre el corpus del equipo; en local-only, sobre el corpus local — devuelve `session_id` + fragmento (si la sesión es del dev, se reanuda con `claude --resume <session_id>`).
-
 ## Notas
-- Con `NEB_LOGBOOK_ENDPOINT` y `NEB_LOGBOOK_TOKEN` configurados el CLI opera contra el **backend central** en cualquier proyecto (autoridad: lock atómico, `solicitar` funcional; los ids son los **remotos** que devuelve `list`/`search`). Si falta cualquiera de las dos → **local-only**: el lock es informativo (un dev, una DB), `solicitar` no aplica —el CLI lo informa— y `search`/`renombrar`/`archivar` operan sobre la DB local. Cómo forzar el modo local: [`../../tooling/logbook.md`](../../tooling/logbook.md) § "Backend pluggable".
+- `search` se retiró: la bitácora ya no guarda ni sube transcripts, y el verbo solo responde un aviso de retiro.
+- Con `NEB_LOGBOOK_ENDPOINT` y `NEB_LOGBOOK_TOKEN` configurados el CLI opera contra el **backend central** en cualquier proyecto (autoridad: lock atómico, `solicitar` funcional; los ids son los **remotos** que devuelve `list`). Si falta cualquiera de las dos → **local-only**: el lock es informativo (un dev, una DB), `solicitar` no aplica —el CLI lo informa— y `renombrar`/`archivar` operan sobre la DB local. Cómo forzar el modo local: [`../../tooling/logbook.md`](../../tooling/logbook.md) § "Backend pluggable".
 - Lo que no tiene opt-in (un REQ de un repo sin el marcador `<!-- neb-logbook: central -->`, o una sesión que arrancó fuera de uno) nunca llega al central: para listarlo o retomarlo con el central configurado, opera en local anteponiendo `NEB_LOGBOOK_ENDPOINT=` a **cada** llamada del flujo (`list`, `show`, `claim`, `release`…). Un verbo sin el prefijo va al central e interpreta el id como remoto: puede ser el work de otro dev. `estado-sync` no lo lista; su nota dice cuántos quedan locales. No uses `renombrar`/`archivar` en local sobre un work que ya tiene `remote_id` (publicado antes): el central no se entera y el slug nuevo bifurca el work.
 - `estado-sync` reporta **`local_id`** (id de la DB local), no `id`. Con central configurado **no** lo uses con `retomar`/`tomar`/`liberar`/`archivar`: esos verbos interpretan ids **remotos** y el mismo número puede ser el work de otro dev. Para operar sobre un work listado ahí, usa su `remote_id`. Si `remote_id` es `null`, este cliente nunca lo publicó con éxito: tras un `409` el work existe en el central a nombre de otro (ubícalo en `LB list` por project + req_slug); tras un `5xx` no existe, y lo único que aplica es corregir la causa que muestra `last_error`.
 - El wrapper `LB` descarta `stderr`: todo lo que el dev deba ver sale por `stdout` (por eso `sync-status` lleva sus avisos dentro del JSON, en `notes`).
