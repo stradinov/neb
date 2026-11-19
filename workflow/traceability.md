@@ -19,10 +19,13 @@ El **Change MD** es el **eje documental**: registra al REQ y todo enlace entre a
 | Plan aprobado | mismo nombre de archivo (`changes/plans/<YYYY-MM-DD>-<nombre>.md`) | Change MD (inverso) | [approved-plans.md](approved-plans.md) |
 | Change MD | `**Commits:**` (`esta confirmación`, `<hash>` o rango `<a>..<b>`) | git | [changes.md](changes.md) |
 | Commit | trailer `Req: <nombre>` (o `Confirmacion-autonoma: <nombre>`) | Change MD (inverso) | [`../process/version-control.md`](../process/version-control.md) § "Trailer `Req:` — del commit al REQ" |
+| REQ vinculado (bitácora local) | `LB trace <nombre>` (`/logbook traza`) | sesiones de esta máquina y commits publicados de los repos declarados, leídos de git al consultar | [logbook.md](logbook.md) § "REQ vinculado" |
 | Change MD | `**Pendientes generados:**` (cita `[slug]` (`PD-<id>`)) | pendiente en `neb.db` | [pendings.md](pendings.md) |
 | Memoria del proyecto (`active_*.md`) | `Draft changes MD:` | Change MD (inverso) | [memory.md](memory.md) |
 | Incidente | `Originado por:` | Change MD original (inverso) | [`../general/incidents.md`](../general/incidents.md) |
 | Defecto (Fase 9) | tabla Diagnóstico → `REQ derivado` | REQ que lo corrige | [`../process/improvement.md`](../process/improvement.md) |
+
+La bitácora no guarda commits; commit → REQ lo responde el trailer en git.
 
 La estructura de la sección Trazabilidad del Change MD es canónica en [`../templates/change.md.template`](../templates/change.md.template).
 
@@ -44,8 +47,9 @@ El Change MD sigue siendo el **eje documental** (todo enlace pasa por él), y la
 
 El último eslabón es la confirmación del cambio (ver [`../process/change-control-gate.md`](../process/change-control-gate.md)). En **profiles versionados con git** (cualquier profile de software/datos y `self-applied`) es el commit, y es bidireccional:
 
-- **REQ → commit**: al cierre (Fase 8) se completa el campo `**Commits:**` del Change MD. Lleva `esta confirmación` cuando el registro cierra en el mismo commit que el entregable; el/los hash(es) cuando el entregable ya se entregó antes (un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos); y un SHA por línea con confirmación o integración autónomas (ver [`changes.md`](changes.md) § "Ciclo de vida del draft"). Además, sin depender de ese campo, la consulta por trailer lista desde cualquier clon los commits entregados del REQ ([`../process/version-control.md`](../process/version-control.md) § "Trailer `Req:` — del commit al REQ").
+- **REQ → commit**: al cierre (Fase 8) se completa el campo `**Commits:**` del Change MD. Lleva `esta confirmación` cuando el registro cierra en el mismo commit que el entregable; el/los hash(es) cuando el entregable ya se entregó antes (un hash único, un rango `<inicial>..<final>`, o una lista cuando los commits no son contiguos); y un SHA por línea con confirmación o integración autónomas (ver [`changes.md`](changes.md) § "Ciclo de vida del draft"). Además, sin depender de ese campo, la consulta por trailer lista desde cualquier clon los commits entregados del REQ ([`../process/version-control.md`](../process/version-control.md) § "Trailer `Req:` — del commit al REQ"). Al anotar los SHA en el registro, `LB trace <nombre>` (`/logbook traza`) da la lista por repo.
 - **commit → REQ**: el trailer `Req: <nombre>` (o `Confirmacion-autonoma: <nombre>`) del commit lleva el `<nombre>` del Change MD; el mensaje (`tipo: descripción`) da el tipo y el tema. Permite ir de un hash suelto al REQ sin partir del Change MD.
+- **líneas → REQ**: `git blame -L <a>,<b> <archivo>` da el último commit de cada línea, o `git log -L <a>,<b>:<archivo>` todos los commits que las tocaron. De cada SHA, `git log -1 --format='%(trailers:key=Req,key=Confirmacion-autonoma,valueonly)' <sha>` da el `<nombre>`; con él, el registro `changes/*-<nombre>.md` del repo que lleva el registro (el central en un REQ cross-repo, que puede no ser el repo del commit) y su `**Plan aprobado:**`. Un commit sin trailer (anterior a la adopción del trailer, o que lo perdió por `merge --squash` o `commit --amend -m`: límites en [`../process/version-control.md`](../process/version-control.md) § "Trailer `Req:` — del commit al REQ") se busca por su hash corto en el campo `**Commits:**` de `changes/*.md` del repo que lleva el registro (el central en un REQ cross-repo).
 
 El draft del Change MD nace sin hashes (estado `En progreso`); el campo `**Commits:**` se llena al cierre. Mientras tanto, el cross-link inverso `Draft changes MD:` en el `active_*.md` del REQ mantiene la trazabilidad de la sesión en curso.
 

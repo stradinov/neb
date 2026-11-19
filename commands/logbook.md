@@ -7,7 +7,7 @@ description: Bitácora de relevo — listar, retomar o relevar trabajos a medias
 
 El usuario invocó `/logbook` (opcionalmente con un subcomando). Operá la bitácora de relevo siguiendo el skill `logbook` (definición completa en `skills/logbook/SKILL.md` — no la dupliques acá).
 
-Subcomandos: sin args o `list` (listar trabajos a medias) · `retomar <id>` o `retomar <ruta-del-Change-MD>` (sin work en la bitácora) · `tomar <id>` · `liberar <id>` · `liberar-forzado <id>` · `solicitar <id>` · `renombrar <id> <nuevo-slug>` · `archivar <id>` · `search <texto>` · `estado-sync` (works sin publicar, en conflicto o con un fallo de publicación, y sesiones cuyo transcript no sube; siempre local — el verbo del CLI es `sync-status`).
+Subcomandos: sin args o `list` (listar trabajos a medias) · `retomar <id>` o `retomar <ruta-del-Change-MD>` (sin work en la bitácora) · `tomar <id>` · `liberar <id>` · `liberar-forzado <id>` · `solicitar <id>` · `renombrar <id> <nuevo-slug>` · `archivar <id>` · `search <texto>` · `vincular <ruta>` · `traza [<nombre>|<ruta>|<id>]` · `desvincular <id|nombre|ruta>` · `estado-sync` (works sin publicar, en conflicto o con un fallo de publicación, y sesiones cuyo transcript no sube; siempre local — el verbo del CLI es `sync-status`).
 
 Resuelve el módulo (el clon de `NEB_HOME` si lo hay; si no, la raíz del plugin, que Claude Code sustituye al cargar este comando) y opera vía:
 

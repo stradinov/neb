@@ -162,6 +162,9 @@ Con el comando `/logbook`:
 - **`/logbook search <texto>`** — busca en el corpus de transcripts (el local; con central, el del equipo).
 - **`/logbook renombrar <id> <nuevo-slug>`** — renombre gobernado del REQ (con central, preserva su historial en el catálogo del equipo).
 - **`/logbook estado-sync`** — qué trabajos siguen sin publicarse al central, cuáles están en conflicto y cuáles tienen un fallo de sync vigente (con su causa y desde cuándo). `/logbook` sin argumentos te avisa si hay conflictos o fallos vigentes. Lee siempre tu bitácora local.
+- **`/logbook vincular <ruta>`** — vincula un REQ en tu bitácora local a partir de su Change MD (escribir el Change MD ya lo vincula); con `--repo <dir>` declaras otro repo del REQ, uno por llamada.
+- **`/logbook traza <nombre>`** — muestra los commits publicados con trailer `Req:` (o `Confirmacion-autonoma:`) en los repos declarados del REQ, leídos de git al consultar, y las sesiones de esta máquina que lo trabajaron, con su transcript. Sin nombre, lista tus REQ vinculados.
+- **`/logbook desvincular <id|nombre|ruta>`** — quita un REQ vinculado por error, con sus repos y sesiones; para corregir un repo mal declarado, desvincula y vuelve a vincular. Nada de esto viaja al central ([`workflow/logbook.md`](../workflow/logbook.md) § "REQ vinculado").
 
 Por defecto la bitácora es **local** (tu máquina) — si trabajas solo, no necesitas nada más. El **relevo entre devs o máquinas** —que otro dev tome tu trabajo y lo devuelva, con búsqueda de texto completo del corpus— lo habilita el **backend central** del equipo (servidor opcional, distribuido en un repositorio dedicado).
 

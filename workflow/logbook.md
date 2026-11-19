@@ -38,7 +38,23 @@ Este ENUM de lock es **ortogonal** al ENUM de estados del requerimiento ([`../me
 | **Con-REQ** | hay ≥1 `active_<proyecto>_<slug>.md` en memoria (o sección legacy) | `project + req_slug` | **relevo cross-dev** (lock atómico); estado + transcript al central |
 | **Exploratorio** | sin REQ formal (exploración previa) | `session_id` (entrada liviana, sin lock) | **`--resume` local** del mismo dev. Si el proyecto activa el central (opt-in), también se publica al catálogo (visibilidad/búsqueda); **no** relevable cross-dev (`claude_session_id` solo vale en su máquina origen) |
 
-El modo exploratorio registra automáticamente la sesión (aunque el dev no anuncie pausa) con un resumen y el `transcript_path` local, para que `/logbook` la localice entre muchas y entregue el comando `--resume`. **Si el proyecto activa el central (opt-in)**, la sesión exploratoria también se publica al catálogo —para visibilidad y búsqueda del corpus—, pero **no es relevable cross-dev**: que **otro** dev la retome exige formalizarla en REQ antes. Al **formalizarse en REQ**, se vincula a un `work` `req` y entra al relevo cross-dev con lock.
+El modo exploratorio registra automáticamente la sesión (aunque el dev no anuncie pausa) con un resumen y el `transcript_path` local, para que `/logbook` la localice entre muchas y entregue el comando `--resume`. **Si el proyecto activa el central (opt-in)**, la sesión exploratoria también se publica al catálogo —para visibilidad y búsqueda del corpus—, pero **no es relevable cross-dev**: que **otro** dev la retome exige formalizarla en REQ antes. Al **formalizarse en REQ**, pasa a un `work` `req` y entra al relevo cross-dev con lock.
+
+## REQ vinculado
+
+Un **REQ vinculado** es una fila de la bitácora local por cada (`project`, `nombre`) de un registro `changes/<AAAA-MM-DD>-<nombre>.md`. Responde, sin recorrer repos ni transcripts a mano, qué sesiones de esta máquina trabajaron el REQ y qué commits publicados lleva. Convive con el `work` `req` de § "Dos modos" sin tocarlo.
+
+- **Dos vías para vincular.**
+  - El hook de captura ve, en `Stop` o `PreCompact`, un `Write`, `Edit` o `MultiEdit` del hilo principal sobre el Change MD.
+  - Corres `/logbook vincular <ruta>`. Con `--repo <dir>` declaras un repo adicional del REQ, uno por llamada.
+- **Leer no vincula.** Leer o nombrar el Change MD no vincula nada, y escribir el plan en `changes/plans/` tampoco. Sin remoto `origin` en el repo del registro no hay vínculo. Un Incident MD se vincula como cualquier registro, con `nombre = incident-<slug>`.
+- **Llave: el `nombre`** del registro, el mismo del trailer `Req:`; la fecha es dato. Un worktree o un clon del mismo remoto ligan al mismo REQ.
+- **Qué guarda.** Solo lo que git no sabe: el REQ, sus repos declarados y las sesiones de esta máquina que lo trabajaron. Una sesión queda ligada cuando escribe el Change MD o corre `vincular` con su ruta.
+- **Qué no guarda: los commits.** `/logbook traza <nombre>` los lee de git al consultar, por el trailer `Req:` o `Confirmacion-autonoma:`, en cada repo declarado; después de un push, la siguiente `traza` ya los trae. Igual que la receta de [`../process/version-control.md`](../process/version-control.md) § "Trailer `Req:` — del commit al REQ", no ve lo que otro dev publicó sin `git fetch`.
+- **Solo local.** No viaja al central, no crea ni cambia works y no archiva nada.
+- **Desvincular.** `/logbook desvincular <id|nombre|ruta>` quita un REQ vinculado por error, con sus repos y sesiones. Para quitar un repo mal declarado, desvincula y vuelve a vincular.
+
+La mecánica (cuándo corre, límite de tiempo, modos de fallo) vive en [`../tooling/logbook.md`](../tooling/logbook.md) § "Captura (hook `logbook-sync`)"; los verbos, en [`../skills/logbook/SKILL.md`](../skills/logbook/SKILL.md).
 
 ## Entorno compartido (disparador opt-in por proyecto)
 

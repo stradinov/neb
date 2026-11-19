@@ -41,6 +41,18 @@ Un fallo de sync es **informativo**: el cliente sigue reintentando en cada sync,
 
 El fallo del transcript es **por sesión** (desde 6.12): varias sesiones alternando sobre el mismo REQ ya no se pisan el aviso ni la cola.
 
+### REQ vinculado — `vincular`, `traza`, `desvincular`
+Qué es un REQ vinculado y qué guarda: [`../../workflow/logbook.md`](../../workflow/logbook.md) § "REQ vinculado". Los tres verbos usan **siempre** la base local, con o sin central. Decide por `ok`, no por el código de salida: exige `"ok": true`. Si la salida viene vacía o no trae `ok`, no se hizo nada: el módulo es anterior a estos verbos (¿`NEB_HOME` desactualizado respecto al plugin?) o falló sin responder; dilo así. Con `"ok": false`, reporta el `motivo`.
+- `vincular <ruta> [--repo <dir>]` → `LB link <ruta> [--repo <dir>]`. Un `--repo` por llamada; para más repos, repite el comando. Un `--repo` que no se pudo resolver sale en `avisos`. `sesiones` cuenta solo las ligas ya capturadas: puede ser 0 en el mismo turno, porque la captura del siguiente `Stop` liga la sesión. No consulta commits; para verlos, `traza`.
+- `traza [<nombre>|<ruta>|<id>] [--sin-git]` → `LB trace [<nombre>|<ruta>|<id>] [--sin-git]`.
+  - Sin argumento lista los REQ vinculados (repos, sesiones, última sesión) sin llamar a git.
+  - Con nombre trae un bloque por cada `project` con ese nombre; con ruta o id, uno solo.
+  - Lee los commits de git al consultar, en cada repo declarado (refs de `origin` del clon, sin `git fetch`). Una `nota` por repo (`sin-repo`, `timeout`, `error: …`, `omitido: tope de 6 repos`) se reporta tal cual, junto con la `leyenda`: solo cuentan los repos declarados.
+  - `--sin-git` muestra solo lo que hay en la base, sin commits.
+  - `works_relacionados` es solo información: los works `req` con el mismo nombre, archivados incluidos.
+  - `leer` apunta al transcript de la sesión más reciente que sigue en disco. Si hace falta un dato que `## Relevo` no trae, Claude busca en ese transcript con Grep o lectura parcial, sin leerlo completo.
+- `desvincular <id|nombre|ruta>` → `LB unlink <id|nombre|ruta>`. Con `"motivo": "ambiguo"` muestra los `ids` y pide al dev que elija uno. Para quitar un repo mal declarado: desvincular y volver a vincular.
+
 ### Retomar — `retomar <id>`
 Corre `LB show <id>` y actúa según `mode`:
 - **`req`**: (1) `LB claim <id>` (tomar el mando); (2) `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica); (3) abre una **sesión nueva** y reconstruye contexto leyendo el `transcript_path` (Read) + el `change_md`; (4) relanza lo descrito en **"Trabajo en vuelo"** de `## Relevo` del `change_md` (si el registro no trae esa sección, desde `next_steps` del `payload_json`, que copia la línea «Próximos pasos» del `active_*.md`). **No** uses `--resume` (no funciona cross-machine — capa B2 descartada).

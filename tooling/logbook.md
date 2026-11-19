@@ -30,6 +30,7 @@ Recurso del hook que alimenta la [bitácora de relevo](../workflow/logbook.md). 
   - **Un sync a la vez** por máquina.
   - **Tope y presupuesto:** cada envío pesa como máximo 6 MiB de cuerpo y cada sync manda como máximo 32 MiB, de menor a mayor pendiente. Un tramo que no cabe espera, visible, a la subida fragmentada.
   - **Adopción:** una sesión del corpus local que quedó sin work recibe un exploratorio propio y sube, si arrancó en un dir con marcador.
+- **REQ vinculado** ([`../workflow/logbook.md`](../workflow/logbook.md) § "REQ vinculado"): en `Stop` y `PreCompact`, después del commit de la captura, liga la sesión a los REQ vinculados cuyo Change MD escribió en el tramo, o sobre los que corrió `vincular` (`link <ruta>`), y registra los nuevos. Tiene un límite de 4 s y nunca corre `git log`: las únicas llamadas a git son 2 por REQ nuevo, para ubicar su repo y su `origin`; un REQ ya registrado no vuelve a llamar a git, y uno que no se pudo registrar (sin `origin`, o con el mismo nombre ya vinculado con otra fecha) las repite en cada captura cuyo tramo traiga esa escritura, dentro del mismo límite. En `SessionEnd` no corre. Si el tramo trae 3 o más Change MD sin vincular, no registra ninguno (barrido) y solo liga los ya vinculados.
 - **Terminación abrupta:** ningún hook garantiza correr ante SIGKILL/corte de luz → se conserva hasta el último turno (`Stop`) completado. El corte de **red** no pierde nada (el estado queda local; el push al central se difiere por el outbox) y queda visible en `estado-sync`.
 
 ## Semántica degradada del lock en local-only
@@ -51,7 +52,12 @@ De activación voluntaria: el plugin registra el hook, y corre si `logbook-sync`
 - DB inaccesible o error → `exit 0` (nunca bloquea el turno).
 - El central rechaza o no responde → `exit 0`, el reintento sigue y el fallo queda persistido: el de publicación en el `work`, el del transcript en la sesión (ver § "Backend central" → *Fallos de sync*). El `stderr` del sync detached y del hook se descarta: por eso el fallo se **persiste** además de imprimirse. Registrar el fallo nunca interrumpe el drenaje de los demás works ni de las demás sesiones; solo un central caído (sin respuesta, `502`/`503`/`504`) corta los envíos de transcript de ese sync.
 - `sync` invocado a mano sin central configurado → avisa por `stderr` en vez de salir mudo.
+- REQ vinculado (§ "Captura (hook `logbook-sync`)"):
+  - Un fallo del vínculo no afecta la captura, que ya está confirmada; la evidencia de sesión de ese tramo se pierde y `vincular` la restituye.
+  - Base bloqueada o límite de 4 s vencido → la escritura se omite; la liga de sesión y el registro de ese tramo se pierden, y `vincular` los restituye.
+  - Esas omisiones (barrido, choque de fecha —el `nombre` ya vinculado con otra fecha en el mismo `project`—, límite vencido, base bloqueada, falla del vínculo) no dejan rastro visible: su aviso solo va a `stderr`, que el hook descarta. Con `link`, el choque de fecha sí se ve: responde `ok: false` con el motivo.
+  - En `traza`, un repo cuyo git falla o tarda más de 5 s sale con su nota y no tumba la consulta.
 
 ## Requisitos
 
-Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib). La captura del hook usa el módulo y el esquema del plugin cargado. El CLI (`/logbook`, `/pendings-review`) y los wrappers de una entrada de settings usan el clon de `NEB_HOME` si lo hay (un `NEB_HOME` que apunte al caché del plugin se ignora). Un maintainer que combine `NEB_HOME` en un clon con `logbook-sync` en `NEB_HOOKS` captura con el esquema del plugin; para capturar con el del clon, usa `claude --plugin-dir <clon>`.
+Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib). Además, git ≥ 2.31 en el `PATH` para registrar un REQ vinculado por escritura y para los commits de `traza`; sin git, nada se registra por escritura, `traza` sale con la nota de error en cada repo y la captura sigue igual. La captura del hook usa el módulo y el esquema del plugin cargado. El CLI (`/logbook`, `/pendings-review`) y los wrappers de una entrada de settings usan el clon de `NEB_HOME` si lo hay (un `NEB_HOME` que apunte al caché del plugin se ignora). Un maintainer que combine `NEB_HOME` en un clon con `logbook-sync` en `NEB_HOOKS` captura con el esquema del plugin; para capturar con el del clon, usa `claude --plugin-dir <clon>`.

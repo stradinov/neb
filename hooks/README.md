@@ -46,6 +46,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **Tipo**: `command`. Bajo el plugin, `hooks/neb-hook.py` llama directo a `hooks/lib/logbook.py`. Para una entrada de settings con clon hay dos wrappers hermanos: `logbook-sync.sh` (Linux/Mac, requiere `jq`) y `logbook-sync.ps1` (Windows).
 - **Requiere**: Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib). Los wrappers requieren además `NEB_HOME`.
 - **`SessionEnd` al salir**: Claude Code da 1.5 s a los hooks de `SessionEnd`, y el `timeout` de un hook de plugin no amplía ese presupuesto. La captura de `Stop` y `PreCompact` ya cubre el último turno.
+- **REQ vinculado**: en `Stop` y `PreCompact`, después del commit de la captura, liga la sesión a los REQ vinculados cuyo Change MD escribió, o sobre los que corrió `vincular` (`link <ruta>`), y registra los nuevos ([`workflow/logbook.md`](../workflow/logbook.md) § "REQ vinculado"). Tiene un límite de 4 s, nunca corre `git log` y no corre en `SessionEnd`. Nunca bloquea la captura: corre cuando la captura ya está confirmada, y un fallo suyo se descarta.
 - **Central (opcional)**: con `NEB_LOGBOOK_ENDPOINT` + `NEB_LOGBOOK_TOKEN` en el entorno y el marcador en el `CLAUDE.md` del cwd, la captura lanza `logbook.py sync` **detached** (`subprocess.Popen`, cross-OS) que publica al central solo lo que tiene opt-in (regla en [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador") — los wrappers `.sh`/`.ps1` no cambian. El cliente usa solo stdlib (`urllib`); **PyMySQL es solo del servidor** (distribuido en un repositorio dedicado).
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`).
 - **Windows, entrada de settings con clon**: declarar `"shell": "powershell"` con `logbook-sync.ps1` (ver § "Filosofía").
@@ -58,7 +59,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
   - **Búsqueda por nombre:** si la ruta guardada del `.jsonl` ya no existe, se busca por nombre en `~/.claude/projects/*/`.
 - **Activación voluntaria**: `logbook-sync` en `NEB_HOOKS` (personal) o en `NEB_PROJECT_HOOKS` (proyecto); ver § "Bajo el plugin de Neb".
 - **Subsesión interna del corrector**: si `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), `exit 0` — no escribe la subsesión Haiku a la bitácora. Ver `hooks/lib/subsession.py`.
-- **Lógica completa**: `hooks/lib/logbook.py` (modo hook de captura + CLI del comando `/logbook`).
+- **Lógica completa**: `hooks/lib/logbook.py` (modo hook de captura + CLI del comando `/logbook`); el REQ vinculado (vínculo en la captura y los verbos `link`, `trace` y `unlink`) en `hooks/lib/req_link.py`.
 
 ### notify-on-permission.{ps1,sh}
 
