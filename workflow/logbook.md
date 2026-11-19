@@ -71,7 +71,7 @@ Publicar el `work` a un entorno compartido **habilita la Entrega temprana del re
 
 ## Entrada de la bitácora
 
-Se **deriva** de la memoria del proyecto (los `active_<proyecto>_<slug>.md` — uno por REQ — y su "Pendiente de entrega"; fuente de verdad); la bitácora es su **proyección publicada al equipo**, no una segunda fuente. Contiene:
+Se **deriva** de la memoria del proyecto (los `active_<proyecto>_<slug>.md` — uno por REQ — y su "Pendiente de entrega"); la bitácora es su **proyección publicada al equipo**. Contiene:
 
 - Metadatos: `project`, `req_slug`, `owner`, `lock_state`, estado del REQ, `branch`, `head_commit`, `origin_machine`, `claude_session_id` (válido solo en su máquina origen).
 - Estado semántico (`payload_json`): plan resumido, archivos, próximos pasos y "Pendiente de entrega". El **Trabajo en vuelo** de un relevo —prosa sobre **cómo relanzar** agentes/scripts— y sus próximos pasos no viajan aquí: viven en `## Relevo` del Change MD al que la entrada apunta ([`changes.md`](changes.md) § "Relevo").
@@ -90,5 +90,5 @@ El esquema concreto (SQLite local / central) vive en [`../hooks/logbook-schema.s
 ## Relación con otros artefactos (frontera, no duplicar)
 
 - [`pendings.md`](pendings.md) § "Sesiones pausadas" + `--resume`: reanudar **la propia sesión local** (mismo dev, misma máquina). La bitácora **no lo reemplaza** — lo complementa con el **relevo cross-dev** y, en modo exploratorio, automatiza el registro para `--resume`.
-- [`memory.md`](memory.md) (`active_<proyecto>_<slug>.md` — uno por REQ — y su "Pendiente de entrega"): **fuente de verdad** local del estado del REQ. La bitácora la deriva.
+- [`memory.md`](memory.md) (`active_<proyecto>_<slug>.md` — uno por REQ — y su "Pendiente de entrega"): estado vivo del REQ en la máquina del dev. La bitácora lo deriva.
 - [`changes.md`](changes.md): el Change MD (registro del requerimiento — ver [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Registro del requerimiento") da la trazabilidad del REQ; la entrada de bitácora **apunta** a él, no lo duplica. Con el `work` publicado a una bitácora **compartida** (backend central, relevo cross-dev), su registro debe estar **entregado** (en git: pusheado) para que el puntero resuelva en la máquina que releva: es la **Entrega temprana del registro** ([`changes.md`](changes.md) § "Ciclo de vida del draft"). En backend local-only el registro sigue el ciclo por defecto, salvo al relevar: ahí se entrega de inmediato junto con su plan aprobado.

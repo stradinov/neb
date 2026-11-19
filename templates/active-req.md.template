@@ -9,7 +9,7 @@ type: project
 > **Un archivo por REQ activo**: `active_<proyecto>_<slug>.md` en el mismo dir de memoria.
 > Soporta **varios REQ del mismo proyecto en paralelo** (cada uno su archivo). El contexto
 > duradero del proyecto (Profile, Convenciones, Bugs resueltos) vive en `project_<nombre>.md`.
-> **Se elimina al cerrar el requerimiento.** Es la fuente de verdad local del estado del REQ
+> **Se elimina al cerrar el requerimiento.** Lleva el estado vivo del REQ en esta máquina
 > (la bitácora `work` lo lee, y Claude lo relee tras compactar).
 > `Nombre` lleva el `<nombre>` del Change MD del REQ, sin la fecha: el mismo identificador
 > del trailer `Req:` de sus commits y del archivo de su plan aprobado.

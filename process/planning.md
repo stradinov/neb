@@ -17,7 +17,7 @@ Gate de entrada al workflow. Contenido canónico en [`phase-transitions.md`](pha
 
 > Aplica cuando el prompt es un requerimiento formal (ver § "Trigger de formalización" arriba). Para observaciones, preguntas de diseño o propuestas exploratorias sin trigger, responder en prosa breve sin generar plan estructurado.
 
-- Reformular el requerimiento con palabras propias.
+- Reformular el requerimiento con palabras propias: el efecto que el dev busca, aparte del medio que el pedido nombra para lograrlo ([`../general/communication.md`](../general/communication.md) § "Avance del trabajo: ejecuta-y-reporta vs. gate", «Intención sobre letra»).
 - Máximo 3 preguntas si algo es ambiguo. Si lo ambiguo es el porqué de un comportamiento existente que parece deliberado, las fuentes locales van antes que la pregunta ([`../general/communication.md`](../general/communication.md) § "Elecciones: menú de selección", bullet «Opciones ancladas al estado real»).
 - No proceder sin confirmación.
 - Excepción: cambios triviales (una línea, un texto) → ir directo a propuesta.
@@ -48,6 +48,8 @@ El **plan de pruebas es obligatorio** en cualquier nivel. Dónde se define:
 | Alta  | 7+ elementos, cambio de arquitectura | Estimado + plan detallado + plan de pruebas |
 
 El plan de elaboración incluye: rango de tiempo, elementos del entregable con una línea cada uno, riesgos. El profile concretiza qué son "elementos" (archivos en un profile de software, secciones del documento en un profile de análisis).
+
+Si el plan agrega un almacén o un campo que guarda un dato sobre el estado del repo o de un sistema —una tabla o una columna de `neb.db`, un campo de la memoria o de la plantilla de un artefacto—, declara la clase de cada uno ([`../methodology/principles.md`](../methodology/principles.md) § "Fuente de verdad: el repo y el estado actual"). El que no cae en ninguna clase es derivable, o es un dato de un ambiente o de un tercero sin marca de verificación, que solo orienta. Del derivable, el plan nombra la consulta que lo da y, si aun así propone persistirlo, lo presenta como decisión del dev con su tradeoff y con la variante que no lo persiste como opción.
 
 ## Riesgo de regresión
 

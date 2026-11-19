@@ -20,7 +20,7 @@ Estructura del contexto duradero: ver [`templates/project-memory.md.template`](.
 
 ## Requerimientos activos
 
-Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estructura completa en [`templates/active-req.md.template`](../templates/active-req.md.template)). **Un archivo por REQ** — varios REQ del mismo proyecto coexisten sin pisarse. Es la **fuente de verdad** local del estado del REQ: la bitácora de relevo (`work`) los lee, y tras compactar Claude recupera de aquí el estado ([`../general/compaction.md`](../general/compaction.md)). Campos canónicos:
+Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estructura completa en [`templates/active-req.md.template`](../templates/active-req.md.template)). **Un archivo por REQ** — varios REQ del mismo proyecto coexisten sin pisarse. Lleva el estado vivo del REQ en esta máquina: la bitácora de relevo (`work`) lo lee, y tras compactar Claude recupera de aquí el estado ([`../general/compaction.md`](../general/compaction.md)). Campos canónicos:
 
 ```markdown
 - **Nombre:** <slug del requerimiento>
@@ -48,6 +48,7 @@ Handoff entre sesiones cuando el REQ está en validación esperando entrega fina
 - Lista de archivos modificados de un commit → git lo tiene.
 - Contexto de la sesión actual → tareas o archivo de plan.
 - Convenciones ya en el `CLAUDE.md` del proyecto → no duplicar.
+- Rama, último commit de una rama y demás estado que git responde → se lee de git; los campos de arriba que hoy lo copian siguen por la cláusula «Copias anteriores» de [`../methodology/principles.md`](../methodology/principles.md) § "Fuente de verdad: el repo y el estado actual". Un dato de un ambiente o de un tercero entra en los términos de esa sección: sin marca de verificación, solo orienta.
 
 ## Cuándo crear / actualizar
 

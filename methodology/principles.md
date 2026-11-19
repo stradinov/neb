@@ -74,12 +74,12 @@ Toda afirmación se respalda en evidencia del turno actual o se declara como sup
 
 Hay dos clases de suposición a vigilar:
 
-- **Estado concreto sin verificar** (brecha de contexto): afirmar sobre un archivo, dato, dependiente, configuración o el motivo de un estado existente, cuya fuente existe localmente pero no fue consultada en el turno actual. Acción: verificar (lectura, grep, LSP, consulta a memoria/skill vigente).
+- **Estado concreto sin verificar** (brecha de contexto): afirmar sobre un archivo, dato, dependiente, configuración o el motivo de un estado existente, cuya fuente existe localmente pero no fue consultada en el turno actual. Acción: verificar en la fuente (lectura, grep, LSP, consulta al sistema). La memoria y los skills cuentan como verificación solo en los términos de § "Fuente de verdad: el repo y el estado actual".
 - **Dominio sin antecedente** (dominio desconocido): inferir sobre un dominio sin cobertura en skills, memoria del proyecto o research vigente. Acción: aplicar "Contexto especializado antes de inferir" — proponer abrir REQ de research si el impacto es medio/alto (ver [`../profiles/research/conventions.md`](../profiles/research/conventions.md) § "Modos de disparo").
 
 Output esperado:
 
-- Plan (Fase 3): el plan separa dependientes/datos **verificados** (con la fuente: grep `X`, lectura de `Y:Z-W`, LSP, skill `<nombre>`, memoria `<archivo>`) de los **asumidos sin verificar** (con la razón y la acción pendiente). Cuando la Re-verificación alcanza a un supuesto de plataforma del diseño, lo que de él se puede probar en una sesión desechable no cabe entre los asumidos ([platform-assumptions.md](platform-assumptions.md) § "Mantenimiento").
+- Plan (Fase 3): el plan separa dependientes/datos **verificados** (con la fuente: grep `X`, lectura de `Y:Z-W`, LSP; skill `<nombre>` o memoria `<archivo>`, en los términos de § "Fuente de verdad: el repo y el estado actual") de los **asumidos sin verificar** (con la razón y la acción pendiente). Cuando la Re-verificación alcanza a un supuesto de plataforma del diseño, lo que de él se puede probar en una sesión desechable no cabe entre los asumidos ([platform-assumptions.md](platform-assumptions.md) § "Mantenimiento").
 - Cierre de edit (Fase 4): Claude menciona qué fuentes consultó vs cuáles dio por entendidas por contexto previo.
 - Corrección de un artefacto del REQ (cualquier fase): quien corrige una regla, un criterio, una cifra o una afirmación que el REQ ya había escrito en uno de sus artefactos actualiza, antes de presentar la corrección al dev o a una re-revisión, lo que depende de lo corregido en los artefactos de ese REQ: los pasajes que lo aplican o lo repiten, y las cifras, listas y órdenes calculados con el valor anterior. Sin eso, el dependiente sigue afirmando lo que la corrección desmintió.
   - La actualización no alcanza lo que registra un momento, como el plan ya aprobado o una entrada fechada del registro.
@@ -91,6 +91,27 @@ Output esperado:
 Aplica a todos los profiles. Cubre dos huecos: (a) incluso con skill cargado y memoria vigente, una sesión puede asumir el estado concreto de un archivo sin haberlo abierto; (b) Claude puede confundir analogías superficiales del entrenamiento con conocimiento real del dominio.
 
 Operacionalización: subagente `context-completeness-reviewer` (ver [`../agents/context-completeness-reviewer.md`](../agents/context-completeness-reviewer.md)) audita formalmente las suposiciones en plan-review (Fase 3), cierre de implementación (Fase 4) y pre-entrega final (Fase 7).
+
+## Fuente de verdad: el repo y el estado actual
+
+La fuente de verdad de un dato es donde se produce: el repositorio (commits, ramas, archivos y sus trailers) y el estado actual del sistema (lo que sirve un ambiente, lo que responde una base o un servicio). Cada uno responde lo suyo: el repo, qué está versionado; el sistema, qué corre. Si divergen, lo que corre se lee del sistema y no se infiere del repo.
+
+**Alcance:** lo que se guarda sobre el estado del repo o de un sistema en `neb.db`, en la memoria, en los artefactos del flujo (registro, plan, bitácora, pendientes), en un skill o en un documento de conocimiento, y el diseño de esos almacenes. El modelo de datos de un producto queda fuera.
+
+Lo que se lee sin salir de la máquina —el clon, sus archivos, `neb.db`— **se lee de la fuente al momento y no se persiste**: la copia se desfasa y, citada, pasa por evidencia sin serlo. Lo que git responde es derivable aunque un force-push o el borrado del clon puedan perderlo. Persistirlo —porque la lectura es lenta, porque la copia sobreviviría al clon o porque el pedido lo nombra— es una decisión del dev, presentada con su tradeoff y con la variante que no lo persiste como opción. Leer un ambiente, aunque sea en solo lectura, es tocarlo: no es una lectura local, y por eso su dato puede guardarse como dato verificado. Si esa lectura pide OK lo decide [`../general/communication.md`](../general/communication.md) § "Qué dispara un gate", no esta sección.
+
+Lo que se persiste como evidencia es de una de dos clases:
+
+| Clase | Qué es | Regla |
+|---|---|---|
+| **Constancia de un momento** | Un hecho que la fuente no conserva, o que su fuente purga (los transcripts): qué commit se validó y quién lo validó, qué diff vio el dev, qué aprobó o decidió, qué se desplegó, qué sesión trabajó un REQ, el origen de un pendiente, lo que se observó en una lectura o una prueba como evidencia fechada de un plan o de una validación, el uso medido al cierre | Se conserva y no se re-deriva (§ "Suposiciones explícitas antes de afirmar", «no alcanza lo que registra un momento»). Dice lo que era entonces y no es evidencia del estado actual: para afirmarlo se lee la fuente |
+| **Dato verificado** | Un dato de un ambiente, de un tercero o que solo el dev tiene, guardado para que otra sesión lo use sin volver a leerlo | Se persiste solo por indicación del dev —lo declara verificado, o da su OK al cambio que lo guarda— y con su **marca de verificación**: `verificado: AAAA-MM-DD` (la fecha en que se confirmó contra la fuente) y `Fuente:` (comando, archivo, commit o quién lo dijo) |
+
+- **Sin marca no es evidencia.** Un dato de un ambiente o de un tercero se puede anotar sin indicación del dev, pero sin marca. Un dato persistido que no es constancia de un momento ni lleva marca de verificación orienta dónde leer; para afirmar, quien lo cita lee la fuente o lo marca `[memoria sin re-verificar]`. Con marca, lo cita con su fecha; con más de 30 días, o si es volátil (versiones, deploys, IDs), lo vuelve a verificar antes de apoyar en él un plan o un gate.
+- **Almacén con regla propia.** La tabla de supuestos de plataforma ([platform-assumptions.md](platform-assumptions.md) § "Mantenimiento") y los research ([`../profiles/research/conventions.md`](../profiles/research/conventions.md) § "Modos de disparo" y § "Obsolescencia") se rigen por su regla, que fija su alta y su re-verificación o su reemplazo. Otro almacén entra a esta lista por un REQ.
+- **Lector sin acceso a la fuente.** Publicar un dato para quien no puede leer la fuente (el relevo entre máquinas) no es copia; quien lo lee lo cita como constancia de la captura, con su fecha.
+- **Copias anteriores.** La copia de un dato derivable que una regla o una plantilla vigente ya pide sigue, también en cada instancia nueva de esa plantilla, hasta que un REQ la retire; no es precedente para un campo nuevo.
+- **Fuera de alcance.** Los espejos de una regla dentro del repo, que rige § "Eliminar" («una sola fuente de verdad»).
 
 ## Reglas de proceso y mecanismos de plataforma
 
