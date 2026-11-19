@@ -149,8 +149,8 @@ class TestGateEnShell(unittest.TestCase):
         self.assertEqual(self._calls(), ['logbook-sync|{"a": "ñ→"}'])
 
     def test_activado_por_proyecto(self):
-        self._run("ops-capture", "{}", NEB_HOOKS="notify-on-stop", NEB_PROJECT_HOOKS="ops-capture")
-        self.assertEqual(self._calls(), ["ops-capture|{}"])
+        self._run("save-approved-plan", "{}", NEB_HOOKS="notify-on-stop", NEB_PROJECT_HOOKS="save-approved-plan")
+        self.assertEqual(self._calls(), ["save-approved-plan|{}"])
 
     def test_apagado(self):
         self._run("logbook-sync", "{}")

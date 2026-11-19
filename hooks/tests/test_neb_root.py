@@ -135,6 +135,11 @@ class TestArranque(unittest.TestCase):
         self.assertIn("`usage-tracker` en `NEB_HOOKS` (retirado en 6.29.0", head)
         self.assertNotIn("no reconoce", head)
 
+    def test_ops_capture_retirado_avisa_aparte(self):
+        head = self._header(self._bootstrap(NEB_PROJECT_HOOKS="logbook-sync,ops-capture"))
+        self.assertIn("`ops-capture` en `NEB_PROJECT_HOOKS` (retirado en ", head)
+        self.assertNotIn("no reconoce", head)
+
     def test_nombres_validos_sin_aviso(self):
         head = self._header(self._bootstrap(NEB_HOOKS="logbook-sync", NEB_PROJECT_HOOKS="save-approved-plan"))
         self.assertNotIn("Aviso de Neb", head)

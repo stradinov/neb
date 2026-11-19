@@ -4,8 +4,8 @@
 Cubre hooks/neb-hook.py y hooks/lib/approved_plan.py:
   • gate: unión de NEB_HOOKS y NEB_PROJECT_HOOKS; valores inválidos (desconocidos, con espacios)
   • main(): gate apagado, subsesión interna y stdin inválido no despachan
-  • dispatch(): argumentos de cada hook (logbook-sync, notify-*, ops-capture,
-    preprocess-prompt), PYTHONIOENCODING en los hijos, ops-capture desacoplado
+  • dispatch(): argumentos de cada hook (logbook-sync, notify-*, preprocess-prompt),
+    PYTHONIOENCODING en los hijos
   • save-approved-plan: slug ASCII completo, ruta y encabezado, proyecto de un cwd de Windows
   • extremo a extremo: neb-hook.py como proceso con un HOME temporal
 
@@ -51,9 +51,9 @@ class TestGate(unittest.TestCase):
         self.assertEqual(nh.enabled_hooks({"NEB_HOOKS": "", "NEB_PROJECT_HOOKS": ","}), set())
 
     def test_invalidos_no_activan(self):
-        env = {"NEB_HOOKS": "logbook-sync, ops-capture,Notify,logbook", "NEB_PROJECT_HOOKS": "x"}
+        env = {"NEB_HOOKS": "logbook-sync, notify-on-stop,Notify,logbook", "NEB_PROJECT_HOOKS": "x"}
         self.assertEqual(nh.enabled_hooks(env), {"logbook-sync"})
-        self.assertEqual(nh.invalid_tokens(env), [("NEB_HOOKS", " ops-capture"), ("NEB_HOOKS", "Notify"),
+        self.assertEqual(nh.invalid_tokens(env), [("NEB_HOOKS", " notify-on-stop"), ("NEB_HOOKS", "Notify"),
                                                   ("NEB_HOOKS", "logbook"), ("NEB_PROJECT_HOOKS", "x")])
 
     def test_usage_tracker_retirado(self):
@@ -61,8 +61,14 @@ class TestGate(unittest.TestCase):
         self.assertEqual(nh.enabled_hooks({"NEB_HOOKS": "usage-tracker"}), set())
         self.assertEqual(nh.invalid_tokens({"NEB_HOOKS": "usage-tracker"}), [("NEB_HOOKS", "usage-tracker")])
 
+    def test_ops_capture_retirado(self):
+        # El nombre ya no activa nada y el arranque avisa (RETIRED).
+        self.assertEqual(nh.enabled_hooks({"NEB_HOOKS": "ops-capture"}), set())
+        self.assertEqual(nh.invalid_tokens({"NEB_HOOKS": "ops-capture"}), [("NEB_HOOKS", "ops-capture")])
+        self.assertIn("ops-capture", nh.RETIRED)
+
     def test_sin_invalidos(self):
-        self.assertEqual(nh.invalid_tokens({"NEB_HOOKS": "ops-capture,,preprocess-prompt"}), [])
+        self.assertEqual(nh.invalid_tokens({"NEB_HOOKS": "notify-on-permission,,preprocess-prompt"}), [])
 
 
 class TestMain(unittest.TestCase):
@@ -140,34 +146,6 @@ class TestDispatch(unittest.TestCase):
         self.assertIsNone(run.call_args[1]["stdout"])
         self.assertEqual(run.call_args[1]["timeout"], 33)
         self.assertEqual(run.call_args[1]["env"]["PYTHONIOENCODING"], "utf-8")
-
-    def test_ops_capture_desacoplado_windows(self):
-        run, popen, payload = self._dispatch("ops-capture", windows=True)
-        run.assert_not_called()
-        kwargs = popen.call_args[1]
-        self.assertEqual(popen.call_args[0][0][1], os.path.join(nh.HERE, "ops-capture.py"))
-        self.assertTrue(kwargs["creationflags"] & nh._CREATE_BREAKAWAY_FROM_JOB)
-        self.assertTrue(kwargs["creationflags"] & nh._CREATE_NO_WINDOW)
-        self.assertEqual(kwargs["stdout"], subprocess.DEVNULL)
-        popen.return_value.stdin.write.assert_called_once_with(payload)
-        popen.return_value.stdin.close.assert_called_once()
-        popen.return_value.wait.assert_not_called()
-
-    def test_ops_capture_sin_breakaway_si_el_job_no_lo_permite(self):
-        event = self.EVENT
-        payload = json.dumps(event).encode("utf-8")
-        ok = mock.Mock()
-        with mock.patch.object(nh, "IS_WINDOWS", True), \
-                mock.patch.object(nh.subprocess, "Popen", side_effect=[OSError("access denied"), ok]) as popen:
-            nh.dispatch("ops-capture", payload, event, "HOME")
-        self.assertEqual(popen.call_count, 2)
-        self.assertFalse(popen.call_args_list[1][1]["creationflags"] & nh._CREATE_BREAKAWAY_FROM_JOB)
-        ok.stdin.write.assert_called_once_with(payload)
-
-    def test_ops_capture_desacoplado_posix(self):
-        _, popen, _ = self._dispatch("ops-capture", windows=False)
-        self.assertTrue(popen.call_args[1]["start_new_session"])
-        self.assertNotIn("creationflags", popen.call_args[1])
 
 
 class TestApprovedPlan(unittest.TestCase):

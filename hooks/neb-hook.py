@@ -38,21 +38,15 @@ HOOKS = {
     "logbook-sync":         ("Stop", "SessionEnd", "PreCompact"),
     "notify-on-stop":       ("Stop",),
     "notify-on-permission": ("Notification",),
-    "ops-capture":          ("SessionEnd",),
     "preprocess-prompt":    ("UserPromptSubmit",),
 }
 # Hooks retirados → versión y qué los reemplaza (el arranque avisa si siguen en las variables).
 RETIRED = {
     "usage-tracker": "6.29.0; el uso se mide al cerrar con `/neb-usage`",
+    "ops-capture": "6.41.0; sin reemplazo en el núcleo: el conocimiento operativo se registra a mano desde la sesión",
 }
 ENV_VARS = ("NEB_HOOKS", "NEB_PROJECT_HOOKS")
 IS_WINDOWS = os.name == "nt"
-
-# Windows: sin ventana de consola (ops-capture lanza `claude -p`), grupo propio y fuera del job del
-# proceso padre, para sobrevivir al presupuesto de 1.5 s de SessionEnd.
-_CREATE_NEW_PROCESS_GROUP = 0x00000200
-_CREATE_NO_WINDOW = 0x08000000
-_CREATE_BREAKAWAY_FROM_JOB = 0x01000000
 
 
 def _tokens(env, var):
@@ -93,33 +87,6 @@ def _run(hook, argv, payload, stdout=subprocess.DEVNULL, stderr=None, timeout=No
         _log("%s: %r" % (hook, e))
 
 
-def _spawn_detached(hook, argv, payload):
-    """Lanza `argv` con `payload` por stdin y no lo espera. El hijo sobrevive al proceso del hook."""
-    kwargs = dict(stdin=subprocess.PIPE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                  env=_child_env())
-    if IS_WINDOWS:
-        flags = _CREATE_NO_WINDOW | _CREATE_NEW_PROCESS_GROUP
-        attempts = [flags | _CREATE_BREAKAWAY_FROM_JOB, flags]   # sin breakaway si el job no lo permite
-    else:
-        kwargs["start_new_session"] = True
-        attempts = [0]
-    for flags in attempts:
-        try:
-            if IS_WINDOWS:
-                kwargs["creationflags"] = flags
-            proc = subprocess.Popen(argv, **kwargs)
-        except OSError as e:
-            _log("%s (flags %#x): %r" % (hook, flags, e))
-            continue
-        try:
-            proc.stdin.write(payload)
-            proc.stdin.close()
-        except OSError:
-            pass
-        return proc
-    return None
-
-
 def dispatch(hook, payload, event, home):
     py = sys.executable
     if hook == "logbook-sync":
@@ -139,8 +106,6 @@ def dispatch(hook, payload, event, home):
         # Salida a DEVNULL: el .sh deja la reproducción en segundo plano (`& disown`) con los
         # descriptores heredados, y con un pipe el dispatcher la esperaría.
         _run(hook, argv, payload, stderr=subprocess.DEVNULL, timeout=9)
-    elif hook == "ops-capture":
-        _spawn_detached(hook, [py, os.path.join(HERE, "ops-capture.py")], payload)
     elif hook == "preprocess-prompt":
         # El stdout del hijo es el del hook: su JSON es el contexto que inyecta UserPromptSubmit.
         _run(hook, [py, os.path.join(HERE, "preprocess-prompt.py")], payload, stdout=None, timeout=33)
