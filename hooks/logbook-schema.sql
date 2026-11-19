@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS work (
   head_commit     TEXT,
   repo_path       TEXT,
   change_md       TEXT,
-  payload_json    TEXT,                               -- plan, archivos, próximos pasos, "Pendiente de entrega", "Trabajo en vuelo"
+  payload_json    TEXT,                               -- plan, archivos, próximos pasos, "Pendiente de entrega" (la copia saliente agrega req_state_note). El Trabajo en vuelo vive en ## Relevo del Change MD
   payload_version INTEGER NOT NULL DEFAULT 0,         -- concurrencia optimista en el sync al central
   -- contexto de la sesión origen
   origin_dev      TEXT,
@@ -118,6 +118,47 @@ CREATE TABLE IF NOT EXISTS transcript_local (
 -- Idempotencia del tramo: re-indexar la misma sesion no duplica.
 CREATE UNIQUE INDEX IF NOT EXISTS uq_transcript_local ON transcript_local(session_id, byte_from, byte_to);
 CREATE INDEX IF NOT EXISTS idx_transcript_local_session ON transcript_local(session_id);
+
+-- ===========================================================================
+-- REQ vinculado (REQ neb-trazabilidad-indice-commits, E2). SOLO LOCAL: no viaja al central, no toca `work`
+-- ni el drenaje. Vincula un REQ el Write/Edit/MultiEdit de su Change MD en el hilo principal, o
+-- `logbook.py link <ruta>`. El Change MD sigue en git (fuente); aquí solo hay punteros y session_id.
+-- Los commits NO se guardan: `logbook.py trace` los lee de git al consultar (trailer Req / Confirmacion-autonoma).
+-- Columna futura: tupla _REQ_<tabla>_MIGRATIONS + _add_missing_columns en _migrate (las PK no migran).
+-- ===========================================================================
+CREATE TABLE IF NOT EXISTS req_link (
+  id          INTEGER PRIMARY KEY,
+  project     TEXT NOT NULL,   -- host/owner/repo del remoto origin del repo del Change MD (_normalize_remote)
+  nombre      TEXT NOT NULL,   -- <nombre> de changes/<fecha>-<nombre>.md, forma [a-z0-9-]+; llave de cruce
+  fecha       TEXT NOT NULL,   -- <fecha> AAAA-MM-DD del archivo; dato y base de la ventana de commits de trace
+  change_md   TEXT NOT NULL,   -- ruta desde la raíz de su repo, con '/': changes/<fecha>-<nombre>.md
+  linked_by   TEXT NOT NULL,   -- 'write' | 'cli': vía que lo registró (no cambia después)
+  created_at  TEXT NOT NULL,
+  updated_at  TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_req_link ON req_link(project, nombre);
+CREATE INDEX IF NOT EXISTS idx_req_link_nombre ON req_link(nombre);
+
+-- Repos declarados del REQ, uno por directorio git común (los worktrees de un repo comparten refs).
+-- `trace` lee de aquí dónde correr git. El del Change MD entra al vincular; los demás, con `link <ruta> --repo <dir>`.
+CREATE TABLE IF NOT EXISTS req_repo (
+  req_id      INTEGER NOT NULL REFERENCES req_link(id) ON DELETE CASCADE,
+  common_dir  TEXT NOT NULL,   -- git-common-dir absoluto, normcase(realpath)
+  path        TEXT NOT NULL,   -- última raíz de árbol vista (informativo, fuera de la llave)
+  project     TEXT NOT NULL,   -- origin normalizado de ese repo (puede diferir del de req_link: cross-repo)
+  PRIMARY KEY (req_id, common_dir)
+) WITHOUT ROWID;
+
+-- Sesiones de ESTA máquina que escribieron el Change MD o corrieron `link` con su ruta.
+CREATE TABLE IF NOT EXISTS req_session (
+  req_id        INTEGER NOT NULL REFERENCES req_link(id) ON DELETE CASCADE,
+  session_id    TEXT NOT NULL,
+  via           TEXT NOT NULL,  -- 'write' | 'cli': primera evidencia (no cambia después)
+  first_seen_at TEXT NOT NULL,
+  last_seen_at  TEXT NOT NULL,
+  PRIMARY KEY (req_id, session_id)
+) WITHOUT ROWID;
+-- Sin índice por session_id: ninguna lectura lo usa (si una futura lo pide, va en _migrate con IF NOT EXISTS).
 
 -- ===========================================================================
 -- Pendings (REQ neb-pendings-sqlite, nucleo). Reusa la infra del logbook.

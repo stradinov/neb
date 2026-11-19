@@ -220,7 +220,8 @@ for REF in "${REFS[@]}"; do
     if ! "$PY" "$NEB_ROOT/bootstrap/assemble-changelog.py" --check >/dev/null 2>&1; then
       fail "CHANGELOG.md desactualizado respecto a changelog.d/ en el commit publicado." \
            "Lo regenerado sin commitear no cuenta. Regenera y commitea antes del push:" \
-           "  py bootstrap/assemble-changelog.py && git add CHANGELOG.md && git commit -m 'docs: regenerar CHANGELOG'"
+           "  py bootstrap/assemble-changelog.py && git add CHANGELOG.md && git commit -m 'docs: regenerar CHANGELOG' --trailer 'Req: <nombre>'" \
+           "  (sin trailer si el push no es de un REQ; receta en process/version-control.md)"
     fi
   fi
 done

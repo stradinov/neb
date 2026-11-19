@@ -17,6 +17,8 @@ Tres modos (dispatch en __main__):
       SQLite local.
       Excepción: `sync-status` lee SIEMPRE el SQLite local (el estado del outbox no existe en el central)
       y reporta ids LOCALES (`local_id`), que no son válidos para los demás verbos cuando hay central.
+      `link`, `trace` y `unlink` (REQ vinculado, E2; módulo req_link.py) también operan SIEMPRE contra el
+      SQLite local, con o sin NEB_LOGBOOK_ENDPOINT: nunca van al central.
 
 Backend local = default + outbox. Backend central (REQ B) = autoridad del lock + corpus buscable.
 Filosofía: defensivo — exit 0 siempre; errores a stderr, nunca bloquean al dev. El stderr del sync
@@ -38,7 +40,7 @@ from datetime import datetime, timezone
 # Infra compartida de la DB (resolver dual-mode + conexión net-new + helpers puros movidos).
 # El resolver dual-mode vive SOLO en _db_shared; las 3 sedes de db_path de este módulo lo importan.
 from _db_shared import (
-    resolve_db_path, _connect, _migrate, begin_immediate, with_write_tx,
+    resolve_db_path, _connect, _migrate, begin_immediate, with_write_tx, _safe_rollback,
     now_iso, posix_to_win, encode_cwd, find_active_reqs, resolve_memory_dir,
     _whoami, _hostname, _git, _git_info, _project_id, _normalize_remote, _basename,
 )
@@ -106,13 +108,28 @@ def main():
             work_ids.append(_upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd,
                                                 jsonl_path))
         _register_session(con, session_id, jsonl_path, work_ids, optin)   # cursor de subida propio de la sesión
-        _index_local(con, session_id, None, jsonl_path)   # SR-1: persistir el corpus local (siempre)
+        chunk = _index_local(con, session_id, None, jsonl_path)   # SR-1 (+ tramo para E2)
         con.commit()
+        _after_capture(con, session_id, chunk, event_name)      # E2: nunca afecta lo ya confirmado
     finally:
         con.close()
 
     # REQ B: si el entorno es compartido, drenar el outbox al central (detached, best-effort).
     _maybe_spawn_sync(cwd, guide_dir, home_dir)
+
+
+def _after_capture(con, session_id, chunk, event_name):
+    """E2 (REQ vinculado). Corre DESPUÉS del commit de la captura; cualquier error se avisa y se descarta.
+    En SessionEnd sale antes de tocar la base. Si req_link falta (o vale None en sys.modules), el import
+    falla dentro del try y la captura no se entera."""
+    if not chunk or event_name == "SessionEnd":
+        return
+    try:
+        import req_link
+        req_link.after_capture(con, session_id, chunk)
+    except Exception as e:
+        _safe_rollback(con)
+        print(f"[logbook] aviso: vínculo de REQ omitido: {e}", file=sys.stderr)
 
 
 # --------------------------------------------------------------------------- DB
@@ -1112,26 +1129,30 @@ def _ensure_transcript_fts(con):
 
 def _index_local(con, session_id, work_id, jsonl_path):
     """Persiste el text_plain del tramo NUEVO del .jsonl en transcript_local (idempotente por
-    rango; cursor = MAX(byte_to)). Best-effort: nunca rompe la captura."""
+    rango; cursor = MAX(byte_to)). Best-effort: nunca rompe la captura.
+    Devuelve el texto decodificado del tramo (insumo de E2, req_link.after_capture), o None en las
+    salidas tempranas y ante error."""
     try:
         if not jsonl_path or not os.path.isfile(jsonl_path):
-            return
+            return None
         row = con.execute("SELECT COALESCE(MAX(byte_to), 0) FROM transcript_local WHERE session_id=?",
                           (session_id,)).fetchone()
         start = row[0] if row else 0
         size = os.path.getsize(jsonl_path)
         if size <= start:
-            return
+            return None
         with open(jsonl_path, "rb") as f:
             f.seek(start)
             chunk = f.read()
-        text_plain = _extract_text_plain(chunk.decode("utf-8", errors="replace"))
+        text = chunk.decode("utf-8", errors="replace")
+        text_plain = _extract_text_plain(text)
         con.execute(
             "INSERT OR IGNORE INTO transcript_local "
             "(session_id, work_id, byte_from, byte_to, text_plain, created_at) VALUES (?,?,?,?,?,?)",
             (session_id, work_id, start, size, text_plain, now_iso()))
+        return text
     except (OSError, sqlite3.Error):
-        return  # best-effort: la captura nunca falla por el indexado local
+        return None  # best-effort: la captura nunca falla por el indexado local
 
 
 def _search_local(con, query):
@@ -1158,7 +1179,7 @@ def _search_local(con, query):
 # Sin él, contra el SQLite local (REQ A; lock informativo).
 
 CLI_CMDS = {"list", "show", "claim", "release", "forced-release", "request", "rename", "archive", "search",
-            "sync-status"}
+            "sync-status", "link", "trace", "unlink"}
 
 
 def _db_for_cli():
@@ -1518,6 +1539,15 @@ def cli_main(argv):
         cli_archive(rest)
     elif cmd == "search":
         cli_search(rest)
+    elif cmd in ("link", "trace", "unlink"):
+        # REQ vinculado (E2): siempre la base local, con o sin central. Import perezoso.
+        # JSON en stdout siempre: una excepción (base bloqueada, error de sqlite, import fallido) sale
+        # como {ok: false}; una salida vacía se leería como «árbol anterior a estos verbos».
+        try:
+            import req_link
+            getattr(req_link, "cli_" + cmd)(rest, _db_for_cli)
+        except Exception as e:
+            print(json.dumps({"ok": False, "motivo": f"error: {e}"}, ensure_ascii=False))
     else:
         print(f"subcomando desconocido: {cmd}")
 
