@@ -38,7 +38,9 @@ Los criterios de completitud (obligatorios que bloquean el cierre, checkpoint, c
 
 Antes de ejecutar la entrega final (deploy a prod, `git push` cuando es la entrega final del profile, `pscp`/`ssh`, notificación al cliente), el rol principal (persona) invoca al menos un subagente del profile como último gate adversarial. El briefing describe el **artefacto final + ambiente destino** usando la misma plantilla que Fase 3 (ver [`process/plan-review.md`](plan-review.md) § "Plantilla de briefing").
 
-**Condición de paso**: cero hallazgos abiertos sobre el artefacto final y su ambiente destino — cada hallazgo corregido y re-revisado por un subagente del profile, o descartado con OK del dev.
+**Condición de paso**: cero hallazgos abiertos sobre el artefacto final y su ambiente destino — cada hallazgo corregido y re-revisado por un subagente del profile, corregido como menor, o descartado con OK del dev.
+
+**Corrección menor**: la corrección que cumple las tres condiciones de [`execution.md`](execution.md) § "Cierre de Fase 4 (gate de subagente)", «Corrección menor», no pide por sí sola otra pasada de este gate ni OK del dev: el rol principal la anota en el registro como aplicada sin re-revisión y la nombra en el reporte de la entrega.
 
 **Registro del gate**: como en [`execution.md`](execution.md) § "Cierre de Fase 4 (gate de subagente)": al cerrarlo, el rol principal anota en el registro del REQ cada hallazgo con el rol que lo levantó y su desenlace.
 

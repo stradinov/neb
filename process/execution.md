@@ -31,9 +31,17 @@ Antes de cada confirmación del cambio que toque el entregable del proyecto dest
 
 Antes de declarar Fase 4 terminada y transicionar a Fase 5, el rol principal (persona) invoca al menos un subagente del profile como gate adversarial del **artefacto implementado** — no del plan. El subagente recibe un briefing explícito con el artefacto final usando la misma plantilla que Fase 3 (ver [`process/plan-review.md`](plan-review.md) § "Plantilla de briefing"), adaptando la sección "Plan propuesto" para describir el artefacto producido.
 
-**Condición de paso**: cero hallazgos abiertos — cada hallazgo corregido y re-revisado por un subagente del profile, o descartado con OK del dev.
+**Condición de paso**: cero hallazgos abiertos — cada hallazgo corregido y re-revisado por un subagente del profile, corregido como menor, o descartado con OK del dev.
 
-**Registro del gate**: al cerrarlo, el rol principal anota en el registro del REQ, bajo «Avances realizados», cada hallazgo con el rol que lo levantó y su desenlace (corregido o descartado). Bajo «Incidencias» va solo lo que cuenta como incidencia ([`../workflow/metrics.md`](../workflow/metrics.md) § "Definiciones operativas"): el alcance que un hallazgo agrega o quita, o el defecto ajeno a lo planeado que corrige. De esas líneas sale el aporte de cada rol en Fase 9 ([`improvement.md`](improvement.md) § "Retroalimentación"); sin ellas, la etiqueta se asigna de memoria.
+**Corrección menor**: la corrección de un hallazgo no pide por sí sola otra pasada de este gate cuando cumple tres condiciones:
+
+- el revisor dejó en su reporte el texto literal que la corrige;
+- el rol principal lo aplica sin cambiarle nada, y lo corregido no tiene dependientes que ese texto deje sin actualizar ([`../methodology/principles.md`](../methodology/principles.md) § "Suposiciones explícitas antes de afirmar", «Corrección de un artefacto del REQ»);
+- el diff de la corrección no toca el entregable: cae solo en el registro del REQ o en el changelog.
+
+El rol principal la anota en el registro como aplicada sin re-revisión. Si falta una condición, rige la re-revisión. Bajo la confirmación autónoma, una corrección menor sin re-revisar no cumple la condición 2 de su piso: el rol principal la re-revisa o pide OK al confirmar ([`change-control-gate.md`](change-control-gate.md) § "Autorización de la confirmación del cambio (Fase 4)").
+
+**Registro del gate**: al cerrarlo, el rol principal anota en el registro del REQ, bajo «Avances realizados», cada hallazgo con el rol que lo levantó y su desenlace (corregido, menor aplicado sin re-revisión o descartado). Bajo «Incidencias» va solo lo que cuenta como incidencia ([`../workflow/metrics.md`](../workflow/metrics.md) § "Definiciones operativas"): el alcance que un hallazgo agrega o quita, o el defecto ajeno a lo planeado que corrige. De esas líneas sale el aporte de cada rol en Fase 9 ([`improvement.md`](improvement.md) § "Retroalimentación"); sin ellas, la etiqueta se asigna de memoria.
 
 **Mecanismo vigente**: el subagente corre en su propio contexto, sin la conversación, y se lanza con la herramienta Agent o, si el dev pidió un workflow, como agente del workflow con `agentType` del mismo subagente (supuestos R11, R12, R16 y R18 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). El revisor corre con el modelo y el esfuerzo de la sesión (supuesto R20); bajarlos pide OK del dev. El rol principal simulando al revisor en su propio contexto (persona) no cumple este gate.
 
