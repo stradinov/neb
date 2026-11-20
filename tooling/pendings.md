@@ -2,6 +2,8 @@
 
 Recurso del módulo `hooks/lib/pendings.py` que opera los **pendientes del dev** sobre la misma DB SQLite del logbook (`~/.claude/neb.db`; resolver dual-mode `neb.db ∨ neb-logbook.db`). El skill que lo conduce es [`../skills/pendings-review/SKILL.md`](../skills/pendings-review/SKILL.md); el modelo de datos (6 tablas) vive en [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql) y los Change MD de los REQ (`neb-pendings-sqlite`, `pendings-taxonomia-cliente-topico`). Aquí: los **ejes curados** (cliente · tópico) y la curaduría, la **brújula `compas.md`**, la **jerarquía de fuentes** de priorización y la **normalización slug↔subsistema**.
 
+Un pendiente es de tipo `task` (seguimiento) o `session` (sesión pausada): `PD create <task|session> "<contexto>"`. `PD remember-session <work_id> [contexto]` crea un `session` ligado a un work exploratorio de la bitácora (`session_ref`). Cuándo se usa cada uno: [`../workflow/pendings.md`](../workflow/pendings.md).
+
 ## Ejes curados (cliente · tópico) y curaduría
 
 Glosario (el vocabulario abstracto de la metodología no lo fija; es propio de este recurso):

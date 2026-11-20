@@ -51,7 +51,7 @@ Al retomar un requerimiento interrumpido:
 2. Leer el MD del requerimiento (`<proyecto>/changes/<fecha>-<nombre>.md`) para ver estado y, si los tiene, su `## Relevo` y su plan aprobado (`changes/plans/`).
 3. Si el `active_*.md` tiene "Pendiente de entrega" → atender primero.
 4. Si la última fase no está cerrada → continuar desde ahí.
-5. Si la sesión se reanudó vía `claude --resume <nombre>`, eliminar la entrada correspondiente en `~/.claude/pendings.md` § "Sesiones pausadas".
+5. Si se reanudó una sesión pausada, cerrar su registro en los pendientes ([`../workflow/pendings.md`](../workflow/pendings.md) § "Sesiones pausadas").
 
 Resumir el estado en una línea al inicio:
 
@@ -59,7 +59,7 @@ Resumir el estado en una línea al inicio:
 
 ### Pausar y reanudar la misma sesión Claude
 
-Cuando el dev anuncia que pausará para continuar después en otra sesión, la sesión actual debe quedar recuperable por nombre — `claude --continue` solo recupera la última, y si el dev abre una sesión intermedia se pierde el hilo. La **acción de Claude** al detectar el anuncio de pausa (nombrar la sesión, registrar en `pendings.md`, confirmar) vive en [`../general/communication.md`](../general/communication.md) § "Handoff de sesión".
+Cuando el dev anuncia que pausará para continuar después en otra sesión, la sesión actual debe quedar recuperable por nombre — `claude --continue` solo recupera la última, y si el dev abre una sesión intermedia se pierde el hilo. La **acción de Claude** al detectar el anuncio de pausa (nombrar la sesión, registrarla como pendiente tipo `session` según [`../workflow/pendings.md`](../workflow/pendings.md) § "Sesiones pausadas", confirmar) vive en [`../general/communication.md`](../general/communication.md) § "Handoff de sesión".
 
 **Comandos disponibles para el dev**:
 

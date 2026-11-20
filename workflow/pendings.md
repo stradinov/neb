@@ -1,6 +1,6 @@
 # Pendientes
 
-Ítems de seguimiento del dev que no bloquean el cierre de un REQ pero piden acción futura. Viven en `neb.db` (`~/.claude/neb.db`). El archivo plano `~/.claude/pendings.md` no lleva pendientes: conserva § "Sesiones pausadas" y los avisos que un mecanismo del adoptante le anexe.
+Ítems de seguimiento del dev que no bloquean el cierre de un REQ pero piden acción futura. Viven en `neb.db` (`~/.claude/neb.db`), junto con las sesiones pausadas (§ "Sesiones pausadas").
 
 ## Dónde viven y cómo se citan
 
@@ -17,22 +17,20 @@
 
 ## Sesiones pausadas
 
-Sección `## Sesiones pausadas` de `~/.claude/pendings.md` para sesiones Claude nombradas con `/rename` (supuesto R10 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) cuando el dev anuncia pausa/continuación posterior. Permite recuperar el comando de reanudación sin que el dev recuerde el nombre.
+Una sesión Claude nombrada con `/rename` (supuesto R10 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) que el dev pausa para continuar después se registra en `neb.db` como pendiente de tipo `session`. Permite recuperar el comando de reanudación sin que el dev recuerde el nombre. Es un pendiente más: se cita, se cura y se consulta como los demás (§ "Dónde viven y cómo se citan").
 
 Esto cubre **reanudar la propia sesión local** (mismo dev, misma máquina). Para **relevo cross-dev / cross-máquina** (otro dev continúa, u otra máquina) ver la [bitácora de relevo](logbook.md), que además registra sesiones automáticamente sin depender del anuncio de pausa.
 
-Formato:
+Alta (el `[<slug>]` es el del pendiente, como en el alta de una tarea):
 
-```markdown
-## Sesiones pausadas
-
-- **`<nombre-sesion>`** — <descripción del hilo, 1–2 líneas>. Reanudar: `claude --resume <nombre-sesion>`.
+```
+PD create session "[<slug>] Sesión pausada <nombre-sesion>: <descripción del hilo, 1–2 líneas>. Reanudar: claude --resume <nombre-sesion>"
 ```
 
-Claude edita la sección sin pedir confirmación al dev. Procedimiento completo en [`process/execution.md`](../process/execution.md) § "Pausar y reanudar la misma sesión Claude".
+Si el trabajo de la sesión ya tiene un pendiente abierto —el que cita su Change MD o su `active_*.md`, o uno creado con `recordar-sesion` del skill `pendings-review`—, la pausa se anota en ese pendiente (`PD note <id> "<mismo texto>"`) y no se crea otro. La cita del pendiente (`[slug]` y `PD-<id>`) va en la confirmación al dev; con ella se localiza al reanudar.
+
+Los comandos de reanudación viven en [`process/execution.md`](../process/execution.md) § "Pausar y reanudar la misma sesión Claude".
 
 **Cuándo Claude escribe**: al detectar el anuncio de pausa (ver [`general/communication.md`](../general/communication.md) § "Handoff de sesión").
 
-**Cuándo Claude elimina**: al reanudar la sesión vía `--resume <nombre>` (paso 5 de [`process/execution.md`](../process/execution.md) § "Retomar una sesión interrumpida"), o si el dev anuncia descarte explícito.
-
-**Ventana de 30 días**: si una sesión pausada no se reanuda en 30 días, Claude pregunta al dev antes de eliminar el ítem (no asume descarte implícito — el hilo puede seguir siendo útil).
+**Cuándo Claude lo archiva**: al reanudar la sesión pausada, por `--resume` o desde la app (paso 5 de [`process/execution.md`](../process/execution.md) § "Retomar una sesión interrumpida"), con `PD archive <id> resolved-otherwise`; o si el dev anuncia descarte explícito, con `PD archive <id> no-longer-applies`. Una pausa anotada en un pendiente existente no lo archiva: Claude anota ahí la reanudación o el descarte.

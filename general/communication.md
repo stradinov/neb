@@ -90,9 +90,9 @@ Mismo principio de decisión que el menú: **qué falla, qué bloquea, qué opci
 
 Cuando el dev anuncia que pausará el trabajo para continuar después en otra sesión, Claude ejecuta el procedimiento de handoff antes de cerrar el turno y **confirma al dev en una línea**: nombre asignado y cómo reanudar.
 
-> "Nombré la sesión `checkout-bugfix`. Reanudas con `claude --resume checkout-bugfix`. Anotada en pendings."
+> "Nombré la sesión `checkout-bugfix`. Reanudas con `claude --resume checkout-bugfix`. Anotada en tus pendientes: `[checkout-bugfix]` (`PD-812`)."
 
-El procedimiento completo (nombrado en kebab-case, `/rename`, registro en `pendings.md` bajo `## Sesiones pausadas`, comandos de reanudación, retomar una sesión interrumpida) vive en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)". La capa de comunicación solo carga el contrato comunicativo: confirmar en una línea.
+El procedimiento completo (nombrado en kebab-case, `/rename`, registro como pendiente tipo `session` en `neb.db`, comandos de reanudación, retomar una sesión interrumpida) vive en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)". La capa de comunicación solo carga el contrato comunicativo: confirmar en una línea.
 
 ## Idioma
 

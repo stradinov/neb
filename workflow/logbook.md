@@ -1,6 +1,6 @@
 # Bitácora de relevo (logbook)
 
-Registro de trabajos a medias para **relevo entre devs y máquinas**. Cubre el caso que `pendings.md` § "Sesiones pausadas" y la memoria del proyecto no cubren: una sesión interrumpida (tokens agotados, corte de energía/internet, o handoff a otro dev) que debe continuar **en otra máquina con otra cuenta**, conservando el contexto vía el Change MD, su `## Relevo` y su plan aprobado.
+Registro de trabajos a medias para **relevo entre devs y máquinas**. Cubre el caso que las sesiones pausadas ([`pendings.md`](pendings.md) § "Sesiones pausadas") y la memoria del proyecto no cubren: una sesión interrumpida (tokens agotados, corte de energía/internet, o handoff a otro dev) que debe continuar **en otra máquina con otra cuenta**, conservando el contexto vía el Change MD, su `## Relevo` y su plan aprobado.
 
 La **mecánica** (backend pluggable, hook de captura, config, modos de fallo) vive en [`../tooling/logbook.md`](../tooling/logbook.md); el **protocolo operativo** (pasos para publicar/retomar/relevar) en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)". Este archivo cubre el **artefacto**: su modelo, ciclo de vida y relación con el resto.
 
