@@ -24,6 +24,7 @@ import os
 import re
 import shutil
 import sqlite3
+import stat
 import sys
 import tempfile
 from datetime import datetime, timezone
@@ -66,7 +67,7 @@ def _existing_db(home):
     for p in present:
         if _readable_with_work(p):
             return p
-    return os.path.join(base, _db_shared.NEB_DB_NAME) if present else None
+    return present[0] if present else None          # la que existe, aunque no se pueda leer
 
 
 # --------------------------------------------------------------------------- status
@@ -169,11 +170,14 @@ def _refuse(motivo, detalle, accion):
 
 
 def _is_link(path):
+    """Enlace simbólico o junction (Path.is_junction es de 3.12; neb soporta 3.8+). Otros reparse points
+    (archivos de OneDrive, deduplicados) no son enlaces."""
     try:
         if os.path.islink(path):
             return True
-        from pathlib import Path
-        return bool(getattr(Path(path), "is_junction", lambda: False)())
+        tag = getattr(os.lstat(path), "st_reparse_tag", 0)
+        return tag in (getattr(stat, "IO_REPARSE_TAG_SYMLINK", 0xA000000C),
+                       getattr(stat, "IO_REPARSE_TAG_MOUNT_POINT", 0xA0000003))
     except OSError:
         return True
 

@@ -32,6 +32,7 @@ import sys
 import tempfile
 import threading
 import unittest
+from datetime import datetime, timedelta, timezone
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -422,7 +423,7 @@ class TestTransaccion(Base):
         con.close()
         self.assertEqual(self.version(), (1, 1))
         c2 = sqlite3.connect(self.db)
-        self.assertIn("rompió su transacción", _migrations.read_errors(c2)[0][3])
+        self.assertIn("no controla la transacción", _migrations.read_errors(c2)[0][3])
         c2.close()
 
 
@@ -450,28 +451,99 @@ class TestRobustez(Base):
         self.assertIn("paso mal escrito", _migrations.read_errors(other)[0][3])
         other.close()
 
-    def test_paso_que_rompe_su_transaccion_conserva_el_respaldo_y_no_se_reintenta(self):
+    def test_paso_que_intenta_confirmar_no_deja_nada_confirmado(self):
+        legacy_647_db(self.db)
+        self.connect([STEP1]).close()
+        before = table_hashes(self.db)
+        for intento in (lambda c: c.execute("COMMIT"), lambda c: c.commit(),
+                        lambda c: c.executescript("SELECT 1"), lambda c: c.cursor().execute("COMMIT"),
+                        lambda c: c.execute("-- confirmo\nCOMMIT"), lambda c: c.execute("/* x */ end"),
+                        lambda c: c.execute("PRAGMA foreign_keys=OFF"), lambda c: c.execute("PRAGMA foreign_keys(0)")):
+            def rompe(con, intento=intento):
+                con.execute("ALTER TABLE work DROP COLUMN transcript_error")
+                intento(con)
+            with self.assertRaises(_migrations.DbUnavailable):
+                self.connect([STEP1, Step(2, "rompe", rompe, destructivo=True)], retry=True)
+            self.assertIn("transcript_error", columns(self.db, "work"))
+            self.assertEqual(table_hashes(self.db), before)
+            self.assertEqual(self.backups(), [])
+            self.assertEqual(self.version(), (1, 1))
+
+    def test_guarda_de_sentencias_sin_backtracking_con_sangria_larga(self):
+        import time
+        sql = "\n" + " " * 26 + "UPDATE work SET project = project"   # con \s+ anidado tardaría segundos
+        t = time.monotonic()
+        self.assertIsNone(_migrations._TX_CONTROL_RE.match(sql))
+        self.assertIsNone(_migrations._FK_PRAGMA_RE.match(sql))
+        self.assertLess(time.monotonic() - t, 0.5)
+        self.assertIsNotNone(_migrations._TX_CONTROL_RE.match(" " * 60 + "COMMIT"))
+
+    def test_reversion_de_sqlite_es_un_error_comun_que_se_reintenta(self):
         legacy_647_db(self.db)
         self.connect([STEP1]).close()
         calls = []
 
-        def rompe(con):
+        def revierte(con):                                # OR ROLLBACK: SQLite revierte la transacción entera
             calls.append(1)
             con.execute("ALTER TABLE work DROP COLUMN transcript_error")
-            con.execute("COMMIT")
-        steps = [STEP1, Step(2, "rompe", rompe, destructivo=True)]
-        with self.assertRaises(_migrations.DbUnavailable) as cm:
-            self.connect(steps)
-        self.assertIn(_migrations.BROKEN_TX_PREFIX, cm.exception.detalle)
-        b = self.backups()
-        self.assertEqual(len(b), 1)
-        bak = os.path.join(_migrations.backup_dir(self.db), b[0])
-        self.assertIn(bak, cm.exception.detalle)
-        self.assertIn("transcript_error", columns(bak, "work"))
+            con.execute("INSERT OR ROLLBACK INTO pending (context_origin, created_at, slug) VALUES ('x', 'a', 'algo')")
+        steps = [STEP1, Step(2, "revierte", revierte, destructivo=True)]
         with self.assertRaises(_migrations.DbUnavailable):
-            self.connect(steps, retry=True)
-        self.assertEqual(len(calls), 1)
-        self.assertEqual(self.version(), (1, 1))
+            self.connect(steps)
+        self.assertIn("transcript_error", columns(self.db, "work"))
+        self.assertEqual(self.backups(), [])
+        with self.assertRaises(_migrations.DbUnavailable):
+            self.connect(steps, retry=True)              # no queda bloqueado para siempre: apply lo reintenta
+        self.assertEqual(len(calls), 2)
+
+    def test_paso_que_se_traga_la_reversion_no_confirma_lo_siguiente(self):
+        legacy_647_db(self.db)
+        self.connect([STEP1]).close()
+
+        def traga(con):
+            con.execute("ALTER TABLE work DROP COLUMN transcript_error")
+            try:
+                con.execute("INSERT OR ROLLBACK INTO pending (context_origin, created_at, slug) VALUES ('x', 'a', 'algo')")
+            except sqlite3.IntegrityError:
+                pass
+            con.execute("UPDATE pending SET context_origin = 'suelto'")   # sin guarda, se confirmaría suelto
+        before = table_hashes(self.db)
+        with self.assertRaises(_migrations.DbUnavailable):
+            self.connect([STEP1, Step(2, "traga", traga, destructivo=True)])
+        self.assertIn("transcript_error", columns(self.db, "work"))
+        self.assertEqual(table_hashes(self.db), before)
+
+    def test_paso_que_se_traga_la_reversion_y_termina_no_se_registra(self):
+        legacy_647_db(self.db)
+        self.connect([STEP1]).close()
+
+        def traga(con):
+            con.execute("ALTER TABLE work DROP COLUMN transcript_error")
+            try:
+                con.execute("INSERT OR ROLLBACK INTO pending (context_origin, created_at, slug) VALUES ('x', 'a', 'algo')")
+            except sqlite3.IntegrityError:
+                pass
+        with self.assertRaises(_migrations.DbUnavailable):
+            self.connect([STEP1, Step(2, "traga", traga, destructivo=True)])
+        self.assertEqual(self.version(), (1, 1), "un paso revertido no queda registrado como aplicado")
+        self.assertIn("transcript_error", columns(self.db, "work"))
+
+    def test_precheck_que_lanza_se_reporta_en_status(self):
+        self.connect([STEP1]).close()
+
+        def malo(con):
+            raise ValueError("precheck roto")
+        con = sqlite3.connect(self.db)
+        rep = _migrations.blocked_report(con, [STEP1, add_column_step(2, precheck=malo)])
+        con.close()
+        self.assertEqual(len(rep), 1)
+        self.assertIn("precheck roto", rep[0][2])
+
+    def test_reloj_que_retrocede_no_alarga_la_espera(self):
+        futuro = (datetime.now(timezone.utc) + timedelta(hours=5)).isoformat(timespec="seconds")
+        self.assertFalse(_migrations._in_backoff(futuro))
+        reciente = (datetime.now(timezone.utc) - timedelta(seconds=30)).isoformat(timespec="seconds")
+        self.assertTrue(_migrations._in_backoff(reciente))
 
     def test_precheck_que_falla_porque_otro_proceso_ya_aplico_el_paso_no_bloquea(self):
         self.connect([STEP1]).close()

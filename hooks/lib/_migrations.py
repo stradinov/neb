@@ -36,7 +36,6 @@ STEP_BACKUP_GLOB  = "neb.pre-paso-*.db"
 RESTORE_BACKUP_GLOB = "neb.pre-restore.*.db"
 
 RETRY_BACKOFF_SECONDS = 600         # tras un fallo guardado, las conexiones esperan esto antes de reintentar
-BROKEN_TX_PREFIX = "transaccion-rota:"
 ADVANCED = object()                 # la base ya estaba en el paso: se vuelve a decidir la compatibilidad
 
 _SCHEMA_VERSION_RE = re.compile(r"^SCHEMA_VERSION\s*=\s*(\d+)\s*$", re.MULTILINE)
@@ -137,9 +136,8 @@ class Step:
 
     n           número consecutivo
     titulo      nombre corto
-    aplicar     fn(con): el cambio; corre dentro de BEGIN IMMEDIATE, sin commit ni executescript, y sin
-                atrapar sqlite3.Error (un error que SQLite revierte solo dejaría las sentencias siguientes
-                confirmándose una por una)
+    aplicar     fn(con): el cambio; corre dentro de BEGIN IMMEDIATE con una conexión sin control de la
+                transacción (_StepConnection: commit, executescript, BEGIN/COMMIT... lanzan error)
     min_code    mínima compatible que deja. Sube cuando una escritura válida del código anterior fallaría
                 (NOT NULL sin DEFAULT, UNIQUE, CHECK o trigger nuevos) o cuando un dato que ese código lee
                 desaparece o cambia de significado
@@ -364,8 +362,9 @@ def _register(con, step, backup):
 def _apply_initial(con, step, schema_path):
     """Paso 1: executescript del esquema inicial + columnas (idempotente, no atómico: el executescript
     confirma antes de correr), luego relectura e INSERT OR IGNORE en una transacción corta. Relee V justo
-    antes del executescript: si otro proceso ya registró el paso (y quizá otros que retiran columnas), no
-    vuelve a agregar nada."""
+    antes del executescript: si otro proceso ya registró el paso (y quizá otros que retiran columnas),
+    achica, sin cerrarla, la ventana en que podría volver a agregar algo. Antes del primer paso que retire
+    una columna o tabla, el DDL del esquema debe correr dentro del BEGIN IMMEDIATE (§ 5 del plan del REQ)."""
     if read_version(con)[0] >= step.n:
         return ADVANCED
     if schema_path and os.path.isfile(schema_path):
@@ -414,22 +413,75 @@ def _in_backoff(at):
         return False
     if when.tzinfo is None:
         when = when.replace(tzinfo=timezone.utc)
-    return (datetime.now(timezone.utc) - when).total_seconds() < RETRY_BACKOFF_SECONDS
+    age = (datetime.now(timezone.utc) - when).total_seconds()
+    return 0 <= age < RETRY_BACKOFF_SECONDS             # un reloj que retrocedió no alarga la espera
+
+
+# Espacios y comentarios antes de la sentencia. `\s` simple, no `\s+`: con cuantificadores anidados una
+# sangría larga que no es de control de transacción haría backtracking exponencial en cada execute.
+_SQL_LEAD = r"^(?:\s|--[^\n]*(?:\n|$)|/\*.*?\*/)*"
+_TX_CONTROL_RE = re.compile(_SQL_LEAD + r"(BEGIN|COMMIT|END|ROLLBACK|SAVEPOINT|RELEASE)\b",
+                            re.IGNORECASE | re.DOTALL)
+_FK_PRAGMA_RE = re.compile(_SQL_LEAD + r"PRAGMA\s+(?:\w+\s*\.\s*)?foreign_keys\s*[=(]", re.IGNORECASE | re.DOTALL)
+
+
+class _StepConnection:
+    """La conexión que recibe `aplicar`: la del paso, sin control de la transacción. commit, rollback,
+    executescript (confirma antes de correr) y BEGIN/COMMIT/END/ROLLBACK/SAVEPOINT/RELEASE lanzan error; y
+    si SQLite ya revirtió la transacción por su cuenta (disco lleno, una cláusula OR ROLLBACK), la
+    siguiente sentencia también, para que nada se confirme suelto. Así un paso nunca deja la base a medias:
+    termina confirmado entero o revertido entero."""
+
+    def __init__(self, con):
+        self._con = con
+
+    def _check(self, sql):
+        m = _TX_CONTROL_RE.match(sql or "")
+        if m:
+            raise sqlite3.ProgrammingError(f"un paso no controla la transacción: {m.group(1).upper()}")
+        if _FK_PRAGMA_RE.match(sql or ""):
+            # Dentro de la transacción SQLite lo ignora sin avisar: un paso que reconstruye una tabla
+            # creyendo que apagó las FK dispararía los ON DELETE CASCADE / SET NULL.
+            raise sqlite3.ProgrammingError("un paso no cambia foreign_keys: dentro de la transacción no surte "
+                                           "efecto (lo hace el mecanismo, antes del BEGIN)")
+        if not self._con.in_transaction:
+            raise sqlite3.OperationalError("SQLite revirtió la transacción del paso")
+
+    def execute(self, sql, *args):
+        self._check(sql)
+        return self._con.execute(sql, *args)
+
+    def executemany(self, sql, *args):
+        self._check(sql)
+        return self._con.executemany(sql, *args)
+
+    def executescript(self, *_args):
+        raise sqlite3.ProgrammingError("un paso no usa executescript (confirma antes de correr)")
+
+    def commit(self):
+        raise sqlite3.ProgrammingError("un paso no confirma: lo confirma el mecanismo junto con su registro")
+
+    def rollback(self):
+        raise sqlite3.ProgrammingError("un paso no revierte: lanza una excepción y el mecanismo revierte")
+
+    def cursor(self, *_args):
+        raise sqlite3.ProgrammingError("un paso usa execute, no cursor()")
+
+    def __getattr__(self, name):
+        return getattr(self._con, name)
 
 
 def _apply_step(con, db_path, step, fresh, retry=False):
     """Paso n >= 2, todo o nada. Devuelve None si este proceso lo aplicó, ADVANCED si la base ya está en
     n o más (otro proceso avanzó: quien llama vuelve a decidir la compatibilidad), o _Failure.
 
-    Un paso que rompió su transacción no se reintenta solo: lo aplicado quedó confirmado a medias y el
-    respaldo se conserva para `restore`. Tras un fallo guardado de aplicar o de respaldo, las conexiones
-    no lo reintentan durante RETRY_BACKOFF_SECONDS (cada intento de un paso destructivo copia la base con
-    el candado tomado); `retry=True` (neb-migrate.py apply) reintenta ya."""
+    `aplicar` recibe un _StepConnection: no puede confirmar nada por su cuenta. Tras un fallo guardado de
+    aplicar o de respaldo, las conexiones no lo reintentan durante RETRY_BACKOFF_SECONDS (cada intento de
+    un paso destructivo copia la base con el candado tomado); `retry=True` (neb-migrate.py apply)
+    reintenta ya."""
     saved_err = _saved_error(con, step.n)
     if saved_err is not None:
         at, motivo = saved_err
-        if motivo.startswith(BROKEN_TX_PREFIX):
-            return _Failure("aplicar", motivo)
         if not retry and _in_backoff(at):
             return _Failure("aplicar", f"{motivo} (reintento después de {RETRY_BACKOFF_SECONDS // 60} min o "
                                        "con `neb-migrate.py apply`)")
@@ -466,18 +518,13 @@ def _apply_step(con, db_path, step, fresh, retry=False):
                 _record_error(con, step.n, f"respaldo fallido: {e}")
                 return _Failure("backup", f"respaldo fallido: {e}")
         try:
-            step.aplicar(con)
-            if not con.in_transaction:
-                raise sqlite3.OperationalError("el paso rompió su transacción (commit o executescript adentro)")
+            step.aplicar(_StepConnection(con))
+            if not con.in_transaction:                  # SQLite la revirtió y aplicar se tragó el error
+                raise sqlite3.OperationalError("SQLite revirtió la transacción del paso")
             _register(con, step, backup)
             con.execute("COMMIT")
         except Exception as e:                          # noqa: BLE001 — también un TypeError de un paso mal escrito
-            broken = not con.in_transaction             # algo ya se confirmó: el rollback no lo deshace
-            _rollback(con)
-            if broken:
-                motivo = f"{BROKEN_TX_PREFIX} {e}" + (f"; respaldo previo en {backup}" if backup else "")
-                _record_error(con, step.n, motivo)
-                return _Failure("aplicar", motivo)
+            _rollback(con)                              # nada quedó confirmado: _StepConnection no lo permite
             if backup:
                 _remove_quiet(backup)
                 backup = None
@@ -581,8 +628,8 @@ def blocked_report(con, steps=None):
         if s.precheck is not None:
             try:
                 motivo = s.precheck(con)
-            except sqlite3.Error:
-                motivo = None
+            except Exception as e:  # noqa: BLE001 — mismo criterio que _apply_step: también bloquea
+                motivo = f"precheck: {e}"
         motivo = motivo or saved.get(s.n)
         if motivo:
             out.append((s.n, s.titulo, motivo))

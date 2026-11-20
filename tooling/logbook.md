@@ -47,7 +47,7 @@ De activación voluntaria: el plugin registra el hook, y corre si `logbook-sync`
 - Sin Python → warning a stderr, `exit 0`.
 - Sin REQ activo → registra sesión exploratoria (no falla).
 - DB inaccesible o error → `exit 0` (nunca bloquea el turno).
-- Base que este código ya no puede operar, o paso de base detenido sin `espera` → la captura no escribe y el CLI responde `ok: false` con el motivo (un paso detenido con `espera` deja operar la base en su versión); como el `stderr` se descarta, lo dicen el arranque y `neb-migrate.py status` ([`migrations.md`](migrations.md)).
+- Base que este código ya no puede operar, o paso de base detenido → la captura no escribe y el CLI responde `ok: false` con el motivo (si el paso detenido y todos los posteriores tienen `espera`, la base sigue operando en su versión); como el `stderr` se descarta, lo dicen el arranque y `neb-migrate.py status` ([`migrations.md`](migrations.md)).
 - El central rechaza o no responde → `exit 0`, el reintento sigue y el fallo queda persistido en el `work` (ver § "Backend central" → *Fallos de sync*). El `stderr` del sync detached y del hook se descarta: por eso el fallo se **persiste** además de imprimirse. Registrar el fallo nunca interrumpe el drenaje de los demás works.
 - `sync` invocado a mano sin central configurado → avisa por `stderr` en vez de salir mudo.
 - REQ vinculado (§ "Captura (hook `logbook-sync`)"):
