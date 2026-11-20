@@ -4,6 +4,19 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.44.0] - 2026-11-19
+
+> **Minor**: en una re-revisión, un revisor coteja además el texto que cada corrección agrega o reescribe contra lo que ya rige. **Cambia fuerza normativa**: se estrecha el gate cuando hay re-revisión, que la condición de paso exige en Fase 4 y en Fase 7 y que en el plan-review de Fase 3 es voluntaria. Sale del diagnóstico del defecto «el texto normativo aprobado admitía lecturas que chocaban con prácticas vigentes» (origen Fase 3, tipo plan) en el REQ `neb-fuente-de-verdad-e-intencion`: dos de sus tres hallazgos importantes entraron como correcciones de una ronda del plan-review, se cotejaron solo con su fuente y llegaron al gate de implementación.
+>
+> - **Familia**: «correcciones que llegan a sus dependientes», ya revisada en 6.27.0. Aquella revisión cubrió la fuente de la corrección y lo que depende de ella en los artefactos del REQ; esta cubre lo que ya rige fuera de ellos.
+> - **Límite**: la oración no reemplaza a un crítico dedicado ni vuelve a lanzar a los revisores de la primera ronda. Medida sobre el plan del REQ de origen contra tres hallazgos de referencia, con una corrida por variante: 0 de 3 sin la oración; 1, 1 y 2 de 3 con tres redacciones de ella (la publicada, 2). El gate de Fase 4 sigue siendo la red.
+> - **Adoptantes**: no hay migración. Aplica desde la siguiente re-revisión.
+
+### Changed
+- **`process/plan-review.md`** § "Plantilla de briefing para subagentes":
+  - «Lo que ya se sabe»: en una re-revisión, cada corrección va con la fuente que la sostiene y con el texto que agrega o reescribe, literal o por su ubicación.
+  - «Tu tarea»: marcador nuevo. En una re-revisión, el rol principal agrega al briefing de uno solo de los subagentes revisores que corren, el que elija, una oración que le pide buscar, por cada texto que una corrección agrega o reescribe, lo que ya rige fuera de los cambios del REQ y ese texto contradice, prohíbe o deja sin cubrir, en el proyecto que se edita y en las rutas de «Profile». En los demás briefings el marcador se omite.
+
 ## [6.43.0] - 2026-11-19
 
 > **Minor**: el registro del REQ deja escrito qué rol levantó cada hallazgo. **Cambia fuerza normativa**: es una obligación nueva del rol principal al abrir el registro tras el plan-review y al cerrar los gates de Fase 4 y de Fase 7. Sale del diagnóstico del defecto «el registro no dice qué revisor levantó cada hallazgo» (origen Fases 4 y 7, tipo documentación) en el REQ `neb-retiro-destilacion-curado-sesiones`: al cerrar, el aporte de cada rol no se pudo determinar del registro.
