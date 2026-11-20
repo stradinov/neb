@@ -4,6 +4,18 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.47.0] - 2026-11-19
+
+> **Minor**: la plantilla de briefing pide al revisor el texto literal de la corrección que cae en el registro del REQ o en el changelog, y dónde cae. **Cambia fuerza normativa**: instrucción nueva en todo briefing; ningún gate cambia. Sale de la retroalimentación del REQ `neb-menores-de-gate-sin-re-revision` (6.46.0): la corrección menor exige que el revisor haya dejado el texto literal, y la plantilla no se lo pedía.
+>
+> - **Efecto indirecto**: la corrección menor de 6.46.0 aplicará más veces, y con ella su riesgo (una corrección de registro o changelog que nadie vuelve a revisar).
+> - **Evidencia**: un solo REQ, sin control. En el REQ de origen, 6 de 8 briefings llevaron a mano una frase parecida, que pedía el texto literal de toda corrección de redacción: los 5 que tuvieron hallazgos lo trajeron y los 2 sin la frase no. La oración publicada es más acotada y no se midió tal cual.
+> - **Límite**: el texto del revisor no es fuente; el rol principal lee la fuente antes de aplicarlo (`methodology/principles.md` § "Suposiciones explícitas antes de afirmar"). El tope de 300 palabras del reporte no cambia.
+> - **Adoptantes**: no hay migración. Aplica desde el siguiente briefing.
+
+### Changed
+- **`process/plan-review.md`** § "Plantilla de briefing para subagentes", «Tu tarea»: oración nueva tras la de «Intención sobre letra». Si la corrección de un hallazgo cae en el registro del REQ o en el changelog, el revisor escribe el texto literal que propone y dice dónde cae: archivo y línea, o el texto que reemplaza.
+
 ## [6.46.0] - 2026-11-19
 
 > **Minor**: la corrección menor de un hallazgo de gate ya no pide por sí sola otra pasada de revisor. **Cambia fuerza normativa**: se relaja la condición de paso de los gates de Fase 4 y de Fase 7, que hasta ahora exigía re-revisar toda corrección o descartarla con OK del dev. Sale de la retroalimentación del REQ `neb-plan-review-ronda-final-frases-normativas` (6.44.0): la condición de paso no distinguía gravedad y cada menor costaba una pasada completa.
