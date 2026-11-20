@@ -4,7 +4,8 @@ _db_shared.py — infraestructura compartida de la DB del logbook/pendings (Neb)
 
 Centraliza (DRY) lo que antes vivía en logbook.py y que ahora también consume pendings.py:
   • resolución de path dual-mode (neb.db ∨ neb-logbook.db) — vive AQUI y SOLO aqui.
-  • conexión + aplicación de schema + migración idempotente.
+  • conexión: el esquema inicial sale del árbol de este módulo; la versión de esquema y los pasos de
+    base viven en _migrations.py (6.48.0); aquí, las dos reparaciones que corren en cada conexión.
   • begin_immediate (transacción de escritura exclusiva inmediata, para concurrencia).
   • helpers puros movidos desde logbook.py (now_iso, posix_to_win, _whoami, ...).
 
@@ -22,8 +23,18 @@ import sys
 import time
 from datetime import datetime, timezone
 
+import _migrations
+from _migrations import (                              # reexportados: las pruebas los llaman desde aquí
+    DbUnavailable, IncompatibleDb,
+    _WORK_MIGRATIONS, _SESSION_SYNC_MIGRATIONS, _PENDING_MIGRATIONS, _PENDING_TOPIC_MIGRATIONS,
+    _table_exists, _add_missing_columns,
+)
+
 
 NEB_DB_NAME    = "neb.db"            # nuevo nombre canónico
+
+# Esquema inicial (versión de esquema 1) del árbol de ESTE módulo: nunca el de NEB_HOME.
+INITIAL_SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logbook-schema.sql")
 LEGACY_DB_NAME = "neb-logbook.db"    # nombre legado (máquinas del equipo sin migrar)
 
 
@@ -243,7 +254,8 @@ def _is_usable_db(path):
     """True sii <path> existe, tamaño > 0, y abre con tabla 'work' consultable.
     Guarda anti-shadowing: sqlite3.connect CREA el archivo vacío, así que un neb.db
     de tamaño 0 o sin la tabla 'work' NO debe ocultar a neb-logbook.db poblado.
-    NO usa uri=True / 'file:...?mode=ro' (el drive-letter 'C:' rompe la URI en Windows)."""
+    Abre con un connect normal (no de solo lectura): quien solo lee (el arranque) no pasa por aquí y usa
+    _migrations.open_readonly, con Path.as_uri() + '?mode=ro', que sí funciona con letra de unidad."""
     try:
         if not os.path.isfile(path) or os.path.getsize(path) == 0:
             return False
@@ -279,42 +291,64 @@ def resolve_db_path(home_dir):
 
 # --------------------------------------------------------------------------- conexión + migración
 
-def _connect(db_path, schema_path, timeout=5.0):
-    """Abre la DB, aplica schema (executescript) + _migrate. Net-new vs el actual:
-    timeout en sqlite3.connect + PRAGMA busy_timeout. Devuelve con o None (defensivo)."""
+def _connect(db_path, schema_path=None, timeout=5.0, steps=None, retry=False):
+    """Abre la DB y la lleva a la versión de esquema de este código (_migrations.migrate); con V <= C corre
+    las dos reparaciones. Devuelve con o None (defensivo), salvo dos casos que lanzan DbUnavailable:
+    base incompatible (IncompatibleDb) y paso de base bloqueado sin `espera` (motivo paso-bloqueado). Un
+    None ahí haría que los CLI respondan vacío: el fallo silencioso que la versión de esquema quita.
+
+    schema_path: solo para pruebas; producción usa el esquema inicial del árbol de este módulo.
+    steps: solo para pruebas (lista de pasos inyectable).
+    retry: reintenta ya un paso con fallo reciente guardado (neb-migrate.py apply)."""
+    if schema_path is None:
+        schema_path = INITIAL_SCHEMA_PATH
+    try:
+        fresh = not os.path.isfile(db_path) or os.path.getsize(db_path) == 0
+    except OSError:
+        fresh = False
     try:
         con = sqlite3.connect(db_path, timeout=timeout)
     except sqlite3.Error as e:
         print(f"[logbook] ERROR abriendo {db_path}: {e}", file=sys.stderr)
         return None
     try:
-        con.execute("PRAGMA busy_timeout=5000")       # ms; net-new (concurrencia logbook↔pendings)
-        if os.path.isfile(schema_path):
-            with open(schema_path, encoding="utf-8") as fh:
-                con.executescript(fh.read())
-        _migrate(con)
+        # Fuera de toda transacción y en cada conexión (antes llegaban por el executescript del esquema).
+        con.execute("PRAGMA busy_timeout=5000")       # ms (concurrencia logbook↔pendings)
+        con.execute("PRAGMA foreign_keys=ON")
+        con.execute("PRAGMA journal_mode=WAL")
+        if _migrations.migrate(con, db_path, schema_path, steps=steps, fresh=fresh, retry=retry):
+            _repair(con)
+    except DbUnavailable:
+        con.close()
+        raise
+    except _migrations._Busy as e:
+        print(f"[logbook] ERROR aplicando paso de base: {e}", file=sys.stderr)
+        con.close()
+        return None
     except (OSError, sqlite3.Error) as e:
         print(f"[logbook] ERROR aplicando schema: {e}", file=sys.stderr)
         con.close()
         return None
+    except BaseException:
+        con.close()                                   # nunca una conexión abierta con un candado tomado
+        raise
     return con
 
 
-# Columnas agregadas a `work` después del esquema inicial. CREATE TABLE IF NOT EXISTS no altera una
-# tabla existente, así que cada una se agrega aquí si falta. Mantener en sincronía con logbook-schema.sql.
-_WORK_MIGRATIONS = (
-    ("conflict",            "ALTER TABLE work ADD COLUMN conflict INTEGER NOT NULL DEFAULT 0"),
-    ("last_error",          "ALTER TABLE work ADD COLUMN last_error TEXT"),
-    ("last_error_at",       "ALTER TABLE work ADD COLUMN last_error_at TEXT"),
-    ("transcript_error",    "ALTER TABLE work ADD COLUMN transcript_error TEXT"),
-    ("transcript_error_at", "ALTER TABLE work ADD COLUMN transcript_error_at TEXT"),
-)
+def open_default_db(home_dir):
+    """Apertura de producción de la base por omisión (la ubica resolve_db_path, que en 6.x acepta los dos
+    nombres), con el esquema inicial del árbol de este módulo. Puede lanzar DbUnavailable."""
+    return _connect(resolve_db_path(home_dir))
 
-# Columnas agregadas a `session_sync` (6.12) después de su esquema inicial. Mismo contrato.
-_SESSION_SYNC_MIGRATIONS = (
-    ("root_cwd",  "ALTER TABLE session_sync ADD COLUMN root_cwd TEXT"),
-    ("read_byte", "ALTER TABLE session_sync ADD COLUMN read_byte INTEGER NOT NULL DEFAULT 0"),
-)
+
+def _repair(con):
+    """Reparaciones que se reintentan hasta lograrse. Corren después de los pasos, solo con V <= C (nunca
+    sobre una base más nueva que el código): el índice uq_pending_slug si falta, y la limpieza de las
+    tablas de transcripts retiradas en 6.41.0 (sin respaldo, como desde 6.41.0)."""
+    _ensure_pending_slug_index(con)
+    con.commit()
+    _drop_retired_transcript_tables(con)
+
 
 # Tablas del corpus local y del cursor de subida de transcripts, retiradas. _migrate las borra si existen
 # (ver _drop_retired_transcript_tables). El índice FTS5 va al final y en su propia transacción: si su
@@ -322,86 +356,36 @@ _SESSION_SYNC_MIGRATIONS = (
 _RETIRED_TRANSCRIPT_TABLES = ("transcript_local", "transcript_cursor", "transcript_fts")
 
 
-# Columnas agregadas a las tablas de pendings después de su esquema inicial (REQ pendings-taxonomia).
-# Mismo contrato que _WORK_MIGRATIONS. Solo DDL: el backfill de `pending.slug` (DML dependiente de
-# datos) NO vive aquí — lo hace pendings.backfill_slugs (seed / `PD backfill-slugs`), fuera del hot
-# path del hook y sin heredar el modo de fallo de _connect.
-_PENDING_MIGRATIONS = (
-    ("slug", "ALTER TABLE pending ADD COLUMN slug TEXT"),
-)
-_PENDING_TOPIC_MIGRATIONS = (
-    ("curated", "ALTER TABLE pending_topic ADD COLUMN curated INTEGER NOT NULL DEFAULT 0"),
-)
-# Índices que dependen de columnas migradas: no pueden ir en logbook-schema.sql (en una DB existente el
-# executescript corre ANTES de estos ALTER). IF NOT EXISTS -> idempotente y barato en cada connect.
+# Las tuplas de columnas (_WORK_MIGRATIONS, _PENDING_MIGRATIONS, …) viven en _migrations.py, congeladas con el
+# esquema inicial: un cambio nuevo del esquema es un paso de base. El backfill de `pending.slug` (DML) no es
+# migración: lo hace pendings.backfill_slugs.
+# Índice que depende de una columna agregada después: no puede ir en el esquema inicial (en una DB existente el
+# executescript corre ANTES del ALTER). Es reparación: se crea si falta en sqlite_master.
 _PENDING_INDEX_DDL = (
     "CREATE UNIQUE INDEX IF NOT EXISTS uq_pending_slug ON pending(slug) WHERE slug IS NOT NULL",
 )
 
 
-def _table_exists(con, name):
-    """Existencia REAL de la tabla vía el catálogo. PRAGMA table_info devuelve vacío para una tabla
-    ausente, pero el chequeo por sqlite_master es el que sobrevive a conexiones envueltas en tests
-    (delegan las consultas normales a la conexión real)."""
-    return con.execute(
-        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
-
-
-def _add_missing_columns(con, table, migrations):
-    """Aplica las migraciones de columnas que falten en <table>. Tolera 'duplicate column name'
-    (carrera entre procesos); cualquier otro error se propaga (ver _migrate)."""
-    cols = {r[1] for r in con.execute(f"PRAGMA table_info({table})").fetchall()}
-    for name, ddl in migrations:
-        if name in cols:
-            continue
+def _ensure_pending_slug_index(con):
+    """Crea uq_pending_slug si falta. Tolera duplicados preexistentes (el índice no se crea y la conexión sigue
+    usable; se reintenta cuando el dev los sanee). 'database is locked' se propaga."""
+    if not _table_exists(con, "pending"):
+        return
+    if con.execute("SELECT 1 FROM sqlite_master WHERE type='index' AND name='uq_pending_slug'").fetchone():
+        return
+    for ddl in _PENDING_INDEX_DDL:
         try:
             con.execute(ddl)
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                raise
+        except sqlite3.IntegrityError as e:
+            print(f"[logbook] aviso: uq_pending_slug no creado ({e}); saneá los slugs duplicados",
+                  file=sys.stderr)
 
 
 def _migrate(con):
-    """Migraciones idempotentes para DBs ya existentes (CREATE TABLE IF NOT EXISTS no altera).
-    Chequeo POR columna: una migración parcial (proceso interrumpido) se completa en el siguiente connect.
-    El chequeo y el ALTER no son atómicos entre procesos (el DDL se autoconfirma fuera de transacción):
-    si otro proceso agregó la columna en medio, SQLite responde 'duplicate column name' — se tolera,
-    porque la columna ya existe, que es el objetivo. Cualquier otro error (p. ej. 'database is locked')
-    se propaga: _connect devuelve None y se conserva el invariante 'conexión devuelta = esquema completo'.
-
-    Orden: `work` primero (siempre), luego `session_sync` y las tablas de pendings SOLO si existen de verdad
-    (una DB solo-logbook, sin pendings, no debe romper). Solo DDL: sin UPDATEs dependientes de datos.
-    La excepción es la limpieza de las tablas de transcripts retiradas, que va al final (necesita la
-    columna read_byte) y tiene su propio contrato: nunca propaga (ver _drop_retired_transcript_tables)."""
-    cols = {r[1] for r in con.execute("PRAGMA table_info(work)").fetchall()}
-    if not cols:
-        return
-    for name, ddl in _WORK_MIGRATIONS:
-        if name in cols:
-            continue
-        try:
-            con.execute(ddl)
-        except sqlite3.OperationalError as e:
-            if "duplicate column name" not in str(e).lower():
-                raise
-    if _table_exists(con, "session_sync"):
-        _add_missing_columns(con, "session_sync", _SESSION_SYNC_MIGRATIONS)
-    if _table_exists(con, "pending"):
-        _add_missing_columns(con, "pending", _PENDING_MIGRATIONS)
-    if _table_exists(con, "pending_topic"):
-        _add_missing_columns(con, "pending_topic", _PENDING_TOPIC_MIGRATIONS)
-    if _table_exists(con, "pending"):
-        for ddl in _PENDING_INDEX_DDL:
-            try:
-                con.execute(ddl)
-            except sqlite3.IntegrityError as e:
-                # Duplicados pre-existentes en `slug` (solo posible por escritura cruda): el índice no se
-                # crea, pero la conexión sigue siendo usable — los escritores (seed/curate/backfill)
-                # verifican unicidad por su cuenta. No tumbar el hook por esto.
-                print(f"[logbook] aviso: uq_pending_slug no creado ({e}); saneá los slugs duplicados",
-                      file=sys.stderr)
-    con.commit()
-    _drop_retired_transcript_tables(con)
+    """Columnas del esquema inicial + reparaciones, sin pasar por la versión de esquema. Se conserva para las
+    pruebas que lo llaman directo; producción entra por _connect. Propaga 'database is locked'."""
+    _migrations.add_initial_columns(con)
+    _repair(con)
 
 
 def _drop_retired_transcript_tables(con):

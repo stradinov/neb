@@ -1,4 +1,7 @@
--- Bitácora de relevo — esquema del backend SQLite local (Neb).
+-- Bitácora de relevo — ESQUEMA INICIAL del backend SQLite local (Neb): versión de esquema 1 (el de 6.47.0).
+-- NO SE EDITA (6.48.0): todo cambio posterior del esquema es un paso de base en hooks/lib/_migrations.py, y una
+-- base nueva y una migrada llegan al mismo esquema por el mismo camino. El esquema vigente lo imprime
+-- `bootstrap/neb-migrate.py schema`. Ver tooling/migrations.md.
 -- Backend por defecto (universal, sin infra) y outbox del cliente cuando hay central.
 -- El DDL del backend central (MySQL de referencia) vive en el repositorio dedicado del backend central.
 -- WAL: una escritura interrumpida (corte de luz/kill) se revierte sola al reabrir — por eso SQLite y no archivos planos.
@@ -96,7 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_session_sync_work ON session_sync(work_id);
 -- ni el drenaje. Vincula un REQ el Write/Edit/MultiEdit de su Change MD en el hilo principal, o
 -- `logbook.py link <ruta>`. El Change MD sigue en git (fuente); aquí solo hay punteros y session_id.
 -- Los commits NO se guardan: `logbook.py trace` los lee de git al consultar (trailer Req / Confirmacion-autonoma).
--- Columna futura: tupla _REQ_<tabla>_MIGRATIONS + _add_missing_columns en _migrate (las PK no migran).
+-- Columna futura: un paso de base en hooks/lib/_migrations.py (las PK no migran).
 -- ===========================================================================
 CREATE TABLE IF NOT EXISTS req_link (
   id          INTEGER PRIMARY KEY,
@@ -130,7 +133,7 @@ CREATE TABLE IF NOT EXISTS req_session (
   last_seen_at  TEXT NOT NULL,
   PRIMARY KEY (req_id, session_id)
 ) WITHOUT ROWID;
--- Sin índice por session_id: ninguna lectura lo usa (si una futura lo pide, va en _migrate con IF NOT EXISTS).
+-- Sin índice por session_id: ninguna lectura lo usa (si una futura lo pide, va en un paso de base).
 
 -- ===========================================================================
 -- Pendings (REQ neb-pendings-sqlite, nucleo). Reusa la infra del logbook.
@@ -152,8 +155,8 @@ CREATE TABLE IF NOT EXISTS pending (
   archived_at      TEXT,                                -- NULL = activo; se setea al pasar a obsolete (no se borra)
   slug             TEXT                                 -- cita canonica persistida (kebab-case). NULL = sin slug propio: resuelve por el tag [slug] historico de context_origin. Unico entre los no-NULL (uq_pending_slug)
 );
--- uq_pending_slug (UNIQUE parcial WHERE slug IS NOT NULL) lo crea _db_shared._migrate, NO este script:
--- en una DB existente este executescript corre ANTES de la migracion de columnas y `slug` aun no existe.
+-- uq_pending_slug (UNIQUE parcial WHERE slug IS NOT NULL) lo crea la reparacion de _db_shared (si falta), NO este
+-- script: en una DB existente este executescript corre ANTES de la migracion de columnas y `slug` aun no existe.
 -- Vista activa rapida (status='open' AND archived_at IS NULL): indice parcial.
 CREATE INDEX IF NOT EXISTS idx_pending_active   ON pending(status) WHERE archived_at IS NULL;
 -- FKs con indice (evita scans en on_work_archived / cierre del work ligado).

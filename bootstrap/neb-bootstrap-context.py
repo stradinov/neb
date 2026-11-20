@@ -121,9 +121,94 @@ def _load_assembler(bootstrap_dir):
     return _load_module(os.path.join(bootstrap_dir, 'assemble-startup.py'), 'neb_assemble_startup')
 
 
-def _env_notices(bootstrap_dir):
+DB_NOTICE_MAX = 900  # unidades UTF-16 del aviso de base incompatible o paso detenido, con su envoltura
+
+
+def _readonly_db(mig, home):
+    """Ruta de la base, ubicada sin abrirla para escribir (misma preferencia que resolve_db_path:
+    neb.db si trae `work`, si no neb-logbook.db). None si no hay ninguna."""
+    for name in ('neb.db', 'neb-logbook.db'):
+        p = os.path.join(home, '.claude', name)
+        con = mig.open_readonly(p)
+        if con is None:
+            continue
+        try:
+            if mig._table_exists(con, 'work'):
+                return p
+        except Exception:  # noqa: BLE001
+            pass
+        finally:
+            con.close()
+    return None
+
+
+def _db_notice(bootstrap_dir, neb_home=None, home=None):
+    """Aviso de base que un árbol de Neb ya no puede operar, o de un paso de base detenido; None si no hay
+    nada que decir. Solo lee (mode=ro; nunca crea la base). Usa las migraciones del árbol propio; del clon
+    (NEB_HOME) solo lee SCHEMA_VERSION como texto (un árbol sin _migrations.py cuenta como 1). Que la base
+    esté atrás no es aviso por sí solo (lo normal en la primera sesión tras actualizar), ni que plugin y
+    clon difieran de versión si los dos la entienden (M7 del REQ neb-migraciones-de-version)."""
+    own_root = os.path.dirname(bootstrap_dir)
+    try:
+        mig = _load_module(os.path.join(own_root, 'hooks', 'lib', '_migrations.py'), 'neb_migrations_own')
+    except Exception:  # noqa: BLE001 — un árbol anterior a 6.48.0 no lo trae
+        return None
+    home = home or os.path.expanduser('~')
+    db = _readonly_db(mig, home)
+    if db is None:
+        return None
+    con = mig.open_readonly(db)
+    if con is None:
+        return None
+    try:
+        v, f = mig.read_version(con)
+        trees = [(own_root, mig.code_version(), True)]
+        if neb_home and os.path.normcase(os.path.abspath(neb_home)) != os.path.normcase(os.path.abspath(own_root)):
+            clone_mig = os.path.join(neb_home, 'hooks', 'lib', '_migrations.py')
+            c_clone = mig.read_schema_version_text(clone_mig)
+            if c_clone is not None:
+                trees.append((neb_home, c_clone, os.path.isfile(clone_mig)))
+        parts = []
+        for root, c, knows_rule in trees:
+            if v > c and c < f:
+                effect = ("su captura no escribe y sus comandos responden `base-incompatible`" if knows_rule else
+                          "es anterior a 6.48.0 y no conoce la regla: puede escribir en ella o responder vacío")
+                parts.append(
+                    "el árbol de Neb `%s` trae la versión de esquema %d y la base (`%s`) está en la %d, que pide "
+                    "al menos la %d: ese código no la opera (%s). Ofrece al dev actualizar ese árbol"
+                    % (root, c, db, v, f, effect))
+        if v <= mig.code_version():
+            for n, titulo, motivo in mig.blocked_report(con)[:2]:
+                parts.append("el paso de base %d de Neb (%s) está detenido: %s. Avísale al dev; `%s status` da "
+                             "el detalle" % (n, titulo, str(motivo)[:200],
+                                             os.path.join(own_root, 'bootstrap', 'neb-migrate.py').replace('\\', '/')))
+    except Exception:  # noqa: BLE001 — el aviso es accesorio
+        return None
+    finally:
+        con.close()
+    if not parts:
+        return None
+    text = '; '.join(parts) + '.'
+    text = text[0].upper() + text[1:]
+    tail = '… (`neb-migrate.py status` da el detalle).'
+
+    def u16(s):
+        return len(s.encode('utf-16-le')) // 2
+    if u16(ENV_NOTICE % text) > DB_NOTICE_MAX:
+        room = DB_NOTICE_MAX - u16(ENV_NOTICE % tail)
+        cut = text[:room]
+        while cut and u16(cut) > room:
+            cut = cut[:-1]
+        text = cut.rstrip() + tail
+    return text
+
+
+def _env_notices(bootstrap_dir, neb_home=None):
     """Avisos sobre el entorno de Neb que Claude debe trasladar al dev. Vacio si todo esta en orden."""
     notices = []
+    db = _db_notice(bootstrap_dir, neb_home)
+    if db:
+        notices.append(db)
     stale = stale_neb_home()
     if stale:
         notices.append(
@@ -209,7 +294,7 @@ def _intro(neb_home):
 def _blocks(asm, neb_home, bootstrap_dir):
     """[(etiqueta, archivo fuente, texto)] del arranque, en el orden en que se inyecta."""
     blocks = [(None, None, _intro(neb_home))]
-    blocks.extend((None, None, n) for n in _env_notices(bootstrap_dir))
+    blocks.extend((None, None, n) for n in _env_notices(bootstrap_dir, neb_home))
     startup = os.path.join(neb_home, 'general', 'startup.md')
     blocks.append(('arranque del núcleo', startup, asm.assemble(startup, 0, frozenset())))
 

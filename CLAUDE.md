@@ -82,6 +82,14 @@ Ver lineamiento completo en `methodology/skills.md`.
 
 Ver definición técnica del modelo persona/subagente en [`methodology/roles-catalog.md`](methodology/roles-catalog.md) § "Implementación de roles".
 
+## Agregar un paso de base
+
+Cuándo toca y qué declara la versión: [`process/version-control.md`](process/version-control.md) § "Flujo al cerrar REQ". Mecánica:
+
+1. Un paso de base al final de `STEPS` en `hooks/lib/_migrations.py` y `SCHEMA_VERSION` al mismo número; `hooks/logbook-schema.sql` (esquema inicial) no se edita. Atributos y forma de `aplicar`: [`tooling/migrations.md`](tooling/migrations.md) § "Escribir un paso".
+2. Pruebas en `hooks/tests/` con la lista de pasos inyectable (`_connect(..., steps=...)`), cada una vista fallar con su falla sembrada, y el paso sobre una copia de una base real antes del gate de Fase 4 ([`profiles/self-applied/deployment.md`](profiles/self-applied/deployment.md) § "Validación").
+3. Bump minor; major si sube la mínima compatible. El fragmento declara el paso.
+
 ## Cambiar paths o nombres de archivos importados
 
 Rompe imports en los `CLAUDE.md` de todos los proyectos. Considerar alias o redirección antes de hacerlo; si no hay forma, justifica un major.

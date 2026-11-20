@@ -27,7 +27,7 @@ import sys
 import unicodedata
 
 from _db_shared import (
-    resolve_db_path, _connect, begin_immediate,
+    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable, begin_immediate,
     now_iso, posix_to_win, _whoami,
     with_write_tx as _with_write_tx, _safe_rollback,
 )
@@ -45,13 +45,9 @@ _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
 # --------------------------------------------------------------------------- conexión CLI
 
 def _db_for_cli():
-    home  = os.path.expanduser("~")
-    # Sin NEB_HOME (solo plugin), o con NEB_HOME fijado al caché: el árbol de este módulo,
-    # cuyo esquema es el de su misma versión (neb_root.py).
-    guide = posix_to_win(resolve_neb_root(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
-    return _connect(resolve_db_path(home),
-                    os.path.join(guide, "hooks", "logbook-schema.sql"))
+    # Esquema inicial del árbol de este módulo, con o sin NEB_HOME (6.48.0). Puede lanzar DbUnavailable:
+    # lo atrapa cli_main una sola vez.
+    return _connect(resolve_db_path(os.path.expanduser("~")), INITIAL_SCHEMA_PATH)
 
 
 # _with_write_tx / _safe_rollback se movieron a _db_shared (fuente única del patrón de escritura;
@@ -1639,7 +1635,13 @@ def cli_main(argv):
             _s.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
-    cmd, rest = argv[0], argv[1:]
+    try:
+        _dispatch(argv[0], argv[1:])
+    except DbUnavailable as e:
+        print(json.dumps(e.to_dict(), ensure_ascii=False))
+
+
+def _dispatch(cmd, rest):
     if cmd == "create":
         cli_create(rest)
     elif cmd == "note":

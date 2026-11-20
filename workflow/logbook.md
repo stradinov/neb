@@ -77,7 +77,7 @@ Se **deriva** de la memoria del proyecto (los `active_<proyecto>_<slug>.md` — 
 - Estado semántico (`payload_json`): plan resumido, archivos, próximos pasos y "Pendiente de entrega". El **Trabajo en vuelo** de un relevo —prosa sobre **cómo relanzar** agentes/scripts— y sus próximos pasos no viajan aquí: viven en `## Relevo` del Change MD al que la entrada apunta ([`changes.md`](changes.md) § "Relevo").
 - Transcript: solo la referencia local (`transcript_path`), informativa y válida en la máquina de origen. De la conversación, la bitácora solo guarda, y con opt-in sube al central, el resumen del exploratorio (los primeros 120 caracteres del primer mensaje); el resto no se guarda ni viaja.
 
-El esquema concreto (SQLite local / central) vive en [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql); la plantilla de entrada en [`../templates/logbook-entry.md.template`](../templates/logbook-entry.md.template).
+El esquema concreto del SQLite local es el esquema inicial de [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql) más los pasos de base de [`../tooling/migrations.md`](../tooling/migrations.md) (el vigente lo imprime `bootstrap/neb-migrate.py schema`); la plantilla de entrada en [`../templates/logbook-entry.md.template`](../templates/logbook-entry.md.template).
 
 ## Ciclo de vida
 

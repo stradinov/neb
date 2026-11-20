@@ -47,8 +47,7 @@ sys.path.insert(0, _LIB)
 import _db_shared          # noqa: E402
 import pendings            # noqa: E402
 
-_SCHEMA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "..", "hooks", "logbook-schema.sql")
+_SCHEMA = _db_shared.INITIAL_SCHEMA_PATH          # esquema inicial del árbol de este script (6.48.0)
 
 
 # =========================================================================== heurística de estado
@@ -510,7 +509,12 @@ def run(src_path, db_path, do_apply):
         return plan, None
 
     # --apply: escritura idempotente dentro de una transacción.
-    con = _db_shared._connect(db_path, _SCHEMA)
+    try:
+        con = _db_shared._connect(db_path, _SCHEMA)
+    except _db_shared.DbUnavailable as e:
+        print(f"[migrate-pendings] ERROR: base no disponible ({e.motivo}): {e.detalle}. {e.accion}",
+              file=sys.stderr)
+        return None, None
     if con is None:
         print(f"[migrate-pendings] ERROR: no se pudo abrir la DB {db_path}", file=sys.stderr)
         return plan, None

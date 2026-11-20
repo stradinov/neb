@@ -117,10 +117,11 @@ Un solo `CHANGELOG.md` con orden DESC es punto de conflicto entre sesiones paral
 
 Claude ejecuta estos pasos como parte de Fase 6/7, antes del push del REQ:
 
-1. Crear `changelog.d/<X.Y.Z>.md` con el entry del REQ. Naming: el stem del archivo es la versión SemVer en `<major>.<minor>.<patch>` (sin prefijo `v`).
-2. Bumpear `VERSION` al mismo número.
-3. Correr `py bootstrap/assemble-changelog.py` — regenera `CHANGELOG.md`.
-4. `git add changelog.d/<X.Y.Z>.md CHANGELOG.md VERSION` (más archivos del REQ) y commit con el trailer `Req: <nombre>` (§ "Trailer `Req:` — del commit al REQ").
+1. En el repo `neb`, si el REQ cambia el esquema de `neb.db`, Claude verifica que su paso de base (escrito y probado en Fase 4) esté en `hooks/lib/_migrations.py` y declara en el fragmento qué hace y si sube la mínima compatible. El esquema inicial (`hooks/logbook-schema.sql`) no se edita. Mecánica: [`../tooling/migrations.md`](../tooling/migrations.md) § "Escribir un paso".
+2. Crear `changelog.d/<X.Y.Z>.md` con el entry del REQ. Naming: el stem del archivo es la versión SemVer en `<major>.<minor>.<patch>` (sin prefijo `v`).
+3. Bumpear `VERSION` al mismo número.
+4. Correr `py bootstrap/assemble-changelog.py` — regenera `CHANGELOG.md`.
+5. `git add changelog.d/<X.Y.Z>.md CHANGELOG.md VERSION` (más archivos del REQ) y commit con el trailer `Req: <nombre>` (§ "Trailer `Req:` — del commit al REQ").
 
 ### Gate pre-push
 

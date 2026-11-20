@@ -357,12 +357,10 @@ def after_capture(con, session_id, chunk):
 # --------------------------------------------------------------------------- CLI
 
 def _default_connect():
-    """Misma base y esquema que `logbook._db_for_cli` (para llamadas directas sin conector)."""
-    from _db_shared import _connect
-    from neb_root import resolve_neb_root
-    guide = resolve_neb_root(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-    return _connect(resolve_db_path(os.path.expanduser("~")),
-                    os.path.join(guide, "hooks", "logbook-schema.sql"))
+    """Misma base y esquema que `logbook._db_for_cli` (para llamadas directas sin conector): el esquema
+    inicial del árbol de este módulo (6.48.0). Puede lanzar DbUnavailable."""
+    from _db_shared import open_default_db
+    return open_default_db(os.path.expanduser("~"))
 
 
 def _emit(obj):

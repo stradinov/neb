@@ -42,7 +42,8 @@ from datetime import datetime, timezone
 # Infra compartida de la DB (resolver dual-mode + conexión net-new + helpers puros movidos).
 # El resolver dual-mode vive SOLO en _db_shared; las 3 sedes de db_path de este módulo lo importan.
 from _db_shared import (
-    resolve_db_path, _connect, _migrate, begin_immediate, with_write_tx, _safe_rollback,
+    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable,
+    _migrate, begin_immediate, with_write_tx, _safe_rollback,
     now_iso, posix_to_win, encode_cwd, find_active_reqs, resolve_memory_dir,
     _whoami, _hostname, _git, _git_info, _project_id, _normalize_remote, _basename,
 )
@@ -59,7 +60,7 @@ def main():
     cwd            = posix_to_win(sys.argv[2])
     transcript_arg = posix_to_win(sys.argv[3])
     event_name     = sys.argv[4]
-    guide_dir      = posix_to_win(sys.argv[5])
+    guide_dir      = posix_to_win(sys.argv[5])        # lo siguen enviando los wrappers; ya no decide el esquema
     home_dir       = posix_to_win(sys.argv[6]) or os.path.expanduser("~")
 
     if not session_id or not cwd:
@@ -69,9 +70,6 @@ def main():
     projects_dir = os.path.join(home_dir, ".claude", "projects", encoded)
     jsonl_path   = transcript_arg or os.path.join(projects_dir, f"{session_id}.jsonl")
     memory_dir   = resolve_memory_dir(home_dir, cwd, encoded)   # respeta autoMemoryDirectory; fallback al default
-    schema_path  = os.path.join(guide_dir, "hooks", "logbook-schema.sql")
-#    db_path      = os.path.join(home_dir, ".claude", "neb-logbook.db")
-    db_path      = resolve_db_path(home_dir)
 
     owner   = _whoami()
     machine = _hostname()
@@ -79,7 +77,12 @@ def main():
 
     active_reqs = find_active_reqs(memory_dir) if os.path.isdir(memory_dir) else []
 
-    con = _connect(db_path, schema_path)
+    try:
+        con = _open_db(home_dir)                       # esquema del árbol de este módulo, nunca el de NEB_HOME
+    except DbUnavailable as e:
+        # El stderr del hook se descarta: lo hacen visible el arranque y `neb-migrate.py status`.
+        print(f"[logbook] base no disponible ({e.motivo}): {e.detalle}", file=sys.stderr)
+        return
     if con is None:
         return
     try:
@@ -449,15 +452,17 @@ def sync_main(args):
         print("[logbook] sync: central no configurado (falta NEB_LOGBOOK_ENDPOINT y/o NEB_LOGBOOK_TOKEN); "
               "nada que drenar", file=sys.stderr)
         return
-#    db_path     = os.path.join(home, ".claude", "neb-logbook.db")
     db_path     = resolve_db_path(home)
-    schema_path = os.path.join(guide, "hooks", "logbook-schema.sql") if guide else ""
     lock = _acquire_sync_lock(os.path.dirname(db_path))
     if lock is False:
         print("[logbook] sync: otro sync de esta máquina está en curso; nada que hacer", file=sys.stderr)
         return
     try:
-        con = _connect(db_path, schema_path)
+        try:
+            con = _open_db(home)                      # `guide` ya no decide el esquema
+        except DbUnavailable as e:
+            print(f"[logbook] sync: base no disponible ({e.motivo}): {e.detalle}", file=sys.stderr)
+            return
         if con is None:
             return
         con.row_factory = sqlite3.Row
@@ -834,15 +839,16 @@ CLI_CMDS = {"list", "show", "claim", "release", "forced-release", "request", "re
             "sync-status", "link", "trace", "unlink"}
 
 
+def _open_db(home_dir):
+    """Base por omisión con el esquema inicial del árbol de este módulo, con o sin NEB_HOME (6.48.0).
+    Pasa por el `_connect` de este módulo para que las pruebas que lo parchean sigan vigilando la captura
+    y el sync. Puede lanzar DbUnavailable."""
+    return _connect(resolve_db_path(home_dir), INITIAL_SCHEMA_PATH)
+
+
 def _db_for_cli():
-    home  = os.path.expanduser("~")
-    # Sin NEB_HOME (solo plugin), o con NEB_HOME fijado al caché: el árbol de este módulo,
-    # cuyo esquema es el de su misma versión (neb_root.py).
-    guide = posix_to_win(resolve_neb_root(
-        os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
-    return _connect(resolve_db_path(home),
-#                    os.path.join(home, ".claude", "neb-logbook.db"),
-                    os.path.join(guide, "hooks", "logbook-schema.sql"))
+    # Puede lanzar DbUnavailable: lo atrapa cli_main una sola vez.
+    return _open_db(os.path.expanduser("~"))
 
 
 def cli_list(_args):
@@ -1087,7 +1093,13 @@ def cli_main(argv):
             _s.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
-    cmd, rest = argv[0], argv[1:]
+    try:
+        _dispatch(argv[0], argv[1:])
+    except DbUnavailable as e:
+        print(json.dumps(e.to_dict(), ensure_ascii=False))
+
+
+def _dispatch(cmd, rest):
     if cmd == "list":
         cli_list(rest)
     elif cmd == "sync-status":
@@ -1111,6 +1123,8 @@ def cli_main(argv):
         try:
             import req_link
             getattr(req_link, "cli_" + cmd)(rest, _db_for_cli)
+        except DbUnavailable as e:
+            print(json.dumps(e.to_dict(), ensure_ascii=False))
         except Exception as e:
             print(json.dumps({"ok": False, "motivo": f"error: {e}"}, ensure_ascii=False))
     else:

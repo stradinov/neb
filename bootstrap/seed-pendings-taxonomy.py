@@ -68,8 +68,15 @@ sys.path.insert(0, _LIB)
 import _db_shared          # noqa: E402
 import pendings            # noqa: E402
 
-_SCHEMA = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                       "..", "hooks", "logbook-schema.sql")
+_SCHEMA = _db_shared.INITIAL_SCHEMA_PATH          # esquema inicial del árbol de este script (6.48.0)
+
+
+def _open(db_path):
+    """_connect con DbUnavailable traducido a RuntimeError (main sale con 1 y el motivo por stderr)."""
+    try:
+        return _db_shared._connect(db_path, _SCHEMA)
+    except _db_shared.DbUnavailable as e:
+        raise RuntimeError(f"base no disponible ({e.motivo}): {e.detalle}. {e.accion}") from e
 
 # Prioridad del pase -> (priority_band EN, priority_score por defecto). El score real se hereda de la
 # fila primaria previa cuando la banda coincide (ver apply_plan); este mapa es el fallback.
@@ -420,7 +427,7 @@ def rollback(db_path, bak_path):
     _require_db(db_path)
     if not os.path.isfile(bak_path):
         raise RuntimeError(f"no existe el respaldo {bak_path}")
-    con = _db_shared._connect(db_path, _SCHEMA)
+    con = _open(db_path)
     if con is None:
         raise RuntimeError(f"no se pudo abrir la DB {db_path}")
     try:
@@ -524,7 +531,7 @@ def run(db_path, catalog_path, dataset_path, apply=False, force=False, backup_di
         return {"plan": plan, "counts": None, "backup": None, "changed": None}
     bak_dir = backup_dir or os.path.dirname(os.path.abspath(db_path))
     bak = backup_db(db_path, os.path.join(bak_dir, f"{os.path.basename(db_path)}.bak-pre-taxonomy-{_stamp()}"))
-    con = _db_shared._connect(db_path, _SCHEMA)
+    con = _open(db_path)
     if con is None:
         raise RuntimeError(f"no se pudo abrir la DB {db_path} (respaldo intacto en {bak})")
     try:

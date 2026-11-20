@@ -1,0 +1,601 @@
+#!/usr/bin/env python3
+"""
+_migrations.py — versión de esquema y pasos de base de neb.db (Neb, desde 6.48.0).
+
+La base guarda sus pasos aplicados en `schema_step`; el código trae `SCHEMA_VERSION`. Al conectar
+(_db_shared._connect → migrate), con V = MAX(step), F = MAX(min_code) y C = SCHEMA_VERSION:
+
+    V == C            opera
+    V <  C            aplica los pasos V+1 … C y opera
+    V >  C y C >= F   opera sin migrar (base más nueva pero compatible)
+    V >  C y C <  F   no toca la base: IncompatibleDb
+
+Un paso de base es un cambio del esquema escrito en código. Corre dentro de BEGIN IMMEDIATE junto con
+su fila de `schema_step` (todo o nada), salvo el paso 1 (esquema inicial), que es idempotente.
+Un paso destructivo lleva respaldo previo verificado en `<carpeta de la base>/neb-backups/` (queda 1).
+
+Este módulo NO importa módulos hermanos: el arranque lee `SCHEMA_VERSION` de otro árbol como texto
+(regex sobre este archivo) sin cargarlo. Mantener la asignación en una sola línea literal.
+
+Documento: tooling/migrations.md.
+"""
+
+import glob
+import os
+import re
+import sqlite3
+import sys
+import time
+from datetime import datetime, timezone
+
+
+SCHEMA_VERSION = 1
+
+BACKUP_DIR_NAME   = "neb-backups"
+STEP_BACKUP_GLOB  = "neb.pre-paso-*.db"
+RESTORE_BACKUP_GLOB = "neb.pre-restore.*.db"
+
+RETRY_BACKOFF_SECONDS = 600         # tras un fallo guardado, las conexiones esperan esto antes de reintentar
+BROKEN_TX_PREFIX = "transaccion-rota:"
+ADVANCED = object()                 # la base ya estaba en el paso: se vuelve a decidir la compatibilidad
+
+_SCHEMA_VERSION_RE = re.compile(r"^SCHEMA_VERSION\s*=\s*(\d+)\s*$", re.MULTILINE)
+
+
+# --------------------------------------------------------------------------- errores
+
+class DbUnavailable(Exception):
+    """La base no se puede operar con este código. Los cli_main la atrapan una sola vez y responden
+    {"ok": false, "motivo", "detalle", "accion"} con salida 0."""
+
+    def __init__(self, motivo, detalle, accion):
+        super().__init__(f"{motivo}: {detalle}")
+        self.motivo, self.detalle, self.accion = motivo, detalle, accion
+
+    def to_dict(self):
+        return {"ok": False, "motivo": self.motivo, "detalle": self.detalle, "accion": self.accion}
+
+
+class IncompatibleDb(DbUnavailable):
+    pass
+
+
+class _Busy(Exception):
+    """Candado ocupado al aplicar un paso sin `espera`: _connect devuelve None, como hoy."""
+
+
+# --------------------------------------------------------------------------- columnas del esquema inicial
+# Columnas agregadas después de la creación de cada tabla. CREATE TABLE IF NOT EXISTS no altera una tabla
+# existente: el paso 1 las agrega si faltan. Congeladas con el esquema inicial (6.47.0): un cambio nuevo
+# del esquema es un paso de base, no una fila aquí.
+
+_WORK_MIGRATIONS = (
+    ("conflict",            "ALTER TABLE work ADD COLUMN conflict INTEGER NOT NULL DEFAULT 0"),
+    ("last_error",          "ALTER TABLE work ADD COLUMN last_error TEXT"),
+    ("last_error_at",       "ALTER TABLE work ADD COLUMN last_error_at TEXT"),
+    ("transcript_error",    "ALTER TABLE work ADD COLUMN transcript_error TEXT"),
+    ("transcript_error_at", "ALTER TABLE work ADD COLUMN transcript_error_at TEXT"),
+)
+_SESSION_SYNC_MIGRATIONS = (
+    ("root_cwd",  "ALTER TABLE session_sync ADD COLUMN root_cwd TEXT"),
+    ("read_byte", "ALTER TABLE session_sync ADD COLUMN read_byte INTEGER NOT NULL DEFAULT 0"),
+)
+_PENDING_MIGRATIONS = (
+    ("slug", "ALTER TABLE pending ADD COLUMN slug TEXT"),
+)
+_PENDING_TOPIC_MIGRATIONS = (
+    ("curated", "ALTER TABLE pending_topic ADD COLUMN curated INTEGER NOT NULL DEFAULT 0"),
+)
+
+
+def _table_exists(con, name):
+    """Existencia REAL de la tabla vía el catálogo (sobrevive a conexiones envueltas en tests)."""
+    return con.execute(
+        "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (name,)).fetchone() is not None
+
+
+def _add_missing_columns(con, table, migrations):
+    """Aplica las migraciones de columnas que falten en <table>. Tolera 'duplicate column name'
+    (carrera entre procesos); cualquier otro error se propaga."""
+    cols = {r[1] for r in con.execute(f"PRAGMA table_info({table})").fetchall()}
+    for name, ddl in migrations:
+        if name in cols:
+            continue
+        try:
+            con.execute(ddl)
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                raise
+
+
+def add_initial_columns(con):
+    """Columnas del esquema inicial que falten. `work` siempre (si existe); las demás solo si su tabla
+    existe (una base solo-logbook no debe romper). Solo DDL. Propaga 'database is locked'."""
+    cols = {r[1] for r in con.execute("PRAGMA table_info(work)").fetchall()}
+    if not cols:
+        return
+    for name, ddl in _WORK_MIGRATIONS:
+        if name in cols:
+            continue
+        try:
+            con.execute(ddl)
+        except sqlite3.OperationalError as e:
+            if "duplicate column name" not in str(e).lower():
+                raise
+    if _table_exists(con, "session_sync"):
+        _add_missing_columns(con, "session_sync", _SESSION_SYNC_MIGRATIONS)
+    if _table_exists(con, "pending"):
+        _add_missing_columns(con, "pending", _PENDING_MIGRATIONS)
+    if _table_exists(con, "pending_topic"):
+        _add_missing_columns(con, "pending_topic", _PENDING_TOPIC_MIGRATIONS)
+
+
+# --------------------------------------------------------------------------- pasos
+
+class Step:
+    """Un paso de base.
+
+    n           número consecutivo
+    titulo      nombre corto
+    aplicar     fn(con): el cambio; corre dentro de BEGIN IMMEDIATE, sin commit ni executescript, y sin
+                atrapar sqlite3.Error (un error que SQLite revierte solo dejaría las sentencias siguientes
+                confirmándose una por una)
+    min_code    mínima compatible que deja. Sube cuando una escritura válida del código anterior fallaría
+                (NOT NULL sin DEFAULT, UNIQUE, CHECK o trigger nuevos) o cuando un dato que ese código lee
+                desaparece o cambia de significado
+    destructivo borra o reescribe datos: respaldo previo verificado (salvo base recién creada)
+    espera      el código nuevo funciona aunque el paso no se haya aplicado: si no se puede, la conexión
+                sigue con la base en V y se reintenta en la siguiente
+    precheck    fn(con) -> motivo | None, solo lectura: por qué el paso no puede correr todavía
+    inicial     solo el paso 1: executescript del esquema inicial + columnas, fuera de transacción
+    """
+
+    def __init__(self, n, titulo, aplicar=None, min_code=None, destructivo=False, espera=False,
+                 precheck=None, inicial=False):
+        self.n, self.titulo, self.aplicar = n, titulo, aplicar
+        self.min_code = n if min_code is None else min_code
+        self.destructivo, self.espera, self.precheck, self.inicial = destructivo, espera, precheck, inicial
+
+
+STEPS = (
+    Step(1, "esquema inicial", min_code=1, inicial=True),
+)
+
+
+def code_version(steps=None):
+    steps = STEPS if steps is None else steps
+    return max(s.n for s in steps)
+
+
+def read_schema_version_text(path):
+    """SCHEMA_VERSION de un _migrations.py de OTRO árbol, leído como texto (sin cargarlo).
+    Un árbol sin el archivo (anterior a 6.48.0) cuenta como 1; un archivo ilegible, None."""
+    try:
+        with open(path, encoding="utf-8") as fh:
+            m = _SCHEMA_VERSION_RE.search(fh.read())
+    except FileNotFoundError:
+        return 1
+    except (OSError, UnicodeDecodeError):
+        return None
+    return int(m.group(1)) if m else None
+
+
+def neb_version():
+    """Versión de neb de este árbol (archivo VERSION), constancia en schema_step."""
+    p = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "VERSION")
+    try:
+        with open(p, encoding="utf-8") as fh:
+            return fh.read().strip() or "desconocida"
+    except OSError:
+        return "desconocida"
+
+
+def _now():
+    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+
+
+def _stamp():
+    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%fZ")
+
+
+# --------------------------------------------------------------------------- tablas del mecanismo
+# No son pasos: las crea el mecanismo con IF NOT EXISTS. Su forma solo cambia agregando columnas con DEFAULT,
+# y quien las lee tolera que falten.
+
+_BOOKKEEPING_DDL = (
+    """CREATE TABLE IF NOT EXISTS schema_step (
+  step        INTEGER PRIMARY KEY,
+  min_code    INTEGER NOT NULL,
+  title       TEXT NOT NULL,
+  neb_version TEXT NOT NULL,
+  applied_at  TEXT NOT NULL,
+  backup      TEXT
+)""",
+    """CREATE TABLE IF NOT EXISTS schema_step_error (
+  step        INTEGER PRIMARY KEY,
+  at          TEXT NOT NULL,
+  neb_version TEXT NOT NULL,
+  motivo      TEXT NOT NULL
+)""",
+)
+
+
+def read_version(con):
+    """(V, F) de la base: (0, 0) sin tabla de versión."""
+    if not _table_exists(con, "schema_step"):
+        return 0, 0
+    v, f = con.execute("SELECT COALESCE(MAX(step), 0), COALESCE(MAX(min_code), 0) FROM schema_step").fetchone()
+    return int(v), int(f)
+
+
+def read_errors(con):
+    """Fallos vigentes de pasos no aplicados: [(step, at, neb_version, motivo)], ignorando step <= V."""
+    if not _table_exists(con, "schema_step_error"):
+        return []
+    v, _f = read_version(con)
+    return [tuple(r) for r in con.execute(
+        "SELECT step, at, neb_version, motivo FROM schema_step_error WHERE step > ? ORDER BY step", (v,))]
+
+
+# --------------------------------------------------------------------------- respaldo
+
+def backup_dir(db_path):
+    return os.path.join(os.path.dirname(os.path.abspath(db_path)), BACKUP_DIR_NAME)
+
+
+def _private_dir(path):
+    os.makedirs(path, exist_ok=True)
+    try:
+        os.chmod(path, 0o700)
+    except OSError:
+        pass
+
+
+def take_backup(db_path, name):
+    """Copia verificada de la base con la API de backup, desde una conexión aparte (funciona aunque otra
+    conexión tenga BEGIN IMMEDIATE). Devuelve la ruta. Lanza OSError/sqlite3.Error si falla (sin dejar
+    archivo a medias)."""
+    folder = backup_dir(db_path)
+    _private_dir(folder)
+    dest = os.path.join(folder, name)
+    src = dst = None
+    try:
+        src = sqlite3.connect(db_path, timeout=5.0)
+        dst = sqlite3.connect(dest)
+        src.backup(dst)
+        # La copia hereda WAL del encabezado de la base; en DELETE queda en un solo archivo y leerla en
+        # mode=ro (restore, status) no le deja -wal/-shm que la poda no ve.
+        jm = dst.execute("PRAGMA journal_mode=DELETE").fetchone()[0]
+        if str(jm).lower() != "delete":
+            raise sqlite3.DatabaseError(f"el respaldo quedó en journal_mode={jm}")
+        ok = dst.execute("PRAGMA integrity_check").fetchone()[0]
+        if ok != "ok":
+            raise sqlite3.DatabaseError(f"integrity_check del respaldo: {ok}")
+    except BaseException:
+        for c in (dst, src):
+            if c is not None:
+                c.close()
+        dst = src = None
+        for f in (dest, dest + "-wal", dest + "-shm"):
+            _remove_quiet(f)
+        raise
+    finally:
+        for c in (dst, src):
+            if c is not None:
+                c.close()
+    try:
+        os.chmod(dest, 0o600)
+    except OSError:
+        pass
+    return dest
+
+
+def prune_backups(db_path, pattern, keep_path):
+    """Borra los archivos de <pattern> en neb-backups/ salvo keep_path (queda 1)."""
+    keep = os.path.normcase(os.path.abspath(keep_path)) if keep_path else None
+    for p in glob.glob(os.path.join(backup_dir(db_path), pattern)):
+        if keep and os.path.normcase(os.path.abspath(p)) == keep:
+            continue
+        for f in (p, p + "-wal", p + "-shm"):
+            _remove_quiet(f)
+
+
+def _remove_quiet(path):
+    try:
+        os.remove(path)
+    except OSError:
+        pass
+
+
+# --------------------------------------------------------------------------- aplicación
+
+class _Failure:
+    def __init__(self, kind, motivo):
+        self.kind, self.motivo = kind, motivo      # kind: busy | precheck | backup | aplicar
+
+
+def _is_locked(e):
+    return "locked" in str(e).lower() or "busy" in str(e).lower()
+
+
+def _rollback(con):
+    if getattr(con, "in_transaction", False):
+        try:
+            con.execute("ROLLBACK")
+        except sqlite3.Error:
+            pass
+
+
+def _record_error(con, n, motivo):
+    """Constancia del fallo de un paso, en una transacción corta con espera corta. Sin insistir: si el
+    candado está ocupado o otro proceso ya aplicó el paso, no escribe."""
+    saved = con.isolation_level
+    try:
+        con.execute("PRAGMA busy_timeout=200")
+        con.isolation_level = None
+        con.execute("BEGIN IMMEDIATE")
+        v, _f = read_version(con)
+        if v < n:
+            for ddl in _BOOKKEEPING_DDL:
+                con.execute(ddl)
+            con.execute("INSERT OR REPLACE INTO schema_step_error (step, at, neb_version, motivo) "
+                        "VALUES (?, ?, ?, ?)", (n, _now(), neb_version(), str(motivo)[:500]))
+        con.execute("COMMIT")
+    except sqlite3.Error:
+        _rollback(con)
+    finally:
+        con.isolation_level = saved
+        try:
+            con.execute("PRAGMA busy_timeout=5000")
+        except sqlite3.Error:
+            pass
+
+
+def _register(con, step, backup):
+    """Fila de schema_step + borrado del fallo vigente. Dentro de la transacción del paso."""
+    for ddl in _BOOKKEEPING_DDL:
+        con.execute(ddl)
+    con.execute("INSERT OR IGNORE INTO schema_step (step, min_code, title, neb_version, applied_at, backup) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (step.n, step.min_code, step.titulo, neb_version(), _now(), backup))
+    con.execute("DELETE FROM schema_step_error WHERE step = ?", (step.n,))
+
+
+def _apply_initial(con, step, schema_path):
+    """Paso 1: executescript del esquema inicial + columnas (idempotente, no atómico: el executescript
+    confirma antes de correr), luego relectura e INSERT OR IGNORE en una transacción corta. Relee V justo
+    antes del executescript: si otro proceso ya registró el paso (y quizá otros que retiran columnas), no
+    vuelve a agregar nada."""
+    if read_version(con)[0] >= step.n:
+        return ADVANCED
+    if schema_path and os.path.isfile(schema_path):
+        with open(schema_path, encoding="utf-8") as fh:
+            con.executescript(fh.read())
+    if not _table_exists(con, "work"):
+        raise sqlite3.OperationalError(f"el esquema inicial no creó la tabla work: {schema_path}")
+    add_initial_columns(con)
+    con.commit()
+    saved = con.isolation_level
+    try:
+        con.isolation_level = None
+        try:
+            con.execute("BEGIN IMMEDIATE")
+        except sqlite3.OperationalError as e:
+            if _is_locked(e):
+                return _Failure("busy", str(e))
+            raise
+        v, _f = read_version(con)
+        if v >= step.n:
+            con.execute("COMMIT")
+            return ADVANCED
+        _register(con, step, None)
+        con.execute("COMMIT")
+        return None
+    except BaseException:
+        _rollback(con)
+        raise
+    finally:
+        con.isolation_level = saved
+
+
+def _saved_error(con, n):
+    """(at, motivo) del fallo guardado del paso n, o None."""
+    for step, at, _ver, motivo in read_errors(con):
+        if step == n:
+            return at, motivo or ""
+    return None
+
+
+def _in_backoff(at):
+    """True si el fallo guardado en <at> (ISO UTC) es más reciente que RETRY_BACKOFF_SECONDS."""
+    try:
+        when = datetime.fromisoformat(at)
+    except (TypeError, ValueError):
+        return False
+    if when.tzinfo is None:
+        when = when.replace(tzinfo=timezone.utc)
+    return (datetime.now(timezone.utc) - when).total_seconds() < RETRY_BACKOFF_SECONDS
+
+
+def _apply_step(con, db_path, step, fresh, retry=False):
+    """Paso n >= 2, todo o nada. Devuelve None si este proceso lo aplicó, ADVANCED si la base ya está en
+    n o más (otro proceso avanzó: quien llama vuelve a decidir la compatibilidad), o _Failure.
+
+    Un paso que rompió su transacción no se reintenta solo: lo aplicado quedó confirmado a medias y el
+    respaldo se conserva para `restore`. Tras un fallo guardado de aplicar o de respaldo, las conexiones
+    no lo reintentan durante RETRY_BACKOFF_SECONDS (cada intento de un paso destructivo copia la base con
+    el candado tomado); `retry=True` (neb-migrate.py apply) reintenta ya."""
+    saved_err = _saved_error(con, step.n)
+    if saved_err is not None:
+        at, motivo = saved_err
+        if motivo.startswith(BROKEN_TX_PREFIX):
+            return _Failure("aplicar", motivo)
+        if not retry and _in_backoff(at):
+            return _Failure("aplicar", f"{motivo} (reintento después de {RETRY_BACKOFF_SECONDS // 60} min o "
+                                       "con `neb-migrate.py apply`)")
+    if step.precheck is not None:
+        try:
+            motivo = step.precheck(con)
+            failure = _Failure("precheck", motivo) if motivo else None
+        except Exception as e:                          # noqa: BLE001 — un precheck mal escrito no tumba la conexión
+            failure = _Failure("aplicar", f"precheck: {e}")
+        if failure is not None:
+            # El precheck corre sin candado: si otro proceso aplicó el paso en medio, no es un bloqueo.
+            if read_version(con)[0] >= step.n:
+                return ADVANCED
+            return failure
+    saved = con.isolation_level
+    backup = None
+    try:
+        con.isolation_level = None
+        try:
+            con.execute("BEGIN IMMEDIATE")
+        except sqlite3.OperationalError as e:
+            if _is_locked(e):
+                return _Failure("busy", str(e))
+            raise
+        v, _f = read_version(con)
+        if v >= step.n:                                 # otro proceso lo aplicó en medio
+            con.execute("COMMIT")
+            return ADVANCED
+        if step.destructivo and not fresh:
+            try:
+                backup = take_backup(db_path, f"neb.pre-paso-{step.n}.{_stamp()}.db")
+            except (OSError, sqlite3.Error) as e:
+                _rollback(con)
+                _record_error(con, step.n, f"respaldo fallido: {e}")
+                return _Failure("backup", f"respaldo fallido: {e}")
+        try:
+            step.aplicar(con)
+            if not con.in_transaction:
+                raise sqlite3.OperationalError("el paso rompió su transacción (commit o executescript adentro)")
+            _register(con, step, backup)
+            con.execute("COMMIT")
+        except Exception as e:                          # noqa: BLE001 — también un TypeError de un paso mal escrito
+            broken = not con.in_transaction             # algo ya se confirmó: el rollback no lo deshace
+            _rollback(con)
+            if broken:
+                motivo = f"{BROKEN_TX_PREFIX} {e}" + (f"; respaldo previo en {backup}" if backup else "")
+                _record_error(con, step.n, motivo)
+                return _Failure("aplicar", motivo)
+            if backup:
+                _remove_quiet(backup)
+                backup = None
+            if isinstance(e, sqlite3.Error) and _is_locked(e):
+                return _Failure("busy", str(e))
+            _record_error(con, step.n, f"error al aplicar: {e}")
+            return _Failure("aplicar", f"error al aplicar: {e}")
+        except BaseException:                           # KeyboardInterrupt / SystemExit: deshacer y propagar
+            _rollback(con)
+            if backup:
+                _remove_quiet(backup)
+            raise
+    finally:
+        con.isolation_level = saved
+    if backup:
+        prune_backups(db_path, STEP_BACKUP_GLOB, backup)
+    return None
+
+
+def _check_newer(v, f, c):
+    """Regla para V > C: False (opera sin migrar) o IncompatibleDb."""
+    if c >= f:
+        return False
+    raise IncompatibleDb(
+        "base-incompatible",
+        f"la base está en la versión de esquema {v} y pide al menos la {f}; "
+        f"este código de neb ({neb_version()}) trae la {c}",
+        "actualiza neb (plugin y clon) a una versión con la versión de esquema "
+        f"{f} o mayor; `neb-migrate.py status` muestra el detalle")
+
+
+def migrate(con, db_path, schema_path, steps=None, fresh=None, retry=False):
+    """Lleva la base a la versión del código si toca. Devuelve True si las reparaciones deben correr
+    (V <= C), False si la base es más nueva y compatible. Lanza IncompatibleDb, DbUnavailable
+    (paso-bloqueado) o _Busy; los errores de SQLite se propagan (_connect devuelve None).
+
+    fresh: la base se creó en esta conexión (sin respaldo antes de un paso destructivo). _connect lo
+    decide por el archivo antes de abrirlo; None = sin tabla `work`.
+    Si otro proceso avanzó la base mientras tanto (ADVANCED), vuelve a leer V y F y a aplicar la regla:
+    la compatibilidad no se decide con una lectura vieja."""
+    steps = STEPS if steps is None else steps
+    c = code_version(steps)
+    if fresh is None:
+        fresh = not _table_exists(con, "work")
+    v, f = read_version(con)
+    while True:
+        if v > c:
+            return _check_newer(v, f, c)
+        pending = [s for s in steps if s.n > v]
+        advanced = False
+        for i, step in enumerate(pending):
+            if step.inicial:
+                failure = _apply_initial(con, step, schema_path)
+            else:
+                failure = _apply_step(con, db_path, step, fresh, retry=retry)
+            if failure is None:
+                continue
+            if failure is ADVANCED:
+                advanced = True
+                break
+            if all(s.espera for s in pending[i:]):
+                print(f"[logbook] aviso: paso de base {step.n} ({step.titulo}) sin aplicar: {failure.motivo}; "
+                      "se reintenta en la siguiente conexión", file=sys.stderr)
+                return True
+            if failure.kind == "busy":
+                raise _Busy(failure.motivo)
+            raise DbUnavailable(
+                "paso-bloqueado",
+                f"el paso de base {step.n} ({step.titulo}) no se puede aplicar: {failure.motivo}",
+                "`neb-migrate.py status` muestra qué lo detiene; corrígelo y vuelve a abrir la sesión")
+        if not advanced:
+            return True
+        v, f = read_version(con)
+
+
+# --------------------------------------------------------------------------- lectura sin escribir
+
+def open_readonly(db_path):
+    """Conexión de solo lectura (no crea el archivo). None si no existe, está vacío o no abre."""
+    try:
+        if not os.path.isfile(db_path) or os.path.getsize(db_path) == 0:
+            return None
+        from pathlib import Path
+        return sqlite3.connect(Path(os.path.abspath(db_path)).as_uri() + "?mode=ro", uri=True, timeout=1.0)
+    except (OSError, sqlite3.Error):
+        return None
+
+
+def blocked_report(con, steps=None):
+    """Pasos de base de este código detenidos, en solo lectura: [(n, titulo, motivo)]. Junta el fallo
+    guardado en schema_step_error y el precheck recalculado. Que la base esté atrás sin motivo no cuenta
+    (lo normal en la primera sesión tras actualizar)."""
+    steps = STEPS if steps is None else steps
+    v, _f = read_version(con)
+    saved = {r[0]: r[3] for r in read_errors(con)}
+    out = []
+    for s in steps:
+        if s.n <= v:
+            continue
+        motivo = None
+        if s.precheck is not None:
+            try:
+                motivo = s.precheck(con)
+            except sqlite3.Error:
+                motivo = None
+        motivo = motivo or saved.get(s.n)
+        if motivo:
+            out.append((s.n, s.titulo, motivo))
+    return out
+
+
+def list_backups(db_path):
+    folder = backup_dir(db_path)
+    out = []
+    for pattern in (STEP_BACKUP_GLOB, RESTORE_BACKUP_GLOB):
+        for p in sorted(glob.glob(os.path.join(folder, pattern))):
+            try:
+                out.append((p, os.path.getsize(p)))
+            except OSError:
+                pass
+    return out

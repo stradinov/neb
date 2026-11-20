@@ -64,6 +64,13 @@ python <ruta>/hooks/lib/autoupdate.py disable    # la apaga
 - `disable` no quita `FORCE_AUTOUPDATE_PLUGINS`. Bórrala a mano si ningún otro marketplace la necesita.
 - Si tu settings no trae la entrada del marketplace, el ayudante no escribe nada y te muestra el bloque para agregarla a mano.
 
+**Qué pasa con tu base al actualizar** (desde 6.48.0). Tus pendientes y tu bitácora viven en `~/.claude/neb.db`. Cuando una versión cambia el esquema de esa base, el cambio corre solo en la primera conexión de la versión nueva, sin que tengas que hacer nada:
+
+- Si el cambio borra o reescribe datos, Neb copia antes la base, verificada, a `~/.claude/neb-backups/` y conserva la última copia.
+- Plugin y clon (si tienes `NEB_HOME`) pueden tener versiones distintas: los dos operan la base mientras la entiendan. Si uno ya no la entiende, no la toca, sus comandos responden `base-incompatible` y el arranque de la sesión te dice cuál actualizar.
+- `py <ruta>/bootstrap/neb-migrate.py status` muestra la versión de esquema de tu base y del código, si algo detiene un cambio y qué respaldos hay.
+- Para volver a una versión anterior: regresa primero plugin y clon, y después `neb-migrate.py restore <respaldo>`. Detalle en `tooling/migrations.md`.
+
 ## Conectarse al espacio de trabajo del equipo
 
 Si tu equipo ya tiene un **repositorio del espacio de trabajo** (overlay + `changes/` + `personal/` centralizados), no creas nada: lo conectas. Tres pasos:
@@ -185,7 +192,7 @@ git clone https://github.com/stradinov/neb ~/neb   # o donde prefieras
 cp ~/neb/hooks/pre-push-wrapper ~/neb/.git/hooks/pre-push
 ```
 
-Flujo del mantenedor: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo. Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`. Los hooks opcionales activados con `NEB_HOOKS` corren siempre el plugin cargado: para probarlos desde el clon, usa `--plugin-dir`.
+Flujo del mantenedor: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo. Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`. Los hooks opcionales activados con `NEB_HOOKS` corren siempre el plugin cargado: para probarlos desde el clon, usa `--plugin-dir`. Ojo: si el clon trae un paso de base nuevo, la primera conexión lo aplica a tu `~/.claude/neb.db`; para probarlo sin tocarla, usa un home temporal (`HOME` y `USERPROFILE`) con una copia de la base.
 
 El clon del núcleo y tu espacio de trabajo son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. La envoltura instalada ejecuta `hooks/pre-push-changelog` del clon, así que el hook `pre-push` se actualiza con `git pull` sin reinstalarlo. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)
 

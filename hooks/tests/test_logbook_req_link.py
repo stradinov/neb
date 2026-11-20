@@ -394,7 +394,9 @@ class TestEsquema(unittest.TestCase):
         path = os.path.join(tmp, "neb-logbook.db")
         con = _db_shared._connect(path, SCHEMA)
         con.execute("PRAGMA foreign_keys=OFF")
-        for t in ("req_session", "req_repo", "req_link"):
+        # Base legada = anterior a req_link y a la versión de esquema (6.48.0): sin schema_step. Con la tabla de
+        # versión presente, el esquema inicial ya no se reaplica (una tabla borrada a mano no se recrea).
+        for t in ("req_session", "req_repo", "req_link", "schema_step", "schema_step_error"):
             con.execute(f"DROP TABLE {t}")
         con.commit()
         self.assertFalse(_db_shared._table_exists(con, "req_link"))
