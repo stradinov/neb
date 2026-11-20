@@ -40,6 +40,8 @@ Antes de ejecutar la entrega final (deploy a prod, `git push` cuando es la entre
 
 **Condición de paso**: cero hallazgos abiertos sobre el artefacto final y su ambiente destino — cada hallazgo corregido y re-revisado por un subagente del profile, o descartado con OK del dev.
 
+**Registro del gate**: como en [`execution.md`](execution.md) § "Cierre de Fase 4 (gate de subagente)": al cerrarlo, el rol principal anota en el registro del REQ cada hallazgo con el rol que lo levantó y su desenlace.
+
 **Mecanismo vigente**: el mismo de [`execution.md`](execution.md) § "Cierre de Fase 4 (gate de subagente)" — el subagente corre en su propio contexto y se lanza con la herramienta Agent o, si el dev pidió un workflow, como agente del workflow con `agentType` (supuestos R11, R16 y R18 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). El revisor corre con el modelo y el esfuerzo de la sesión (supuesto R20); bajarlos pide OK del dev. El rol principal simulando al revisor (persona) no cumple este gate.
 
 Qué subagente por profile (default + obligatorio adicional por dimensión, p. ej. `security-reviewer` si el deploy toca auth/datos sensibles, `database-engineer` si hay DDL): ver la matriz columna **Fase 7** en [`roles-invocation.md`](roles-invocation.md) § "Cobertura mínima por fase". Si el profile no tiene subagente formalizado, el dev declara override explícito.

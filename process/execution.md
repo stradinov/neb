@@ -33,6 +33,8 @@ Antes de declarar Fase 4 terminada y transicionar a Fase 5, el rol principal (pe
 
 **Condición de paso**: cero hallazgos abiertos — cada hallazgo corregido y re-revisado por un subagente del profile, o descartado con OK del dev.
 
+**Registro del gate**: al cerrarlo, el rol principal anota en el registro del REQ, bajo «Avances realizados», cada hallazgo con el rol que lo levantó y su desenlace (corregido o descartado). Bajo «Incidencias» va solo lo que cuenta como incidencia ([`../workflow/metrics.md`](../workflow/metrics.md) § "Definiciones operativas"): el alcance que un hallazgo agrega o quita, o el defecto ajeno a lo planeado que corrige. De esas líneas sale el aporte de cada rol en Fase 9 ([`improvement.md`](improvement.md) § "Retroalimentación"); sin ellas, la etiqueta se asigna de memoria.
+
 **Mecanismo vigente**: el subagente corre en su propio contexto, sin la conversación, y se lanza con la herramienta Agent o, si el dev pidió un workflow, como agente del workflow con `agentType` del mismo subagente (supuestos R11, R12, R16 y R18 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)). El revisor corre con el modelo y el esfuerzo de la sesión (supuesto R20); bajarlos pide OK del dev. El rol principal simulando al revisor en su propio contexto (persona) no cumple este gate.
 
 Qué subagente por profile (por defecto + paralelos por dimensión): ver la matriz columna **Fase 4** en [`roles-invocation.md`](roles-invocation.md) § "Cobertura mínima por fase". Si el profile no tiene subagente formalizado, el dev declara override explícito antes de avanzar a Fase 5.

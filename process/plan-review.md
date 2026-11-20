@@ -63,6 +63,8 @@ Aplica tu mandato completo y reporta hallazgos. No decides qué opciones se le p
 
 Hallazgos breves por rol (bullets) + plan revisado consolidado. Todo inline en la propuesta — no se generan artefactos separados.
 
+Al abrir el registro del REQ tras aprobarse el plan, el rol principal anota en él cada hallazgo con el rol que lo levantó y su desenlace (incorporado al plan o descartado), como en [`execution.md`](execution.md) § "Cierre de Fase 4 (gate de subagente)": la propuesta vive en la conversación, y sin esa anotación el aporte de cada rol en Fase 9 se asigna de memoria.
+
 ## Nota de alcance
 
 Este documento cubre el gate de **Fase 3** (plan-review sobre el plan propuesto). Los gates de **Fase 4** (cierre de implementación) y **Fase 7** (pre-ejecución de entrega final) usan la misma mecánica de invocación y plantilla de briefing, con el artefacto producido en lugar del plan — ver [`process/execution.md`](../process/execution.md) y [`process/delivery.md`](../process/delivery.md) respectivamente. En esos gates:
