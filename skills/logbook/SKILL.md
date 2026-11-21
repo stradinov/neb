@@ -63,7 +63,7 @@ Qué es un REQ vinculado y qué guarda: [`../../workflow/logbook.md`](../../work
 
 ### Retomar — `retomar <id>` o `retomar <ruta-del-Change-MD>`
 
-Un argumento que es un número (con o sin `#`) es un id; uno que termina en `.md` o trae una `/` o `\` es la ruta de un Change MD. Cualquier otro (un nombre o slug de REQ) se busca por `req_slug` en `LB list`: con una sola coincidencia, es su id; con varias o ninguna, pregunta al dev por el id o la ruta. Si `LB show` responde `work <id> no encontrado`, dilo y ofrece `/logbook` para ver los ids, o `retomar <ruta-del-Change-MD>`.
+Un argumento que es un número (con o sin `#`; quita el `#` antes de pasarlo a `LB show`) es un id; uno que termina en `.md` o trae una `/` o `\` es la ruta de un Change MD. Cualquier otro (un nombre o slug de REQ) se busca por `req_slug` en `LB list`: con una sola coincidencia, es su id; con varias o ninguna, pregunta al dev por el id o la ruta. Si `LB show` responde `work <id> no encontrado`, dilo y ofrece `/logbook` para ver los ids, o `retomar <ruta-del-Change-MD>`.
 
 `retomar <id>`: corre `LB show <id>` y actúa según `mode`.
 

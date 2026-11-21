@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-test_setup_workspace.py — `_is_workspace` de bootstrap/setup-workspace.sh (6.49.1).
+test_setup_workspace.py — `_is_workspace` de bootstrap/setup-workspace.sh (7.0.1).
 
   • un dir con corchetes (p. ej. un usuario dev[1]) es ruta, no patrón: x[1] no debe leerse como x1, ni
     para dar por workspace un dir que no lo es ni para no ver el marker propio.

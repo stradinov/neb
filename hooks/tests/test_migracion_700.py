@@ -189,7 +189,7 @@ class TestRenombrarBase(Base):
         finally:
             c.close()
         self.assertNotIn("owner", cols)
-        self.assertEqual(len(glob.glob(os.path.join(self.claude, "neb-backups", "neb.pre-paso-2.*.db"))), 1)
+        self.assertEqual(len(glob.glob(os.path.join(glob.escape(self.claude), "neb-backups", "neb.pre-paso-2.*.db"))), 1)
         self.assertNotIn("renombrar-base", self.pending())
 
     def test_critico_condicion_propia_con_la_base_vieja_abierta(self):
@@ -318,7 +318,7 @@ class TestConfiguracionDelBackend(Base):
         r = self.by_id(out["guiados"])["aplicados"]["quitar-logbook-settings"]
         self.assertIsNone(r["respaldo"])
         self.assertEqual(self.settings_env(), {})
-        for p in glob.glob(os.path.join(self.claude, "neb-backups", "*")):
+        for p in glob.glob(os.path.join(glob.escape(self.claude), "neb-backups", "*")):
             with open(p, "rb") as fh:
                 self.assertNotIn(TOKEN_VALUE.encode(), fh.read(), p)
         for text in (raw, raw2, json.dumps(nm.status(self.home))):
