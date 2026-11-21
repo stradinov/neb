@@ -438,7 +438,7 @@ def restore(home, archivo, remigrar=False):
     if pre:
         keep = {os.path.normcase(os.path.abspath(p)) for p in (pre, archivo)}
         import glob
-        for p in glob.glob(os.path.join(folder, _migrations.RESTORE_BACKUP_GLOB)):
+        for p in glob.glob(os.path.join(glob.escape(folder), _migrations.RESTORE_BACKUP_GLOB)):
             if os.path.normcase(os.path.abspath(p)) not in keep:
                 for f in (p, p + "-wal", p + "-shm"):
                     try:

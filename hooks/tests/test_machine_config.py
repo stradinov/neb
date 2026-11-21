@@ -82,7 +82,7 @@ class Base(unittest.TestCase):
             return json.load(fh)
 
     def backups(self):
-        return glob.glob(os.path.join(self.ctx.backups_dir, "settings-env.*.json"))
+        return glob.glob(os.path.join(glob.escape(self.ctx.backups_dir), "settings-env.*.json"))
 
 
 class TestSettingsEnvRemove(Base):
@@ -348,6 +348,34 @@ class TestCatalogo(unittest.TestCase):
         env = _machine.PosixUserEnv()
         with self.assertRaises(OSError):
             env.delete_user("NEB_PRUEBA_X")
+
+
+class TestRutaConCorchetes(unittest.TestCase):
+    """Un home con corchetes (p. ej. un usuario dev[1]) es ruta, no patrón de glob: x[1] no debe leerse como x1."""
+
+    def setUp(self):
+        base = tempfile.mkdtemp(prefix="neb-test-machine-")
+        self.addCleanup(shutil.rmtree, base, True)
+        self.home, self.decoy = os.path.join(base, "x[1]"), os.path.join(base, "x1")
+        p = mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home})
+        p.start()
+        self.addCleanup(p.stop)
+        os.environ.pop("CLAUDE_CONFIG_DIR", None)
+
+    def test_poda_de_respaldos_de_settings_no_sale_del_home_propio(self):
+        ctx = _machine.Ctx(self.home, user_env=FakeUserEnv())
+        past = ctx.started - 3600
+        own, decoy = (os.path.join(h, ".claude", _machine.BACKUP_DIR_NAME,
+                                   _machine.SETTINGS_BACKUP_PREFIX + "20200101T000000Z.json")
+                      for h in (self.home, self.decoy))
+        for f in (own, decoy):
+            os.makedirs(os.path.dirname(f))
+            with open(f, "w", encoding="utf-8") as fh:
+                fh.write("{}")
+            os.utime(f, (past, past))
+        _machine._prune_settings_backups(ctx)
+        self.assertFalse(os.path.exists(own))           # el respaldo viejo propio se poda
+        self.assertTrue(os.path.exists(decoy))          # el de la otra carpeta queda intacto
 
 
 if __name__ == "__main__":

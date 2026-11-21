@@ -115,7 +115,7 @@ def load(root):
     prev = sys.modules.get("_guided")
     sys.modules["_guided"] = _self_module()
     try:
-        for path in glob.glob(os.path.join(migrations_dir(root), "*.py")):
+        for path in glob.glob(os.path.join(glob.escape(migrations_dir(root)), "*.py")):
             version = os.path.splitext(os.path.basename(path))[0]
             if not SEMVER_RE.match(version):
                 continue

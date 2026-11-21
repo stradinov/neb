@@ -4,6 +4,25 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [7.0.1] - 2026-11-21
+
+> **Patch**: cinco `glob.glob` del mecanismo de migraciones y un `compgen -G` de `setup-workspace.sh` armaban su patrón con una ruta del dev sin escaparla. Con `[` o `]` en esa ruta (un usuario `dev[1]`), el patrón `x[1]` coincide con `x1`. La migración guiada cargaba las migraciones de otra carpeta, las tres podas de respaldos borraban en otra carpeta y no en la propia, y `setup-workspace.sh` podía tomar el marker de workspace de otra carpeta o no ver el propio. Ahora la ruta va escapada (`glob.escape`; en bash, entre comillas).
+>
+> - **Sitios**: `hooks/lib/_machine.py` (poda de respaldos de `settings_env_remove`), `hooks/lib/_guided.py` (registro de `migrations/<versión>.py`), `hooks/lib/_migrations.py` (`prune_backups` y `list_backups`), `bootstrap/neb-migrate.py` (poda de `neb.pre-restore.*` tras `restore`) y `bootstrap/setup-workspace.sh` (`_is_workspace`).
+> - **Comportamiento que cambia**: ninguno con una ruta sin `[`, `]`, `*` ni `?`.
+> - **Adoptantes**: nada que hacer.
+
+### Added
+- **Pruebas**: una por sitio, con un directorio `x[1]` junto a un señuelo `x1`; reprueban sin la corrección. `test_machine_config.py` (1), `test_migrations_guided.py` (1), `test_migrations_db.py` (3) y `test_setup_workspace.py` (nuevo, 2: corre solo la función, extraída del script).
+
+### Fixed
+- **`hooks/lib/_machine.py`**, **`hooks/lib/_guided.py`**, **`hooks/lib/_migrations.py`**, **`bootstrap/neb-migrate.py`**: el directorio del patrón de `glob.glob` pasa por `glob.escape`.
+- **`bootstrap/setup-workspace.sh`**: `_is_workspace` recorre `"$d"/*/overlays/detect-profile.local.sh` con la ruta entre comillas, en lugar de `compgen -G`, que leía la cadena entera como patrón.
+- **`hooks/tests/test_machine_config.py`**: el helper `backups()` también escapa el directorio (un temporal con corchetes lo hacía fallar sin motivo).
+
+### Notas
+- Lo señaló el gate de Fase 4 de 7.0.0 (REQ `neb-retiro-team-y-dual-mode`), que corrigió el mismo patrón en `migrations/7.0.0.py` antes de publicar. El `Path.glob` de `bootstrap/assemble-changelog.py` no tiene el defecto: solo interpreta como patrón su argumento, no la ruta base.
+
 ## [7.0.0] - 2026-11-21
 
 > **Major**: neb queda local. Se retiran el cliente del backend central de la bitácora y el candado de relevo entre devs, y la base solo se llama `~/.claude/neb.db`. **Cambia fuerza normativa**: la entrega temprana del registro pierde el disparador «entorno compartido», y el relevo a otra máquina o a otro dev va solo por git. Major porque salen verbos del CLI, dos variables de entorno, un marcador de proyecto, 19 columnas, 2 índices y una tabla de la base (paso de base 2, que sube la mínima compatible a 2: una 6.48.x o 6.49.x deja de operar la base, con aviso del arranque), y el resolvedor que aceptaba dos nombres de archivo. Trae la primera migración guiada (`migrations/7.0.0.md` y `.py`). Sale del pedido del dev del 19-nov-2026: retirar el dual-mode del núcleo para todos, con el proyecto del backend en pausa indefinida.

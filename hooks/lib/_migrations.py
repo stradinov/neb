@@ -441,7 +441,7 @@ def take_backup(db_path, name):
 def prune_backups(db_path, pattern, keep_path):
     """Borra los archivos de <pattern> en neb-backups/ salvo keep_path (queda 1)."""
     keep = os.path.normcase(os.path.abspath(keep_path)) if keep_path else None
-    for p in glob.glob(os.path.join(backup_dir(db_path), pattern)):
+    for p in glob.glob(os.path.join(glob.escape(backup_dir(db_path)), pattern)):
         if keep and os.path.normcase(os.path.abspath(p)) == keep:
             continue
         for f in (p, p + "-wal", p + "-shm"):
@@ -815,7 +815,7 @@ def list_backups(db_path):
     folder = backup_dir(db_path)
     out = []
     for pattern in (STEP_BACKUP_GLOB, RESTORE_BACKUP_GLOB):
-        for p in sorted(glob.glob(os.path.join(folder, pattern))):
+        for p in sorted(glob.glob(os.path.join(glob.escape(folder), pattern))):
             try:
                 out.append((p, os.path.getsize(p)))
             except OSError:

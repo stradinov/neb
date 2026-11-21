@@ -80,7 +80,9 @@ bold "NEB_HOME (nucleo): $NEB_HOME_VAL"
 # discovery del overlay en neb-bootstrap-context.py — si el marker esta, el hook inyecta).
 _is_workspace() {
   local d="$1"
-  compgen -G "$d/*/overlays/detect-profile.local.sh" > /dev/null 2>&1 && return 0
+  local f
+  # "$d" entre comillas es literal: un dir con corchetes (dev[1]) no se lee como patrón.
+  for f in "$d"/*/overlays/detect-profile.local.sh; do [ -f "$f" ] && return 0; done
   [ -f "$d/overlay/startup.md" ] && return 0
   return 1
 }

@@ -846,5 +846,62 @@ class TestSoloLectura(Base):
                          _migrations.SCHEMA_VERSION)
 
 
+class TestRutaConCorchetes(Base):
+    """Un home con corchetes (p. ej. un usuario dev[1]) es ruta, no patrón de glob: x[1] no debe leerse como x1.
+    Las podas borran: leída como patrón, la ruta borraría en la carpeta x1."""
+
+    OLD_STEP = "neb.pre-paso-2.20200101T000000Z.db"
+    OLD_RESTORE = "neb.pre-restore.20200101T000000Z.db"
+
+    def setUp(self):
+        super().setUp()
+        parent = self.home
+        self.home, self.decoy = os.path.join(parent, "x[1]"), os.path.join(parent, "x1")
+        for h in (self.home, self.decoy):
+            os.makedirs(os.path.join(h, ".claude"))
+        self.db = os.path.join(self.home, ".claude", "neb.db")
+        os.environ.update(HOME=self.home, USERPROFILE=self.home)   # el patcher de Base restaura el entorno
+
+    def plant(self, name):
+        """El mismo respaldo en neb-backups/ del home propio y del señuelo: (propio, señuelo)."""
+        out = []
+        for h in (self.home, self.decoy):
+            d = os.path.join(h, ".claude", _migrations.BACKUP_DIR_NAME)
+            os.makedirs(d, exist_ok=True)
+            out.append(os.path.join(d, name))
+            with open(out[-1], "w", encoding="utf-8") as fh:
+                fh.write("x")
+        return out
+
+    def test_prune_backups_no_borra_en_otra_carpeta(self):
+        own, decoy = self.plant(self.OLD_STEP)
+        keep = os.path.join(os.path.dirname(own), "neb.pre-paso-2.20990101T000000Z.db")
+        with open(keep, "w", encoding="utf-8") as fh:
+            fh.write("x")
+        _migrations.prune_backups(self.db, _migrations.STEP_BACKUP_GLOB, keep)
+        self.assertFalse(os.path.exists(own))
+        self.assertTrue(os.path.exists(keep))
+        self.assertTrue(os.path.exists(decoy))
+
+    def test_list_backups_lista_los_propios(self):
+        own, _decoy = self.plant(self.OLD_STEP)
+        self.assertEqual([p for p, _size in _migrations.list_backups(self.db)], [own])
+
+    def test_restore_poda_sus_pre_restore_y_no_los_de_otra_carpeta(self):
+        legacy_647_db(self.db)
+        self.connect([STEP1]).close()
+        self.connect([STEP1, drop_column_step(2)]).close()
+        bak = os.path.join(_migrations.backup_dir(self.db), self.backups()[0])
+        own, decoy = self.plant(self.OLD_RESTORE)
+        out = io.StringIO()
+        with mock.patch.object(_migrations, "STEPS", (STEP1,)), \
+                contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc = NM.main(["restore", bak])
+        self.assertEqual(rc, 0, out.getvalue())
+        self.assertFalse(os.path.exists(own))           # queda solo el pre-restore nuevo
+        self.assertEqual(sum(n.startswith("neb.pre-restore.") for n in self.backups()), 1)
+        self.assertTrue(os.path.exists(decoy))
+
+
 if __name__ == "__main__":
     unittest.main()

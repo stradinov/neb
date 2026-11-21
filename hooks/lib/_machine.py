@@ -209,7 +209,7 @@ def _write_settings_backup(ctx, settings, pairs):
 
 def _prune_settings_backups(ctx):
     """Queda el respaldo más reciente de corridas anteriores fuera; los de esta corrida se conservan todos."""
-    for p in glob.glob(os.path.join(ctx.backups_dir, SETTINGS_BACKUP_PREFIX + "*.json")):
+    for p in glob.glob(os.path.join(glob.escape(ctx.backups_dir), SETTINGS_BACKUP_PREFIX + "*.json")):
         try:
             if os.path.getmtime(p) < ctx.started - 1:
                 os.remove(p)

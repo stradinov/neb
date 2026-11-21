@@ -228,6 +228,21 @@ class TestRegistro(Base):
         self.assertEqual(errors, [])
         self.assertEqual(len(migrations[0].steps), 7)
 
+    def test_arbol_con_corchetes_carga_sus_migraciones_y_no_las_de_otra_carpeta(self):
+        # x[1] es ruta, no patrón de glob: leerla como patrón miraría x1.
+        base = tempfile.mkdtemp(prefix="neb-test-arbol-")
+        self.addCleanup(shutil.rmtree, base, True)
+        own, decoy = os.path.join(base, "x[1]"), os.path.join(base, "x1")
+        empty = "from _guided import GuidedStep\nSTEPS = []\n"
+        for root, version in ((own, "9.9.1"), (decoy, "9.9.2")):
+            os.makedirs(os.path.join(root, "migrations"))
+            with open(os.path.join(root, "migrations", version + ".py"), "w", encoding="utf-8") as fh:
+                fh.write(empty)
+        with mock.patch.dict(os.environ, {"HOME": own, "USERPROFILE": own}):
+            migrations, errors = _guided.load(own)
+        self.assertEqual([m.version for m in migrations], ["9.9.1"])
+        self.assertEqual(errors, [])
+
 
 class TestApply(Base):
 
