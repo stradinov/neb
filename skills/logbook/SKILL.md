@@ -32,9 +32,25 @@ Antes de presentar una salida, revisa si es un objeto JSON con `"ok": false` y u
 
 ## Operaciones
 
+Las palabras del skill no son comandos del CLI. Usa solo los comandos de esta tabla; `logbook.py` responde «subcomando desconocido» a cualquier otro:
+
+| Palabra del skill | Comando |
+|---|---|
+| `/logbook` (listar) | `LB list` |
+| `retomar <id>` | `LB show <id>`; `retomar` **no** es comando del CLI |
+| `retomar <ruta-del-Change-MD>` | Ninguno: se resuelve leyendo el Change MD |
+| `vincular`, `traza`, `desvincular` | `LB link`, `LB trace`, `LB unlink` |
+| `renombrar`, `archivar` | `LB rename`, `LB archive` |
+| Tomar, liberar, solicitar, estado de la sincronización | Ninguno: se retiraron (§ "Lo que se retiró") |
+
 ### Listar (default, sin args)
 
-`LB list` → arreglo JSON de los trabajos activos, cada uno con `id`, `mode`, `project`, `req_slug`, `req_state` y `updated_at`. Presenta una tabla: **id · proyecto/req (o "exploratoria") · estado · antigüedad**. Separa los **con REQ** (se retoman con `retomar <id>` en esta máquina, o con su Change MD en cualquiera) de las **sesiones exploratorias** (se reanudan con `--resume` en la máquina donde se capturaron). Un arreglo vacío significa que no hay trabajos activos.
+`LB list` → arreglo JSON de los trabajos activos, cada uno con `id`, `mode`, `project`, `req_slug`, `req_state` y `updated_at`. Presenta **dos tablas**, no una con columna de modo:
+
+- **Con REQ** (`mode` = `req`): **id · proyecto/req · estado · antigüedad**. Se retoman con `retomar <id>` en esta máquina, o con su Change MD en cualquiera.
+- **Sesiones exploratorias** (`mode` = `exploratory`): **id · antigüedad**. Se reanudan con `--resume` en la máquina donde se capturaron.
+
+La antigüedad es el tiempo desde `updated_at` («hace 3 h», «hace 2 días»), no la fecha: calcúlala contra la hora actual en UTC (`date -u +%Y-%m-%dT%H:%M:%SZ`), no la estimes. Si no puedes obtener la hora, muestra la fecha. Omite la tabla que quede vacía. Un arreglo vacío significa que no hay trabajos activos.
 
 ### REQ vinculado — `vincular`, `traza`, `desvincular`
 
@@ -47,12 +63,19 @@ Qué es un REQ vinculado y qué guarda: [`../../workflow/logbook.md`](../../work
 
 ### Retomar — `retomar <id>` o `retomar <ruta-del-Change-MD>`
 
+Un argumento que es un número (con o sin `#`) es un id; uno que termina en `.md` o trae una `/` o `\` es la ruta de un Change MD. Cualquier otro (un nombre o slug de REQ) se busca por `req_slug` en `LB list`: con una sola coincidencia, es su id; con varias o ninguna, pregunta al dev por el id o la ruta. Si `LB show` responde `work <id> no encontrado`, dilo y ofrece `/logbook` para ver los ids, o `retomar <ruta-del-Change-MD>`.
+
 `retomar <id>`: corre `LB show <id>` y actúa según `mode`.
 
-- **`req`**: vale en la máquina que lo capturó (`origin_machine`), porque `repo_path` es la ruta de su clon. (1) `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica); (2) abre una **sesión nueva** y reconstruye el contexto desde el `change_md`: su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`); (3) relanza lo descrito en **"Trabajo en vuelo"** de `## Relevo` (si el registro no trae esa sección, desde `next_steps` del `payload_json`, que copia la línea «Próximos pasos» del `active_*.md`). **No** uses `--resume`: el contexto de un REQ es su Change MD, no el transcript. Desde otra máquina, usa `retomar <ruta-del-Change-MD>`.
+- **`req`**: vale en la máquina que lo capturó (`origin_machine`), porque `repo_path` es la ruta de su clon. El REQ se continúa en una **sesión nueva**, no en esta:
+  1. `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica). Si falla, repórtalo y detente: no uses `stash`, `-f` ni descartes cambios.
+  2. Entrega al dev el prompt para abrir esa sesión en `<repo_path>`: que reconstruya el contexto desde el `change_md` (su `## Relevo` y su plan aprobado, campo `**Plan aprobado:**`) y relance lo descrito en **"Trabajo en vuelo"** de `## Relevo` (si el registro no trae esa sección, desde `next_steps` del `payload_json`, que copia la línea «Próximos pasos» del `active_*.md`).
+  3. Detente ahí: no implementes, no edites archivos del repo ni continúes el trabajo en esta sesión.
+
+  **No** uses `--resume`: el contexto de un REQ es su Change MD, no el transcript. Desde otra máquina, usa `retomar <ruta-del-Change-MD>`.
 - **`exploratory`**: entrega al dev `claude --resume <claude_session_id>`, válido **solo** en la máquina donde se capturó (`origin_machine`).
 
-`retomar <ruta-del-Change-MD>` sirve cuando el trabajo no está en esta base: un REQ que viene de otra máquina, el que dejó otro dev, o uno que nunca se capturó. Claude lee el Change MD, su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`), hace `git checkout` de la rama anotada en `**Rama:**` y continúa desde los próximos pasos.
+`retomar <ruta-del-Change-MD>` sirve cuando el trabajo no está en esta base: un REQ que viene de otra máquina, el que dejó otro dev, o uno que nunca se capturó. No llama al CLI. Claude lee el Change MD, su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`), hace `git checkout` de la rama anotada en `**Rama:**` y continúa desde los próximos pasos.
 
 ### Renombrar y archivar
 
@@ -61,7 +84,7 @@ Qué es un REQ vinculado y qué guarda: [`../../workflow/logbook.md`](../../work
 
 ### Lo que se retiró
 
-Si el dev pide tomar, liberar o solicitar un trabajo, o el estado de la sincronización, no llames al CLI: explícale que eso se retiró en neb 7.0.0, porque la bitácora es solo local, y ofrece `retomar <ruta-del-Change-MD>`. Para dejarle un REQ a otra persona, basta su `## Relevo` en el Change MD y el registro entregado por git. `search` se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones.
+Si el dev pide tomar, liberar o solicitar un trabajo, o el estado de la sincronización, no llames al CLI. Cuenta como tomar todo pedido de quedarse con un trabajo o apropiárselo («toma el mando del REQ 12», «quédate con ese REQ»), aunque nombre un id o un REQ: no lo trates como `retomar`. En esos casos, explícale que eso se retiró en neb 7.0.0, porque la bitácora es solo local, y ofrece `retomar <ruta-del-Change-MD>`. Un pedido de continuar, seguir o retomar un trabajo («retoma el 12», «sigue con el 12 donde lo dejé») sí es `retomar`, aunque también diga «toma». Para dejarle un REQ a otra persona, basta su `## Relevo` en el Change MD y el registro entregado por git. `search` se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones.
 
 ## Notas
 

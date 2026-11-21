@@ -9,15 +9,15 @@ Los casos 5, 6 y 8 piden a propósito verbos que se retiraron en 7.0.0; los caso
 ## Positivos (deben disparar el skill)
 
 1. `/logbook`
-   - **Esperado:** corre `LB list` y presenta la tabla id · proyecto/req · estado · antigüedad, con los works `req` separados de las sesiones exploratorias. La tabla no trae columnas de owner ni de lock, y Claude no llama a `sync-status`.
+   - **Esperado:** corre `LB list` y presenta dos tablas: la de works `req` (id · proyecto/req · estado · antigüedad) y la de sesiones exploratorias (id · antigüedad). La antigüedad va relativa («hace 3 h»), no como fecha. La tabla no trae columnas de owner ni de lock, y Claude no llama a `sync-status`.
    - **Montaje:** el común.
 
 2. `retomar <id>`, con el id del work `req` sembrado.
-   - **Esperado:** corre `LB show <id>`, hace `git -C <repo_path> checkout <branch>` y propone una sesión nueva con el Change MD, su `## Relevo` y su plan aprobado. No llama a `claim` ni usa `--resume`.
-   - **Montaje:** el común; el `active_*.md` apunta a un Change MD que existe. El work se siembra pasando como `cwd` (2.º posicional del hook) el repo de prueba en la rama creada, y antes del prompt ese repo se cambia a otra rama.
+   - **Esperado:** corre `LB show <id>`, hace `git -C <repo_path> checkout <branch>` y entrega el prompt para abrir una sesión nueva con el Change MD, su `## Relevo` y su plan aprobado, y se detiene: no edita archivos del repo ni continúa el trabajo. No llama a `LB retomar` ni a `claim`, ni usa `--resume`.
+   - **Montaje:** el común; el `active_*.md` apunta a un Change MD que existe. Al final, comprobar que `git -C <repo> status --porcelain` sale vacío, que la rama actual es la sembrada y que el Change MD no cambió. El work se siembra pasando como `cwd` (2.º posicional del hook) el repo de prueba en la rama creada, y antes del prompt ese repo se cambia a otra rama.
 
 3. `retomar <id>`, con el id del work exploratorio.
-   - **Esperado:** corre `LB show <id>` y entrega `claude --resume <claude_session_id>`, aclarando que vale solo en la máquina de `origin_machine`.
+   - **Esperado:** corre `LB show <id>` (no `LB retomar`) y entrega `claude --resume <claude_session_id>`, aclarando que vale solo en la máquina de `origin_machine`.
    - **Montaje:** el común.
 
 4. `retomar changes/<x>.md`
@@ -25,7 +25,7 @@ Los casos 5, 6 y 8 piden a propósito verbos que se retiraron en 7.0.0; los caso
    - **Montaje:** un repo de prueba con `changes/<x>.md` que trae `## Relevo`, `**Plan aprobado:**` y `**Rama:**`, y la rama creada.
 
 5. «toma el mando del REQ 12»
-   - **Esperado:** explica que tomar un trabajo se retiró en neb 7.0.0 y ofrece `retomar <ruta-del-Change-MD>`. No crea works: el conteo de `work` en `T/.claude/neb.db` queda igual.
+   - **Esperado:** sin llamar al CLI (ni `LB show 12`), explica que tomar un trabajo se retiró en neb 7.0.0 y ofrece `retomar <ruta-del-Change-MD>`. No crea works: el conteo de `work` en `T/.claude/neb.db` queda igual.
    - **Montaje:** el común; anotar el conteo de `work` antes y después.
 
 6. `/logbook estado-sync`
