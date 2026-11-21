@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """req_link.py — REQ vinculado en la bitácora local (REQ neb-trazabilidad-indice-commits, E2).
 
-SOLO LOCAL: no viaja al central, no toca `work` ni el drenaje. Tres tablas (`req_link`, `req_repo`,
-`req_session`, en `hooks/logbook-schema.sql`) guardan solo lo que git no sabe: el REQ vinculado, sus
-repos declarados y las sesiones de esta máquina que lo trabajaron. Los commits NO se guardan: `trace`
+Base local, sin tocar `work`. Tres tablas (`req_link`, `req_repo`, `req_session`, en
+`hooks/logbook-schema.sql`) guardan solo lo que git no sabe: el REQ vinculado, sus repos declarados
+y las sesiones de esta máquina que lo trabajaron. Los commits NO se guardan: `trace`
 los lee de git al consultar, por el trailer `Req:` / `Confirmacion-autonoma:`.
 
 Dos vías de vínculo:
@@ -22,8 +22,9 @@ tramo la traiga, dentro del mismo límite. Las omisiones del hook (barrido, choq
 vencido, base bloqueada) solo avisan en stderr, que el hook descarta: el aviso queda para quien corra
 `logbook.py` a mano.
 
-CLI (`link`, `trace`, `unlink`): siempre contra la base local, con o sin `NEB_LOGBOOK_ENDPOINT`;
-salida JSON en stdout y exit 0 siempre (el skill decide por `ok`).
+CLI (`link`, `trace`, `unlink`): los despacha `logbook.cli_main`, que atrapa `DbUnavailable` (base
+sin migrar, o que este código no puede operar); salida JSON en stdout y exit 0 siempre (el skill
+decide por `ok`).
 """
 
 import json
@@ -35,7 +36,7 @@ import time
 from collections import namedtuple
 from datetime import date, datetime, timedelta
 
-from _db_shared import _normalize_remote, now_iso, resolve_db_path, with_write_tx
+from _db_shared import _normalize_remote, now_iso, with_write_tx
 
 # --------------------------------------------------------------------------- patrones
 
@@ -358,7 +359,8 @@ def after_capture(con, session_id, chunk):
 
 def _default_connect():
     """Misma base y esquema que `logbook._db_for_cli` (para llamadas directas sin conector): el esquema
-    inicial del árbol de este módulo (6.48.0). Puede lanzar DbUnavailable."""
+    inicial del árbol de este módulo (6.48.0). Lanza UnmigratedDb si la base sigue sin migrar; puede lanzar
+    DbUnavailable."""
     from _db_shared import open_default_db
     return open_default_db(os.path.expanduser("~"))
 

@@ -1,20 +1,17 @@
 #!/usr/bin/env python3
 """
-test_logbook_sync_regression.py — Sub-entrega A (REQ neb-pendings-sqlite).
+test_logbook_sync_regression.py — regresión del flujo del hook logbook-sync sobre la base única.
 
-Gate crítico (fila 2 del change MD): regresión del flujo logbook-sync con la DB
-resuelta por resolve_db_path (rename lógico neb-logbook.db → neb.db), más:
-  T2/T3 anti-shadowing en Windows (neb.db vacío / sin tabla 'work' no oculta legacy poblado)
-  T3 dual-mode legado (máquina del equipo sin migrar)
+Gate crítico: la captura escribe en la base que resuelve resolve_db_path (siempre <home>/.claude/neb.db),
+más:
+  T2 resolvedor único: un neb.db vacío o sin tabla work no cambia la ruta ni cuenta como base usable; la
+     guarda de la base sin migrar la prueba test_logbook_migracion_team.py
   T-concurrencia (dos escritores con busy_timeout)
-  T-gancho (on_work_archived reusa conexión y es reversible)
+  T-gancho (on_work_archived reusa la conexión y es reversible)
 
-Framework: unittest (stdlib), NO pytest. TODAS las DBs son temporales (tempfile);
-NUNCA se toca ~/.claude/neb-logbook.db ni ~/.claude/neb.db.
+Framework: unittest (stdlib), NO pytest. TODAS las DBs son temporales (tempfile); nunca se toca ~/.claude.
 
-Comando de gate:
-  py -m unittest discover -s hooks/tests -p "test_*.py"
-  py -m unittest hooks.tests.test_logbook_sync_regression
+  py -m unittest tests.test_logbook_sync_regression
 """
 
 import os
@@ -50,38 +47,24 @@ class TestLogbookRegression(unittest.TestCase):
         db = _db_shared.resolve_db_path(home)               # → .../.claude/neb.db (no existe aún)
         con = _db_shared._connect(db, SCHEMA)
         self.assertIsNotNone(con)
-        # simula captura de un work 'req' (firma real de _upsert_req)
-        logbook._upsert_req(con, "host/o/repo", "mi-req", "dev", "maq", "En progreso",
+        logbook._upsert_req(con, "host/o/repo", "mi-req", "maq", "En progreso",
                             "main", "abc1234", "/repo", "draft md", '{"plan":""}',
                             "sess-1", "/tmp/t.jsonl")
         con.commit(); con.close()
         # relee con un nuevo connect resuelto (regresión: el path resuelto persiste)
         con2 = _db_shared._connect(_db_shared.resolve_db_path(home), SCHEMA)
-        row = con2.execute("SELECT req_slug, req_state FROM work WHERE project=?",
+        row = con2.execute("SELECT req_slug, req_state, origin_machine FROM work WHERE project=?",
                            ("host/o/repo",)).fetchone()
-        self.assertEqual(row[0], "mi-req")
-        self.assertEqual(row[1], "En progreso")
-        # el evento 'publish' se emitió
-        n = con2.execute("SELECT count(*) FROM event WHERE action='publish'").fetchone()[0]
-        self.assertEqual(n, 1)
+        self.assertEqual(row, ("mi-req", "En progreso", "maq"))
         con2.close()
 
-    # ----------------------------------------------------------------- T2 anti-shadowing
-    def test_anti_shadowing_empty_neb_db(self):
+    # ----------------------------------------------------------------- T2 resolvedor único
+    def test_neb_db_vacio_no_cambia_la_ruta(self):
         home = _fresh_home()
-        legacy = os.path.join(home, ".claude", "neb-logbook.db")
-        newp   = os.path.join(home, ".claude", "neb.db")
-        # poblar legacy con schema + un work
-        con = _db_shared._connect(legacy, SCHEMA)
-        logbook._upsert_exploratory(con, "s-leg", "dev", "maq", "resumen", "main", "h", "/c", "/t.jsonl")
-        con.commit(); con.close()
-        # crear neb.db VACÍO (tamaño 0) — simula connect accidental
-        open(newp, "w").close()
-        self.assertEqual(os.path.getsize(newp), 0)
-        # el resolver debe IGNORAR el neb.db vacío y caer a legacy
-        self.assertEqual(_db_shared.resolve_db_path(home), legacy)
+        newp = os.path.join(home, ".claude", "neb.db")
+        open(newp, "w").close()                              # neb.db de 0 bytes (connect accidental)
+        self.assertEqual(_db_shared.resolve_db_path(home), newp)
         self.assertFalse(_db_shared._is_usable_db(newp))
-        self.assertTrue(_db_shared._is_usable_db(legacy))
 
     def test_neb_db_without_work_table_is_not_usable(self):
         home = _fresh_home()
@@ -89,16 +72,8 @@ class TestLogbookRegression(unittest.TestCase):
         c = sqlite3.connect(newp); c.execute("CREATE TABLE foo(x)"); c.commit(); c.close()
         self.assertFalse(_db_shared._is_usable_db(newp))   # sin tabla 'work'
 
-    # ----------------------------------------------------------------- T3 dual-mode legado
-    def test_dual_mode_legacy_only(self):
-        home = _fresh_home()
-        legacy = os.path.join(home, ".claude", "neb-logbook.db")
-        con = _db_shared._connect(legacy, SCHEMA); con.commit(); con.close()
-        self.assertTrue(os.path.isfile(legacy))
-        self.assertEqual(_db_shared.resolve_db_path(home), legacy)
-
     def test_fresh_install_targets_neb_db(self):
-        home = _fresh_home()  # ni neb.db ni legacy existen
+        home = _fresh_home()  # ni neb.db ni la base anterior existen
         self.assertTrue(_db_shared.resolve_db_path(home).endswith("neb.db"))
 
     # ----------------------------------------------------------------- T-concurrencia
@@ -131,12 +106,11 @@ class TestLogbookRegression(unittest.TestCase):
     def test_on_work_archived_auto_obsolete(self):
         home = _fresh_home()
         con = _db_shared._connect(_db_shared.resolve_db_path(home), SCHEMA)
-        wid = con.execute("INSERT INTO work (mode, owner, lock_state, created_at, updated_at) "
-                          "VALUES ('exploratory','dev','owned',?,?)",
+        wid = con.execute("INSERT INTO work (mode, created_at, updated_at) VALUES ('exploratory',?,?)",
                           (_db_shared.now_iso(), _db_shared.now_iso())).lastrowid
         pid = pendings.create(con, "task", "algo ligado al work", work_ref=wid)
         con.commit()
-        pendings.on_work_archived(con, wid, "dev", "maq")   # SAVEPOINT propio, sin commit
+        pendings.on_work_archived(con, wid)                 # SAVEPOINT propio, sin commit
         con.commit()
         r = con.execute("SELECT status, obsolete_cause FROM pending WHERE id=?", (pid,)).fetchone()
         self.assertEqual(r, ("obsolete", "resolved-otherwise"))

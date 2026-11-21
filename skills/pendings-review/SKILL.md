@@ -55,4 +55,4 @@ Crea un pending tipo `session` que referencia el work exploratorio + transcript 
 - `revive <id>` reactiva un obsoleto (limpia la causa + agrega nota de reactivación). Todo es reversible y auditado.
 - La única vía para persistir una banda es `PD curate <id> --band <alta|media|baja>` (la DB guarda el enum inglés; el CLI traduce). Sobre un pendiente sin curar hay que dar `--cliente`/`--topico` en la misma llamada (si no, `ok: false`). No escribas `pending_topic` por SQL.
 - `PD backfill-slugs` rellena `pending.slug` desde el tag `[slug]` de pendientes viejos (solo tags únicos); las citas históricas resuelven igual sin correrlo.
-- En local-only la prioridad es informativa para el propio dev; no hay sync cross-dev de pendings en el núcleo.
+- La prioridad es informativa para el propio dev: sus pendientes viven solo en su base local.

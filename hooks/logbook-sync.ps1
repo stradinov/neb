@@ -13,9 +13,11 @@ try { $j = $raw | ConvertFrom-Json } catch { exit 0 }
 
 $sid = $j.session_id
 $cwd = $j.cwd
-$tx  = if ($j.transcript_path) { $j.transcript_path } else { "" }
-$ev  = if ($j.hook_event_name) { $j.hook_event_name } else { "" }
-if (-not $sid -or -not $cwd) { exit 0 }
+$tx  = $j.transcript_path
+$ev  = $j.hook_event_name
+# PowerShell 5.1 descarta un argumento vacío al invocar un nativo: logbook.py recibiría menos posicionales
+# y los leería como un subcomando del CLI, con su respuesta en el stdout del hook.
+if (-not $sid -or -not $cwd -or -not $tx -or -not $ev) { exit 0 }
 
 $guide = if ($env:NEB_HOME) { $env:NEB_HOME } else { "$env:USERPROFILE\.claude\neb" }
 
@@ -26,7 +28,7 @@ foreach ($c in @("py", "python", "python3")) {
 if (-not $py) { exit 0 }
 
 try {
-  & $py "$guide\hooks\lib\logbook.py" $sid $cwd $tx $ev $guide $env:USERPROFILE 2>$null
+  & $py "$guide\hooks\lib\logbook.py" $sid $cwd $tx $ev $guide $env:USERPROFILE 2>$null | Out-Null
 } catch {}
 
 exit 0

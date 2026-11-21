@@ -73,7 +73,7 @@ Cualquier ❌ bloquea cierre — fix + revalidar (ver [delivery.md](../process/d
 
 ## Relevo
 
-<!-- Solo al relevar (otro dev u otra máquina continúa); sin relevo, se omite la sección.
+<!-- Solo al relevar por git (otro dev u otra máquina continúa desde el repo); sin relevo, se omite la sección.
      Próximos pasos · Trabajo en vuelo (cómo relanzar lo que quedó a medias) · «relevado por <dev>, <fecha>».
      Al escribirla, el registro y su plan aprobado se entregan de inmediato (workflow/changes.md § "Relevo"). -->
 

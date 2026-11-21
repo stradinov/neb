@@ -30,6 +30,9 @@ import sys
 import tempfile
 import textwrap
 import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -279,6 +282,12 @@ class TestApply(Base):
         self.assertEqual(self.ids(out["guiados"]["aplicados"]), ["libre-respaldo"])
         self.assertEqual(self.ids(out["guiados"]["pendientes"]), ["exclusivo"])
         self.assertTrue(os.path.exists(os.path.join(self.claude, "excl.txt")))
+
+    def test_paso_libre_sin_cambio_no_pasa_por_la_comprobacion_del_respaldo(self):
+        step = _guided.GuidedStep("nada", "Nada", detectar=lambda c: True,
+                                  aplicar=lambda c: {"estado": "sin-cambio", "detalle": "ya estaba"}, respaldo=True)
+        r = _guided.run(_machine.Ctx(self.home, db_path=self.db, user_env=self.env), step)
+        self.assertEqual((r["estado"], r["respaldo"], r["detalle"]), ("sin-cambio", None, "ya estaba"))
 
     def test_error_de_un_paso_libre_no_filtra_su_mensaje(self):
         def aplicar(ctx):

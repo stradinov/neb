@@ -8,6 +8,7 @@ fuente única de los skills de Claude Code disponibles. Cualquier REQ que cree, 
 |---|---|---|---|---|---|
 | [wakeup](wakeup/SKILL.md) | 1.1.0 (2026-06-03) | `self-applied` | 2026-06-03 | — | Experimental |
 | [pendings-review](pendings-review/SKILL.md) | 6.7.0 (2026-09-22) | `self-applied` | 2026-09-22 | — | Experimental |
+| [logbook](logbook/SKILL.md) | 7.0.0 (2026-11-19) | `self-applied` | 2026-11-19 | — | Experimental |
 
 ## Candidatos (stubs en profiles, sin skill activo)
 

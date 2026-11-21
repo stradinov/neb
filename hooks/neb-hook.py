@@ -90,10 +90,10 @@ def _run(hook, argv, payload, stdout=subprocess.DEVNULL, stderr=None, timeout=No
 def dispatch(hook, payload, event, home):
     py = sys.executable
     if hook == "logbook-sync":
-        sid, cwd = event.get("session_id") or "", event.get("cwd") or ""
-        if sid and cwd:
-            _run(hook, [py, os.path.join(LIB, "logbook.py"), sid, cwd, event.get("transcript_path") or "",
-                  event.get("hook_event_name") or "", ROOT, home], payload, stderr=subprocess.DEVNULL)
+        args = [event.get(k) or "" for k in ("session_id", "cwd", "transcript_path", "hook_event_name")]
+        if all(args):
+            _run(hook, [py, os.path.join(LIB, "logbook.py")] + args + [ROOT, home], payload,
+                 stderr=subprocess.DEVNULL)
     elif hook == "save-approved-plan":
         import approved_plan
         approved_plan.save(event, home)

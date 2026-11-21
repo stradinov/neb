@@ -125,21 +125,19 @@ DB_NOTICE_MAX = 900  # unidades UTF-16 del aviso de base incompatible o paso det
 
 
 def _readonly_db(mig, home):
-    """Ruta de la base, ubicada sin abrirla para escribir (misma preferencia que resolve_db_path:
-    neb.db si trae `work`, si no neb-logbook.db). None si no hay ninguna."""
-    for name in ('neb.db', 'neb-logbook.db'):
-        p = os.path.join(home, '.claude', name)
-        con = mig.open_readonly(p)
-        if con is None:
-            continue
-        try:
-            if mig._table_exists(con, 'work'):
-                return p
-        except Exception:  # noqa: BLE001
-            pass
-        finally:
-            con.close()
-    return None
+    """Ruta de la base (~/.claude/neb.db, la de resolve_db_path) si trae `work`, comprobado sin abrirla para
+    escribir; None si no. La base con el nombre anterior a 7.0.0 no se abre ni en solo lectura: dejaría
+    -wal/-shm al lado, y su cambio de nombre lo hace la migración guiada."""
+    p = os.path.join(home, '.claude', 'neb.db')
+    con = mig.open_readonly(p)
+    if con is None:
+        return None
+    try:
+        return p if mig._table_exists(con, 'work') else None
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        con.close()
 
 
 def _db_notice(bootstrap_dir, neb_home=None, home=None):

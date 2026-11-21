@@ -122,4 +122,4 @@ La revisión agregada ([`improvement.md`](../process/improvement.md) § "Revisi�
 
 ## Handoff entre sesiones
 
-El procedimiento de handoff (retomar un requerimiento interrumpido, pausar/reanudar la propia sesión por nombre con `claude --resume`, y el **relevo cross-dev** vía la [bitácora de relevo](logbook.md)) es gestión de sesión, no métrica — vive en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)".
+El procedimiento de handoff (retomar un requerimiento interrumpido, pausar/reanudar la propia sesión por nombre con `claude --resume`, retomar trabajos a medias desde la [bitácora de relevo](logbook.md) y el **relevo por git** con el `## Relevo` del Change MD) es gestión de sesión, no métrica — vive en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)".

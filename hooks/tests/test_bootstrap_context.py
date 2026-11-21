@@ -12,8 +12,11 @@ LIMIT unidades UTF-16 o menos, una por entrada de hooks/hooks.json:
   • la oferta de actualización automática (hooks/lib/autoupdate.py): desde un caché simulado, sin decidir
     avisa en la parte 1 y no escribe; decidido sale igual que fuera del caché; el tope del aviso; con los
     cuatro avisos el arranque cabe
+  • la base sin migrar (solo neb-logbook.db, no vacío) sale en el aviso de migración guiada pendiente como
+    el paso de 7.0.0, sin crear neb.db; ausente con neb.db o con la base vieja vacía; el arranque no abre
+    la base vieja (sqlite3.connect)
 
-Framework: unittest (stdlib). Árboles y workspaces temporales; nunca toca ~/.claude.
+Framework: unittest (stdlib). Árboles, workspaces y HOME/USERPROFILE temporales; nunca toca ~/.claude.
   py -m unittest discover -s hooks/tests -p test_bootstrap_context.py
 """
 import importlib.util
@@ -22,10 +25,14 @@ import json
 import os
 import re
 import shutil
+import sqlite3
 import subprocess
 import sys
 import tempfile
 import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -40,6 +47,14 @@ HEADER_RE = re.compile(r"^# Arranque de Neb — parte (\d+) de (\d+) · huella (
 CLEAN = ("NEB_HOME", "CLAUDE_PLUGIN_ROOT", "NEB_WORKSPACE", "NEB_HOOKS", "NEB_PROJECT_HOOKS",
          "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION", "CLAUDE_PROJECT_DIR",
          "CLAUDE_CODE_PLUGIN_CACHE_DIR")
+
+
+def _tmp_home(test):
+    """HOME y USERPROFILE temporales (en Windows expanduser lee USERPROFILE): el aviso de base sin migrar
+    no depende de la máquina."""
+    home = tempfile.mkdtemp(prefix="neb-test-home-")
+    test.addCleanup(shutil.rmtree, home, True)
+    return {"HOME": home, "USERPROFILE": home}
 
 
 def u16(s):
@@ -112,10 +127,12 @@ class TestPartesDelArranque(unittest.TestCase):
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="neb-test-")
         self.addCleanup(shutil.rmtree, self.tmp, True)
+        self.home_env = _tmp_home(self)
 
     def _run(self, *args, **env):
         e = {k: v for k, v in os.environ.items() if k not in CLEAN}
         e["NEB_HOME"] = NEB
+        e.update(self.home_env)
         e.update(env)
         r = subprocess.run([sys.executable, SCRIPT] + [str(a) for a in args], env=e,
                            capture_output=True, timeout=60)
@@ -212,6 +229,9 @@ class TestMainEnProceso(unittest.TestCase):
     """test_subsession.py llama a main() con un io.StringIO, que no tiene `.buffer`."""
 
     def setUp(self):
+        patcher = mock.patch.dict(os.environ, _tmp_home(self))
+        patcher.start()
+        self.addCleanup(patcher.stop)
         self._saved = {k: os.environ.get(k) for k in CLEAN}
         for k in CLEAN:
             os.environ.pop(k, None)
@@ -253,6 +273,7 @@ class TestAvisoActualizacion(unittest.TestCase):
             shutil.copytree(os.path.join(NEB, d), os.path.join(self.root, d), ignore=skip)
         self.script = os.path.join(self.root, "bootstrap", "neb-bootstrap-context.py")
         self.helper = os.path.join(self.root, "hooks", "lib", "autoupdate.py")
+        self.home_env = _tmp_home(self)
 
     def _config(self, settings=None, known=None):
         for path, value in ((os.path.join(self.cfg, "settings.json"), settings),
@@ -278,6 +299,7 @@ class TestAvisoActualizacion(unittest.TestCase):
         e["NEB_HOME"] = NEB
         e["PYTHONDONTWRITEBYTECODE"] = "1"
         e["CLAUDE_CONFIG_DIR"] = self.cfg       # el dir de configuración en uso es el de la prueba
+        e.update(self.home_env)
         e.update(env)
         r = subprocess.run([sys.executable, script or self.script] + [str(a) for a in args], env=e,
                            capture_output=True, timeout=60)
@@ -384,6 +406,75 @@ class TestAvisoActualizacion(unittest.TestCase):
         if "plugins" in NEB and "cache" in NEB:
             self.skipTest("el repo vive dentro de un caché de plugins")
         self.assertIsNone(nb._autoupdate_offer(os.path.join(NEB, "bootstrap")))
+
+
+class TestAvisoBaseSinMigrar(unittest.TestCase):
+    """La base con el nombre anterior a 7.0.0 se avisa como migración guiada pendiente (el paso
+    7.0.0:renombrar-base); el arranque no crea neb.db ni abre la base vieja, ni en solo lectura."""
+
+    AVISO = "Hay una migración guiada de Neb pendiente (`7.0.0`): 1 paso que pide configurar la máquina"
+
+    def setUp(self):
+        self.home_env = _tmp_home(self)
+        self.base = os.path.join(self.home_env["HOME"], ".claude")
+        os.makedirs(self.base)
+        self.legacy = os.path.join(self.base, "neb-logbook.db")
+        self.target = os.path.join(self.base, "neb.db")
+
+    def _base(self, path):
+        con = sqlite3.connect(path)
+        con.execute("CREATE TABLE work (id INTEGER PRIMARY KEY)")
+        con.commit()
+        con.close()
+
+    def _out(self):
+        e = {k: v for k, v in os.environ.items() if k not in CLEAN}
+        e["NEB_HOME"] = NEB
+        e.update(self.home_env)
+        r = subprocess.run([sys.executable, SCRIPT], env=e, capture_output=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8"))
+        return r.stdout.decode("utf-8")
+
+    def _carpeta(self):
+        return sorted(os.listdir(self.base))
+
+    def test_critico_con_solo_la_base_vieja_avisa_la_migracion_guiada(self):
+        self._base(self.legacy)
+        st = os.stat(self.legacy)
+        out = self._out()
+        self.assertIn(self.AVISO, out)
+        self.assertIn("/neb:migrate", out)
+        self.assertNotIn("La bitácora sigue con el nombre anterior", out)
+        self.assertEqual(self._carpeta(), ["neb-logbook.db"])
+        st2 = os.stat(self.legacy)
+        self.assertEqual((st.st_size, st.st_mtime_ns), (st2.st_size, st2.st_mtime_ns))
+
+    def test_sin_la_base_vieja_no_avisa(self):
+        self._base(self.target)
+        self.assertNotIn("`7.0.0`", self._out())
+
+    def test_critico_env_notices_no_abre_la_base_vieja(self):
+        real = sqlite3.connect
+        self._base(self.legacy)
+        for neb_db in (False, True):
+            with self.subTest(neb_db=neb_db):
+                if neb_db:
+                    self._base(self.target)
+                abiertos = []
+
+                def espia(path, *a, **k):
+                    abiertos.append(str(path))
+                    return real(path, *a, **k)
+                with mock.patch.dict(os.environ, self.home_env), mock.patch("sqlite3.connect", espia):
+                    notices = nb._env_notices(os.path.join(NEB, "bootstrap"))
+                self.assertFalse([p for p in abiertos if "neb-logbook" in p], abiertos)
+                self.assertEqual(any(self.AVISO in n for n in notices), not neb_db, notices)
+
+    def test_base_vieja_vacia_no_avisa(self):
+        open(self.legacy, "wb").close()
+        with mock.patch.dict(os.environ, self.home_env):
+            notices = nb._env_notices(os.path.join(NEB, "bootstrap"))
+        self.assertFalse(any("`7.0.0`" in n for n in notices), notices)
 
 
 if __name__ == "__main__":

@@ -41,7 +41,7 @@ Luego, ejecuta
 ```
 para montar tu *espacio de trabajo* (directorio donde extiendes la metodología, *overlay* + configuración personal).
 
-> El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores. En Windows, Neb requiere Git for Windows (Git Bash): Claude Code corre ahí los hooks del plugin.
+> El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores. En Windows, Neb requiere Git for Windows (Git Bash): Claude Code corre ahí los hooks del plugin. La bitácora y los pendientes piden Python 3 con SQLite 3.35.5 o superior (en Windows, Python 3.12 o superior lo trae).
 
 > El plugin no se actualiza solo hasta que lo decidas: ver [Guía del usuario](docs/user-guide.md) § "Mantener Neb al día".
 

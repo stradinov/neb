@@ -109,7 +109,7 @@ Lo que se persiste como evidencia es de una de dos clases:
 
 - **Sin marca no es evidencia.** Un dato de un ambiente o de un tercero se puede anotar sin indicación del dev, pero sin marca. Un dato persistido que no es constancia de un momento ni lleva marca de verificación orienta dónde leer; para afirmar, quien lo cita lee la fuente o lo marca `[memoria sin re-verificar]`. Con marca, lo cita con su fecha; con más de 30 días, o si es volátil (versiones, deploys, IDs), lo vuelve a verificar antes de apoyar en él un plan o un gate.
 - **Almacén con regla propia.** La tabla de supuestos de plataforma ([platform-assumptions.md](platform-assumptions.md) § "Mantenimiento") y los research ([`../profiles/research/conventions.md`](../profiles/research/conventions.md) § "Modos de disparo" y § "Obsolescencia") se rigen por su regla, que fija su alta y su re-verificación o su reemplazo. Otro almacén entra a esta lista por un REQ.
-- **Lector sin acceso a la fuente.** Publicar un dato para quien no puede leer la fuente (el relevo entre máquinas) no es copia; quien lo lee lo cita como constancia de la captura, con su fecha.
+- **Lector sin acceso a la fuente.** Escribir un dato para quien no puede leer la fuente (el `## Relevo` del Change MD, que lee quien continúa en otra máquina) no es copia; quien lo lee lo cita como constancia de la captura, con su fecha.
 - **Copias anteriores.** La copia de un dato derivable que una regla o una plantilla vigente ya pide sigue, también en cada instancia nueva de esa plantilla, hasta que un REQ la retire; no es precedente para un campo nuevo.
 - **Fuera de alcance.** Los espejos de una regla dentro del repo, que rige § "Eliminar" («una sola fuente de verdad»).
 

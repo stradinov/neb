@@ -54,7 +54,7 @@ py "$NEB_SRC/bootstrap/neb-migrate.py" apply --include <id> [<id> …]   # los �
 py "$NEB_SRC/bootstrap/neb-migrate.py" skip <id>                       # uno por cada «No aplicarlo»
 ```
 
-Si en el paso 3 el dev eligió «Después», agrega `--sin-exclusivos` también a `apply --include`. `skip` se niega sin base o con una base de una versión de neb más nueva (`motivo`): el paso sigue pendiente; díselo al dev. Un paso que responde `manual` (una variable a nivel de máquina, o fuera de Windows) sigue pendiente hasta que el dev la quite a mano: díselo y ofrécele «No aplicarlo» para que el arranque deje de avisar.
+Si en el paso 3 el dev eligió «Después», agrega `--sin-exclusivos` también a `apply --include`. `skip` se niega sin base, con la base sin migrar o con una base de una versión de neb más nueva (`motivo`): el paso sigue pendiente; díselo al dev. Un paso que responde `manual` (una variable a nivel de máquina, o fuera de Windows) sigue pendiente hasta que el dev la quite a mano: díselo y ofrécele «No aplicarlo» para que el arranque deje de avisar. Si un paso `manual` ya no figura en `guiados.pendientes` (p. ej. `7.0.0:renombrar-base` cuando una sesión anterior escribió en `neb-logbook.db` después del cambio de nombre), no ofrezcas «No aplicarlo»: reporta su `detalle`.
 
 Nunca corras `restore`, ni `apply --include` o `skip` de un paso que el dev no eligió en el menú de esta sesión.
 

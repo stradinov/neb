@@ -1,30 +1,22 @@
 #!/usr/bin/env python3
 """
-logbook.py — cliente de la bitácora de relevo (Neb).
+logbook.py — bitácora de relevo de neb: base local de trabajos a medias (~/.claude/neb.db), para retomarlos.
 
-Tres modos (dispatch en __main__):
-  • captura (sin args reconocidos)  — lo dispara el hook `logbook-sync` en Stop/SessionEnd/PreCompact:
-      registra estado + transcript_path del work activo en SQLite local; si el proyecto activa el
-      central (NEB_LOGBOOK_ENDPOINT y opt-in por proyecto vía marcador `<!-- neb-logbook: central -->`),
-      lanza el modo `sync` detached. De la conversación solo se guarda (y, con opt-in, se sube) el
-      resumen del exploratorio: el primer mensaje del dev recortado a 120 caracteres
-      (_first_user_prompt). Fuera de eso la captura solo lee el tramo nuevo del .jsonl para el REQ
-      vinculado (ver _read_new_chunk), sin guardarlo.
-  • sync <guide_dir> <home_dir>     — drena el outbox (works dirty) al central (un sync a la vez).
-      Best-effort, defensivo (REQ B). Un fallo NO corta el reintento (salvo el 409), pero queda VISIBLE
-      en work.last_error — ver `sync-status`. El outbox es de toda la máquina: solo sale lo que tiene
-      opt-in (ver _OptIn).
-  • CLI (list/show/claim/...)       — lo invoca el comando/skill `/logbook`. Con NEB_LOGBOOK_ENDPOINT y
-      NEB_LOGBOOK_TOKEN opera contra el CENTRAL (la autoridad: ids remotos); si falta cualquiera, contra el
-      SQLite local.
-      Excepción: `sync-status` lee SIEMPRE el SQLite local (el estado del outbox no existe en el central)
-      y reporta ids LOCALES (`local_id`), que no son válidos para los demás verbos cuando hay central.
-      `link`, `trace` y `unlink` (REQ vinculado, E2; módulo req_link.py) también operan SIEMPRE contra el
-      SQLite local, con o sin NEB_LOGBOOK_ENDPOINT: nunca van al central.
+Dos modos (dispatch en __main__):
+  • captura — lo dispara el hook `logbook-sync` en Stop/SessionEnd/PreCompact: registra estado +
+      transcript_path del work activo en la base local. De la conversación solo se guarda el resumen del
+      exploratorio: el primer mensaje del dev recortado a 120 caracteres (_first_user_prompt). Fuera de eso
+      la captura solo lee el tramo nuevo del .jsonl para el REQ vinculado (ver _read_new_chunk), sin
+      guardarlo. Entra SOLO con exactamente 6 posicionales, un primer argumento que no es verbo y un
+      cuarto argumento que es uno de CAPTURE_EVENTS.
+  • CLI (list/show/rename/archive/link/trace/unlink) — lo invoca el comando/skill `/logbook`. `link`,
+      `trace` y `unlink` (REQ vinculado, E2) viven en req_link.py. Los verbos retirados responden un JSON
+      fijo (_RETIRED_VERBS); cualquier otro primer argumento, «subcomando desconocido».
 
-Backend local = default + outbox. Backend central (REQ B) = autoridad del lock y catálogo de works.
-Filosofía: defensivo — exit 0 siempre; errores a stderr, nunca bloquean al dev. El stderr del sync
-detached y del hook se descarta, por eso los fallos de sync se PERSISTEN además de imprimirse.
+Si la base sigue con el nombre anterior a 7.0.0, la captura no crea nada y el CLI responde
+{ok: false, motivo: "base-sin-migrar", ...} con la migración guiada que la renombra (ver
+_db_shared.raise_if_unmigrated).
+Filosofía: defensivo — exit 0 siempre; errores a stderr, nunca bloquean al dev.
 
 Args posicionales del modo captura (los arma el wrapper desde el stdin JSON del hook):
   1 session_id  2 cwd  3 transcript_path  4 event_name  5 guide_dir (NEB_HOME)  6 home_dir
@@ -32,22 +24,15 @@ Args posicionales del modo captura (los arma el wrapper desde el stdin JSON del 
 
 import json
 import os
-import re
 import sqlite3
-import subprocess
 import sys
-import time
-from datetime import datetime, timezone
 
-# Infra compartida de la DB (resolver dual-mode + conexión net-new + helpers puros movidos).
-# El resolver dual-mode vive SOLO en _db_shared; las 3 sedes de db_path de este módulo lo importan.
 from _db_shared import (
-    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable,
-    _migrate, begin_immediate, with_write_tx, _safe_rollback,
+    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable, raise_if_unmigrated,
+    with_write_tx, _safe_rollback,
     now_iso, posix_to_win, encode_cwd, find_active_reqs, resolve_memory_dir,
-    _whoami, _hostname, _git, _git_info, _project_id, _normalize_remote, _basename,
+    _hostname, _git_info, _project_id,
 )
-from neb_root import resolve_neb_root
 
 
 # =========================================================================== captura
@@ -63,15 +48,13 @@ def main():
     guide_dir      = posix_to_win(sys.argv[5])        # lo siguen enviando los wrappers; ya no decide el esquema
     home_dir       = posix_to_win(sys.argv[6]) or os.path.expanduser("~")
 
-    if not session_id or not cwd:
+    if not session_id or not cwd or not transcript_arg:
         return
 
     encoded      = encode_cwd(cwd)
-    projects_dir = os.path.join(home_dir, ".claude", "projects", encoded)
-    jsonl_path   = transcript_arg or os.path.join(projects_dir, f"{session_id}.jsonl")
+    jsonl_path   = transcript_arg
     memory_dir   = resolve_memory_dir(home_dir, cwd, encoded)   # respeta autoMemoryDirectory; fallback al default
 
-    owner   = _whoami()
     machine = _hostname()
     branch, head = _git_info(cwd)
 
@@ -81,14 +64,11 @@ def main():
         con = _open_db(home_dir)                       # esquema del árbol de este módulo, nunca el de NEB_HOME
     except DbUnavailable as e:
         # El stderr del hook se descarta: lo hacen visible el arranque y `neb-migrate.py status`.
-        print(f"[logbook] base no disponible ({e.motivo}): {e.detalle}", file=sys.stderr)
+        print(f"[logbook] captura omitida ({e.motivo}): {e.detalle}", file=sys.stderr)
         return
     if con is None:
         return
     try:
-        # cwd con el que arrancó la sesión, si aún no está registrado. La lectura del .jsonl se hace ANTES de
-        # abrir la transacción de la captura: un disco lento no debe retener el candado de escritura.
-        session_root = _stored_root(con, session_id) or _jsonl_cwd(jsonl_path)
         if active_reqs:
             for active in active_reqs:                # N REQ activos (incluye varios del mismo proyecto), mtime desc
                 project  = _project_id(active.get("project_path") or cwd)
@@ -99,21 +79,18 @@ def main():
                     "files": active.get("files", ""),
                     "pending_delivery": active.get("pending_delivery", ""),
                 }, ensure_ascii=False)
-                _upsert_req(con, project, req_slug, owner, machine, active.get("state", ""),
+                _upsert_req(con, project, req_slug, machine, active.get("state", ""),
                             branch, head, active.get("project_path", ""), active.get("draft", ""),
                             payload, session_id, jsonl_path)
         else:
             summary = _first_user_prompt(jsonl_path)
-            _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd, jsonl_path)
-        _register_session(con, session_id, jsonl_path, session_root)
+            _upsert_exploratory(con, session_id, machine, summary, branch, head, cwd, jsonl_path)
+        _register_session(con, session_id, jsonl_path)
         chunk = _read_new_chunk(con, session_id, jsonl_path)    # tramo nuevo del .jsonl, insumo de E2
         con.commit()
         _after_capture(con, session_id, chunk, event_name)      # E2: nunca afecta lo ya confirmado
     finally:
         con.close()
-
-    # REQ B: si el entorno es compartido, drenar el outbox al central (detached, best-effort).
-    _maybe_spawn_sync(cwd, guide_dir, home_dir)
 
 
 def _after_capture(con, session_id, chunk, event_name):
@@ -131,14 +108,12 @@ def _after_capture(con, session_id, chunk, event_name):
 
 
 # --------------------------------------------------------------------------- DB
-# _connect / _migrate se movieron a _db_shared.py (importados arriba); aquí solo viven
-# los upserts/eventos específicos del logbook que usan esa conexión.
+# _connect / _migrate viven en _db_shared.py; aquí solo viven los upserts específicos del logbook.
 
-def _upsert_req(con, project, req_slug, owner, machine, state, branch, head,
+def _upsert_req(con, project, req_slug, machine, state, branch, head,
                 repo_path, change_md, payload, session_id, transcript_path):
     """Upsert del work del REQ. Devuelve su id local. repo_path se refresca con el «Path del proyecto»
-    vigente, porque de él sale el opt-in al drenar (un REQ que pasa a otro checkout lo sigue); vacío
-    conserva el anterior."""
+    vigente (un REQ que pasa a otro checkout lo sigue); vacío conserva el anterior."""
     ts = now_iso()
     row = con.execute(
         "SELECT id FROM work WHERE mode='req' AND project=? AND req_slug=?",
@@ -146,24 +121,22 @@ def _upsert_req(con, project, req_slug, owner, machine, state, branch, head,
     if row:
         con.execute(
             "UPDATE work SET req_state=?, branch=?, head_commit=?, change_md=?, "
-            "payload_json=?, payload_version=payload_version+1, claude_session_id=?, "
-            "transcript_path=?, repo_path=COALESCE(NULLIF(?, ''), repo_path), updated_at=?, "
-            "dirty=1 WHERE id=?",
+            "payload_json=?, claude_session_id=?, "
+            "transcript_path=?, repo_path=COALESCE(NULLIF(?, ''), repo_path), updated_at=? WHERE id=?",
             (state, branch, head, change_md, payload, session_id, transcript_path, repo_path,
              ts, row[0]))
         return row[0]
     cur = con.execute(
-        "INSERT INTO work (mode, project, req_slug, owner, lock_state, req_state, branch, "
-        "head_commit, repo_path, change_md, payload_json, origin_dev, origin_machine, "
+        "INSERT INTO work (mode, project, req_slug, req_state, branch, "
+        "head_commit, repo_path, change_md, payload_json, origin_machine, "
         "claude_session_id, transcript_path, created_at, updated_at) "
-        "VALUES ('req',?,?,?,'owned',?,?,?,?,?,?,?,?,?,?,?,?)",
-        (project, req_slug, owner, state, branch, head, repo_path, change_md, payload,
-         owner, machine, session_id, transcript_path, ts, ts))
-    _event(con, cur.lastrowid, owner, machine, "publish")
+        "VALUES ('req',?,?,?,?,?,?,?,?,?,?,?,?,?)",
+        (project, req_slug, state, branch, head, repo_path, change_md, payload,
+         machine, session_id, transcript_path, ts, ts))
     return cur.lastrowid
 
 
-def _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, cwd, transcript_path):
+def _upsert_exploratory(con, session_id, machine, summary, branch, head, cwd, transcript_path):
     """Upsert del work exploratorio de la sesión. Devuelve su id local."""
     ts = now_iso()
     payload = json.dumps({"summary": summary}, ensure_ascii=False)
@@ -173,43 +146,31 @@ def _upsert_exploratory(con, session_id, owner, machine, summary, branch, head, 
     if row:
         con.execute(
             "UPDATE work SET payload_json=?, branch=?, head_commit=?, transcript_path=?, "
-            "updated_at=?, dirty=1 WHERE id=?",
+            "updated_at=? WHERE id=?",
             (payload, branch, head, transcript_path, ts, row[0]))
         return row[0]
     cur = con.execute(
-        "INSERT INTO work (mode, owner, lock_state, branch, head_commit, repo_path, "
-        "payload_json, origin_dev, origin_machine, claude_session_id, transcript_path, "
-        "created_at, updated_at) VALUES ('exploratory',?,'owned',?,?,?,?,?,?,?,?,?,?)",
-        (owner, branch, head, cwd, payload, owner, machine, session_id, transcript_path, ts, ts))
-    _event(con, cur.lastrowid, owner, machine, "publish")
+        "INSERT INTO work (mode, branch, head_commit, repo_path, "
+        "payload_json, origin_machine, claude_session_id, transcript_path, "
+        "created_at, updated_at) VALUES ('exploratory',?,?,?,?,?,?,?,?,?)",
+        (branch, head, cwd, payload, machine, session_id, transcript_path, ts, ts))
     return cur.lastrowid
 
 
 # --------------------------------------------------------------------------- registro de sesión
-# Una fila por sesión en session_sync: ruta del .jsonl, cwd con el que arrancó (opt-in de los works
-# exploratorios, ver _OptIn) y cursor de lectura del .jsonl (read_byte, ver _read_new_chunk). No guarda
-# texto de la conversación.
+# Una fila por sesión en session_sync: ruta del .jsonl y cursor de lectura del .jsonl (read_byte, ver
+# _read_new_chunk). No guarda texto de la conversación.
 
-def _stored_root(con, session_id):
-    """root_cwd ya registrado de la sesión, o None. Nunca propaga."""
-    try:
-        row = con.execute("SELECT root_cwd FROM session_sync WHERE session_id=?", (session_id,)).fetchone()
-        return row[0] if row else None
-    except sqlite3.Error:
-        return None
-
-
-def _register_session(con, session_id, transcript_path, root_cwd=None):
+def _register_session(con, session_id, transcript_path):
     """Alta o actualización de la fila de la sesión, en la misma transacción de la captura. Refresca la ruta
-    del .jsonl y guarda UNA sola vez el cwd con el que arrancó la sesión (root_cwd): el .jsonl puede borrarse
-    después y sin él no habría con qué decidir el opt-in. Best-effort."""
+    del .jsonl. Best-effort."""
     try:
         ts = now_iso()
-        cur = con.execute("UPDATE session_sync SET transcript_path=?, root_cwd=COALESCE(root_cwd, ?), updated_at=? "
-                          "WHERE session_id=?", (transcript_path, root_cwd, ts, session_id))
+        cur = con.execute("UPDATE session_sync SET transcript_path=?, updated_at=? WHERE session_id=?",
+                          (transcript_path, ts, session_id))
         if cur.rowcount == 0:
-            con.execute("INSERT OR IGNORE INTO session_sync (session_id, transcript_path, root_cwd, updated_at) "
-                        "VALUES (?,?,?,?)", (session_id, transcript_path, root_cwd, ts))
+            con.execute("INSERT OR IGNORE INTO session_sync (session_id, transcript_path, updated_at) "
+                        "VALUES (?,?,?)", (session_id, transcript_path, ts))
     except sqlite3.Error as e:
         print(f"[logbook] aviso: no se pudo registrar la sesión {session_id}: {e}", file=sys.stderr)
 
@@ -252,12 +213,6 @@ def _read_new_chunk(con, session_id, jsonl_path):
         return None                                   # best-effort: la captura nunca falla por la lectura
 
 
-def _event(con, work_id, dev, machine, action, prev_owner=None, note=None):
-    con.execute(
-        "INSERT INTO event (work_id, ts, dev, action, prev_owner, machine, note) VALUES (?,?,?,?,?,?,?)",
-        (work_id, now_iso(), dev, action, prev_owner, machine, note))
-
-
 # ----------------------------------------------------------------------- memoria
 # find_active_reqs (plural, soporta N REQ activos) y el parser _field viven ahora en
 # _db_shared.py — fuente única (antes había 2 copias); usage-tracker.py ya no la usa desde 6.29.0.
@@ -294,555 +249,45 @@ def _first_user_prompt(jsonl_path, limit=120):
     return ""
 
 
-# -------------------------------------------------------------------------- util
-# _whoami / _basename / _hostname / _git / _git_info / _project_id / _normalize_remote
-# se movieron a _db_shared.py (importados arriba). Aquí no se redefinen.
-
-
-# =========================================================================== sync (REQ B)
-# Drena el outbox (works dirty) al central. Best-effort.
-
-def _central():
-    """(endpoint, token) del central si ambos están en el entorno; (None, None) si no."""
-    ep = os.environ.get("NEB_LOGBOOK_ENDPOINT")
-    tok = (os.environ.get("NEB_LOGBOOK_TOKEN") or "").strip()
-    return (ep, tok) if ep and tok else (None, None)
-
-
-def _is_shared(cwd):
-    """Disparador determinista: el central (compartido) es OPT-IN por proyecto.
-    Compartido sii hay endpoint Y el CLAUDE.md del cwd trae el marcador `<!-- neb-logbook: central -->`.
-    Sin endpoint o sin marcador → local-only (la bitácora local de REQ A es el default).
-    El default es local porque la bitácora local ya cubre el relevo del propio dev; el central
-    se reserva a los proyectos que deliberadamente lo comparten con el equipo."""
-    if not os.environ.get("NEB_LOGBOOK_ENDPOINT"):
-        return False
-    if not cwd:   # sin ruta no hay CLAUDE.md que declare el opt-in (no resolver contra el cwd del proceso)
-        return False
-    claude_md = os.path.join(cwd, "CLAUDE.md")
-    try:
-        if os.path.isfile(claude_md):
-            with open(claude_md, encoding="utf-8", errors="replace") as fh:
-                txt = fh.read()
-            if re.search(r"<!--\s*neb-logbook:\s*central\s*-->", txt):
-                return True
-    except OSError:
-        pass
-    return False
-
-
-# «Path del proyecto» es texto libre en la memoria: "C:\x\tienda (rama `master`)", "`/c/x/app` + …".
-_PATH_START = r"(?:[A-Za-z]:[\\/]|[\\/]|~)"
-_REPO_PATH_QUOTED_RE = re.compile(r"""^[\s*]*([`'"])(%s[^`'"]*)\1""" % _PATH_START)
-_REPO_PATH_RE = re.compile(r"""^[\s`'"*]*(%s[^\s`'"()*]*)""" % _PATH_START)
-
-
-def _repo_dir(repo_path):
-    """Directorio del repo de un REQ: el primer path absoluto de su «Path del proyecto», sin comillas ni
-    puntuación final. "" si no empieza con uno (una ruta relativa resolvería contra el cwd del proceso
-    sync). Una ruta con espacios solo se reconoce entre comillas o backticks; sin ellas se corta en el
-    primer espacio y queda sin opt-in (falla cerrado)."""
-    m = _REPO_PATH_QUOTED_RE.match(repo_path or "") or _REPO_PATH_RE.match(repo_path or "")
-    if not m:
-        return ""
-    path = posix_to_win(os.path.expanduser(m.group(m.lastindex).strip().rstrip(".,;")))
-    path = os.path.normpath(path)
-    return path if os.path.isabs(path) else ""
-
-
-class _OptIn:
-    """Opt-in al drenar. El sync lo lanza un proyecto con marcador, pero el outbox es de toda la máquina:
-    sin este filtro publicaba los works de cualquier repo.
-      • REQ: tiene opt-in si su repo (primer path de «Path del proyecto») trae el marcador.
-      • Exploratorio: si su sesión arrancó en un dir con marcador (cwd raíz; no el cwd del primer Stop,
-        que se mueve con los `cd`).
-    Solo cuenta el CLAUDE.md del dir exacto (como en el disparador). Sin cwd raíz conocido falla cerrado.
-    Lo ya publicado no se toca: purgarlo es decisión del backend central. Memoiza por sync."""
-
-    def __init__(self, con, index=None):
-        self._con, self._index = con, index
-        self._dirs, self._roots = {}, {}
-        self.hidden = {"works": 0}                    # works que sync-status no lista por falta de opt-in
-
-    def dir(self, path):
-        if path not in self._dirs:
-            self._dirs[path] = _is_shared(path)
-        return self._dirs[path]
-
-    def root(self, session_id, stored_path=None):
-        """cwd con el que arrancó la sesión: el guardado en session_sync o, si falta, el de su .jsonl."""
-        if session_id not in self._roots:
-            root = None
-            row = None
-            if session_id:
-                row = self._con.execute("SELECT root_cwd, transcript_path FROM session_sync WHERE session_id=?",
-                                        (session_id,)).fetchone()
-                root = row[0] if row else None
-            if not root:
-                path = _session_path(stored_path or (row[1] if row else None), session_id, self._index)
-                root = _jsonl_cwd(path)
-            self._roots[session_id] = root
-        return self._roots[session_id]
-
-    def session(self, session_id, stored_path=None):
-        return self.dir(self.root(session_id, stored_path))
-
-    def work(self, mode, repo_path, session_id, transcript_path):
-        if mode == "req":
-            return self.dir(_repo_dir(repo_path))
-        return self.session(session_id, transcript_path)
-
-
-def _maybe_spawn_sync(cwd, guide_dir, home_dir):
-    """Lanza `logbook.py sync` detached si el entorno es compartido. No bloquea el turno."""
-    if not _is_shared(cwd):
-        return
-    try:
-        kwargs = dict(stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        if os.name == "nt":
-            kwargs["creationflags"] = 0x00000008 | 0x00000200  # DETACHED_PROCESS | CREATE_NEW_PROCESS_GROUP
-        else:
-            kwargs["start_new_session"] = True
-        subprocess.Popen([sys.executable, os.path.abspath(__file__), "sync", guide_dir, home_dir], **kwargs)
-    except Exception:
-        pass
-
-
-def _http(endpoint, token, path, method="GET", payload=None):
-    """Request JSON al central. Devuelve (status_code|None, dict). Defensivo (timeout corto)."""
-    import http.client
-    import urllib.request
-    import urllib.error
-    url = endpoint.rstrip("/") + path
-    data = json.dumps(payload).encode("utf-8") if payload is not None else None
-    headers = {"Authorization": "Bearer " + token}
-    if data is not None:
-        headers["Content-Type"] = "application/json"
-    try:
-        # El Request va DENTRO del try: un endpoint sin esquema ("host/ruta") lanza ValueError al construirlo.
-        req = urllib.request.Request(url, data=data, method=method, headers=headers)
-        with urllib.request.urlopen(req, timeout=5) as r:
-            text = r.read().decode("utf-8")
-            return r.status, (json.loads(text) if text else {})
-    except urllib.error.HTTPError as e:
-        try:
-            return e.code, json.loads(e.read().decode("utf-8"))
-        except Exception:
-            return e.code, {}
-    except (urllib.error.URLError, OSError, ValueError, http.client.HTTPException) as e:
-        # Sin código HTTP utilizable: DNS/conexión/TLS (URLError), timeout (OSError), respuesta truncada o
-        # línea de estado inválida (HTTPException), URL mal formada o un 2xx con cuerpo no-JSON (ValueError:
-        # portal cautivo, WAF). Se conserva el motivo para que el fallo sea diagnosticable. El token viaja
-        # en el header, pero un token con CR/LF lo hace aparecer en el ValueError de http.client: se enmascara.
-        detail = str(e)
-        for secret in {token, token.strip()}:
-            if secret:
-                detail = detail.replace(secret, "***")
-        return None, {"error": type(e).__name__, "detail": detail[:200]}
-
-
-def sync_main(args):
-    guide = posix_to_win(args[0]) if args else posix_to_win(
-        resolve_neb_root(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..")))
-    home  = posix_to_win(args[1]) if len(args) >= 2 else os.path.expanduser("~")
-    endpoint, token = _central()
-    if not endpoint or not token:
-        # El sync detached tiene stderr en DEVNULL: este aviso solo se ve en un `sync` manual,
-        # que de otro modo sería un no-op mudo.
-        print("[logbook] sync: central no configurado (falta NEB_LOGBOOK_ENDPOINT y/o NEB_LOGBOOK_TOKEN); "
-              "nada que drenar", file=sys.stderr)
-        return
-    db_path     = resolve_db_path(home)
-    lock = _acquire_sync_lock(os.path.dirname(db_path))
-    if lock is False:
-        print("[logbook] sync: otro sync de esta máquina está en curso; nada que hacer", file=sys.stderr)
-        return
-    try:
-        try:
-            con = _open_db(home)                      # `guide` ya no decide el esquema
-        except DbUnavailable as e:
-            print(f"[logbook] sync: base no disponible ({e.motivo}): {e.detalle}", file=sys.stderr)
-            return
-        if con is None:
-            return
-        con.row_factory = sqlite3.Row
-        try:
-            index = _JsonlIndex(home)
-            # Backfill ANTES de publicar works: el opt-in de un exploratorio lee el root_cwd de su sesión.
-            _backfill_sessions(con, index)
-            _drain_works(con, endpoint, token, _OptIn(con, index))
-        finally:
-            con.close()
-    finally:
-        _release_sync_lock(lock)
-
-
-# --- un sync a la vez ---------------------------------------------------------------------------
-# Cada Stop/SessionEnd/PreCompact en un cwd compartido lanza un sync detached. Sin candado, varios
-# publicarían en paralelo los mismos works dirty (doble publicación de la misma versión al central). El
-# perdedor sale: el siguiente Stop vuelve a disparar. El dueño refresca el mtime del candado antes de cada
-# POST (_touch_sync_lock), así que «rancio» (más viejo que _SYNC_LOCK_STALE_S) significa un proceso muerto,
-# no uno lento con el central colgado. Al terminar, solo borra el candado si sigue siendo suyo (pid).
-# Dos procesos que lo declaran rancio a la vez pueden quedar ambos dentro: carrera residual aceptada;
-# el guard de versión de _drain_works evita que una publicación vieja baje el dirty de una nueva.
-
-_SYNC_LOCK_NAME = "neb-logbook-sync.lock"
-_SYNC_LOCK_STALE_S = 600
-_SYNC_LOCK_HELD = None                                # ruta del candado de ESTE proceso, si lo tiene
-
-
-def _acquire_sync_lock(lock_dir):
-    """Ruta del candado si se tomó; False si otro sync lo tiene; None si no se pudo crear por una causa
-    ajena al candado (se sincroniza sin candado en vez de dejar de publicar)."""
-    global _SYNC_LOCK_HELD
-    path = os.path.join(lock_dir or ".", _SYNC_LOCK_NAME)
-    for attempt in range(2):
-        try:
-            fd = os.open(path, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
-            try:
-                os.write(fd, f"{os.getpid()} {now_iso()}\n".encode("ascii"))
-            finally:
-                os.close(fd)
-            _SYNC_LOCK_HELD = path
-            return path
-        except FileExistsError:
-            try:
-                age = time.time() - os.path.getmtime(path)
-            except OSError:
-                continue                              # lo liberaron entre medio: reintentar
-            if age < _SYNC_LOCK_STALE_S or attempt:
-                return False
-            try:
-                os.remove(path)                       # rancio: el proceso que lo tomó ya no existe
-            except OSError:
-                return False
-        except PermissionError:
-            return False                              # Windows: el archivo existe y se está borrando
-        except OSError as e:
-            print(f"[logbook] aviso: sin candado de sync ({e}); se sincroniza igual", file=sys.stderr)
-            return None
-    return False
-
-
-def _touch_sync_lock():
-    """Latido: el dueño refresca el mtime antes de cada POST para que nadie lo dé por rancio."""
-    if _SYNC_LOCK_HELD:
-        try:
-            os.utime(_SYNC_LOCK_HELD, None)
-        except OSError:
-            pass
-
-
-def _release_sync_lock(lock):
-    """Borra el candado solo si sigue siendo de este proceso: si otro lo tomó por rancio, es suyo."""
-    global _SYNC_LOCK_HELD
-    if lock:
-        try:
-            with open(lock, encoding="ascii", errors="replace") as fh:
-                mine = fh.read().split(" ", 1)[0] == str(os.getpid())
-            if mine:
-                os.remove(lock)
-        except OSError:
-            pass
-    _SYNC_LOCK_HELD = None
-
-
-# --- fallos de sync visibles -------------------------------------------------------------------
-# Un fallo que no sea 200 NO corta el reintento (salvo el 409, que ya lo cortaba), pero deja de ser
-# mudo: el de la publicación del work se persiste en work.last_error. work.transcript_error y
-# session_sync.transcript_error son heredados del canal de subida de transcripts, retirado: nada los
-# escribe ni los limpia.
-
-_SYNC_ERR_MAX = 500
-
-
-def _sync_error_text(channel, code, resp, token=None):
-    """'<canal> <código|sin respuesta HTTP> <error>: <detail>', omitiendo las partes vacías.
-    `resp` viene de _http: puede ser {} (cuerpo no-JSON) o no ser dict (JSON válido que no es objeto)."""
-    resp = resp if isinstance(resp, dict) else {}
-    head = f"{channel} {code if code is not None else 'sin respuesta HTTP'}"
-    parts = [str(resp.get(k) or "").strip() for k in ("error", "detail")]
-    body = ": ".join(p for p in parts if p) or "(sin cuerpo JSON)"
-    text = f"{head} {body}"
-    if token:
-        text = text.replace(token, "***")      # defensa en profundidad: el detail lo redacta el servidor
-    return text[:_SYNC_ERR_MAX]
-
-
-def _quiet_rollback(con):
-    try:
-        if getattr(con, "in_transaction", False):
-            con.rollback()
-    except Exception:
-        pass
-
-
-def _record_sync_error(con, work_id, col, text, prev, only_if_dirty=False):
-    """Persiste el fallo vigente de un canal en work.<col> / work.<col>_at. NUNCA propaga: registrar el
-    error no puede tumbar el drenaje de los demás works (antes esta rama no hacía nada y no podía fallar).
-    No reescribe si el texto no cambió: en régimen estable son 0 escrituras y <col>_at responde
-    'desde cuándo falla', no 'cuándo fue el último reintento'.
-    `col` es una constante interna ('last_error'), nunca entrada externa.
-    only_if_dirty: no registrar si otro sync ya publicó este work mientras este POST estaba en vuelo."""
-    print(f"[logbook] sync work {work_id}: {text}", file=sys.stderr)
-    if text == prev:
-        return
-    sql = f"UPDATE work SET {col}=?, {col}_at=? WHERE id=?" + (" AND dirty=1" if only_if_dirty else "")
-    try:
-        con.execute(sql, (text, now_iso(), work_id))
-        con.commit()
-    except Exception as e:
-        _quiet_rollback(con)
-        print(f"[logbook] aviso: no se pudo registrar el fallo de sync del work {work_id}: {e}", file=sys.stderr)
-
-
-def _clear_sync_error(con, work_id, col, prev):
-    """Limpia el par <col>/<col>_at solo si había algo (evita un UPDATE+commit por fila sana). Nunca propaga."""
-    if prev is None:
-        return
-    try:
-        con.execute(f"UPDATE work SET {col}=NULL, {col}_at=NULL WHERE id=?", (work_id,))
-        con.commit()
-    except Exception as e:
-        _quiet_rollback(con)
-        print(f"[logbook] aviso: no se pudo limpiar {col} del work {work_id}: {e}", file=sys.stderr)
-
-
-# --- req_state: ENUM hacia el central -----------------------------------------------------------
-# El central declara `req_state` como ENUM del requerimiento (vocabulary.md § "Estados del requerimiento",
-# VARCHAR(64) en modo estricto). La memoria del proyecto redacta el `Estado:` como ENUM + prosa, y publicar
-# esa prosa cruda hacía que el central rechazara el work en cada sync. Solo el payload se normaliza: la
-# bitácora local conserva el texto completo, y la prosa viaja en `payload_json.req_state_note`.
-
-_REQ_STATES = ("En progreso", "En validación", "Listo para aprobación", "Cerrado")
-_REQ_STATE_ALIASES = {"listo para produccion": "Listo para aprobación"}   # término anterior, documentado
-_REQ_STATE_MAX = 64
-
-
-def _fold(text):
-    """Minúsculas sin acentos ni espacios repetidos, para comparar."""
-    import unicodedata
-    t = unicodedata.normalize("NFD", text)
-    t = "".join(ch for ch in t if not unicodedata.combining(ch))
-    return " ".join(t.lower().split())
-
-
-def _normalize_req_state(raw):
-    """(enum | None, note | None). `enum` es el valor canónico que se publica; `note` es el texto original
-    completo cuando trae algo más que el ENUM (o cuando no empieza por ninguno), para que la prosa no se pierda.
-    Reconoce el ENUM al INICIO del texto sin distinguir mayúsculas ni acentos, tolera envoltorios markdown
-    y el alias `Listo para producción`; el sufijo documentado `(bloqueado …)` se conserva como `(bloqueado)`."""
-    raw = (raw or "").strip()
-    if not raw:
-        return None, None
-    text = raw.strip("*_` \t")
-    folded = _fold(text)
-    candidates = [(_fold(s), s) for s in _REQ_STATES] + [(k, v) for k, v in _REQ_STATE_ALIASES.items()]
-    for key, canon in sorted(candidates, key=lambda kv: -len(kv[0])):      # el más largo primero
-        # prefijo + frontera de palabra: "en progreso — nota" sí, "en progresos" no
-        if folded == key or (folded.startswith(key) and not folded[len(key)].isalnum()):
-            rest = folded[len(key):]
-            enum = canon + (" (bloqueado)" if re.search(r"\(\s*bloquead", rest) else "")
-            note = None if folded == key else raw
-            return enum[:_REQ_STATE_MAX], note
-    return None, raw
-
-
-def _payload_json_with_note(payload_json, note):
-    """Copia saliente de payload_json con `req_state_note`. Si no hay nota, o el JSON no es un objeto,
-    se manda tal cual (nunca se pierde el publish por esto). No modifica el valor local."""
-    if not note:
-        return payload_json
-    try:
-        d = json.loads(payload_json) if payload_json else {}
-    except (TypeError, ValueError):
-        return payload_json
-    if not isinstance(d, dict):
-        return payload_json
-    d["req_state_note"] = note
-    return json.dumps(d, ensure_ascii=False)
-
-
-def _drain_works(con, endpoint, token, optin=None):
-    optin = optin or _OptIn(con)
-    rows = con.execute("SELECT * FROM work WHERE dirty=1").fetchall()
-    for w in rows:
-        if not optin.work(w["mode"], w["repo_path"], w["claude_session_id"], w["transcript_path"]):
-            continue                                  # sin opt-in: queda local (dirty) hasta que lo tenga
-        # Lista EXPLÍCITA de campos: las columnas del outbox (dirty, conflict, last_error…) son solo locales
-        # y no viajan al central. No sustituir por dict(w).
-        req_state, note = _normalize_req_state(w["req_state"])
-        payload = {
-            "mode": w["mode"], "project": w["project"], "req_slug": w["req_slug"],
-            "owner": w["owner"], "req_state": req_state, "branch": w["branch"],
-            "head_commit": w["head_commit"], "repo_path": w["repo_path"], "change_md": w["change_md"],
-            "payload_json": _payload_json_with_note(w["payload_json"], note),
-            "payload_version": w["payload_version"],
-            "origin_dev": w["origin_dev"], "origin_machine": w["origin_machine"],
-            "claude_session_id": w["claude_session_id"],
-            "transcript_path": w["transcript_path"],
-        }
-        try:
-            _touch_sync_lock()
-            code, resp = _http(endpoint, token, "/work/publish", "POST", payload)
-            remote_id = resp.get("remote_id") if isinstance(resp, dict) else None
-            if code == 200 and remote_id is None:
-                # Un 200 sin remote_id no es una publicación (cuerpo vacío, JSON ajeno de un proxy/portal):
-                # darlo por publicado dejaría dirty=0 sin remote_id: invisible para sync-status sin haberse
-                # publicado. Se trata como fallo y se conserva el reintento.
-                code = "200-sin-remote_id"
-            if code == 200:
-                # Guard de versión: si el work se re-capturó durante el POST, lo publicado es una versión
-                # vieja; no hay que bajar dirty ni borrar un last_error que otro sync registró para la nueva.
-                cur = con.execute("UPDATE work SET dirty=0, synced_at=?, remote_id=?, conflict=0, "
-                                  "last_error=NULL, last_error_at=NULL WHERE id=? AND payload_version=? AND updated_at=?",
-                                  (now_iso(), remote_id, w["id"], w["payload_version"], w["updated_at"]))
-                if cur.rowcount == 0:
-                    con.execute("UPDATE work SET remote_id=?, synced_at=? WHERE id=?",
-                                (remote_id, now_iso(), w["id"]))
-                con.commit()
-            elif code == 409:
-                # Conflicto: corta el reintento (dirty=0) y deja el motivo, en un solo UPDATE.
-                text = _sync_error_text("publish", code, resp, token)
-                since = w["last_error_at"] if (text == w["last_error"] and w["last_error_at"]) else now_iso()
-                con.execute("UPDATE work SET dirty=0, conflict=1, last_error=?, last_error_at=? WHERE id=? "
-                            "AND payload_version=? AND updated_at=?",
-                            (text, since, w["id"], w["payload_version"], w["updated_at"]))
-                con.commit()
-            else:
-                # Sin respuesta, 4xx≠409 o 5xx: dirty se conserva (reintenta el próximo sync) y el fallo queda VISIBLE.
-                _record_sync_error(con, w["id"], "last_error", _sync_error_text("publish", code, resp, token),
-                                   w["last_error"], only_if_dirty=True)
-        except sqlite3.OperationalError as e:
-            _quiet_rollback(con)
-            print(f"[logbook] aviso: sync work {w['id']}: {e}", file=sys.stderr)
-            continue
-
-
-# --- sesiones: ruta del .jsonl y cwd raíz para el opt-in ------------------------------------------
-
-class _JsonlIndex:
-    """session_id -> ruta del .jsonl bajo <home>/.claude/projects/*/. Se arma una vez por sync y solo si
-    hace falta (una ruta guardada que ya no existe, o una sesión sin ruta) para leer el cwd raíz de la
-    sesión. Si un id aparece en varios directorios, gana el archivo más grande."""
-
-    def __init__(self, home):
-        self._root = os.path.join(home or os.path.expanduser("~"), ".claude", "projects")
-        self._idx = None
-
-    def get(self, session_id):
-        if self._idx is None:
-            self._idx = {}
-            try:
-                for d in os.scandir(self._root):
-                    if not d.is_dir():
-                        continue
-                    try:
-                        for f in os.scandir(d.path):
-                            if f.is_file() and f.name.endswith(".jsonl"):
-                                sid = f.name[:-6]
-                                prev = self._idx.get(sid)
-                                if prev is None or f.stat().st_size > os.path.getsize(prev):
-                                    self._idx[sid] = f.path
-                    except OSError:
-                        continue
-            except OSError:
-                pass
-        return self._idx.get(session_id)
-
-
-def _session_path(stored, session_id, index):
-    """Ruta utilizable del .jsonl: la guardada si existe; si no, la del índice; None si no hay archivo."""
-    path = posix_to_win(stored or "")
-    if path and os.path.isfile(path):
-        return path
-    return index.get(session_id) if index is not None else None
-
-
-def _jsonl_cwd(path, max_lines=200):
-    """cwd con el que arrancó la sesión: el primero que registra su .jsonl (las entradas user/assistant lo
-    traen; las primeras líneas pueden ser resúmenes o snapshots sin él). None si no aparece o no hay archivo."""
-    if not path:
-        return None
-    try:
-        with open(path, encoding="utf-8", errors="replace") as fh:
-            for i, line in enumerate(fh):
-                if i >= max_lines:
-                    break
-                try:
-                    cwd = (json.loads(line) or {}).get("cwd")
-                except (json.JSONDecodeError, AttributeError):
-                    continue
-                if cwd:
-                    return cwd
-    except OSError:
-        pass
-    return None
-
-
-def _backfill_sessions(con, index):
-    """Completa session_sync para el opt-in de los exploratorios. Idempotente y sin red.
-    1. Sesiones apuntadas por un work y sin fila: se registran (session_id y el transcript_path del work más
-       reciente que lo tenga; NULL se resuelve por nombre). Sin fila, un exploratorio cuyo .jsonl ya se
-       borró no tendría con qué decidir su opt-in.
-    2. root_cwd de las filas que no lo tienen (ver _fill_root_cwd)."""
-    ts = now_iso()
-    try:
-        pointed = {}
-        for r in con.execute(
-                "SELECT claude_session_id, transcript_path FROM work "
-                "WHERE claude_session_id IS NOT NULL "
-                "AND claude_session_id NOT IN (SELECT session_id FROM session_sync) "
-                "ORDER BY updated_at DESC, id DESC").fetchall():
-            if pointed.get(r[0]) is None:
-                pointed[r[0]] = r[1]
-        con.executemany(
-            "INSERT OR IGNORE INTO session_sync (session_id, transcript_path, updated_at) VALUES (?,?,?)",
-            [(sid, path, ts) for sid, path in pointed.items()])
-        con.commit()
-    except sqlite3.Error as e:
-        _quiet_rollback(con)
-        print(f"[logbook] aviso: backfill de session_sync: {e}", file=sys.stderr)
-        return
-    _fill_root_cwd(con, index)
-
-
-def _fill_root_cwd(con, index):
-    """root_cwd de las filas que no lo tienen (anteriores a 6.14.2, o sin .jsonl legible al registrarse). Se
-    lee una sola vez por sesión: el .jsonl puede borrarse después y sin él no habría con qué decidir el
-    opt-in. Lecturas de disco fuera de la transacción; las filas sin .jsonl quedan en NULL (sin opt-in)."""
-    try:
-        rows = con.execute("SELECT session_id, transcript_path FROM session_sync WHERE root_cwd IS NULL").fetchall()
-    except sqlite3.Error as e:
-        print(f"[logbook] aviso: root_cwd de session_sync: {e}", file=sys.stderr)
-        return
-    found = []
-    for r in rows:
-        cwd = _jsonl_cwd(_session_path(r[1], r[0], index))
-        if cwd:
-            found.append((cwd, r[0]))
-    if not found:
-        return
-    try:
-        con.executemany("UPDATE session_sync SET root_cwd=? WHERE session_id=? AND root_cwd IS NULL", found)
-        con.commit()
-    except sqlite3.Error as e:
-        _quiet_rollback(con)
-        print(f"[logbook] aviso: root_cwd de session_sync: {e}", file=sys.stderr)
-
-
 # =========================================================================== CLI (/logbook)
-# Con NEB_LOGBOOK_ENDPOINT configurado, el CLI opera contra el CENTRAL (autoridad; ids remotos).
-# Sin él, contra el SQLite local (REQ A; lock informativo).
+# Siempre contra la base local (~/.claude/neb.db). Salida por stdout: el wrapper del skill descarta stderr.
 
-CLI_CMDS = {"list", "show", "claim", "release", "forced-release", "request", "rename", "archive", "search",
-            "sync-status", "link", "trace", "unlink"}
+CLI_CMDS = {"list", "show", "rename", "archive", "link", "trace", "unlink"}
+
+# Eventos en que hooks/hooks.json registra el hook logbook-sync: solo con uno de ellos se entra a captura.
+CAPTURE_EVENTS = {"Stop", "SessionEnd", "PreCompact"}
+
+# Verbos retirados: responden un JSON fijo y nunca caen al modo captura. Residuo de transición (sale en 8.0.0).
+_RETIRED_VERBS = {
+    "sync": {"detalle": "se retiró en neb 7.0.0 junto con el backend central: la bitácora es solo local y no hay "
+                        "nada que sincronizar."},
+    # attention: 0 evita que un SKILL.md anterior en caché muestre un diagnóstico falso.
+    "sync-status": {"detalle": "se retiró en neb 7.0.0 junto con el backend central: la bitácora es solo local y "
+                               "no hay estado de sincronización que revisar.",
+                    "attention": 0},
+    "claim": {"detalle": "se retiró en neb 7.0.0 junto con el candado entre devs; para continuar un REQ usa "
+                         "`retomar <ruta-del-Change-MD>` (## Relevo, plan aprobado y rama)."},
+    "release": {"detalle": "se retiró en neb 7.0.0 junto con el candado entre devs; para dejar un REQ a otro, deja "
+                           "su ## Relevo en el Change MD y entrega el registro por git."},
+    "forced-release": {"detalle": "se retiró en neb 7.0.0 junto con el candado entre devs; para continuar un REQ "
+                                  "usa `retomar <ruta-del-Change-MD>`."},
+    "request": {"detalle": "se retiró en neb 7.0.0 junto con el candado entre devs; para continuar un REQ usa "
+                           "`retomar <ruta-del-Change-MD>`."},
+    "search": {"detalle": "se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones. Para retomar un REQ "
+                          "usa su Change MD, su ## Relevo, el plan aprobado y la rama."},
+}
+
+
+def _retired_verb(verb):
+    out = {"ok": False, "motivo": "verbo-retirado", "verbo": verb, **_RETIRED_VERBS[verb]}
+    print(json.dumps(out, ensure_ascii=False))
 
 
 def _open_db(home_dir):
     """Base por omisión con el esquema inicial del árbol de este módulo, con o sin NEB_HOME (6.48.0).
-    Pasa por el `_connect` de este módulo para que las pruebas que lo parchean sigan vigilando la captura
-    y el sync. Puede lanzar DbUnavailable."""
+    Pasa por el `_connect` de este módulo para que las pruebas que lo parchean sigan vigilando la captura.
+    Lanza UnmigratedDb, antes de crear nada, si la base sigue sin migrar; puede lanzar DbUnavailable."""
+    raise_if_unmigrated(home_dir)
     return _connect(resolve_db_path(home_dir), INITIAL_SCHEMA_PATH)
 
 
@@ -852,236 +297,79 @@ def _db_for_cli():
 
 
 def cli_list(_args):
-    ep, tok = _central()
-    if ep:
-        code, resp = _http(ep, tok, "/work")
-        print(json.dumps(resp.get("works", []) if code == 200 else {"error": code, **resp},
-                         ensure_ascii=False, indent=2, default=str))
-        return
     con = _db_for_cli()
     if con is None:
         print("[]"); return
     rows = con.execute(
-        "SELECT id, mode, COALESCE(project,''), COALESCE(req_slug,''), owner, lock_state, "
-        "COALESCE(req_state,''), updated_at FROM work WHERE archived_at IS NULL "
-        "ORDER BY updated_at DESC").fetchall()
+        "SELECT id, mode, COALESCE(project,''), COALESCE(req_slug,''), COALESCE(req_state,''), updated_at "
+        "FROM work WHERE archived_at IS NULL ORDER BY updated_at DESC").fetchall()
     con.close()
     print(json.dumps([
-        {"id": r[0], "mode": r[1], "project": r[2], "req_slug": r[3], "owner": r[4],
-         "lock_state": r[5], "req_state": r[6], "updated_at": r[7]} for r in rows
+        {"id": r[0], "mode": r[1], "project": r[2], "req_slug": r[3], "req_state": r[4], "updated_at": r[5]}
+        for r in rows
     ], ensure_ascii=False, indent=2))
+
+
+# Columnas que muestra `show`, en lista explícita: en una base donde el borrado del esquema retirado no
+# corrió, SELECT * mostraría columnas que ya no significan nada.
+_SHOW_COLS = ("id", "mode", "project", "req_slug", "req_state", "branch", "head_commit", "repo_path",
+              "change_md", "payload_json", "origin_machine", "claude_session_id", "claude_session_name",
+              "transcript_path", "created_at", "updated_at", "archived_at")
 
 
 def cli_show(args):
     if not args:
         print("uso: show <id>"); return
-    ep, tok = _central()
-    if ep:
-        code, resp = _http(ep, tok, "/work/" + str(args[0]))
-        print(json.dumps(resp, ensure_ascii=False, indent=2, default=str) if code == 200 else f"work {args[0]}: {code}")
-        return
     con = _db_for_cli()
     if con is None:
         return
-    cur = con.execute("SELECT * FROM work WHERE id=?", (args[0],))
-    r = cur.fetchone()
-    cols = [c[0] for c in cur.description] if r else []
-    ev = [dict(zip(("ts", "dev", "action", "prev_owner"), e))
-          for e in con.execute("SELECT ts,dev,action,prev_owner FROM event WHERE work_id=? ORDER BY id", (args[0],))]
+    r = con.execute(f"SELECT {', '.join(_SHOW_COLS)} FROM work WHERE id=?", (args[0],)).fetchone()
     con.close()
     if not r:
         print(f"work {args[0]} no encontrado"); return
-    print(json.dumps({**dict(zip(cols, r)), "events": ev}, ensure_ascii=False, indent=2, default=str))
-
-
-def cli_lock(action, args):
-    """claim/release/forced-release. Con central → atómico ahí; sin central → informativo local (REQ A)."""
-    if not args:
-        print(f"uso: {action} <id>"); return
-    wid = args[0]
-    me  = _whoami()
-    machine = _hostname()
-    ep, tok = _central()
-    if ep:
-        path = {"claim": "/work/claim", "release": "/work/release",
-                "forced-release": "/work/forced-release"}[action]
-        code, resp = _http(ep, tok, path, "POST", {"id": int(wid), "owner": me, "machine": machine})
-        print(f"{action} → {code}: {json.dumps(resp, ensure_ascii=False)}")
-        return
-    con = _db_for_cli()
-    if con is None:
-        return
-    r = con.execute("SELECT owner FROM work WHERE id=?", (wid,)).fetchone()
-    if not r:
-        print(f"work {wid} no encontrado"); con.close(); return
-    prev_owner = r[0]
-    ts = now_iso()
-
-    # Simetría transaccional con pendings: BEGIN IMMEDIATE + COMMIT/ROLLBACK con retry ante
-    # SQLITE_BUSY (antes era DEFERRED + commit ciego, que ante un escritor concurrente fallaba
-    # sin reintento). El SELECT del owner ya ocurrió arriba (lectura); las escrituras van dentro.
-    def _do(c):
-        if action == "claim":
-            c.execute("UPDATE work SET owner=?, lock_state='owned', locked_at=?, dirty=1 WHERE id=?", (me, ts, wid))
-            _event(c, wid, me, machine, "claim", prev_owner=prev_owner)
-        elif action == "release":
-            c.execute("UPDATE work SET lock_state='released', locked_at=?, dirty=1 WHERE id=?", (ts, wid))
-            _event(c, wid, me, machine, "release")
-        elif action == "forced-release":
-            c.execute("UPDATE work SET owner=?, lock_state='released', takeover_by=NULL, locked_at=?, dirty=1 WHERE id=?", (me, ts, wid))
-            _event(c, wid, me, machine, "forced_release", prev_owner=prev_owner)
-
-    with_write_tx(con, _do); con.close()
-    print(f"{action} OK (work {wid}). Nota: en backend local el lock es informativo; "
-          f"el relevo cross-dev real requiere el backend central (NEB_LOGBOOK_ENDPOINT).")
-
-
-def cli_request(args):
-    if not args:
-        print("uso: request <id>"); return
-    ep, tok = _central()
-    if not ep:
-        print("'request' (solicitar el mando) requiere el backend central "
-              "(NEB_LOGBOOK_ENDPOINT/NEB_LOGBOOK_TOKEN no configurados)."); return
-    code, resp = _http(ep, tok, "/work/request-takeover", "POST",
-                       {"id": int(args[0]), "owner": _whoami(), "machine": _hostname()})
-    print(f"request → {code}: {json.dumps(resp, ensure_ascii=False)}")
+    print(json.dumps(dict(zip(_SHOW_COLS, r)), ensure_ascii=False, indent=2, default=str))
 
 
 def cli_rename(args):
     if len(args) < 2:
-        print("uso: rename <id> <new_req_slug> [new_project]"); return
-    ep, tok = _central()
-    if ep:
-        payload = {"id": int(args[0]), "owner": _whoami(), "machine": _hostname(), "new_req_slug": args[1]}
-        if len(args) >= 3:
-            payload["new_project"] = args[2]
-        code, resp = _http(ep, tok, "/work/rename", "POST", payload)
-        print(f"rename → {code}: {json.dumps(resp, ensure_ascii=False)}")
-        return
+        print("uso: rename <id> <new_req_slug>"); return
     con = _db_for_cli()
     if con is None:
         return
 
     # Simetría transaccional con pendings: BEGIN IMMEDIATE + COMMIT/ROLLBACK con retry ante BUSY.
     def _do(c):
-        c.execute("UPDATE work SET req_slug=?, updated_at=?, dirty=1 WHERE id=? AND mode='req'",
+        c.execute("UPDATE work SET req_slug=?, updated_at=? WHERE id=? AND mode='req'",
                   (args[1], now_iso(), args[0]))
-        _event(c, args[0], _whoami(), _hostname(), "rename", note=f"-> {args[1]}")
 
     with_write_tx(con, _do); con.close()
-    print(f"rename OK local (work {args[0]} → {args[1]}).")
+    print(f"rename OK (work {args[0]} → {args[1]}).")
 
 
 def cli_archive(args):
-    """Archiva el work (cierre del REQ). Con central → POST /work/archive; sin central → local."""
+    """Archiva el work (cierre del REQ) y cierra los pendientes abiertos ligados a él."""
     if not args:
         print("uso: archivar <id>"); return
-    wid, me, machine = args[0], _whoami(), _hostname()
-    ep, tok = _central()
-    if ep:
-        code, resp = _http(ep, tok, "/work/archive", "POST", {"id": int(wid), "owner": me, "machine": machine})
-        print(f"archive → {code}: {json.dumps(resp, ensure_ascii=False)}")
-        return
+    wid = args[0]
     con = _db_for_cli()
     if con is None:
         return
 
-    # Simetría transaccional con pendings: BEGIN IMMEDIATE + COMMIT/ROLLBACK con retry ante BUSY,
-    # emitido ANTES del primer write (y del SAVEPOINT del gancho). El gancho on_work_archived
-    # usa un SAVEPOINT que EXIGE estar dentro de una transacción; con DEFERRED dependía del
-    # BEGIN implícito del primer UPDATE — ahora el BEGIN IMMEDIATE lo garantiza explícitamente.
+    # BEGIN IMMEDIATE antes del primer write (y del SAVEPOINT del gancho): on_work_archived usa un
+    # SAVEPOINT que EXIGE estar dentro de una transacción.
     def _do(c):
-        c.execute("UPDATE work SET archived_at=?, dirty=1 WHERE id=? AND archived_at IS NULL", (now_iso(), wid))
-        _event(c, wid, me, machine, "archive")
-        # --- gancho aditivo: disparador de obsolescencia "al cerrar el work ligado" ---
-        # Best-effort: si pendings no importa o falla, el archive del work NO se rompe (patrón
-        # _maybe_spawn_sync). on_work_archived hace ROLLBACK TO SAVEPOINT propio ante error y
-        # re-lanza; lo tragamos aquí para que el COMMIT del work siga su curso.
+        c.execute("UPDATE work SET archived_at=? WHERE id=? AND archived_at IS NULL", (now_iso(), wid))
+        # Gancho best-effort: si pendings no importa o falla, el archive del work NO se rompe.
+        # on_work_archived hace ROLLBACK TO SAVEPOINT propio ante error y re-lanza; se traga aquí
+        # para que el COMMIT del work siga su curso.
         try:
             import pendings
-            pendings.on_work_archived(c, wid, me, machine)
+            pendings.on_work_archived(c, wid)
         except Exception as e:
             print(f"[logbook] aviso: on_work_archived omitido: {e}", file=sys.stderr)
 
     with_write_tx(con, _do); con.close()
-    print(f"archive OK local (work {wid}).")
-
-
-# `search` sigue en CLI_CMDS solo para avisar el retiro: fuera de CLI_CMDS el verbo caería en el modo
-# captura (sale mudo y, con 6 o más palabras, crearía un work basura).
-_SEARCH_RETIRED = ("`search` se retiró en neb 6.41.0: la bitácora ya no guarda ni sube transcripts, así "
-                   "que no hay texto de sesiones que buscar. Para retomar un REQ usa su Change MD, su "
-                   "## Relevo, el plan aprobado y la rama.")
-
-
-def cli_search(_args):
-    """Verbo retirado: mensaje fijo por stdout, sin tocar la base ni la red, con cualquier número de argumentos."""
-    print(_SEARCH_RETIRED)
-
-
-def _sync_status_rows(con, central=True, optin=None):
-    """Works locales que requieren atención: pendientes de publicar, en conflicto o con un fallo de
-    publicación vigente. Función pura sobre la conexión (la comparten el CLI y los tests).
-    Sin central configurado `dirty` nace en 1 y nada lo baja: listar por dirty devolvería toda la
-    bitácora, así que ahí solo cuentan conflicto y fallos.
-    Con central y `optin`, un work sin opt-in no se lista (nunca va a salir): se cuenta en optin.hidden.
-    La clave es `local_id`, nunca `id`: con central los demás verbos interpretan ids REMOTOS."""
-    where = "conflict=1 OR last_error IS NOT NULL"
-    if central:
-        where = "dirty=1 OR " + where
-    rows = con.execute(
-        "SELECT id, mode, project, req_slug, dirty, conflict, remote_id, synced_at, last_error, last_error_at, "
-        "updated_at, archived_at, repo_path, claude_session_id, transcript_path "
-        f"FROM work WHERE {where} ORDER BY id").fetchall()
-    out = []
-    for r in rows:
-        if central and optin is not None and not optin.work(r[1], r[12], r[13], r[14]):
-            optin.hidden["works"] += 1
-            continue
-        out.append({"local_id": r[0], "mode": r[1], "project": r[2], "req_slug": r[3], "dirty": r[4],
-                    "conflict": r[5], "remote_id": r[6], "synced_at": r[7], "last_error": r[8],
-                    "last_error_at": r[9], "updated_at": r[10], "archived_at": r[11]})
-    return out
-
-
-def cli_sync_status(_args):
-    """Estado del outbox. SIEMPRE lee el SQLite local (este estado no existe en el central) y nunca
-    hace red. Sale por STDOUT: el wrapper del skill descarta stderr. ensure_ascii=True a propósito:
-    en un pipe cp1252 de Windows un carácter fuera de la página produciría salida VACÍA con rc=0,
-    que se leería como 'nada atascado' — justo el falso negativo que este verbo existe para evitar."""
-    endpoint_set = bool(os.environ.get("NEB_LOGBOOK_ENDPOINT"))
-    token_set = bool(os.environ.get("NEB_LOGBOOK_TOKEN"))
-    con = _db_for_cli()
-    if con is None:
-        print(json.dumps({"error": "no se pudo abrir la bitacora local"}, ensure_ascii=True)); return
-    try:
-        optin = _OptIn(con, _JsonlIndex(os.path.expanduser("~"))) if endpoint_set else None
-        works = _sync_status_rows(con, central=endpoint_set, optin=optin)
-    except Exception as e:
-        print(json.dumps({"error": "no se pudo leer el estado del sync: " + str(e)[:200]}, ensure_ascii=True)); return
-    finally:
-        con.close()
-    notes = ["local_id es el id LOCAL: no usarlo con show/claim/release/archive cuando hay central "
-             "(esos verbos interpretan ids remotos; usar remote_id)."]
-    if endpoint_set and not token_set:
-        notes.append("Hay endpoint pero falta NEB_LOGBOOK_TOKEN en este entorno: el sync no corre y no deja "
-                     "rastro; los works dirty de abajo no se estan publicando.")
-    if not endpoint_set:
-        notes.append("Sin central configurado: solo se listan conflictos y fallos (dirty no aplica).")
-    if any(w["remote_id"] is None for w in works):
-        notes.append("remote_id null = este cliente nunca lo publico con exito. Con un 409 el work existe en el "
-                     "central a nombre de otro (ubicarlo en `list` por project + req_slug); con un 5xx no existe "
-                     "y solo queda corregir la causa que muestra last_error.")
-    if optin is not None and optin.hidden["works"]:
-        notes.append(f"No se listan {optin.hidden['works']} works sin opt-in (su repo, o el dir donde arranco "
-                     "la sesion de un exploratorio, no trae el marcador neb-logbook: central): se quedan locales "
-                     "y no van a salir mientras no lo tengan.")
-    print(json.dumps({
-        "scope": "local", "endpoint_set": endpoint_set, "token_set": token_set,
-        "attention": sum(1 for w in works if w["conflict"] or w["last_error"]),
-        "notes": notes, "works": works,
-    }, ensure_ascii=True, indent=2, default=str))
+    print(f"archive OK (work {wid}).")
 
 
 def cli_main(argv):
@@ -1093,52 +381,44 @@ def cli_main(argv):
             _s.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, ValueError):
             pass
+    cmd, rest = argv[0], argv[1:]
     try:
-        _dispatch(argv[0], argv[1:])
+        if cmd in _RETIRED_VERBS:
+            _retired_verb(cmd)
+        elif cmd == "list":
+            cli_list(rest)
+        elif cmd == "show":
+            cli_show(rest)
+        elif cmd == "rename":
+            cli_rename(rest)
+        elif cmd == "archive":
+            cli_archive(rest)
+        elif cmd in ("link", "trace", "unlink"):
+            # REQ vinculado (E2). Import perezoso.
+            # JSON en stdout siempre: una excepción (base bloqueada, error de sqlite, import fallido) sale
+            # como {ok: false}; una salida vacía se leería como «árbol anterior a estos verbos».
+            try:
+                import req_link
+                getattr(req_link, "cli_" + cmd)(rest, _db_for_cli)
+            except DbUnavailable as e:
+                print(json.dumps(e.to_dict(), ensure_ascii=False))
+            except Exception as e:
+                print(json.dumps({"ok": False, "motivo": f"error: {e}"}, ensure_ascii=False))
+        else:
+            print(f"subcomando desconocido: {cmd}")
     except DbUnavailable as e:
         print(json.dumps(e.to_dict(), ensure_ascii=False))
 
 
-def _dispatch(cmd, rest):
-    if cmd == "list":
-        cli_list(rest)
-    elif cmd == "sync-status":
-        cli_sync_status(rest)
-    elif cmd == "show":
-        cli_show(rest)
-    elif cmd in ("claim", "release", "forced-release"):
-        cli_lock(cmd, rest)
-    elif cmd == "request":
-        cli_request(rest)
-    elif cmd == "rename":
-        cli_rename(rest)
-    elif cmd == "archive":
-        cli_archive(rest)
-    elif cmd == "search":
-        cli_search(rest)
-    elif cmd in ("link", "trace", "unlink"):
-        # REQ vinculado (E2): siempre la base local, con o sin central. Import perezoso.
-        # JSON en stdout siempre: una excepción (base bloqueada, error de sqlite, import fallido) sale
-        # como {ok: false}; una salida vacía se leería como «árbol anterior a estos verbos».
-        try:
-            import req_link
-            getattr(req_link, "cli_" + cmd)(rest, _db_for_cli)
-        except DbUnavailable as e:
-            print(json.dumps(e.to_dict(), ensure_ascii=False))
-        except Exception as e:
-            print(json.dumps({"ok": False, "motivo": f"error: {e}"}, ensure_ascii=False))
-    else:
-        print(f"subcomando desconocido: {cmd}")
-
-
 if __name__ == "__main__":
     try:
-        if len(sys.argv) >= 2 and sys.argv[1] == "sync":
-            sync_main(sys.argv[2:])
-        elif len(sys.argv) >= 2 and sys.argv[1] in CLI_CMDS:
-            cli_main(sys.argv[1:])
-        else:
+        args = sys.argv[1:]
+        if args and (args[0] in CLI_CMDS or args[0] in _RETIRED_VERBS):
+            cli_main(args)
+        elif len(args) == 6 and args[3] in CAPTURE_EVENTS:
             main()
+        elif args:
+            cli_main(args)
     except Exception as e:
         print(f"[logbook] ERROR inesperado: {e}", file=sys.stderr)
     sys.exit(0)

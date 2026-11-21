@@ -34,9 +34,11 @@ El MD se crea como draft al aprobar el plan y se completa durante la implementac
 
 **Entrega temprana del registro.** El **registro del requerimiento** (su Change MD — ver [`../methodology/vocabulary.md`](../methodology/vocabulary.md) § "Registro del requerimiento") es un **artefacto que Neb genera** (y, derivadamente, `.md`), por lo que confirmarlo y entregarlo es **autónomo** desde su creación (Fase 4) bajo el ownership — no requiere OK del dev cuando el delta es solo `.md` (ver [`change-control-policy.md`](../methodology/change-control-policy.md) § "Ownership de archivos `.md`" y [`version-control.md`](../process/version-control.md) § "Push"). Cuándo se entrega:
 
-- **Entorno de validación compartido** (disparador: [`logbook.md`](logbook.md) § "Entorno compartido (disparador opt-in por proyecto)") → entrega temprana: el registro se confirma y se publica **desacoplado** de la entrega del entregable. El `work` va a la bitácora compartida, y publicarlo para relevo cross-dev exige que su registro esté **entregado** para que el puntero resuelva en la máquina que releva.
-- **Entorno no compartido** (sesión solo del dev, sin bitácora compartida) → el registro se confirma y se entrega al cierre.
-- **Al relevar**, en cualquiera de los dos entornos → el registro y su plan aprobado se confirman y se entregan de inmediato (§ "Relevo"). Donde el push es por sí mismo una entrega del profile, ese push sigue el gate de esa entrega.
+- **Al relevar** → el registro y su plan aprobado se confirman y se entregan de inmediato, **desacoplados** de la entrega del entregable (§ "Relevo").
+- **Cuando el dev pide push** → Claude sugiere primero actualizar el registro; su push `.md`-only es autónomo ([`../process/version-control.md`](../process/version-control.md) § "Push").
+- **Si no** → el registro se confirma y se entrega al cierre.
+
+Donde el push es por sí mismo una entrega del profile, ese push sigue el gate de esa entrega.
 
 Esto cubre solo el **registro**: el entregable (los `.md` de la metodología misma) mantiene su propio gate de validación/cierre.
 
@@ -54,11 +56,11 @@ Al pausar para que otro dev u otra máquina continúe, Claude escribe en `## Rel
 
 - los próximos pasos;
 - el «Trabajo en vuelo»: cómo relanzar lo que quedó a medias (agentes, scripts);
-- la línea «relevado por <dev>, <fecha>». Quién tiene el mando lo decide `tomar` ([logbook.md](logbook.md) § "Modelo de ownership").
+- la línea «relevado por <dev>, <fecha>».
 
-Después confirma y entrega de inmediato el registro y su plan aprobado, sea cual sea el entorno (§ "Ciclo de vida del draft").
+Después confirma y entrega de inmediato el registro y su plan aprobado (§ "Ciclo de vida del draft").
 
-`## Relevo` es el único lugar de esos datos al relevar, y no se llena en cada sesión. Para continuar en la misma máquina siguen sirviendo el `active_*.md` y sus «Próximos pasos» ([memory.md](memory.md)). Quien releva lee el registro, su `## Relevo` y su plan aprobado: [`../process/execution.md`](../process/execution.md) § "Relevo cross-dev (bitácora de relevo)".
+`## Relevo` es el único lugar de esos datos al relevar, y no se llena en cada sesión. Para continuar en la misma máquina siguen sirviendo el `active_*.md` y sus «Próximos pasos» ([memory.md](memory.md)). Quien retoma lee el registro, su `## Relevo` y su plan aprobado con `/logbook retomar <ruta-del-Change-MD>`: [`../process/execution.md`](../process/execution.md) § "Relevo por git".
 
 ## Incident MD
 

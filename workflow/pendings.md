@@ -19,7 +19,7 @@
 
 Una sesión Claude nombrada con `/rename` (supuesto R10 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) que el dev pausa para continuar después se registra en `neb.db` como pendiente de tipo `session`. Permite recuperar el comando de reanudación sin que el dev recuerde el nombre. Es un pendiente más: se cita, se cura y se consulta como los demás (§ "Dónde viven y cómo se citan").
 
-Esto cubre **reanudar la propia sesión local** (mismo dev, misma máquina). Para **relevo cross-dev / cross-máquina** (otro dev continúa, u otra máquina) ver la [bitácora de relevo](logbook.md), que además registra sesiones automáticamente sin depender del anuncio de pausa.
+Esto cubre **reanudar la propia sesión local** (misma máquina); la [bitácora de relevo](logbook.md) además registra las sesiones de esta máquina sin depender del anuncio de pausa. Para continuar en otra máquina, o para que otro dev continúe, el relevo va por git: el `## Relevo` del Change MD ([`changes.md`](changes.md) § "Relevo").
 
 Alta (el `[<slug>]` es el del pendiente, como en el alta de una tarea):
 

@@ -27,7 +27,7 @@ import sys
 import unicodedata
 
 from _db_shared import (
-    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable, begin_immediate,
+    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable, raise_if_unmigrated, begin_immediate,
     now_iso, posix_to_win, _whoami,
     with_write_tx as _with_write_tx, _safe_rollback,
 )
@@ -45,9 +45,11 @@ _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
 # --------------------------------------------------------------------------- conexión CLI
 
 def _db_for_cli():
-    # Esquema inicial del árbol de este módulo, con o sin NEB_HOME (6.48.0). Puede lanzar DbUnavailable:
-    # lo atrapa cli_main una sola vez.
-    return _connect(resolve_db_path(os.path.expanduser("~")), INITIAL_SCHEMA_PATH)
+    # Esquema inicial del árbol de este módulo, con o sin NEB_HOME (6.48.0). Lanza UnmigratedDb, antes de
+    # crear nada, si la base sigue sin migrar; puede lanzar DbUnavailable: lo atrapa cli_main una sola vez.
+    home = os.path.expanduser("~")
+    raise_if_unmigrated(home)
+    return _connect(resolve_db_path(home), INITIAL_SCHEMA_PATH)
 
 
 # _with_write_tx / _safe_rollback se movieron a _db_shared (fuente única del patrón de escritura;
@@ -101,7 +103,7 @@ def revive(con, pending_id, note=None):
     return n
 
 
-def on_work_archived(con, work_id, dev, machine):
+def on_work_archived(con, work_id):
     """Disparador 'al cerrar el work ligado': auto-archiva (sin confirmacion) los pendings
     open vinculados a este work con causa 'resolved-otherwise'. SEGURO porque es reversible
     (revive) y auditable (pending_note). Usa la conexion del caller (cli_archive) y un

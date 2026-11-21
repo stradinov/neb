@@ -128,6 +128,18 @@ class TestDispatch(unittest.TestCase):
         run, _, _ = self._dispatch("logbook-sync", event={"cwd": "/p"})
         run.assert_not_called()
 
+    def test_logbook_sync_sin_transcript_o_evento_no_corre(self):
+        for campo in ("transcript_path", "hook_event_name"):
+            for valor in (None, ""):
+                with self.subTest(campo=campo, valor=valor):
+                    event = dict(self.EVENT)
+                    if valor is None:
+                        del event[campo]
+                    else:
+                        event[campo] = valor
+                    run, _, _ = self._dispatch("logbook-sync", event=event)
+                    run.assert_not_called()
+
     def test_notify_windows_ps1(self):
         run, _, _ = self._dispatch("notify-on-stop", windows=True)
         argv = run.call_args[0][0]

@@ -120,7 +120,7 @@ class TestFindActiveReqs(unittest.TestCase):
     # ----------------------------------------------------------------- regresión PD-517 (6.7.1)
     def test_empty_state_field_yields_empty_state(self):
         """Un REQ con '- **Estado:**' vacío se encuentra (Nombre + Path presentes) con state == ''
-        — no con el texto del campo siguiente, que el hook logbook-sync publicaría al catálogo."""
+        — no con el texto del campo siguiente, que el hook logbook-sync guardaría en la bitácora."""
         self._write("active_foo_x.md",
                     "- **Nombre:** x\n- **Path del proyecto:** /repo/foo\n"
                     "- **Estado:**\n- **Plan resumido:** plan corto\n")

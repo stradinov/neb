@@ -7,7 +7,7 @@ Cubre lo que el retiro deja en su lugar:
     transacción, siembra session_sync.read_byte y nunca hace que _connect devuelva None (módulo FTS5
     ausente, candado de escritura tomado por otra conexión, base que ya no tiene las tablas).
   • El lector solo-cursor de la captura (_read_new_chunk) entrega el tramo nuevo del .jsonl sin guardar texto.
-  • `search` responde el retiro sin tocar la base; `sync-status` ya no trae el bloque de sesiones.
+  • `search` sigue en el diccionario de verbos retirados: responde su JSON sin tocar ni crear la base.
 
 Invariantes: DBs y homes temporales (tempfile); nunca ~/.claude; ningún test hace red.
 Framework: unittest (stdlib).
@@ -34,7 +34,6 @@ import _db_shared
 import logbook
 
 SCHEMA = os.path.join(HERE, "..", "logbook-schema.sql")
-ENV_KEYS = ("NEB_LOGBOOK_ENDPOINT", "NEB_LOGBOOK_TOKEN")
 RETIRADAS = ("transcript_fts", "transcript_local", "transcript_cursor")
 MARCA = "texto-unico-de-la-conversacion-7f3a"
 LINE = json.dumps({"type": "user", "message": {"content": MARCA}}).encode() + b"\n"
@@ -90,7 +89,8 @@ def _count(path, table):
 
 
 def _legacy_db(with_fts=False):
-    """Base como la deja neb ≤ 6.40: session_sync sin read_byte, las tablas retiradas con datos y relevo vivo."""
+    """Base como la deja neb ≤ 6.40: session_sync sin read_byte, las tablas retiradas con datos y relevo vivo.
+    El resto del esquema sale del esquema inicial (el de 6.45.0: trae event, que el paso de base 2 borra)."""
     d = tempfile.mkdtemp(prefix="neb-test-retiro-")
     path = os.path.join(d, "neb.db")
     raw = sqlite3.connect(path)
@@ -132,13 +132,14 @@ class TestMigracion(unittest.TestCase):
         path = _legacy_db(with_fts=fts)
         if fts:
             self.assertTrue(any(t.startswith("transcript_fts_") for t in _tables(path)))   # tablas sombra
-        antes = {t: _count(path, t) for t in ("work", "event", "session_sync")}
+        antes = {t: _count(path, t) for t in ("work", "session_sync")}
         con, err = _connect_quiet(path)
         self.assertIsNotNone(con, err)
         con.close()
         quedan = _tables(path)
         self.assertEqual([t for t in quedan if t.startswith("transcript")], [], quedan)
-        self.assertEqual({t: _count(path, t) for t in ("work", "event", "session_sync")}, antes)
+        self.assertEqual({t: _count(path, t) for t in ("work", "session_sync")}, antes)
+        self.assertNotIn("event", quedan)
         c = sqlite3.connect(path)
         cursores = dict(c.execute("SELECT session_id, read_byte FROM session_sync"))
         c.close()
@@ -256,8 +257,12 @@ class TestMigracion(unittest.TestCase):
 
 class TestSearchRetirado(unittest.TestCase):
 
+    DETALLE = ("se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones. Para retomar un REQ usa su "
+               "Change MD, su ## Relevo, el plan aprobado y la rama.")
+
     def _run(self, home, args):
-        env = {k: v for k, v in os.environ.items() if k not in ENV_KEYS + ("PYTHONUTF8",)}
+        env = {k: v for k, v in os.environ.items()
+               if not k.startswith("NEB_") and k not in ("PYTHONUTF8", "CLAUDE_PLUGIN_ROOT")}
         env.update(HOME=home, USERPROFILE=home, NEB_HOME=NEB_ROOT, PYTHONIOENCODING="cp1252")
         return subprocess.run([sys.executable, os.path.join(LIB, "logbook.py"), "search"] + args,
                               capture_output=True, env=env, timeout=60)
@@ -267,24 +272,26 @@ class TestSearchRetirado(unittest.TestCase):
         os.makedirs(os.path.join(home, ".claude"))
         db = _db_shared.resolve_db_path(home)
         _db_shared._connect(db, SCHEMA).close()
-        antes = {t: _count(db, t) for t in ("work", "event", "session_sync")}
-        for args in (["algo"], ["a", "b", "c", "d", "e"], ["a", "b", "c", "d", "e", "f"], []):
+        antes = {t: _count(db, t) for t in ("work", "session_sync")}
+        for args in (["algo"], ["a", "b", "c", "d", "e"], ["a", "b", "Stop", "d", "e"],
+                     ["a", "b", "c", "d", "e", "f"], []):
             r = self._run(home, args)
             self.assertEqual(r.returncode, 0, args)
-            out = r.stdout.decode("utf-8")
-            self.assertIn("search", out, args)
-            self.assertIn("transcripts", out, args)
-            self.assertEqual({t: _count(db, t) for t in ("work", "event", "session_sync")}, antes, args)
+            self.assertEqual(json.loads(r.stdout.decode("utf-8")),
+                             {"ok": False, "motivo": "verbo-retirado", "verbo": "search", "detalle": self.DETALLE},
+                             args)
+            self.assertEqual({t: _count(db, t) for t in ("work", "session_sync")}, antes, args)
 
     def test_search_no_crea_la_base(self):
         home = tempfile.mkdtemp(prefix="neb-test-search-")
         os.makedirs(os.path.join(home, ".claude"))
-        r = self._run(home, ["a", "b", "c", "d", "e", "f"])
+        r = self._run(home, ["a", "b", "Stop", "d", "e"])
         self.assertEqual(r.returncode, 0)
         self.assertEqual(os.listdir(os.path.join(home, ".claude")), [])
 
-    def test_search_sigue_en_el_dispatcher(self):
-        self.assertIn("search", logbook.CLI_CMDS)
+    def test_search_vive_en_el_diccionario_de_retirados(self):
+        self.assertEqual(logbook._RETIRED_VERBS["search"], {"detalle": self.DETALLE})
+        self.assertNotIn("search", logbook.CLI_CMDS)
 
 
 class TestLectorSoloCursor(unittest.TestCase):
@@ -302,7 +309,7 @@ class TestLectorSoloCursor(unittest.TestCase):
 
     def test_critico_primero_todo_luego_solo_lo_nuevo_y_ningun_texto_guardado(self):
         self._write(LINE * 3)
-        logbook._register_session(self.con, "S", self.t, None)
+        logbook._register_session(self.con, "S", self.t)
         self.assertEqual(logbook._read_new_chunk(self.con, "S", self.t), (LINE * 3).decode())
         self.con.commit()
         self.assertIsNone(logbook._read_new_chunk(self.con, "S", self.t))  # sin crecimiento
@@ -334,54 +341,13 @@ class TestLectorSoloCursor(unittest.TestCase):
         self._write(LINE * 2)
         vistos = []
         argv = ["logbook.py", "S", cwd, self.t, "Stop", NEB_ROOT, home]
-        env = {k: "" for k in ENV_KEYS}
-        with mock.patch.dict(os.environ, env), mock.patch.object(sys, "argv", argv), \
+        with mock.patch.object(sys, "argv", argv), \
                 mock.patch.object(logbook, "_after_capture", lambda con, sid, chunk, ev: vistos.append(chunk)):
             logbook.main()
             self._write(LINE, "ab")
             logbook.main()
             logbook.main()
         self.assertEqual(vistos, [(LINE * 2).decode(), LINE.decode(), None])
-
-
-class TestSyncStatusSinSesiones(unittest.TestCase):
-
-    def _run(self, con, env):
-        buf = io.TextIOWrapper(io.BytesIO(), encoding="cp1252", errors="strict", write_through=True)
-        vacio = logbook._JsonlIndex(tempfile.mkdtemp(prefix="neb-test-home-"))
-        with mock.patch.dict(os.environ, env), \
-                mock.patch.object(logbook, "_JsonlIndex", lambda _home: vacio), \
-                mock.patch.object(logbook, "_db_for_cli", lambda: con), \
-                mock.patch.object(logbook, "_http", side_effect=AssertionError("sin red")), \
-                mock.patch.object(sys, "stdout", buf):
-            logbook.cli_main(["sync-status"])
-        return json.loads(buf.buffer.getvalue().decode("ascii"))
-
-    def _db(self):
-        d = tempfile.mkdtemp(prefix="neb-test-status-")
-        con = _db_shared._connect(os.path.join(d, "neb.db"), SCHEMA)
-        for slug in ("a", "b"):
-            logbook._upsert_req(con, "p", slug, "dev", "m", "x", None, None, "", "", "{}", "s-" + slug, None)
-        con.execute("UPDATE work SET dirty=0, conflict=1, last_error='publish 409 conflict'")
-        logbook._register_session(con, "s-a", None, None)
-        con.execute("UPDATE session_sync SET transcript_error='transcript 500 heredado'")
-        con.commit()
-        return con
-
-    def test_critico_sin_bloque_de_sesiones_y_con_works_en_conflicto(self):
-        for env in ({"NEB_LOGBOOK_ENDPOINT": "", "NEB_LOGBOOK_TOKEN": ""},
-                    {"NEB_LOGBOOK_ENDPOINT": "http://central.invalid", "NEB_LOGBOOK_TOKEN": "tok"}):
-            out = self._run(self._db(), env)
-            self.assertNotIn("error", out, env)
-            self.assertNotIn("sessions", out, env)
-            if env["NEB_LOGBOOK_ENDPOINT"]:
-                # repo_path vacío: sin opt-in, no se listan y la nota habla solo de works
-                self.assertEqual((out["works"], out["attention"]), ([], 0))
-                self.assertTrue(any("2 works sin opt-in" in n for n in out["notes"]), out["notes"])
-                self.assertFalse(any("sesiones" in n for n in out["notes"]), out["notes"])
-            else:
-                self.assertEqual(len(out["works"]), 2)
-                self.assertEqual(out["attention"], 2)
 
 
 if __name__ == "__main__":

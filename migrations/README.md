@@ -6,7 +6,7 @@ Una versión de Neb que pide algo más que pasos de base (configurar la máquina
 
 | Versión | Pasos guiados | Qué hace |
 |---|---|---|
-| — | — | Ninguna todavía (6.49.0 trae el mecanismo; la primera es la de 7.0.0) |
+| [7.0.0](7.0.0.md) | `renombrar-base`, `quitar-logbook-settings`, `quitar-endpoint-entorno`, `quitar-token-entorno`, `borrar-respaldos-settings` | Cambia el nombre de la base de `neb-logbook.db` a `neb.db` y quita la configuración del backend central que 7.0.0 retiró: las dos variables de `settings.json` y de las variables de usuario, y los respaldos `settings.json.bak-neb-*` que traen el token |
 
 ## Formato
 
@@ -35,6 +35,6 @@ STEPS = [
 ```
 
 - `id`: minúsculas, dígitos y guiones, único en la versión. El id completo es `<X.Y.Z>:<id>`. Los argumentos de un paso de catálogo se validan al cargar.
-- Un paso libre: `detectar(ctx)` solo lee y no llama a nada que escriba; `aplicar(ctx)` devuelve `{"respaldo": ruta, "detalle": texto}` o `{"estado": "pendiente" | "manual" | "fallo", "detalle": texto}`. El respaldo que declara es un archivo nuevo, creado por `aplicar`, directamente en `~/.claude` o en `neb-backups/`; si es una base SQLite, en `journal_mode=DELETE` (reglas completas en [`../tooling/migrations.md`](../tooling/migrations.md) § "Qué corre solo y qué pide al dev"). Un paso `exclusivo` vuelve a comprobar su condición con `ctx.exclusivo_ok()` (None si se cumple) justo antes de la acción que no se deshace.
+- Un paso libre: `detectar(ctx)` solo lee y no llama a nada que escriba; `aplicar(ctx)` devuelve `{"respaldo": ruta, "detalle": texto}` o `{"estado": "sin-cambio" | "pendiente" | "manual" | "fallo", "detalle": texto}`. El respaldo que declara es un archivo nuevo, creado por `aplicar`, directamente en `~/.claude` o en `neb-backups/`; si es una base SQLite, en `journal_mode=DELETE` (reglas completas en [`../tooling/migrations.md`](../tooling/migrations.md) § "Qué corre solo y qué pide al dev"). Un paso `exclusivo` vuelve a comprobar su condición con `ctx.exclusivo_ok()` (None si se cumple) justo antes de la acción que no se deshace. La condición por omisión mira `neb.db`; un paso que actúa sobre otro archivo declara la suya con `condicion=f(ctx)` (motivo o None).
 - El mensaje de una excepción de un paso libre no se reporta (puede traer valores): `detalle` lleva solo su tipo. Un paso libre que quiera explicar un fallo devuelve `{"estado": "fallo", "detalle": …}` sin valores.
 - Pruebas: la migración se prueba con su falla sembrada antes del gate de Fase 4 de su versión. Quién revisa en ese gate: `profiles/self-applied/roles.md` § "Subagentes por fase".

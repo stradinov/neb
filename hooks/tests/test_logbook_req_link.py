@@ -8,6 +8,8 @@ Cubre hooks/lib/req_link.py y su enganche en hooks/lib/logbook.py (filas 2 a 12 
   • CLI link / unlink / trace, siempre locales; idempotencia y sentencias
   • commits en `trace` leídos de git al consultar (solo lo alcanzable desde origin, trailer exacto)
   • costo del hook (llamadas a git), presupuesto de 4 s y aislamiento de las fallas de E2
+  • base sin migrar (solo la bitácora con el nombre anterior a 7.0.0): link, trace y unlink por subproceso
+    responden el JSON de base-sin-migrar con la migración guiada y el comando del migrador, y no crean neb.db
 
 Infraestructura: repos git temporales con remoto bare (url https://example.invalid/o/<repo>.git para fijar el
 `project` y pushurl al bare para publicar), homes y bases temporales, transcripts sintéticos. Nunca toca
@@ -42,12 +44,11 @@ sys.path.insert(0, LIB)
 import _db_shared  # noqa: E402
 import logbook  # noqa: E402
 import req_link  # noqa: E402
+import _migrations  # noqa: E402
 
 SCHEMA = os.path.abspath(os.path.join(HERE, "..", "logbook-schema.sql"))
 GUIDE = os.path.abspath(os.path.join(HERE, "..", ".."))       # NEB_HOME de esta copia
 LOGBOOK_PY = os.path.join(LIB, "logbook.py")
-NO_CENTRAL = {"NEB_LOGBOOK_ENDPOINT": "", "NEB_LOGBOOK_TOKEN": ""}
-FAKE_ENV = {"NEB_LOGBOOK_ENDPOINT": "http://central.invalid", "NEB_LOGBOOK_TOKEN": "tok-de-prueba-0123456789"}
 HAS_GIT = shutil.which("git") is not None
 F = "2026-01-15"           # fecha base de los Change MD de prueba
 F2 = "2026-01-20"
@@ -208,11 +209,10 @@ def _count(home, table, where="", params=()):
 
 
 def _capturar(home, cwd, sid, transcript, event="Stop"):
-    """Captura REAL (logbook.main) con argv del hook y sin central en el entorno. Devuelve el stderr."""
+    """Captura REAL (logbook.main) con argv del hook. Devuelve el stderr."""
     argv = ["logbook.py", sid, cwd, transcript, event, GUIDE, home]
     err = io.StringIO()
-    with mock.patch.dict(os.environ, NO_CENTRAL), mock.patch.object(sys, "argv", argv), \
-            mock.patch.object(sys, "stderr", err):
+    with mock.patch.object(sys, "argv", argv), mock.patch.object(sys, "stderr", err):
         logbook.main()
     return err.getvalue()
 
@@ -343,13 +343,11 @@ class _Base(unittest.TestCase):
 
 # =========================================================================== fila 2: esquema
 
-BASE_TABLES = {"event", "pending", "pending_link", "pending_note", "pending_topic", "session_sync", "topic",
+BASE_TABLES = {"pending", "pending_link", "pending_note", "pending_topic", "session_sync", "topic",
                "topic_link", "work"}
-WORK_COLS = ["id", "mode", "project", "req_slug", "owner", "lock_state", "takeover_by", "locked_at", "req_state",
-             "branch", "head_commit", "repo_path", "change_md", "payload_json", "payload_version", "origin_dev",
-             "origin_machine", "claude_session_id", "claude_session_name", "transcript_path", "created_at",
-             "updated_at", "archived_at", "dirty", "synced_at", "remote_id", "conflict", "last_error",
-             "last_error_at", "transcript_error", "transcript_error_at"]
+WORK_COLS = ["id", "mode", "project", "req_slug", "req_state", "branch", "head_commit", "repo_path", "change_md",
+             "payload_json", "origin_machine", "claude_session_id", "claude_session_name", "transcript_path",
+             "created_at", "updated_at", "archived_at"]
 
 
 class TestEsquema(unittest.TestCase):
@@ -360,10 +358,20 @@ class TestEsquema(unittest.TestCase):
             m.executescript(fh.read())
         return m
 
+    def _viva(self):
+        """Base nueva por el mecanismo de versión: el esquema inicial más los pasos de base (el 2 retira lo de
+        equipo que el esquema inicial todavía trae)."""
+        tmp = tempfile.mkdtemp(prefix="neb-test-reqlink-")
+        self.addCleanup(_rmtree, tmp)
+        con = _db_shared._connect(os.path.join(tmp, "neb.db"), SCHEMA)
+        self.addCleanup(con.close)
+        return con
+
     def test_sql_vivo_crea_las_3_tablas_y_sus_indices_y_nada_mas(self):
-        m = self._mem()
+        m = self._viva()
         tables = {r[0] for r in m.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-        self.assertEqual(tables - BASE_TABLES, {"req_link", "req_repo", "req_session"})
+        self.assertEqual(tables - BASE_TABLES - {"schema_step", "schema_step_error"},
+                         {"req_link", "req_repo", "req_session"})
         self.assertTrue(BASE_TABLES <= tables)
         idx = {r[0]: (r[1], r[2]) for r in m.execute(
             "SELECT name, tbl_name, sql FROM sqlite_master WHERE type='index' "
@@ -380,23 +388,23 @@ class TestEsquema(unittest.TestCase):
         self.assertEqual(cols["req_session"], ["req_id", "session_id", "via", "first_seen_at", "last_seen_at"])
 
     def test_work_no_cambia_de_columnas(self):
-        m = self._mem()
-        self.assertEqual([r[1] for r in m.execute("PRAGMA table_info(work)")], WORK_COLS)
-        tmp = tempfile.mkdtemp(prefix="neb-test-reqlink-")
-        self.addCleanup(_rmtree, tmp)
-        con = _db_shared._connect(os.path.join(tmp, "neb.db"), SCHEMA)
-        self.addCleanup(con.close)
+        crudas = [r[1] for r in self._mem().execute("PRAGMA table_info(work)")]
+        retiradas = dict(_migrations._RETIRED_TEAM_COLUMNS)["work"]
+        self.assertEqual([c for c in crudas if c not in retiradas], WORK_COLS)
+        con = self._viva()
         self.assertEqual([r[1] for r in con.execute("PRAGMA table_info(work)")], WORK_COLS)
 
     def test_base_legada_las_gana_y_doble_connect_sin_error(self):
         tmp = tempfile.mkdtemp(prefix="neb-test-reqlink-")
         self.addCleanup(_rmtree, tmp)
-        path = os.path.join(tmp, "neb-logbook.db")
-        con = _db_shared._connect(path, SCHEMA)
-        con.execute("PRAGMA foreign_keys=OFF")
-        # Base legada = anterior a req_link y a la versión de esquema (6.48.0): sin schema_step. Con la tabla de
-        # versión presente, el esquema inicial ya no se reaplica (una tabla borrada a mano no se recrea).
-        for t in ("req_session", "req_repo", "req_link", "schema_step", "schema_step_error"):
+        path = os.path.join(tmp, "neb.db")
+        # Base legada = anterior a req_link y a la versión de esquema (6.48.0): el esquema inicial crudo, sin
+        # schema_step ni req_*. Con la tabla de versión presente, el esquema inicial ya no se reaplica (una tabla
+        # borrada a mano no se recrea).
+        con = sqlite3.connect(path)
+        with open(SCHEMA, encoding="utf-8") as fh:
+            con.executescript(fh.read())
+        for t in ("req_session", "req_repo", "req_link"):
             con.execute(f"DROP TABLE {t}")
         con.commit()
         self.assertFalse(_db_shared._table_exists(con, "req_link"))
@@ -536,11 +544,12 @@ class TestVinculoPorEscritura(_Base):
     def test_session_end_no_consulta_la_base(self):
         envueltas = []
 
-        def connect(path, schema):
-            envueltas.append(_ConEnvuelta(_db_shared._connect(path, schema)))
+        def connect(home):
+            envueltas.append(_ConEnvuelta(_db_shared._connect(_db_shared.resolve_db_path(home), SCHEMA)))
             return envueltas[-1]
         spy = mock.Mock(wraps=req_link.after_capture)
-        with mock.patch.object(logbook, "_connect", connect), mock.patch.object(req_link, "after_capture", spy):
+        with mock.patch.object(logbook, "_open_db", connect), \
+                mock.patch.object(req_link, "after_capture", spy):
             self.captura("s1", [_w(self.cm)], event="SessionEnd")
             self.assertEqual(spy.call_count, 0)
             (con,) = envueltas
@@ -688,8 +697,8 @@ class TestVinculoPorCli(_Base):
             raise sqlite3.OperationalError("database is locked")
         for argv in (["link", self.cm], ["trace", "x"], ["unlink", "x"]):
             out = io.StringIO()
-            with mock.patch.dict(os.environ, NO_CENTRAL), mock.patch.object(logbook, "_db_for_cli", boom), \
-                    mock.patch.object(sys, "stdout", out), mock.patch.object(sys, "stderr", io.StringIO()):
+            with mock.patch.object(logbook, "_db_for_cli", boom), mock.patch.object(sys, "stdout", out), \
+                    mock.patch.object(sys, "stderr", io.StringIO()):
                 logbook.cli_main(argv)
             with self.subTest(verb=argv[0]):
                 r = json.loads(out.getvalue())
@@ -718,27 +727,12 @@ class TestVinculoPorCli(_Base):
         self.assertEqual(m.call_count, 4)
         self.assertEqual(_logs(m), [])
 
-    def test_con_endpoint_queda_local(self):
-        def forbidden(*_a, **_k):
-            raise AssertionError("E2 no debe ir al central")
-        http = mock.Mock(side_effect=forbidden)
-        for argv in (["link", self.cm], ["trace", "x"], ["unlink", "x"]):
-            out = io.StringIO()
-            with mock.patch.dict(os.environ, FAKE_ENV), mock.patch.object(logbook, "_http", http), \
-                    mock.patch.object(logbook, "_db_for_cli", lambda: _db(self.home)), \
-                    mock.patch.object(sys, "stdout", out), mock.patch.object(sys, "stderr", io.StringIO()):
-                logbook.cli_main(argv)
-            with self.subTest(verb=argv[0]):
-                self.assertTrue(json.loads(out.getvalue())["ok"])
-        self.assertEqual(http.call_count, 0)
-        self.assertEqual(_count(self.home, "req_link"), 0)          # el unlink final borró lo local
-
     def test_verbos_en_cli_cmds(self):
         for v in ("link", "trace", "unlink"):
             self.assertIn(v, logbook.CLI_CMDS)
 
     def test_exit_0_siempre_por_subproceso(self):
-        env = {k: v for k, v in os.environ.items() if k not in ("NEB_LOGBOOK_ENDPOINT", "NEB_LOGBOOK_TOKEN")}
+        env = dict(os.environ)
         env.update(HOME=self.home, USERPROFILE=self.home, NEB_HOME=GUIDE, PYTHONDONTWRITEBYTECODE="1",
                    PYTHONIOENCODING="utf-8")
         for ruta, ok in ((self.cm, True), (os.path.join(self.repo, "changes", f"{F}-nada.md"), False)):
@@ -1213,7 +1207,7 @@ class TestAislamiento(_Base):
         with open(os.path.join(root, "hooks", "lib", "req_link.py"), "w", encoding="utf-8") as fh:
             fh.write("def after_capture(con, session_id, chunk):\n    raise RuntimeError('inyectada')\n")
         t = _append(self.tr("s1"), [_w(os.path.join(self.tmp, "r", "changes", f"{F}-x.md"))])
-        env = {k: v for k, v in os.environ.items() if k not in ("NEB_LOGBOOK_ENDPOINT", "NEB_LOGBOOK_TOKEN")}
+        env = dict(os.environ)
         env.update(PYTHONDONTWRITEBYTECODE="1", PYTHONIOENCODING="utf-8", HOME=self.home, USERPROFILE=self.home)
         p = subprocess.run([sys.executable, os.path.join(root, "hooks", "lib", "logbook.py"), "s1", self.cwd, t,
                             "Stop", root, self.home], capture_output=True, env=env, stdin=subprocess.DEVNULL)
@@ -1227,15 +1221,17 @@ class TestAislamiento(_Base):
         cm = _change_md(repo, "x")
         envueltas = []
 
-        def connect(path, schema):
-            envueltas.append(_ConEnvuelta(_db_shared._connect(path, schema), raise_on="req_session"))
+        def connect(home):
+            envueltas.append(_ConEnvuelta(_db_shared._connect(_db_shared.resolve_db_path(home), SCHEMA),
+                                          raise_on="req_session"))
             return envueltas[-1]
         real = req_link.after_capture
 
         def marcada(con, sid, chunk):
             con.mark = len(con.log)
             return real(con, sid, chunk)
-        with mock.patch.object(logbook, "_connect", connect), mock.patch.object(req_link, "after_capture", marcada):
+        with mock.patch.object(logbook, "_open_db", connect), \
+                mock.patch.object(req_link, "after_capture", marcada):
             err = self.captura("s1", [_w(cm)])
         (con,) = envueltas
         if con.raised != 1:
@@ -1278,9 +1274,9 @@ class TestTraza(_Base):
                 con.execute("INSERT INTO session_sync (session_id, transcript_path, updated_at) VALUES (?,?,?)",
                             (sid, path, ts % i))
         con.commit()
-        w1 = logbook._upsert_req(con, "host/otro/repo", "x", "dev", "maq", "En progreso", "main", "abc", "/r",
+        w1 = logbook._upsert_req(con, "host/otro/repo", "x", "maq", "En progreso", "main", "abc", "/r",
                                  "", "{}", "s9", "/t/s9.jsonl")
-        w2 = logbook._upsert_req(con, "host/tercero/repo", "x", "dev", "maq", "Cerrado", "main", "abc", "/r",
+        w2 = logbook._upsert_req(con, "host/tercero/repo", "x", "maq", "Cerrado", "main", "abc", "/r",
                                  "", "{}", "s8", "/t/s8.jsonl")
         con.execute("UPDATE work SET archived_at='2026-01-30T00:00:00Z' WHERE id=?", (w2,))
         con.commit()
@@ -1372,6 +1368,75 @@ class TestTraza(_Base):
         for args in ([], ["x"], ["x", "--sin-git"], [str(self.a)], ["y"], ["no-existe"]):
             _cli("trace", args, self.home)
         self.assertEqual(_snapshot_req(self.home), antes)
+
+
+# =========================================================================== base sin migrar (7.0.0)
+
+@unittest.skipUnless(HAS_GIT, "requiere git")
+class TestBaseSinMigrar(unittest.TestCase):
+    """HOME y USERPROFILE temporales con solo la bitácora de nombre anterior (poblada): link, trace y unlink
+    entran por logbook.py en subproceso y responden el JSON de base-sin-migrar (con `accion` y `comando`),
+    no «error: …»."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp(prefix="neb-test-reqlink-")
+        self.addCleanup(_rmtree, self.tmp)
+        self.home = _home(self.tmp)
+        self.base = os.path.join(self.home, ".claude")
+        self.legacy = os.path.join(self.base, _db_shared.LEGACY_DB_NAME)
+        _db_shared._connect(self.legacy, SCHEMA).close()
+        self.nuevo = _db_shared.resolve_db_path(self.home)
+        self.repo = _gitrepo(self.tmp)
+        self.cm = _change_md(self.repo, "x")
+
+    def _run(self, argv):
+        env = dict(os.environ)
+        env.update(HOME=self.home, USERPROFILE=self.home, NEB_HOME=GUIDE, PYTHONDONTWRITEBYTECODE="1",
+                   PYTHONIOENCODING="utf-8")
+        p = subprocess.run([sys.executable, LOGBOOK_PY, *argv], capture_output=True, env=env,
+                           stdin=subprocess.DEVNULL)
+        self.assertEqual(p.returncode, 0)
+        return json.loads(p.stdout.decode("utf-8"))
+
+    def _esperado(self):
+        # Con el mismo HOME que ve el CLI: así el comando no lleva --home (ese home es el de ~).
+        with mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home}):
+            err = _db_shared.unmigrated_legacy(self.home)
+        self.assertIsNotNone(err)
+        self.assertIn("migrate-neb-db.py", err.comando)
+        self.assertIn(self.legacy, err.detalle)
+        return err.to_dict()
+
+    def _verbos(self):
+        return (["link", self.cm], ["trace", "x"], ["trace"], ["unlink", "x"])
+
+    def _huella(self, path):
+        with open(path, "rb") as fh:
+            return fh.read(), os.path.getmtime(path)
+
+    def test_link_trace_unlink_responden_base_sin_migrar_sin_crear_neb_db(self):
+        esperado = self._esperado()
+        self.assertNotIn("mueve fuera", esperado["detalle"])
+        antes = self._huella(self.legacy)
+        for argv in self._verbos():
+            with self.subTest(argv=argv[0]):
+                self.assertEqual(self._run(argv), esperado)
+        self.assertFalse(os.path.exists(self.nuevo))
+        self.assertEqual(self._huella(self.legacy), antes)
+
+    def test_neb_db_no_vacio_sin_work_pide_moverlo_y_no_se_toca(self):
+        c = sqlite3.connect(self.nuevo)
+        c.execute("CREATE TABLE otra (x)")
+        c.commit()
+        c.close()
+        antes = self._huella(self.nuevo)
+        esperado = self._esperado()
+        self.assertIn(f"mueve fuera de {self.base} el neb.db que hay ahí ({os.path.getsize(self.nuevo)} bytes)",
+                      esperado["detalle"])
+        for argv in self._verbos():
+            with self.subTest(argv=argv[0]):
+                self.assertEqual(self._run(argv), esperado)
+        self.assertEqual(self._huella(self.nuevo), antes)
 
 
 if __name__ == "__main__":

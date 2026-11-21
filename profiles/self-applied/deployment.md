@@ -41,11 +41,11 @@ Con eso el REQ **cierra de inmediato** (sin esperar N sesiones). La observación
 
 > Por qué no un conteo de sesiones: "≥N sesiones sin reporte negativo" no es un criterio formal sino un proxy de su ausencia — no es falsable, no tiene instrumentación que lo corrobore y produce REQs en limbo "En validación". La validación verificable al entregar sí se corrobora una vez; la señal-en-uso pertenece a Fase 9, que sí está instrumentada (disparadores en [`../../process/improvement.md`](../../process/improvement.md)).
 
-## Entrega temprana del registro (relevo cross-dev)
+## Entrega temprana del registro (al relevar)
 
 El **registro del requerimiento** (Change MD — ver [`../../methodology/vocabulary.md`](../../methodology/vocabulary.md) § "Registro del requerimiento") puede confirmarse y **entregarse** (`git push`) desde que existe el draft (entrada a Fase 4), independiente del cierre del entregable. Es autónomo: el delta es solo `.md` y aplica el ownership (ver [`../../methodology/change-control-policy.md`](../../methodology/change-control-policy.md) § "Ownership de archivos `.md`"); no requiere OK del dev.
 
-**Cuándo**: desde el draft si el **entorno es compartido**, para que el puntero del `work` resuelva en la máquina que releva; si no, en el cierre del REQ. Al relevar, en cualquiera de los dos entornos, el registro y su plan aprobado se entregan de inmediato ([`../../workflow/changes.md`](../../workflow/changes.md) § "Relevo"). Condición y momento: [`../../workflow/changes.md`](../../workflow/changes.md) § "Ciclo de vida del draft"; disparador de «entorno compartido»: [`../../workflow/logbook.md`](../../workflow/logbook.md) § "Entorno compartido (disparador opt-in por proyecto)".
+**Cuándo**: al relevar, el registro y su plan aprobado se entregan de inmediato, para que quien retoma los lea desde git ([`../../workflow/changes.md`](../../workflow/changes.md) § "Relevo"); también cuando el dev pide push; si no, en el cierre del REQ. Condición y momento: [`../../workflow/changes.md`](../../workflow/changes.md) § "Ciclo de vida del draft".
 
 ## Incorporar un PR
 

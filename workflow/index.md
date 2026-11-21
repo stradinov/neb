@@ -10,7 +10,7 @@ Lineamientos concretos: qué archivos genera la metodología, dónde viven, cóm
 4. [Metrics](metrics.md) — métricas por requerimiento + handoff.
 5. [Pendings](pendings.md) — pendientes del dev y sesiones pausadas, en `neb.db`.
 6. [Traceability](traceability.md) — cómo se enlazan los artefactos (plan → Change MD → commits) y el modelo cross-repo.
-7. [Logbook](logbook.md) — bitácora de relevo (registro cross-dev de trabajos a medias para retomar/relevar).
+7. [Logbook](logbook.md) — bitácora de relevo (base local de trabajos a medias, para retomarlos).
 
 ## Mapa rápido
 
@@ -24,7 +24,7 @@ Lineamientos concretos: qué archivos genera la metodología, dónde viven, cóm
 | Pendientes del dev | `~/.claude/neb.db` | No | Seguimiento cross-sesión |
 | Sesiones pausadas | `~/.claude/neb.db` (pendiente tipo `session`) | No | Reanudar por nombre la propia sesión |
 | Incidente en prod | `<proyecto>/changes/<YYYY-MM-DD>-incident-<slug>.md` | Sí | Trazabilidad del incidente (ver [`general/incidents.md`](../general/incidents.md)) |
-| Bitácora de relevo | `~/.claude/neb.db` (local) + central opcional | No | Relevo cross-dev de sesiones a medias (ver [logbook.md](logbook.md)) |
+| Bitácora de relevo | `~/.claude/neb.db` (local) | No | Retomar trabajos a medias en esta máquina (ver [logbook.md](logbook.md)) |
 
 ## Estados del requerimiento
 

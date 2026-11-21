@@ -13,7 +13,7 @@ Al entrar a un directorio de proyecto, Claude detecta el profile:
 
    Prioridad canónica y heurísticas estructurales: [`profiles/index.md`](../profiles/index.md).
 1. **Identificar la raíz del proyecto** — subir hasta encontrar `.git` (o equivalente) si el cwd es un subdirectorio.
-2. **Leer `CLAUDE.md` del proyecto** si existe — confirmar imports `@~/.claude/neb/profiles/<profile>/...` y revisar el **marcador de opt-out** (ver § "Marcadores de proyecto (opt-out de profile/Neb · opt-in de logbook central)"): si el proyecto declaró `neb-profile: none`, continúa genérico **sin sugerir profile** (no se ejecuta el paso 4 para profile desconocido).
+2. **Leer `CLAUDE.md` del proyecto** si existe — confirmar imports `@~/.claude/neb/profiles/<profile>/...` y revisar el **marcador de opt-out** (ver § "Marcadores de proyecto (opt-out de profile/Neb)"): si el proyecto declaró `neb-profile: none`, continúa genérico **sin sugerir profile** (no se ejecuta el paso 4 para profile desconocido).
 3. **Si imports incompletos o ausentes**, ejecutar heurísticas de [`profiles/index.md`](../profiles/index.md) — primer match gana.
 4. **Actuar según resultado**:
 
@@ -36,15 +36,14 @@ Al entrar a un directorio de proyecto, Claude detecta el profile:
 
 Sin preámbulo, sin interrumpir el trabajo. El recorrido es opcional.
 
-## Marcadores de proyecto (opt-out de profile/Neb · opt-in de logbook central)
+## Marcadores de proyecto (opt-out de profile/Neb)
 
-Un proyecto declara con un **marcador en su `CLAUDE.md`** que no quiere sugerencias de profile, que no usa Neb o que publica su trabajo al catálogo central. El marcador persiste entre sesiones y se respeta **antes** de sugerir nada.
+Un proyecto declara con un **marcador en su `CLAUDE.md`** que no quiere sugerencias de profile o que no usa Neb. El marcador persiste entre sesiones y se respeta **antes** de sugerir nada.
 
 | Marcador | Efecto | Quién lo consume |
 |---|---|---|
 | `<!-- neb-profile: none -->` | El proyecto **usa Neb** sin profile: trabajo genérico. Claude no vuelve a sugerir detectar o crear profile en ese dir | Esta detección (pasos 2 y 4) |
 | `<!-- neb: skip -->` | El proyecto **no usa Neb**: el arranque no se inyecta | El hook `SessionStart` (`bootstrap/neb-bootstrap-context.py`, vía `CLAUDE_PROJECT_DIR`) |
-| `<!-- neb-logbook: central -->` | El proyecto **publica su trabajo al catálogo central** (opt-in por proyecto) si se cumple el disparador de [`../workflow/logbook.md`](../workflow/logbook.md) § "Entorno compartido (disparador opt-in por proyecto)"; sin el marcador, la bitácora queda local | El hook `logbook-sync` (`hooks/lib/logbook.py`) |
 
 Reglas del marcador:
 

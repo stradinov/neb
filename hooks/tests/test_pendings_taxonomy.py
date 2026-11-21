@@ -47,7 +47,8 @@ _spec = importlib.util.spec_from_file_location("seed_pendings_taxonomy", _SEED_P
 seed = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(seed)
 
-# DDL CONGELADO de las tablas de pendings en 6.6.0 (sin slug / curated / uq_pending_slug) + work completo.
+# DDL CONGELADO de las tablas de pendings en 6.6.0 (sin slug / curated / uq_pending_slug) + work completo
+# de esa época (con las columnas de equipo, que retira el paso de base 2).
 LEGACY_DDL = """
 CREATE TABLE work (
   id INTEGER PRIMARY KEY, mode TEXT NOT NULL DEFAULT 'req', project TEXT, req_slug TEXT, owner TEXT,
@@ -181,9 +182,9 @@ class TestMigration(unittest.TestCase):
         con.close()
 
     def test_logbook_only_db_and_wrapped_connection_do_not_break(self):
-        """Espejo de TestMigrate.test_el_perdedor_de_la_carrera (test_logbook_sync_errors): una DB con
-        SOLO `work` y una conexión que falsea CUALQUIER PRAGMA table_info no deben hacer que _migrate
-        intente tocar `pending` (guard por sqlite_master, que el mock delega a la conexión real)."""
+        """Una DB con SOLO `work` y una conexión que falsea CUALQUIER PRAGMA table_info no deben hacer
+        que _migrate intente tocar `pending` (guard por sqlite_master, que el mock delega a la conexión
+        real)."""
         d = tempfile.mkdtemp(prefix="neb-tax-onlywork-")
         path = os.path.join(d, "neb.db")
         real = sqlite3.connect(path)
@@ -872,6 +873,27 @@ class TestSeed(unittest.TestCase):
         self.assertEqual(_rows(con, self.p1)["alpha"][3], 1)
         self.assertIn(self.p1, res2["plan"]["curate"])
         con.close()
+
+
+class TestSeedBaseSinMigrar(unittest.TestCase):
+    """Con solo la base del nombre anterior a 7.0.0, no vacía, en <home>/.claude, la siembra (dry-run, --apply y --rollback)
+    reenvía el detalle, la migración guiada y el comando que arma _db_shared y no crea neb.db."""
+
+    def test_run_y_rollback_reenvian_motivo_y_comando_sin_crear_neb_db(self):
+        home = _fresh_home()
+        with open(os.path.join(home, ".claude", _db_shared.LEGACY_DB_NAME), "wb") as fh:
+            fh.write(b"x" * 64)
+        db = _db_shared.resolve_db_path(home)
+        err = _db_shared.unmigrated_legacy(home)
+        self.assertIsNotNone(err)
+        expected = f"{err.detalle} Cómo: {err.accion}. A mano: {err.comando}"
+        for call in (lambda: seed.run(db, "catalogo.json", "dataset.json", apply=False),
+                     lambda: seed.run(db, "catalogo.json", "dataset.json", apply=True, backup_dir=home),
+                     lambda: seed.rollback(db, "respaldo.db")):
+            with self.assertRaises(RuntimeError) as cm:
+                call()
+            self.assertEqual(str(cm.exception), expected)
+            self.assertFalse(os.path.exists(db))
 
 
 if __name__ == "__main__":

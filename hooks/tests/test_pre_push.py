@@ -24,6 +24,9 @@ import sys
 import tempfile
 import unittest
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 NEB = os.path.abspath(os.path.join(HERE, "..", ".."))
 HOOK = os.path.join(NEB, "hooks", "pre-push-changelog")

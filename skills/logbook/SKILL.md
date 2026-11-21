@@ -1,15 +1,18 @@
 ---
 name: logbook
 description: >
-  Cargar cuando el usuario invoca /logbook o pide listar, retomar o relevar trabajos a medias
-  (handoff entre devs o máquinas, reanudar una sesión interrumpida, ver qué quedó pendiente de
-  otra sesión). Opera la bitácora de relevo (SQLite local; central opcional). NO cargar para
-  tareas de implementación normales ni cuando el usuario ya está trabajando en su REQ activo.
+  Cargar cuando el usuario invoca `/logbook` o pide listar o retomar trabajos a medias de la bitácora
+  de relevo, la base local `~/.claude/neb.db`: una sesión interrumpida en esta máquina, o un REQ desde
+  su Change MD (en otra máquina, o el que dejó otro dev), por git. También para vincular, trazar o
+  desvincular un REQ (repos, sesiones y commits). Si piden tomar, liberar o solicitar un trabajo, o el
+  estado de la sincronización, cargar para explicar que eso se retiró en neb 7.0.0 y ofrecer
+  `retomar <ruta-del-Change-MD>`. NO cargar para consultar o curar pendientes (eso es `pendings-review`)
+  ni para implementar el REQ activo.
 ---
 
 # Skill: logbook (bitácora de relevo)
 
-Opera la bitácora de relevo. El artefacto y su modelo de ownership viven en [`../../workflow/logbook.md`](../../workflow/logbook.md); la mecánica del backend en [`../../tooling/logbook.md`](../../tooling/logbook.md). Este skill **ejecuta** las operaciones — no repite esos lineamientos.
+Opera la bitácora de relevo: la base local de trabajos a medias, para retomarlos. Qué guarda y cómo se relaciona con el Change MD vive en [`../../workflow/logbook.md`](../../workflow/logbook.md); la captura, la base sin migrar y el significado de los campos de `trace`, en [`../../tooling/logbook.md`](../../tooling/logbook.md). Este skill **ejecuta** las operaciones; no repite esos lineamientos.
 
 ## Resolver el módulo
 
@@ -20,52 +23,47 @@ case "$NEB_SRC" in ""|*/plugins/cache/*|*\\plugins\\cache\\*) NEB_SRC="${CLAUDE_
 LB() { py "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python3 "$NEB_SRC/hooks/lib/logbook.py" "$@"; }
 ```
 
+## Respuestas que cortan el flujo
+
+Antes de presentar una salida, revisa si es un objeto JSON con `"ok": false` y uno de estos `motivo`:
+
+- **`base-sin-migrar`**: la base conserva el nombre anterior a neb 7.0.0 y ningún verbo la abre hasta migrarla. Muestra al dev el `detalle` y la `accion` tal cual (la migración guiada: `/neb:migrate` en una sesión nueva, que pide cerrar antes las demás sesiones de Claude), y el `comando` como la vía a mano (qué hacer si el migrador se niega: [`../../tooling/logbook.md`](../../tooling/logbook.md) § "Base sin migrar"). No corras el migrador ni la migración guiada sin un OK explícito del dev, y no reintentes con otro verbo: ninguno abre la base hasta migrarla. Detente ahí.
+- **`verbo-retirado`** (llega si una versión anterior del skill llamó al verbo): el verbo ya no existe. Dile al dev que se retiró, con el `detalle`, y sigue con la operación que sí aplica (por lo general, `retomar <ruta-del-Change-MD>`).
+
 ## Operaciones
 
 ### Listar (default, sin args)
-`LB list` → JSON de los trabajos activos. Presenta una tabla: **id · proyecto/req (o "exploratoria") · owner · lock · estado · antigüedad**. Separa los **con-REQ** (relevables cross-dev) de las **sesiones exploratorias** (reanudables con `--resume` por su dueño).
 
-**Siempre** corre además `LB sync-status` y, **antes** de la tabla, antepón un aviso cuando su salida traiga `attention > 0` (works en conflicto o con un fallo de publicación) o `endpoint_set: true` con `token_set: false` (el sync no está corriendo y no deja rastro). Una línea por work afectado (`local_id` · req · `last_error` · desde cuándo). Sin este aviso un rechazo permanente del central es invisible: el dev solo se entera si pregunta. Si no hay nada que avisar, no digas nada. **Pero si la salida de `LB sync-status` viene vacía, no es JSON o no trae `attention`, antepón una línea: «no se pudo verificar el estado del sync (¿`NEB_HOME` desactualizado respecto al plugin?)»** — una salida vacía no significa «nada atascado».
-
-### Estado del sync — `estado-sync`
-`LB sync-status` → estado del outbox hacia el central. Lee **siempre** la DB local y nunca hace red: ese estado no existe en el central.
-- **`works`:** works pendientes de publicar (`dirty`), en conflicto (`conflict`) o con un fallo de publicación (`last_error`).
-
-Cada fallo trae su `last_error_at` = **desde cuándo** falla; no se reescribe mientras el error sea el mismo.
-
-Un fallo de sync es **informativo**: el cliente sigue reintentando en cada sync, y cuando la causa se corrige el work se publica solo. Solo el conflicto (`409`) corta el reintento y exige reconciliar (`tomar`/`liberar-forzado`) antes de volver a publicar; con `conflict=1`, `last_error` guarda el motivo del 409. El aviso de un conflicto se apaga cuando una **captura posterior** (siguiente Stop en ese REQ) vuelve a publicar con éxito; reconciliar por sí solo no toca la fila local.
+`LB list` → arreglo JSON de los trabajos activos, cada uno con `id`, `mode`, `project`, `req_slug`, `req_state` y `updated_at`. Presenta una tabla: **id · proyecto/req (o "exploratoria") · estado · antigüedad**. Separa los **con REQ** (se retoman con `retomar <id>` en esta máquina, o con su Change MD en cualquiera) de las **sesiones exploratorias** (se reanudan con `--resume` en la máquina donde se capturaron). Un arreglo vacío significa que no hay trabajos activos.
 
 ### REQ vinculado — `vincular`, `traza`, `desvincular`
-Qué es un REQ vinculado y qué guarda: [`../../workflow/logbook.md`](../../workflow/logbook.md) § "REQ vinculado". Los tres verbos usan **siempre** la base local, con o sin central. Decide por `ok`, no por el código de salida: exige `"ok": true`. Si la salida viene vacía o no trae `ok`, no se hizo nada: el módulo es anterior a estos verbos (¿`NEB_HOME` desactualizado respecto al plugin?) o falló sin responder; dilo así. Con `"ok": false`, reporta el `motivo`.
+
+Qué es un REQ vinculado y qué guarda: [`../../workflow/logbook.md`](../../workflow/logbook.md) § "REQ vinculado". Decide por `ok`, no por el código de salida: exige `"ok": true`. Si la salida viene vacía o no trae `ok`, no se hizo nada: el módulo es anterior a estos verbos (¿`NEB_HOME` desactualizado respecto al plugin?) o falló sin responder; dilo así. Con `"ok": false`, aplica primero las respuestas que cortan el flujo; con cualquier otro `motivo`, repórtalo.
+
 - `vincular <ruta> [--repo <dir>]` → `LB link <ruta> [--repo <dir>]`. Un `--repo` por llamada; para más repos, repite el comando. Un `--repo` que no se pudo resolver sale en `avisos`. `sesiones` cuenta solo las ligas ya capturadas: puede ser 0 en el mismo turno, porque la captura del siguiente `Stop` liga la sesión. No consulta commits; para verlos, `traza`.
-- `traza [<nombre>|<ruta>|<id>] [--sin-git]` → `LB trace [<nombre>|<ruta>|<id>] [--sin-git]`.
-  - Sin argumento lista los REQ vinculados (repos, sesiones, última sesión) sin llamar a git.
-  - Con nombre trae un bloque por cada `project` con ese nombre; con ruta o id, uno solo.
-  - Lee los commits de git al consultar, en cada repo declarado (refs de `origin` del clon, sin `git fetch`). Una `nota` por repo (`sin-repo`, `timeout`, `error: …`, `omitido: tope de 6 repos`) se reporta tal cual, junto con la `leyenda`: solo cuentan los repos declarados.
-  - `--sin-git` muestra solo lo que hay en la base, sin commits.
-  - `works_relacionados` es solo información: los works `req` con el mismo nombre, archivados incluidos.
+- `traza [<nombre>|<ruta>|<id>] [--sin-git]` → `LB trace [<nombre>|<ruta>|<id>] [--sin-git]`. Sin argumento lista los REQ vinculados; con nombre, ruta o id trae sus repos, sesiones y commits (`--sin-git` omite los commits). Para interpretar cada campo de la salida, lee [`../../tooling/logbook.md`](../../tooling/logbook.md) § "Salida de `traza`".
   - `leer` apunta al transcript de la sesión más reciente que sigue en disco. Si hace falta un dato que `## Relevo` no trae, Claude busca en ese transcript con Grep o lectura parcial, sin leerlo completo.
 - `desvincular <id|nombre|ruta>` → `LB unlink <id|nombre|ruta>`. Con `"motivo": "ambiguo"` muestra los `ids` y pide al dev que elija uno. Para quitar un repo mal declarado: desvincular y volver a vincular.
 
-### Retomar — `retomar <id>`
-Corre `LB show <id>` y actúa según `mode`:
-- **`req`**: (1) `LB claim <id>` (tomar el mando); (2) `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica); (3) abre una **sesión nueva** y reconstruye contexto desde el `change_md`: su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`); (4) relanza lo descrito en **"Trabajo en vuelo"** de `## Relevo` del `change_md` (si el registro no trae esa sección, desde `next_steps` del `payload_json`, que copia la línea «Próximos pasos» del `active_*.md`). **No** uses `--resume` (no funciona cross-machine — capa B2 descartada).
-- **`exploratory`**: entrega al dev `claude --resume <claude_session_id>` (reanuda local; válido **solo** en la máquina origen, `origin_machine`).
+### Retomar — `retomar <id>` o `retomar <ruta-del-Change-MD>`
 
-**Sin `work` en la bitácora** (sin central, o el REQ nunca se publicó): `retomar <ruta-del-Change-MD>`. No hay `claim`: Claude lee el Change MD, su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`), hace `git checkout` de la rama anotada en `**Rama:**` y continúa desde los próximos pasos.
+`retomar <id>`: corre `LB show <id>` y actúa según `mode`.
 
-### Lock
-- `tomar <id>` → `LB claim <id>`.
-- `liberar <id>` → `LB release <id>`.
-- `liberar-forzado <id>` → **pide confirmación humana explícita** (le quita el mando a otro dev), y con el OK: `LB forced-release <id>`. Queda auditado (`event forced_release`).
-- `solicitar <id>` → `LB request <id>`.
-- `renombrar <id> <nuevo-slug> [nuevo-project]` → `LB rename <id> <nuevo-slug>` (renombre gobernado: migra la fila preservando `event`; sin esto, un slug nuevo bifurca en otro work).
-- `archivar <id>` → `LB archive <id>` (cierre del REQ: marca el work archivado; se preserva para auditoría, la purga es manual en el backend central).
+- **`req`**: vale en la máquina que lo capturó (`origin_machine`), porque `repo_path` es la ruta de su clon. (1) `git -C <repo_path> checkout <branch>` (y el `head_commit` si aplica); (2) abre una **sesión nueva** y reconstruye el contexto desde el `change_md`: su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`); (3) relanza lo descrito en **"Trabajo en vuelo"** de `## Relevo` (si el registro no trae esa sección, desde `next_steps` del `payload_json`, que copia la línea «Próximos pasos» del `active_*.md`). **No** uses `--resume`: el contexto de un REQ es su Change MD, no el transcript. Desde otra máquina, usa `retomar <ruta-del-Change-MD>`.
+- **`exploratory`**: entrega al dev `claude --resume <claude_session_id>`, válido **solo** en la máquina donde se capturó (`origin_machine`).
+
+`retomar <ruta-del-Change-MD>` sirve cuando el trabajo no está en esta base: un REQ que viene de otra máquina, el que dejó otro dev, o uno que nunca se capturó. Claude lee el Change MD, su `## Relevo` y su plan aprobado (campo `**Plan aprobado:**`), hace `git checkout` de la rama anotada en `**Rama:**` y continúa desde los próximos pasos.
+
+### Renombrar y archivar
+
+- `renombrar <id> <nuevo-slug>` → `LB rename <id> <nuevo-slug>`. Solo aplica a works `req`. Es el renombre gobernado: sin él, un slug nuevo bifurca en otro work.
+- `archivar <id>` → `LB archive <id>`. Cierre del REQ: el work queda archivado en la base, sin borrarse, y los pendientes abiertos ligados a él pasan a obsoletos.
+
+### Lo que se retiró
+
+Si el dev pide tomar, liberar o solicitar un trabajo, o el estado de la sincronización, no llames al CLI: explícale que eso se retiró en neb 7.0.0, porque la bitácora es solo local, y ofrece `retomar <ruta-del-Change-MD>`. Para dejarle un REQ a otra persona, basta su `## Relevo` en el Change MD y el registro entregado por git. `search` se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones.
 
 ## Notas
-- `search` se retiró: la bitácora ya no guarda ni sube transcripts, y el verbo solo responde un aviso de retiro.
-- Con `NEB_LOGBOOK_ENDPOINT` y `NEB_LOGBOOK_TOKEN` configurados el CLI opera contra el **backend central** en cualquier proyecto (autoridad: lock atómico, `solicitar` funcional; los ids son los **remotos** que devuelve `list`). Si falta cualquiera de las dos → **local-only**: el lock es informativo (un dev, una DB), `solicitar` no aplica —el CLI lo informa— y `renombrar`/`archivar` operan sobre la DB local. Cómo forzar el modo local: [`../../tooling/logbook.md`](../../tooling/logbook.md) § "Backend pluggable".
-- Lo que no tiene opt-in (un REQ de un repo sin el marcador `<!-- neb-logbook: central -->`, o una sesión que arrancó fuera de uno) nunca llega al central: para listarlo o retomarlo con el central configurado, opera en local anteponiendo `NEB_LOGBOOK_ENDPOINT=` a **cada** llamada del flujo (`list`, `show`, `claim`, `release`…). Un verbo sin el prefijo va al central e interpreta el id como remoto: puede ser el work de otro dev. `estado-sync` no lo lista; su nota dice cuántos quedan locales. No uses `renombrar`/`archivar` en local sobre un work que ya tiene `remote_id` (publicado antes): el central no se entera y el slug nuevo bifurca el work.
-- `estado-sync` reporta **`local_id`** (id de la DB local), no `id`. Con central configurado **no** lo uses con `retomar`/`tomar`/`liberar`/`archivar`: esos verbos interpretan ids **remotos** y el mismo número puede ser el work de otro dev. Para operar sobre un work listado ahí, usa su `remote_id`. Si `remote_id` es `null`, este cliente nunca lo publicó con éxito: tras un `409` el work existe en el central a nombre de otro (ubícalo en `LB list` por project + req_slug); tras un `5xx` no existe, y lo único que aplica es corregir la causa que muestra `last_error`.
-- El wrapper `LB` descarta `stderr`: todo lo que el dev deba ver sale por `stdout` (por eso `sync-status` lleva sus avisos dentro del JSON, en `notes`).
-- No edites la DB a mano: usa los subcomandos (preservan idempotencia y eventos auditados).
+
+- El wrapper `LB` descarta `stderr`: todo lo que el dev deba ver sale por `stdout`.
+- No edites la base a mano: usa los subcomandos, que preservan la idempotencia.

@@ -26,7 +26,7 @@ Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estru
 - **Nombre:** <slug del requerimiento>
 - **Path del proyecto:** <path absoluto local>
 - **Draft changes MD:** changes/YYYY-MM-DD-<req>.md
-- **Estado:** En progreso | En validación | Listo para aprobación | Cerrado (ver [`workflow/index.md`](index.md) "Estados del requerimiento"). Puede llevar una nota después del valor (`En validación (pend. QA)`); al publicar al catálogo central el cliente manda solo el ENUM y la nota completa aparte (`req_state_note`)
+- **Estado:** En progreso | En validación | Listo para aprobación | Cerrado (ver [`workflow/index.md`](index.md) "Estados del requerimiento"). Puede llevar una nota después del valor (`En validación (pend. QA)`)
 - **Plan resumido:** <3-5 líneas del plan aprobado>
 - **Archivos modificados hasta ahora:** lista
 - **Próximos pasos:** lista
@@ -34,7 +34,7 @@ Cada REQ en curso vive en su propio archivo `active_<proyecto>_<slug>.md` (estru
 
 `Nombre` lleva el `<nombre>` del Change MD del REQ, sin la fecha ([`changes.md`](changes.md) § "Path"): es el mismo identificador del trailer `Req:` de sus commits y del archivo de su plan aprobado, y de ahí lo toma la bitácora como `req_slug`.
 
-Un REQ está **bien-formado** (y entra a la bitácora) si tiene al menos `Nombre` y `Path del proyecto`. Se elimina el archivo completo al cerrar el REQ. `Path del proyecto` decide además si el REQ se publica al central: cuenta su primer path absoluto (puede llevar texto después) y el marcador del `CLAUDE.md` de ese repo — ver [`../tooling/logbook.md`](../tooling/logbook.md) § "Backend central — contrato y disparador".
+Un REQ está **bien-formado** (y entra a la bitácora) si tiene al menos `Nombre` y `Path del proyecto`. Se elimina el archivo completo al cerrar el REQ. `Path del proyecto` da además el proyecto del trabajo en la bitácora y su ruta de repo (`repo_path`).
 
 > **Compatibilidad:** la bitácora también lee el formato legacy (sección `## Requerimiento activo` dentro de `project_<nombre>.md`); si un REQ aparece en ambos formatos, gana el `active_*.md`. Migración natural: al próximo update del REQ, escribir el `active_*.md` y quitar la sección legacy.
 

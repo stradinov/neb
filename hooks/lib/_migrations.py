@@ -11,7 +11,7 @@ La base guarda sus pasos aplicados en `schema_step`; el código trae `SCHEMA_VER
     V >  C y C <  F   no toca la base: IncompatibleDb
 
 Un paso de base es un cambio del esquema escrito en código. Corre dentro de BEGIN IMMEDIATE junto con
-su fila de `schema_step` (todo o nada), salvo el paso 1 (esquema inicial), que es idempotente.
+su fila de `schema_step` (todo o nada); el paso 1 (esquema inicial) también, y además es idempotente.
 Un paso destructivo lleva respaldo previo verificado en `<carpeta de la base>/neb-backups/` (queda 1).
 
 Este módulo NO importa módulos hermanos: el arranque lee `SCHEMA_VERSION` de otro árbol como texto
@@ -29,7 +29,7 @@ import time
 from datetime import datetime, timezone
 
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 BACKUP_DIR_NAME   = "neb-backups"
 STEP_BACKUP_GLOB  = "neb.pre-paso-*.db"
@@ -145,7 +145,7 @@ class Step:
     espera      el código nuevo funciona aunque el paso no se haya aplicado: si no se puede, la conexión
                 sigue con la base en V y se reintenta en la siguiente
     precheck    fn(con) -> motivo | None, solo lectura: por qué el paso no puede correr todavía
-    inicial     solo el paso 1: executescript del esquema inicial + columnas, fuera de transacción
+    inicial     solo el paso 1: esquema inicial + columnas, en su propia transacción
     """
 
     def __init__(self, n, titulo, aplicar=None, min_code=None, destructivo=False, espera=False,
@@ -155,8 +155,158 @@ class Step:
         self.destructivo, self.espera, self.precheck, self.inicial = destructivo, espera, precheck, inicial
 
 
+# --------------------------------------------------------------------------- paso 2: retiro del esquema de equipo
+# 7.0.0 retira el backend central y el candado entre devs: 2 índices, la tabla event y 19 columnas de work y
+# session_sync. Todo o nada (D12 del REQ neb-retiro-team-y-dual-mode): un objeto creado a mano que use algo de
+# eso, o un SQLite sin DROP COLUMN, detienen el paso en su precheck sin borrar nada.
+
+DROP_COLUMN_SQLITE = (3, 35, 5)       # 3.35.5 corrigió defectos de DROP COLUMN que podían dañar la base
+SQLITE_VERSION = sqlite3.sqlite_version_info     # se lee en cada precheck: las pruebas lo cambian
+
+_RETIRED_TEAM_INDEXES = ("idx_work_dirty", "idx_session_sync_work")
+_RETIRED_TEAM_COLUMNS = (
+    ("work", ("owner", "lock_state", "takeover_by", "locked_at", "payload_version", "origin_dev", "dirty",
+              "synced_at", "remote_id", "conflict", "last_error", "last_error_at", "transcript_error",
+              "transcript_error_at")),
+    ("session_sync", ("work_id", "synced_byte", "transcript_error", "transcript_error_at", "root_cwd")),
+)
+_OBJECT_KINDS = {"view": ("la vista", "DROP VIEW"), "trigger": ("el trigger", "DROP TRIGGER"),
+                 "index": ("el índice", "DROP INDEX")}
+
+
+def _names_word(sql, word):
+    return re.search(rf"(?<![A-Za-z0-9_]){re.escape(word)}(?![A-Za-z0-9_])", sql, re.IGNORECASE) is not None
+
+
+def _names_any(sql, words):
+    return any(_names_word(sql, w) for w in words)
+
+
+def _readers(objs, table):
+    """La tabla y toda vista que la lea, directa o a través de otra vista (SELECT * propaga columnas)."""
+    names, grew = {table}, True
+    while grew:
+        grew = False
+        for kind, name, _tbl, sql in objs:
+            if kind == "view" and name.lower() not in names and _names_any(sql, names):
+                names.add(name.lower())
+                grew = True
+    return names
+
+
+_VIEW_COLUMN_LIST = re.compile(r"\s*CREATE\s+(?:TEMP(?:ORARY)?\s+)?VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?"
+                               r"(?:\"[^\"]+\"|\[[^\]]+\]|`[^`]+`|[^\s(]+)\s*\(", re.IGNORECASE)
+
+
+def _depends_on_column_count(kind, sql, names):
+    """Se rompe si la tabla pierde cualquier columna: vista con lista de columnas o con UNION/INTERSECT/EXCEPT
+    sobre un *, o trigger con un * o con un INSERT sin lista de columnas hacia una de esas relaciones."""
+    if kind == "view":
+        return "*" in sql and (_VIEW_COLUMN_LIST.match(sql) is not None
+                               or re.search(r"\b(?:UNION|INTERSECT|EXCEPT)\b", sql, re.IGNORECASE) is not None)
+    if "*" in sql:
+        return True
+    return any(re.search(rf"\bINTO\s+(?:\w+\.)?[\"\[`]?{re.escape(n)}[\"\]`]?\s+(?:VALUES|SELECT|DEFAULT)\b",
+                         sql, re.IGNORECASE) for n in names)
+
+
+def _team_leftovers(con):
+    """(índices, ¿existe event?, [(tabla, columna)]) del esquema de equipo que sigue en la base."""
+    indexes = [r[0] for r in con.execute(
+        "SELECT name FROM sqlite_master WHERE type='index' AND name IN (?,?)", _RETIRED_TEAM_INDEXES).fetchall()]
+    has_event = _table_exists(con, "event")
+    cols = []
+    for table, names in _RETIRED_TEAM_COLUMNS:
+        present = {r[1] for r in con.execute(f"PRAGMA table_info({table})").fetchall()}
+        cols += [(table, c) for c in names if c in present]
+    return indexes, has_event, cols
+
+
+def _team_blockers(con, has_event, cols):
+    """Objetos del usuario que usan lo que el paso retira: [(tipo, nombre, [lo que usa])]. Cuenta lo que usa una
+    vista, un trigger o un índice (directo, a través de otra vista o con un *): el DROP COLUMN fallaría, o
+    dejaría el trigger o la vista rotos. Una vista que ya no abre bloquea todo (SQLite revalida el esquema
+    entero en cada DROP COLUMN). No detecta una columna generada ni un CHECK agregados a mano: ahí falla
+    `aplicar`, que revierte."""
+    if not (has_event or cols):
+        return []
+    objs = con.execute(
+        "SELECT type, name, tbl_name, sql FROM sqlite_master WHERE sql IS NOT NULL AND (type IN "
+        "('view','trigger') OR (type='index' AND name NOT IN (?,?) AND lower(tbl_name)<>'event'))",
+        _RETIRED_TEAM_INDEXES).fetchall()
+    readers = {t: _readers(objs, t) for t in {t for t, _c in cols}}
+    broken = set()
+    for kind, name, _tbl, _sql in objs:
+        if kind == "view":
+            try:
+                con.execute('SELECT 1 FROM "{}" LIMIT 0'.format(name.replace('"', '""'))).fetchall()
+            except sqlite3.Error:
+                broken.add(name)
+    blockers = []
+    for kind, name, tbl, sql in objs:
+        if name in broken:
+            blockers.append((kind, name, ["todo lo que el paso retira (la vista ya no abre)"]))
+            continue
+        hits = []
+        for t, c in cols:
+            via = readers[t]
+            if kind == "index":
+                hit = tbl.lower() == t and _names_word(sql, c)
+            else:
+                on_t = (kind == "trigger" and tbl.lower() in via) or _names_any(sql, via)
+                hit = on_t and (_names_word(sql, c) or _depends_on_column_count(kind, sql, via))
+            if hit:
+                hits.append(f"{t}.{c}")
+        if kind != "index" and has_event and _names_word(sql, "event"):
+            hits.append("event")
+        if hits:
+            blockers.append((kind, name, hits))
+    return blockers
+
+
+def _blockers_text(blockers, siguiente="y la siguiente conexión aplica el paso"):
+    uses = "; ".join(f"{_OBJECT_KINDS[k][0]} {n} usa {', '.join(h)}" for k, n, h in blockers)
+    drops = "; ".join(f"{_OBJECT_KINDS[k][1]} {n}" for k, n, _h in blockers)
+    return (f"objetos creados a mano usan lo que neb 7.0.0 retira: {uses}. No se borró nada; quítalos "
+            f"({drops}) {siguiente}")
+
+
+def _team_precheck(con):
+    indexes, has_event, cols = _team_leftovers(con)
+    if not (indexes or has_event or cols):
+        return None
+    if SQLITE_VERSION < DROP_COLUMN_SQLITE:
+        return (f"neb 7.0.0 pide SQLite 3.35.5 o superior (DROP COLUMN) y este Python trae el "
+                f"{'.'.join(map(str, SQLITE_VERSION))}: instala un Python que lo traiga desde "
+                "https://www.python.org/downloads/ (en Windows, Python 3.12 o superior)")
+    blockers = _team_blockers(con, has_event, cols)
+    return _blockers_text(blockers) if blockers else None
+
+
+class UserObjectsInTheWay(Exception):
+    """No es de SQLite a propósito: el mecanismo trataría como candado ocupado un mensaje que nombra
+    work.locked_at, y no guardaría el fallo."""
+
+
+def _team_apply(con):
+    """Relee dentro de la transacción y borra solo lo que existe: con todo o nada, un DROP COLUMN sobre una
+    columna ausente revertiría siempre. Un objeto del usuario creado después del precheck revierte el paso."""
+    indexes, has_event, cols = _team_leftovers(con)
+    blockers = _team_blockers(con, has_event, cols)
+    if blockers:
+        raise UserObjectsInTheWay(_blockers_text(blockers, siguiente="y el paso se reintenta"))  # el mecanismo agrega cuándo
+    for name in indexes:
+        con.execute(f"DROP INDEX {name}")
+    if has_event:
+        con.execute("DROP TABLE event")
+    for table, col in cols:
+        con.execute(f"ALTER TABLE {table} DROP COLUMN {col}")
+
+
 STEPS = (
     Step(1, "esquema inicial", min_code=1, inicial=True),
+    Step(2, "retiro del esquema de equipo (7.0.0)", aplicar=_team_apply, min_code=2, destructivo=True,
+         espera=True, precheck=_team_precheck),
 )
 
 
@@ -312,8 +462,16 @@ class _Failure:
         self.kind, self.motivo = kind, motivo      # kind: busy | precheck | backup | aplicar
 
 
+_LOCKED_MESSAGES = ("database is locked", "database table is locked", "database schema is locked")
+
+
 def _is_locked(e):
-    return "locked" in str(e).lower() or "busy" in str(e).lower()
+    """Candado ocupado por el código de SQLite (Python 3.11+) o por el mensaje exacto de SQLITE_BUSY/SQLITE_LOCKED;
+    nunca por una palabra suelta: un DROP COLUMN que falla nombra work.locked_at."""
+    code = getattr(e, "sqlite_errorcode", None)
+    if code is not None:
+        return code & 0xFF in (5, 6)                    # SQLITE_BUSY, SQLITE_LOCKED
+    return str(e).lower().startswith(_LOCKED_MESSAGES)
 
 
 def _rollback(con):
@@ -359,21 +517,33 @@ def _register(con, step, backup):
     con.execute("DELETE FROM schema_step_error WHERE step = ?", (step.n,))
 
 
+_PRAGMA_RE = re.compile(r"^(?:\s|--[^\n]*(?:\n|$))*PRAGMA\b", re.IGNORECASE)
+
+
+def _schema_statements(schema_path):
+    """Sentencias del esquema inicial, una por una y sin sus PRAGMA (los pone _connect fuera de toda
+    transacción): así corren dentro del BEGIN IMMEDIATE del paso 1."""
+    if not (schema_path and os.path.isfile(schema_path)):
+        return []
+    with open(schema_path, encoding="utf-8") as fh:
+        text = fh.read()
+    out, buf = [], ""
+    for line in text.splitlines(keepends=True):
+        buf += line
+        if sqlite3.complete_statement(buf):
+            if not _PRAGMA_RE.match(buf):
+                out.append(buf.strip())
+            buf = ""
+    return out
+
+
 def _apply_initial(con, step, schema_path):
-    """Paso 1: executescript del esquema inicial + columnas (idempotente, no atómico: el executescript
-    confirma antes de correr), luego relectura e INSERT OR IGNORE en una transacción corta. Relee V justo
-    antes del executescript: si otro proceso ya registró el paso (y quizá otros que retiran columnas),
-    achica, sin cerrarla, la ventana en que podría volver a agregar algo. Antes del primer paso que retire
-    una columna o tabla, el DDL del esquema debe correr dentro del BEGIN IMMEDIATE (§ 5 del plan del REQ)."""
+    """Paso 1: esquema inicial + columnas + su fila, en una sola transacción BEGIN IMMEDIATE con relectura de V
+    dentro (idempotente: repetirlo no cambia nada). Dentro del candado porque el paso 2 retira columnas y una
+    tabla: un paso 1 tardío que corriera después de otro proceso las volvería a agregar."""
     if read_version(con)[0] >= step.n:
         return ADVANCED
-    if schema_path and os.path.isfile(schema_path):
-        with open(schema_path, encoding="utf-8") as fh:
-            con.executescript(fh.read())
-    if not _table_exists(con, "work"):
-        raise sqlite3.OperationalError(f"el esquema inicial no creó la tabla work: {schema_path}")
-    add_initial_columns(con)
-    con.commit()
+    statements = _schema_statements(schema_path)
     saved = con.isolation_level
     try:
         con.isolation_level = None
@@ -387,6 +557,11 @@ def _apply_initial(con, step, schema_path):
         if v >= step.n:
             con.execute("COMMIT")
             return ADVANCED
+        for sql in statements:
+            con.execute(sql)
+        if not _table_exists(con, "work"):
+            raise sqlite3.OperationalError(f"el esquema inicial no creó la tabla work: {schema_path}")
+        add_initial_columns(con)
         _register(con, step, None)
         con.execute("COMMIT")
         return None

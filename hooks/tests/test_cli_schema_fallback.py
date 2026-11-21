@@ -102,7 +102,7 @@ class TestEsquemaConElModulo(unittest.TestCase):
     def test_base_incompatible_responde_json_en_cada_cli(self):
         self._mark_incompatible()
         for fn, argv in ((pendings.cli_main, ["list"]), (pendings.cli_main, ["show", "1"]),
-                         (logbook.cli_main, ["list"]), (logbook.cli_main, ["sync-status"]),
+                         (logbook.cli_main, ["list"]), (logbook.cli_main, ["show", "1"]),
                          (logbook.cli_main, ["trace", "x"])):
             r = self._run(fn, argv)
             self.assertEqual(r.get("ok"), False, (argv, r))
@@ -149,7 +149,10 @@ class TestEsquemaConElModulo(unittest.TestCase):
         before = content()
         import contextlib
         import io
-        argv = ["logbook.py", "sesion-1", self.home, "", "Stop", self.other, self.home]
+        transcript = os.path.join(self.home, "sesion-1.jsonl")
+        with open(transcript, "w", encoding="utf-8") as fh:
+            fh.write('{"type": "user", "message": {"content": "hola"}}\n')
+        argv = ["logbook.py", "sesion-1", self.home, transcript, "Stop", self.other, self.home]
         err = io.StringIO()
         with mock.patch.object(sys, "argv", argv), contextlib.redirect_stderr(err):
             logbook.main()

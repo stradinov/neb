@@ -14,7 +14,8 @@ CWD=$(echo "$INPUT"        | jq -r '.cwd // ""')
 TRANSCRIPT=$(echo "$INPUT" | jq -r '.transcript_path // ""')
 EVENT=$(echo "$INPUT"      | jq -r '.hook_event_name // ""')
 
-[ -z "$SESSION_ID" ] || [ -z "$CWD" ] && exit 0
+# Sin evento, logbook.py leería el session_id como subcomando del CLI y respondería en el stdout del hook.
+[ -z "$SESSION_ID" ] || [ -z "$CWD" ] || [ -z "$TRANSCRIPT" ] || [ -z "$EVENT" ] && exit 0
 
 GUIDE="${NEB_HOME:-$HOME/.claude/neb}"
 PYTHON_CMD=""
@@ -29,6 +30,6 @@ done
 
 "$PYTHON_CMD" "$GUIDE/hooks/lib/logbook.py" \
   "$SESSION_ID" "$CWD" "$TRANSCRIPT" "$EVENT" "$GUIDE" "$HOME" \
-  2>/dev/null || true
+  >/dev/null 2>&1 || true
 
 exit 0

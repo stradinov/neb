@@ -382,7 +382,7 @@ def run(ctx, step, allow_dev=False):
             res = _machine.OPS[step.op].apply(ctx, allow_no_backup=allow_dev, **step.args)
         else:
             out = step.aplicar(ctx) or {}
-            if out.get("estado") in ("pendiente", "manual", "fallo"):
+            if out.get("estado") in ("pendiente", "manual", "fallo", "sin-cambio"):
                 res = {"estado": out["estado"], "respaldo": out.get("respaldo"), "detalle": out.get("detalle", "")}
             else:
                 res = {"estado": "aplicado", "respaldo": out.get("respaldo"), "detalle": out.get("detalle", "")}

@@ -110,7 +110,7 @@ viven el overlay y `personal/`). Cómo establecerlas: [user-guide](user-guide.md
 | Change MD (registro del requerimiento) | `<proyecto>/changes/<fecha>-<nombre>.md` | Sí, en el repo del proyecto |
 | Plan aprobado (media/alta) | `<proyecto>/changes/plans/<fecha>-<nombre>.md` | Sí, en el repo del proyecto, junto a su Change MD |
 | Pendientes | `~/.claude/neb.db` | No (seguimiento cross-sesión) |
-| Bitácora de relevo | `~/.claude/neb.db` (local) + central opcional | No (relevo cross-dev de sesiones a medias) |
+| Bitácora de relevo | `~/.claude/neb.db` (local) | No (trabajos a medias, para retomarlos en esta máquina) |
 
 Cada registro del requerimiento documenta: contexto y objetivo, decisiones tomadas,
 plan de pruebas (en media/alta, solo su resultado: lo define el plan aprobado),

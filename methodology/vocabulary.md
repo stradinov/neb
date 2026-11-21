@@ -26,7 +26,7 @@ Mapa operativo de los conceptos que **cambian comportamiento**. La fuente de ver
 | **Requerimiento (REQ)** | unidad abstracta de trabajo | El trabajo lógico a realizar (un cambio coherente con un objetivo); no es ningún archivo. (*REQ* = "requerimiento") | registro · entregable · plan · commit | ✗ "ticket", "tarea", "issue" | [§ "Requerimiento (REQ)"](#requerimiento-req) |
 | **Fase** | propiedad del REQ (1–9) | La etapa del flujo en que está el REQ, de 1 Clarificación a 9 Retroalimentación. | gate · estado | ✗ `F<n>` como abreviatura | [`../general/index.md`](../general/index.md) · [`../process/phase-transitions.md`](../process/phase-transitions.md) § "Mapa de fases" |
 | **Gate** *(anglicismo)* | punto de control | Punto donde el avance **se detiene** hasta cumplir una condición o recibir tu OK. (*gate* = compuerta) | fase · estado | → "control", "compuerta" | [`../process/phase-transitions.md`](../process/phase-transitions.md) § "Gates de cola" · [`../process/change-control-gate.md`](../process/change-control-gate.md) |
-| **Estado** | propiedad del REQ (ENUM) | La situación actual del REQ en una lista cerrada: En progreso · En validación · Listo para aprobación · Cerrado (+ sufijo "Bloqueado"). (*ENUM* = lista cerrada de valores) | fase · *lock* de la bitácora | ✗ "Propuesto" (no existe); histórico "Listo para producción" → "Listo para aprobación" | [§ "Estados del requerimiento"](#estados-del-requerimiento) |
+| **Estado** | propiedad del REQ (ENUM) | La situación actual del REQ en una lista cerrada: En progreso · En validación · Listo para aprobación · Cerrado (+ sufijo "Bloqueado"). (*ENUM* = lista cerrada de valores) | fase · `req_state` de la bitácora (copia, no lo define) | ✗ "Propuesto" (no existe); histórico "Listo para producción" → "Listo para aprobación" | [§ "Estados del requerimiento"](#estados-del-requerimiento) |
 | **Artefacto** | objeto del flujo | Cualquier objeto que el flujo produce o usa para registrarse: plan, registro, entregable, métricas. | entregable · registro | — | [§ "Vocabulario abstracto"](#vocabulario-abstracto) · [`../workflow/index.md`](../workflow/index.md) |
 | **Registro del requerimiento** | subclase documental | El documento que cuenta *sobre* el REQ (contexto, alcance, resultado); su forma canónica es el "Change MD". No es el REQ. (*MD* = Markdown) | REQ · entregable · registro de un correo (tú/ustedes, [`../general/correspondence.md`](../general/correspondence.md)) | → "Change MD"; variante "Incident MD"; ✗ `change MD` en minúscula | [§ "Registro del requerimiento"](#registro-del-requerimiento) |
 | **Entregable / elaboración** | lo que el REQ produce | El producto del REQ: código, un documento o un lineamiento. (En *self-applied* el entregable también es un `.md`.) | registro | → "elaboración" | [§ "Vocabulario abstracto"](#vocabulario-abstracto) |
@@ -46,6 +46,7 @@ Mapa operativo de los conceptos que **cambian comportamiento**. La fuente de ver
 | **Regla de proceso** | clase de regla | Regla con eje de severidad (gates, plan de pruebas, firma de commits, revisión): un override la estrecha o la agrega, nunca la relaja. Dice qué se exige, no con qué mecanismo. | punto de customización · mecanismo de plataforma | ✗ "invariante" (como sinónimo) | [`personal-vs-team.md`](personal-vs-team.md) § "Puntos de customización vs reglas de proceso" |
 | **Mecanismo de plataforma** | cómo se cumple una regla | La forma en que Claude Code cumple hoy una regla del núcleo: subagentes, workflows, modelo, esfuerzo, hooks, herramientas de la interfaz. Se reemplaza cuando la plataforma cambia; la regla no. | regla de proceso · usos genéricos de "mecanismo" (de control, de aceptación, verificable, de versionamiento) · implementación de un rol (persona o subagente: la elección del mecanismo para un rol, [`roles-catalog.md`](roles-catalog.md)). Ejemplo a nivel de profile: [`../profiles/research/conventions.md`](../profiles/research/conventions.md) § "Mecanismo recomendado" | — | [`principles.md`](principles.md) § "Reglas de proceso y mecanismos de plataforma" |
 | **Supuesto de plataforma** | hecho sobre Claude Code | Un comportamiento de la plataforma del que depende Neb, con la versión, la interfaz y la fuente donde se verificó (o «sin verificar»). | suposición de contexto o de dominio ([`principles.md`](principles.md) § "Suposiciones explícitas antes de afirmar") | ✗ "registro de supuestos" (el registro es el del requerimiento) | [`platform-assumptions.md`](platform-assumptions.md) |
+| **Bitácora de relevo** | tablas de trabajos en la base local `~/.claude/neb.db` | Base local de trabajos a medias, para retomarlos: los REQ del dev y sus sesiones exploratorias en esta máquina. Continuar en otra máquina o pasar el trabajo a otro dev va por git (`## Relevo` del Change MD). | registro del requerimiento · pendiente tipo `session` | ✗ "registro local" | [`../workflow/logbook.md`](../workflow/logbook.md) |
 | **Vincular / REQ vinculado** | vínculo local en la bitácora | Una fila por (`project`, `nombre`) del registro en la bitácora local: el REQ, sus repos declarados y las sesiones de esta máquina; `desvincular` la quita. | work `req` (entrada de la bitácora) · seguimiento (pendientes) · alta (complejidad) | ✗ "alta", "track", "índice del REQ" | [`../workflow/logbook.md`](../workflow/logbook.md) § "REQ vinculado" |
 | **Traza** (`trace`) | consulta local | Consulta local de los commits publicados (leídos de git al consultar) y las sesiones de esta máquina de un REQ vinculado. | sección Trazabilidad del Change MD | ✗ "show" | [`../workflow/logbook.md`](../workflow/logbook.md) § "REQ vinculado" |
 | **Paso de base** | cambio numerado de `neb.db` | Cambio del esquema de `neb.db` escrito en código; lo aplica la primera conexión de una versión que lo trae. | esquema inicial (`hooks/logbook-schema.sql`, que no se edita) · reparación (corre en cada conexión) · paso guiado (configura la máquina) · migración guiada (prompt y pasos guiados de una versión) | ✗ "migración" a secas | [`../tooling/migrations.md`](../tooling/migrations.md) § "Pasos de base" |
@@ -64,14 +65,14 @@ Un prompt escala a REQ solo al cruzar el **trigger de formalización** (`/plan`,
 
 ### Identidad y nombre
 
-Identidad estable cross-máquina: `project + req_slug` (ver [`../workflow/logbook.md`](../workflow/logbook.md) § "Unidad y backend"). En **Fase 1 no hay nombre formal** — solo un tema conversacional; el nombre nace **al aprobar el plan**, cuando se crea el registro. El `<nombre>` del Change MD es el **identificador único del REQ**; las demás formas lo repiten (ver [`../workflow/changes.md`](../workflow/changes.md) § "Path"):
+Identidad del trabajo en la bitácora: `project + req_slug` (ver [`../workflow/logbook.md`](../workflow/logbook.md) § "Unidad y backend"). Entre máquinas, el REQ se identifica por el `<nombre>` de su Change MD. En **Fase 1 no hay nombre formal** — solo un tema conversacional; el nombre nace **al aprobar el plan**, cuando se crea el registro. El `<nombre>` del Change MD es el **identificador único del REQ**; las demás formas lo repiten (ver [`../workflow/changes.md`](../workflow/changes.md) § "Path"):
 
 | Forma | Dónde | Notas |
 |---|---|---|
 | `<nombre>` del Change MD | `<proyecto>/changes/<YYYY-MM-DD>-<nombre>.md` | siempre presente; forma `[a-z0-9-]+`, único en el `changes/` del proyecto |
 | Archivo del plan aprobado | `<proyecto>/changes/plans/<YYYY-MM-DD>-<nombre>.md` | existe en media/alta |
 | Trailer del commit | `Req: <nombre>` o `Confirmacion-autonoma: <nombre>` | liga cada commit con su REQ |
-| `req_slug` de la bitácora | campo `Nombre` del `active_*.md`, de donde lo toma la bitácora | identidad de relevo; lleva el mismo `<nombre>` |
+| `req_slug` de la bitácora | campo `Nombre` del `active_*.md`, de donde lo toma la bitácora | junto con `project`, identifica el trabajo del REQ en la bitácora; lleva el mismo `<nombre>` |
 
 El `[slug]` de un pendiente es otra cosa: identifica al pendiente, no al REQ ([`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente").
 
@@ -94,7 +95,7 @@ A cada REQ **le corresponde** un único **registro** (su Change MD): proyección
 | Cross-repo: un solo Change MD (repo central) | [`../workflow/traceability.md`](../workflow/traceability.md) § "Multi-proyecto" |
 | Enlace plan ↔ Change MD por nombre, en los dos sentidos; plan solo en media/alta, plan de pruebas siempre | [`../process/planning.md`](../process/planning.md), [`../workflow/traceability.md`](../workflow/traceability.md) |
 | Eslabón Change MD↔commit (bidireccional) | [`../workflow/traceability.md`](../workflow/traceability.md) § "Eslabón Change MD ↔ confirmación" |
-| Definición de done + entrega del registro (temprana si entorno compartido, inmediata al relevar, o atómica al cierre — push `.md`-only del Change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento", [`../workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft" |
+| Definición de done + entrega del registro (temprana al relevar o a pedido del dev, o atómica al cierre — push `.md`-only del Change MD) | [`done-criteria.md`](done-criteria.md), [`../process/delivery.md`](../process/delivery.md) § "Cierre del requerimiento", [`../workflow/changes.md`](../workflow/changes.md) § "Ciclo de vida del draft" |
 | Validación + cierre por mecanismo verificable del profile (sin gate diferido; señal-en-uso → Fase 9) | [§ "Tipos de validación"](#tipos-de-validación), [`../process/improvement.md`](../process/improvement.md) |
 
 ### Formas especiales
@@ -113,7 +114,7 @@ El REQ se proyecta (no se duplica) en varios artefactos; cada uno **deriva** del
 | Proyección | Qué refleja | Canónico |
 |---|---|---|
 | Memoria del proyecto `active_<proyecto>_<slug>.md` (uno por REQ activo) | estado vivo del REQ | [`../workflow/memory.md`](../workflow/memory.md) |
-| Bitácora de relevo (`work` + lock ortogonal + `archived`) | relevo cross-dev; deriva de la memoria | [`../workflow/logbook.md`](../workflow/logbook.md) |
+| Bitácora de relevo (`work` + `archived`) | trabajo a medias, para retomarlo; deriva de la memoria | [`../workflow/logbook.md`](../workflow/logbook.md) |
 | Pendiente en `neb.db` (cita `[slug]`) | seguimiento no bloqueante cross-sesión | [`../workflow/pendings.md`](../workflow/pendings.md) |
 | Métricas del REQ | retroalimentación de la metodología | [`../workflow/metrics.md`](../workflow/metrics.md) |
 | Diagnóstico de defectos | origen del defecto + REQ derivado | [`../process/improvement.md`](../process/improvement.md) § "Diagnóstico de origen" |
@@ -152,7 +153,7 @@ Estado y fase son propiedades del REQ (la unidad abstracta de trabajo); ningún 
 - El Change MD (registro canónico del REQ, relación 1↔1 incluso cross-repo) existe desde `Plan aprobado` (ver [`../workflow/changes.md`](../workflow/changes.md)); por convención registra `En progreso` como estado inicial. No hay estado "Propuesto".
 - Los changes históricos pueden contener vocabulario previo (`Propuesto`, `COMPLETADO`, `Listo para producción`); no se migran. `Listo para producción` es el término anterior de `Listo para aprobación`.
 
-**ENUM de lock de la bitácora de relevo** (`owned` / `released` / `takeover_requested`, definido en [`../workflow/logbook.md`](../workflow/logbook.md) § "Modelo de ownership") es **ortogonal** a este ENUM: gobierna quién tiene el mando de un `work` para relevo entre devs, no el avance del requerimiento. Un `work` archivado al cerrar no altera el estado canónico del REQ.
+Archivar el `work` de un REQ en la bitácora de relevo no altera el estado canónico del REQ.
 
 ## Tipos de validación
 

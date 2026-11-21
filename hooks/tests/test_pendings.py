@@ -8,15 +8,19 @@ Cubre el CRUD + ciclo de vida de pendings.py contra DBs TEMPORALES (tempfile):
   validación de entradas inválidas (type, obsolete_cause)
   resolve_session_context para pending type='session'
   on_work_archived (auto-obsolescencia reversible vía SAVEPOINT)
+  base sin migrar: cada verbo del CLI que abre la base responde el JSON de base-sin-migrar
 
 Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db.
 """
 
+import io
 import os
 import sys
 import json
+import sqlite3
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LIB  = os.path.join(HERE, "..", "lib")
@@ -97,15 +101,14 @@ class TestPendingsCrud(unittest.TestCase):
 
     def test_on_work_archived_only_affects_open_linked(self):
         con = _fresh_con()
-        wid = con.execute("INSERT INTO work (mode, owner, lock_state, created_at, updated_at) "
-                          "VALUES ('req','dev','owned',?,?)",
+        wid = con.execute("INSERT INTO work (mode, created_at, updated_at) VALUES ('req',?,?)",
                           (_db_shared.now_iso(), _db_shared.now_iso())).lastrowid
         linked_open = pendings.create(con, "task", "ligado abierto", work_ref=wid)
         linked_obs  = pendings.create(con, "task", "ligado ya obsoleto", work_ref=wid)
         pendings.archive(con, linked_obs, "no-longer-applies")    # ya obsoleto antes del cierre
         unlinked    = pendings.create(con, "task", "no ligado")   # work_ref NULL
         con.commit()
-        pendings.on_work_archived(con, wid, "dev", "maq")
+        pendings.on_work_archived(con, wid)
         con.commit()
         self.assertEqual(con.execute("SELECT status, obsolete_cause FROM pending WHERE id=?", (linked_open,)).fetchone(),
                          ("obsolete", "resolved-otherwise"))
@@ -119,8 +122,8 @@ class TestPendingsCrud(unittest.TestCase):
     def test_resolve_session_context(self):
         con = _fresh_con()
         payload = json.dumps({"summary": "exploración X"}, ensure_ascii=False)
-        wid = con.execute("INSERT INTO work (mode, owner, lock_state, payload_json, transcript_path, "
-                          "created_at, updated_at) VALUES ('exploratory','dev','owned',?,?,?,?)",
+        wid = con.execute("INSERT INTO work (mode, payload_json, transcript_path, created_at, updated_at) "
+                          "VALUES ('exploratory',?,?,?,?)",
                           (payload, "/tmp/sess.jsonl", _db_shared.now_iso(), _db_shared.now_iso())).lastrowid
         pid = pendings.create(con, "session", "sesión pausada", session_ref=wid)
         con.commit()
@@ -207,6 +210,72 @@ class TestResolvePendingRef(unittest.TestCase):
         _, rows = pendings.resolve_pending_ref(con, "153")
         self.assertEqual(rows, [])  # no hay rowid 153
         con.close()
+
+
+class TestBaseSinMigrar(unittest.TestCase):
+    """HOME y USERPROFILE temporales con solo la bitácora de nombre anterior (poblada): cada verbo del CLI
+    que abre la base responde el JSON de base-sin-migrar con la migración guiada y el comando del migrador,
+    y no crea neb.db.
+    write-compas no abre la base (escribe compas.md), así que no entra."""
+
+    # Argumentos válidos para que cada verbo llegue a abrir la base.
+    VERBOS = (
+        ["create", "task", "algo"], ["note", "1", "texto"], ["archive", "1", "no-longer-applies"],
+        ["revive", "1"], ["show", "1"], ["list"], ["triage"], ["rank", "criterio"], ["infer-objectives"],
+        ["remember-session", "1"], ["curate", "1", "--band", "alta"], ["backfill-slugs"],
+    )
+
+    def setUp(self):
+        self.home = tempfile.mkdtemp(prefix="neb-test-sinmigrar-")
+        self.base = os.path.join(self.home, ".claude")
+        os.makedirs(self.base)
+        self.legacy = os.path.join(self.base, _db_shared.LEGACY_DB_NAME)
+        _db_shared._connect(self.legacy, SCHEMA).close()
+        self.nuevo = _db_shared.resolve_db_path(self.home)
+
+    def _cli(self, argv):
+        out = io.StringIO()
+        with mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home}), \
+                mock.patch.object(sys, "stdout", out), mock.patch.object(sys, "stderr", io.StringIO()):
+            pendings.cli_main(list(argv))
+        return json.loads(out.getvalue())
+
+    def _esperado(self):
+        # Con el mismo HOME que ve el CLI: así el comando no lleva --home (ese home es el de ~).
+        with mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home}):
+            err = _db_shared.unmigrated_legacy(self.home)
+        self.assertIsNotNone(err)
+        self.assertIn("migrate-neb-db.py", err.comando)
+        self.assertIn(self.legacy, err.detalle)
+        self.assertEqual(list(err.to_dict()), ["ok", "motivo", "detalle", "accion", "comando"])
+        return err.to_dict()
+
+    def _huella(self, path):
+        with open(path, "rb") as fh:
+            return fh.read(), os.path.getmtime(path)
+
+    def test_cada_verbo_responde_base_sin_migrar_sin_crear_neb_db(self):
+        esperado = self._esperado()
+        antes = self._huella(self.legacy)
+        for argv in self.VERBOS:
+            with self.subTest(verbo=argv[0]):
+                self.assertEqual(self._cli(argv), esperado)
+        self.assertFalse(os.path.exists(self.nuevo))
+        self.assertEqual(self._huella(self.legacy), antes)
+
+    def test_neb_db_no_vacio_sin_work_pide_moverlo_y_no_se_toca(self):
+        c = sqlite3.connect(self.nuevo)
+        c.execute("CREATE TABLE otra (x)")
+        c.commit()
+        c.close()
+        antes = self._huella(self.nuevo)
+        esperado = self._esperado()
+        self.assertIn(f"mueve fuera de {self.base} el neb.db que hay ahí ({os.path.getsize(self.nuevo)} bytes)",
+                      esperado["detalle"])
+        for argv in self.VERBOS:
+            with self.subTest(verbo=argv[0]):
+                self.assertEqual(self._cli(argv), esperado)
+        self.assertEqual(self._huella(self.nuevo), antes)
 
 
 if __name__ == "__main__":

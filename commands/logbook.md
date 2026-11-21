@@ -1,13 +1,13 @@
 ---
 name: logbook
-description: Bitácora de relevo — listar, retomar o relevar trabajos a medias (handoff cross-dev o reanudar tu propia sesión interrumpida).
+description: "Bitácora de relevo local: listar o retomar trabajos a medias (tu sesión interrumpida, o un REQ desde su Change MD) y vincular o trazar un REQ."
 ---
 
 # /logbook — bitácora de relevo
 
 El usuario invocó `/logbook` (opcionalmente con un subcomando). Opera la bitácora de relevo siguiendo el skill `logbook` (definición completa en `skills/logbook/SKILL.md` — no la dupliques aquí).
 
-Subcomandos: sin args o `list` (listar trabajos a medias) · `retomar <id>` o `retomar <ruta-del-Change-MD>` (sin work en la bitácora) · `tomar <id>` · `liberar <id>` · `liberar-forzado <id>` · `solicitar <id>` · `renombrar <id> <nuevo-slug>` · `archivar <id>` · `vincular <ruta>` · `traza [<nombre>|<ruta>|<id>]` · `desvincular <id|nombre|ruta>` · `estado-sync` (works sin publicar, en conflicto o con un fallo de publicación; siempre local — el verbo del CLI es `sync-status`). `search` se retiró: solo responde un aviso de retiro.
+Subcomandos: sin args o `list` (listar trabajos a medias) · `retomar <id>` o `retomar <ruta-del-Change-MD>` (desde otra máquina o sin work en la bitácora) · `renombrar <id> <nuevo-slug>` · `archivar <id>` · `vincular <ruta>` · `traza [<nombre>|<ruta>|<id>]` · `desvincular <id|nombre|ruta>`. Tomar, liberar o solicitar un trabajo y el estado de la sincronización se retiraron en neb 7.0.0; `search`, en 6.41.0. Si los piden, el skill explica el retiro y ofrece `retomar <ruta-del-Change-MD>`.
 
 Resuelve el módulo (el clon de `NEB_HOME` si lo hay; si no, la raíz del plugin, que Claude Code sustituye al cargar este comando) y opera vía:
 
@@ -18,4 +18,4 @@ case "$NEB_SRC" in ""|*/plugins/cache/*|*\\plugins\\cache\\*) NEB_SRC="${CLAUDE_
 py "$NEB_SRC/hooks/lib/logbook.py" <subcomando> [args]   # o python / python3
 ```
 
-Presenta la salida como tabla legible. Al **retomar**, sigue el flujo del skill según el modo: `req` → tomar el mando + sesión nueva con el Change MD, su `## Relevo` y su plan aprobado como contexto; `exploratory` → entregar `claude --resume <id>`; con una ruta de Change MD → sin tomar el mando, leer el Change MD, su `## Relevo` y su plan aprobado.
+Presenta la salida como tabla legible. Al **retomar**, sigue el flujo del skill según el modo: `req` → checkout de la rama y sesión nueva con el Change MD, su `## Relevo` y su plan aprobado como contexto; `exploratory` → entregar `claude --resume <claude_session_id>` (solo en la máquina de `origin_machine`); con una ruta de Change MD → leer el Change MD, su `## Relevo` y su plan aprobado, y hacer checkout de su rama.

@@ -3,7 +3,7 @@
 _db_shared.py — infraestructura compartida de la DB del logbook/pendings (Neb).
 
 Centraliza (DRY) lo que antes vivía en logbook.py y que ahora también consume pendings.py:
-  • resolución de path dual-mode (neb.db ∨ neb-logbook.db) — vive AQUI y SOLO aqui.
+  • ruta de la base (~/.claude/neb.db) y guarda de la base sin migrar — viven AQUI y SOLO aqui.
   • conexión: el esquema inicial sale del árbol de este módulo; la versión de esquema y los pasos de
     base viven en _migrations.py (6.48.0); aquí, las dos reparaciones que corren en cada conexión.
   • begin_immediate (transacción de escritura exclusiva inmediata, para concurrencia).
@@ -31,11 +31,11 @@ from _migrations import (                              # reexportados: las prueb
 )
 
 
-NEB_DB_NAME    = "neb.db"            # nuevo nombre canónico
+NEB_DB_NAME    = "neb.db"
 
 # Esquema inicial (versión de esquema 1) del árbol de ESTE módulo: nunca el de NEB_HOME.
 INITIAL_SCHEMA_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "logbook-schema.sql")
-LEGACY_DB_NAME = "neb-logbook.db"    # nombre legado (máquinas del equipo sin migrar)
+LEGACY_DB_NAME = "neb-logbook.db"    # nombre anterior a 7.0.0: solo lo leen la guarda y el migrador
 
 
 # --------------------------------------------------------------------------- helpers puros (movidos de logbook.py)
@@ -88,9 +88,9 @@ def _git_info(cwd):
 
 
 def _project_id(path):
-    """Identidad estable del proyecto cross-máquina: host/owner/repo del git remote (REQ B).
+    """Identidad estable del proyecto entre máquinas: host/owner/repo del git remote.
     Prefiere `origin`; si no, el primer remote. Sin remote → basename(path)
-    (NO estable cross-máquina → ese work no es relevable cross-dev de forma fiable)."""
+    (NO estable entre máquinas: dos checkouts con el mismo nombre de carpeta colisionan)."""
     if not path:
         return ""
     url = _git(path, "remote", "get-url", "origin")
@@ -173,7 +173,8 @@ def find_active_reqs(memory_dir):
             continue
         fpath = os.path.join(memory_dir, fname)
         try:
-            content = open(fpath, encoding="utf-8").read()
+            with open(fpath, encoding="utf-8") as fh:
+                content = fh.read()
             mtime = os.path.getmtime(fpath)
         except (OSError, UnicodeDecodeError):
             continue                                  # un archivo no-UTF-8 se salta, no aborta el escaneo
@@ -248,12 +249,12 @@ def resolve_memory_dir(home_dir, cwd, encoded):
     return default
 
 
-# --------------------------------------------------------------------------- resolución de path (dual-mode)
+# --------------------------------------------------------------------------- ruta de la base y guarda
 
 def _is_usable_db(path):
     """True sii <path> existe, tamaño > 0, y abre con tabla 'work' consultable.
-    Guarda anti-shadowing: sqlite3.connect CREA el archivo vacío, así que un neb.db
-    de tamaño 0 o sin la tabla 'work' NO debe ocultar a neb-logbook.db poblado.
+    sqlite3.connect CREA el archivo vacío, así que un neb.db de tamaño 0 o sin la tabla 'work'
+    no cuenta como base.
     Abre con un connect normal (no de solo lectura): quien solo lee (el arranque) no pasa por aquí y usa
     _migrations.open_readonly, con Path.as_uri() + '?mode=ro', que sí funciona con letra de unidad."""
     try:
@@ -274,19 +275,103 @@ def _is_usable_db(path):
 
 
 def resolve_db_path(home_dir):
-    """Path a la DB del logbook/pendings bajo <home_dir>/.claude/.
-    Dual-mode permanente: prefiere neb.db SI es usable; si no, cae a neb-logbook.db.
-    Si ninguno existe → devuelve la ruta de neb.db (destino de creación nueva).
-    Devuelve siempre un str (nunca None)."""
-    base   = os.path.join(home_dir, ".claude")
-    new_p  = os.path.join(base, NEB_DB_NAME)          # neb.db
-    legacy = os.path.join(base, LEGACY_DB_NAME)       # neb-logbook.db
-    if _is_usable_db(new_p):
-        return new_p
-    if _is_usable_db(legacy):
-        return legacy
-    # Ninguno usable: destino de creación nueva = neb.db (nombre canónico)
-    return new_p
+    """Ruta de la base del logbook/pendings: siempre <home_dir>/.claude/neb.db (exista o no)."""
+    return os.path.join(home_dir, ".claude", NEB_DB_NAME)
+
+
+class UnmigratedDb(DbUnavailable):
+    """La base sigue con el nombre anterior a 7.0.0 y no hay un neb.db usable. Su JSON conserva el motivo
+    `base-sin-migrar` y trae, además de `accion` (la migración guiada), `comando` (el migrador a mano)."""
+
+    def __init__(self, detalle, comando):
+        super().__init__(
+            "base-sin-migrar", detalle,
+            "abre una sesión nueva de Claude y corre `/neb:migrate`: su paso 7.0.0:renombrar-base cambia el "
+            "nombre de la base (pide cerrar antes las demás sesiones)")
+        self.comando = comando
+
+    def to_dict(self):
+        return {**super().to_dict(), "comando": self.comando}
+
+
+def _migrator_command(home_dir=None):
+    """Comando del migrador desde el árbol de este módulo (sirve también a quien solo tiene el plugin), con
+    el intérprete que está corriendo. Agrega --home cuando home_dir no es el de expanduser('~')."""
+    script = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                           "..", "..", "bootstrap", "migrate-neb-db.py"))
+    cmd = f'"{sys.executable}" "{script}"'
+    if home_dir and (os.path.normcase(os.path.abspath(home_dir))
+                     != os.path.normcase(os.path.abspath(os.path.expanduser("~")))):
+        cmd += f' --home "{home_dir}"'
+    return cmd
+
+
+def _probe_db(path):
+    """Estado de un archivo de base sin crearlo: 'ausente', 'vacia', 'usable', 'sin-work' (abre pero no
+    tiene la tabla work), 'no-base' (no es una base SQLite), 'bloqueada' u 'otro'. Solo abre el archivo si
+    existe y no está vacío."""
+    try:
+        if not os.path.isfile(path):
+            return "ausente"
+        size = os.path.getsize(path)
+    except OSError:
+        return "otro"
+    if size == 0:
+        return "vacia"
+    con = None
+    try:
+        con = sqlite3.connect(path, timeout=0.5)      # bloqueada no es «sin migrar»: no vale la pena esperar
+        con.execute("SELECT count(*) FROM work").fetchone()
+        return "usable"
+    except sqlite3.OperationalError as e:
+        msg = str(e).lower()
+        if "no such table" in msg:
+            return "sin-work"
+        if "locked" in msg or "busy" in msg:
+            return "bloqueada"
+        return "otro"
+    except sqlite3.DatabaseError as e:
+        return "no-base" if "not a database" in str(e).lower() else "otro"
+    except (sqlite3.Error, OSError):
+        return "otro"
+    finally:
+        if con is not None:
+            con.close()
+
+
+def unmigrated_legacy(home_dir):
+    """UnmigratedDb (sin lanzarla) si <home>/.claude/neb-logbook.db existe y no está vacío y neb.db falta,
+    pesa 0, no tiene la tabla work o no es una base; None en cualquier otro caso. Una base bloqueada no
+    cuenta como sin migrar. No abre nada salvo un neb.db ya existente y no vacío."""
+    base = os.path.join(home_dir, ".claude")
+    legacy = os.path.join(base, LEGACY_DB_NAME)
+    try:
+        if not os.path.isfile(legacy) or os.path.getsize(legacy) == 0:
+            return None
+    except OSError:
+        return None
+    new_p = os.path.join(base, NEB_DB_NAME)
+    state = _probe_db(new_p)
+    if state not in ("ausente", "vacia", "sin-work", "no-base"):
+        return None
+    detalle = (f"La bitácora sigue con el nombre anterior a neb 7.0.0 ({legacy}) y no hay un {NEB_DB_NAME} "
+               "usable: neb no captura ni abre la base hasta cambiarle el nombre.")
+    if state in ("sin-work", "no-base"):
+        try:
+            size = os.path.getsize(new_p)
+        except OSError:
+            size = "?"
+        detalle += (f" Antes, mueve fuera de {base} el {NEB_DB_NAME} que hay ahí ({size} bytes), que no es una "
+                    "base usable: el cambio de nombre no lo pisa.")
+    return UnmigratedDb(detalle, _migrator_command(home_dir))
+
+
+def raise_if_unmigrated(home_dir):
+    """Lanza UnmigratedDb si la base sigue sin migrar (ver unmigrated_legacy). Va antes de abrir la base:
+    abrir neb.db lo crearía vacío y escondería la base vieja."""
+    err = unmigrated_legacy(home_dir)
+    if err is not None:
+        raise err
 
 
 # --------------------------------------------------------------------------- conexión + migración
@@ -336,8 +421,10 @@ def _connect(db_path, schema_path=None, timeout=5.0, steps=None, retry=False):
 
 
 def open_default_db(home_dir):
-    """Apertura de producción de la base por omisión (la ubica resolve_db_path, que en 6.x acepta los dos
-    nombres), con el esquema inicial del árbol de este módulo. Puede lanzar DbUnavailable."""
+    """Apertura de producción de la base por omisión (resolve_db_path), con el esquema inicial del árbol de
+    este módulo. Lanza UnmigratedDb, antes de crear nada, si la base sigue sin migrar; puede lanzar
+    DbUnavailable."""
+    raise_if_unmigrated(home_dir)
     return _connect(resolve_db_path(home_dir))
 
 

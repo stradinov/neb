@@ -10,16 +10,21 @@ TEMPORALES:
   • plan (dry-run): conteos de pendings/topics/links sin tocar DB.
   • --apply: crea pending/topic/pending_link; idempotente (re-correr no duplica).
   • relación 'depends' cuando el sub-ítem es prerequisito/bloqueante; 'related' si no.
+  • --apply con la base sin migrar: reenvía el detalle, la migración guiada y el comando de _db_shared y no
+    crea neb.db.
 
 Ejemplos GENÉRICOS (alpha/beta), NUNCA clientes reales. Framework: unittest (stdlib).
 NUNCA toca ~/.claude/*.db ni ~/.claude/pendings.md.
 """
 
+import io
 import os
 import sys
 import importlib.util
+import shutil
 import tempfile
 import unittest
+from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(HERE, "..", "lib")
@@ -216,6 +221,49 @@ class TestDryRunNoWrite(unittest.TestCase):
         self.assertIsNone(counts)
         self.assertFalse(os.path.exists(bogus_db))   # no se creó
         os.remove(src)
+
+
+class TestBaseSinMigrar(unittest.TestCase):
+
+    def test_apply_reenvia_motivo_y_comando_sin_crear_neb_db(self):
+        home = tempfile.mkdtemp(prefix="neb-migtest-")
+        self.addCleanup(shutil.rmtree, home, True)
+        base = os.path.join(home, ".claude")
+        os.makedirs(base)
+        with open(os.path.join(base, "neb-logbook.db"), "wb") as fh:
+            fh.write(b"x" * 64)
+        db = _db_shared.resolve_db_path(home)
+        src = _write_sample()
+        self.addCleanup(os.remove, src)
+        expected = _db_shared.unmigrated_legacy(home)
+        self.assertIsNotNone(expected)
+        with mock.patch("sys.stderr", new_callable=io.StringIO) as err, \
+                mock.patch("sys.stdout", new_callable=io.StringIO):
+            plan, counts = mig.run(src, db, do_apply=True)
+        self.assertIsNotNone(plan)
+        self.assertIsNone(counts)
+        self.assertIn(f"{expected.detalle} Cómo: {expected.accion}. A mano: {expected.comando}", err.getvalue())
+        self.assertFalse(os.path.exists(db))
+        # Por main, el aborto sale con rc 1 (quien encadena con && no lo lee como aplicado).
+        with mock.patch("sys.stderr", new_callable=io.StringIO), \
+                mock.patch("sys.stdout", new_callable=io.StringIO):
+            rc = mig.main(["--from", src, "--db", db, "--apply"])
+        self.assertEqual(rc, 1)
+        self.assertFalse(os.path.exists(db))
+
+    def test_main_sale_con_0_en_dry_run_y_en_apply_exitoso(self):
+        home = tempfile.mkdtemp(prefix="neb-migtest-")
+        self.addCleanup(shutil.rmtree, home, True)
+        os.makedirs(os.path.join(home, ".claude"))
+        db = _db_shared.resolve_db_path(home)
+        src = _write_sample()
+        self.addCleanup(os.remove, src)
+        with mock.patch("sys.stderr", new_callable=io.StringIO), \
+                mock.patch("sys.stdout", new_callable=io.StringIO):
+            self.assertEqual(mig.main(["--from", src, "--db", db]), 0)
+            self.assertFalse(os.path.exists(db))
+            self.assertEqual(mig.main(["--from", src, "--db", db, "--apply"]), 0)
+        self.assertTrue(os.path.exists(db))
 
 
 if __name__ == "__main__":

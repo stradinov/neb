@@ -1,12 +1,11 @@
 <!-- Plantilla de una entrada de la bitácora de relevo: representación legible de un `work`.
-     El almacenamiento real es la DB (esquema inicial en hooks/logbook-schema.sql más los pasos de base de tooling/migrations.md); esto documenta la forma
-     y lo que /logbook muestra al retomar. NO es un archivo que el dev edite a mano. -->
+     El almacenamiento real es la base local ~/.claude/neb.db (esquema inicial en hooks/logbook-schema.sql más los pasos de base de tooling/migrations.md);
+     esto documenta la forma y lo que /logbook muestra al retomar. NO es un archivo que el dev edite a mano. -->
 
 # Relevo: <project> / <req_slug>   (<mode: req | exploratory>)
 
-- **Owner:** <owner (username)> · **Máquina origen:** <origin_machine>
-- **Lock:** <owned | released | takeover_requested>
-- **Estado del REQ:** <ENUM de estados del requerimiento>  <!-- ortogonal al lock -->
+- **Máquina origen:** <origin_machine>
+- **Estado del REQ:** <ENUM de estados del requerimiento>
 - **Branch / HEAD:** <branch> / <head_commit>
 - **Change MD:** <ruta del Change MD>
 - **Sesión Claude:** <claude_session_id>  <!-- válido solo en la máquina origen -->
@@ -21,5 +20,6 @@
 
 ## Cómo retomar
 
-- **req:** `/logbook retomar <id>` → toma el mando, `checkout` del branch, sesión nueva con el Change MD, su `## Relevo` y su plan aprobado como contexto.
-- **exploratory:** `claude --resume <claude_session_id>` (local, mismo dev).
+- **req, en la máquina origen:** `/logbook retomar <id>` → `checkout` del branch y sesión nueva con el Change MD, su `## Relevo` y su plan aprobado como contexto.
+- **req, en otra máquina o por otro dev:** `/logbook retomar <ruta-del-Change-MD>` → lee el registro entregado por git, su `## Relevo` y su plan aprobado, y hace `checkout` de la rama anotada.
+- **exploratory:** `claude --resume <claude_session_id>` (solo en la máquina origen).

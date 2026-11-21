@@ -2,8 +2,8 @@
 """
 test_migrations_db.py — versión de esquema y pasos de base de neb.db (REQ neb-migraciones-de-version, 6.48.0).
 
-Cubre hooks/lib/_migrations.py a través de _db_shared._connect, con una lista de pasos inyectable (un paso 2
-ficticio que no existe en producción):
+Cubre hooks/lib/_migrations.py a través de _db_shared._connect, con una lista de pasos inyectable (pasos
+ficticios en lugar del paso 2 de producción; el paso 2 real lo prueba test_logbook_migracion_team.py):
   • base nueva y base de 6.47.0 sin tabla de versión (mismo contenido, segunda conexión sin cambio de esquema);
   • dos procesos a la vez con la base en V = 0;
   • las cuatro filas de la regla de compatibilidad;
@@ -32,6 +32,9 @@ import sys
 import tempfile
 import threading
 import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
 from datetime import datetime, timedelta, timezone
 from unittest import mock
 
@@ -149,23 +152,25 @@ class TestPaso1(Base):
     def test_base_nueva_queda_en_la_version_del_codigo(self):
         con = self.connect()
         self.assertIsNotNone(con)
-        rows = con.execute("SELECT step, min_code, title, neb_version FROM schema_step").fetchall()
+        rows = con.execute("SELECT step, min_code, title, neb_version, backup FROM schema_step ORDER BY step").fetchall()
         con.close()
-        self.assertEqual(len(rows), 1)
+        self.assertEqual([r[:3] for r in rows], [(s.n, s.min_code, s.titulo) for s in _migrations.STEPS])
         self.assertEqual(rows[0][:3], (1, 1, "esquema inicial"))
-        self.assertEqual(rows[0][3], _migrations.neb_version())
-        self.assertEqual(self.version(), (_migrations.SCHEMA_VERSION, 1))
+        self.assertEqual({r[3] for r in rows}, {_migrations.neb_version()})
+        self.assertEqual({r[4] for r in rows}, {None}, "una base recién creada no toma respaldo")
+        self.assertEqual(self.version(), (_migrations.SCHEMA_VERSION, _migrations.STEPS[-1].min_code))
+        self.assertEqual(self.backups(), [])
 
     def test_base_647_conserva_su_contenido_y_la_segunda_conexion_no_cambia_el_esquema(self):
         legacy_647_db(self.db)
         before = table_hashes(self.db)
-        self.connect().close()
+        self.connect([STEP1]).close()
         self.assertEqual(self.version(), (1, 1))
         self.assertEqual(table_hashes(self.db), before)
         con = sqlite3.connect(self.db)
         sv = con.execute("PRAGMA schema_version").fetchone()[0]
         con.close()
-        self.connect().close()
+        self.connect([STEP1]).close()
         con = sqlite3.connect(self.db)
         self.assertEqual(con.execute("PRAGMA schema_version").fetchone()[0], sv)
         con.close()
@@ -181,7 +186,7 @@ class TestPaso1(Base):
                     "dirty INTEGER NOT NULL DEFAULT 1, synced_at TEXT, remote_id INTEGER)")
         con.commit()
         con.close()
-        self.connect().close()
+        self.connect([STEP1]).close()
         cols = columns(self.db, "work")
         for c, _ddl in _migrations._WORK_MIGRATIONS:
             self.assertIn(c, cols)
@@ -206,7 +211,7 @@ class TestPaso1(Base):
             t.join()
         self.assertEqual(results, [True, True])
         con = sqlite3.connect(self.db)
-        self.assertEqual(con.execute("SELECT count(*) FROM schema_step").fetchone()[0], 1)
+        self.assertEqual(con.execute("SELECT count(*) FROM schema_step").fetchone()[0], _migrations.SCHEMA_VERSION)
         con.close()
 
 
@@ -605,7 +610,7 @@ class TestReparaciones(Base):
         con.execute("INSERT INTO transcript_local VALUES (1, 's', NULL, 0, 10, 'x', 'a')")
         con.commit()
         con.close()
-        self.connect().close()
+        self.connect([STEP1]).close()
         self.assertFalse(_migrations._table_exists(sqlite3.connect(self.db), "transcript_local"))
         self.assertFalse(os.path.exists(_migrations.backup_dir(self.db)))
 
@@ -623,7 +628,7 @@ class TestCodigoAnterior(Base):
         with open(os.path.join(old, "_db_shared_647.py"), "w", encoding="utf-8") as fh:
             fh.write(src)
         legacy_647_db(self.db)
-        self.connect().close()
+        self.connect([STEP1]).close()
         before = table_hashes(self.db)
         spec = importlib.util.spec_from_file_location("_db_shared_647", os.path.join(old, "_db_shared_647.py"))
         mod = importlib.util.module_from_spec(spec)
@@ -775,7 +780,7 @@ class TestNebMigrate(Base):
 
     def test_status_no_vuelca_un_wal_pendiente(self):
         legacy_647_db(self.db)
-        self.connect([STEP1]).close()
+        self.connect().close()
         code = ("import sqlite3, os, sys; c = sqlite3.connect(sys.argv[1]); c.execute('PRAGMA journal_mode=WAL');"
                 "c.execute('PRAGMA wal_autocheckpoint=0');"
                 "c.execute(\"INSERT INTO pending (context_origin, created_at) VALUES ('en-wal', 'a')\"); c.commit();"
@@ -819,7 +824,7 @@ class TestSoloLectura(Base):
         self.connect(path=path).close()
         con = _migrations.open_readonly(path)
         self.assertIsNotNone(con)
-        self.assertEqual(_migrations.read_version(con), (1, 1))
+        self.assertEqual(_migrations.read_version(con), (_migrations.SCHEMA_VERSION, _migrations.STEPS[-1].min_code))
         con.close()
 
     def test_open_readonly_rechaza_escrituras(self):

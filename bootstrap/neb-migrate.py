@@ -12,9 +12,11 @@ neb-migrate.py — estado y operación de la versión de esquema de neb.db y de 
                              (lo pasa /neb:migrate) corre además los pasos guiados que dejan con qué deshacerlos;
                              los que piden al dev corren solo con --include <versión>:<paso>; --sin-exclusivos
                              deja pendientes los exclusivos. --include y --sin-exclusivos implican --guiados.
+                             Con la base sin migrar (nombre anterior a 7.0.0) no la abre: corren antes los pasos
+                             guiados (el que le cambia el nombre) y después los de base.
   skip <id>                  guarda el «no» del dev a un paso guiado: sale de lo pendiente hasta que se pida
-                             con apply --include. Sin base, o con una base más nueva que no tiene la tabla,
-                             se niega.
+                             con apply --include. Sin base, con la base sin migrar, o con una base más nueva que
+                             no tiene la tabla, se niega.
   restore <archivo> [--remigrar]
                              vuelve la base al contenido de un respaldo de neb-backups/ (neb.pre-paso-*.db
                              o neb.pre-restore.*.db). Antes respalda la base actual. Se niega si el código
@@ -55,32 +57,18 @@ def _home():
     return os.path.expanduser("~")
 
 
-def _readable_with_work(path):
-    con = _migrations.open_readonly(path)
-    if con is None:
-        return False
-    try:
-        con.execute("SELECT count(*) FROM work").fetchone()
-        return True
-    except sqlite3.Error:
-        return False
-    finally:
-        con.close()
-
-
 def _existing_db(home):
-    """Ruta de la base si existe alguna, o None. Solo lectura: la misma preferencia que resolve_db_path
-    (neb.db si tiene `work`, si no neb-logbook.db), sin abrir nada en lectura-escritura."""
-    base = os.path.join(home, ".claude")
-    present = []
-    for name in (_db_shared.NEB_DB_NAME, _db_shared.LEGACY_DB_NAME):
-        p = os.path.join(base, name)
-        if os.path.isfile(p) and os.path.getsize(p) > 0:
-            present.append(p)
-    for p in present:
-        if _readable_with_work(p):
-            return p
-    return present[0] if present else None          # la que existe, aunque no se pueda leer
+    """Ruta de la base (resolve_db_path) si existe y no está vacía, o None. Sin abrir nada."""
+    p = _db_shared.resolve_db_path(home)
+    try:
+        return p if os.path.isfile(p) and os.path.getsize(p) > 0 else None
+    except OSError:
+        return None
+
+
+def _unmigrated(home):
+    """UnmigratedDb si la base sigue con el nombre anterior a 7.0.0, o None. No abre esa base."""
+    return _db_shared.unmigrated_legacy(home)
 
 
 # --------------------------------------------------------------------------- status
@@ -90,6 +78,12 @@ def status(home):
     out = {"neb_version": _migrations.neb_version(), "schema_version_code": c, "db": None,
            "schema_version_db": None, "min_compatible_db": None, "estado": "sin-base",
            "pasos_detenidos": [], "respaldos": [], "guiados": None}
+    unmigrated = _unmigrated(home)
+    if unmigrated is not None:
+        out["estado"] = "sin-migrar"
+        out["detalle"], out["accion"] = unmigrated.detalle, unmigrated.accion
+        out["guiados"] = _guided_status(home, None, set())
+        return out
     db = _existing_db(home)
     if db is None:
         out["guiados"] = _guided_status(home, None, set())
@@ -139,6 +133,8 @@ def _guided_status(home, db, skips, skips_error=None):
 
 _ESTADOS = {
     "sin-base": "no hay base todavía (la crea la primera captura)",
+    "sin-migrar": "con el nombre anterior a neb 7.0.0: neb no la abre hasta que la migración guiada le cambie el "
+                  "nombre",
     "ilegible": "la base no se pudo leer",
     "al-dia": "al día",
     "atras": "atrás: la siguiente conexión aplica los pasos pendientes",
@@ -166,7 +162,10 @@ def _print_guided(g):
 def _print_status(s):
     print(f"neb {s['neb_version']} · versión de esquema del código: {s['schema_version_code']}")
     if s["db"] is None:
-        print("base: " + _ESTADOS["sin-base"])
+        print("base: " + _ESTADOS[s["estado"] if s["estado"] == "sin-migrar" else "sin-base"])
+        if s.get("detalle"):
+            print(f"detalle: {s['detalle']}")
+            print(f"acción: {s['accion']}")
         _print_guided(s.get("guiados"))
         return
     print(f"base: {s['db']}")
@@ -186,23 +185,39 @@ def _print_status(s):
 
 # --------------------------------------------------------------------------- apply
 
+def _open_for_apply(db):
+    """(con, err): la conexión de apply (pasos de base con reintento ya), o None y el dict del motivo, sin
+    imprimirlo (quien llama lo imprime, con lo que ya corrió)."""
+    try:
+        con = _db_shared._connect(db, retry=True)
+    except _db_shared.DbUnavailable as e:
+        return None, e.to_dict()
+    if con is None:
+        return None, {"ok": False, "motivo": "sin-conexion",
+                      "detalle": "no se pudo abrir la base (candado ocupado o error de SQLite)",
+                      "accion": "reintenta en unos segundos"}
+    return con, None
+
+
 def apply(home, include=(), sin_exclusivos=False, guiados=False):
     """Pasos de base y reparaciones (como la captura) si hay base; sin base no la crea (la crea la primera
     captura, y un paso guiado puede necesitar ver la máquina sin ella). Luego, solo con guiados (lo pide
-    /neb:migrate), los pasos guiados: reintentar un paso de base no corre la migración guiada."""
+    /neb:migrate), los pasos guiados: reintentar un paso de base no corre la migración guiada.
+
+    Con la base sin migrar no la abre (abrir neb.db lo crearía vacío y escondería la base vieja): sin
+    guiados responde base-sin-migrar; con guiados corren antes los pasos guiados y, si alguno le cambió el
+    nombre, después los de base."""
     guiados = bool(guiados or include or sin_exclusivos)
     db = _db_shared.resolve_db_path(home)
     v, skips, skips_error = None, set(), None
-    if _existing_db(home) is not None:
-        try:
-            con = _db_shared._connect(db, retry=True)
-        except _db_shared.DbUnavailable as e:
-            print(json.dumps(e.to_dict(), ensure_ascii=False))
-            return 1
+    unmigrated = _unmigrated(home)
+    if unmigrated is not None and not guiados:
+        print(json.dumps(unmigrated.to_dict(), ensure_ascii=False))
+        return 1
+    if unmigrated is None and _existing_db(home) is not None:
+        con, err = _open_for_apply(db)
         if con is None:
-            print(json.dumps({"ok": False, "motivo": "sin-conexion",
-                              "detalle": "no se pudo abrir la base (candado ocupado o error de SQLite)",
-                              "accion": "reintenta en unos segundos"}, ensure_ascii=False))
+            print(json.dumps(err, ensure_ascii=False))
             return 1
         try:
             v, _f = _migrations.read_version(con)
@@ -219,11 +234,20 @@ def apply(home, include=(), sin_exclusivos=False, guiados=False):
         guided["error"] = f"no se pudo leer migration_skip ({skips_error}): no corrió ningún paso guiado"
     else:
         guided = _apply_guided(home, db, skips, include, sin_exclusivos)
+    if unmigrated is not None and _unmigrated(home) is None and _existing_db(home) is not None:
+        con, err = _open_for_apply(db)    # la base ya tiene su nombre: sus pasos de base, con su respaldo
+        if con is None:
+            print(json.dumps({**err, "guiados": guided}, ensure_ascii=False))   # sin perder el reporte del cambio de nombre
+            return 1
+        try:
+            v, _f = _migrations.read_version(con)
+        finally:
+            con.close()
     s = status(home)
     c = _migrations.code_version()
     # Un paso con `espera` que no corrió (candado ocupado) no deja fila de error: ok exige también V >= C.
     # Una migración guiada que no carga tampoco es ok: sus pasos nunca correrían, en silencio.
-    ok = not s["pasos_detenidos"] and (v is None or v >= c)
+    ok = not s["pasos_detenidos"] and (v is None or v >= c) and s["estado"] != "sin-migrar"
     if guided is not None:
         ok = ok and not (guided["error"] or guided["fallos"] or guided["no_encontrados"]
                          or guided["errores_de_carga"])
@@ -271,10 +295,12 @@ def _apply_guided(home, db, skips, include, sin_exclusivos=False):
             if r["estado"] in ("aplicado", "sin-cambio") and key in skips:
                 unskip.append(key)
     if unskip:
-        try:
-            con = _db_shared._connect(db)
-        except _db_shared.DbUnavailable:
-            con = None
+        con = None
+        if _unmigrated(home) is None:      # sin migrar: abrir neb.db lo crearía vacío
+            try:
+                con = _db_shared._connect(db)
+            except _db_shared.DbUnavailable:
+                con = None
         if con is None:
             out["omision_sin_borrar"] = unskip
         else:
@@ -292,6 +318,11 @@ def skip(home, key):
     if _guided.find(migrations, key)[1] is None:
         return _refuse("paso-desconocido", f"no hay un paso guiado {key}",
                        "usa un id <versión>:<paso> de `neb-migrate.py status`")
+    unmigrated = _unmigrated(home)
+    if unmigrated is not None:                     # abrir neb.db lo crearía vacío y escondería la base vieja
+        return _refuse("base-sin-migrar", unmigrated.detalle,
+                       "el paso sigue pendiente; el «no» se podrá guardar cuando la migración guiada le cambie "
+                       "el nombre a la base")
     if _existing_db(home) is None:                 # como apply: sin base no la crea
         return _refuse("sin-base", "no hay base donde guardar el «no»",
                        "el paso sigue pendiente; se podrá omitir cuando la primera captura cree la base")

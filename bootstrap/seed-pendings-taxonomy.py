@@ -95,9 +95,19 @@ def _stamp():
 
 
 def _require_db(db_path):
-    """Un --db con typo NO debe crear una DB vacía (sqlite3.connect la crearía en silencio)."""
+    """Exige una base usable: un --db con typo no debe crear una DB vacía (sqlite3.connect la crearía en
+    silencio). Si es el neb.db de un ~/.claude con la base sin migrar, reenvía el motivo y el comando que
+    arma _db_shared."""
+    if _db_shared._is_usable_db(db_path):
+        return
+    full = os.path.abspath(db_path)
+    if os.path.basename(full) == _db_shared.NEB_DB_NAME and os.path.basename(os.path.dirname(full)) == ".claude":
+        err = _db_shared.unmigrated_legacy(os.path.dirname(os.path.dirname(full)))
+        if err is not None:
+            raise RuntimeError(f"{err.detalle} Cómo: {err.accion}. A mano: {err.comando}")
     if not os.path.isfile(db_path):
         raise RuntimeError(f"no existe la DB {db_path}")
+    raise RuntimeError(f"{db_path} no es una base usable (falta la tabla work o no es una base SQLite)")
 
 
 # =========================================================================== entradas

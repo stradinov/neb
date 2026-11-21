@@ -493,6 +493,15 @@ def _utf8_stdout():
             pass
 
 
+def _unmigrated(db_path):
+    """UnmigratedDb de _db_shared si db_path es el neb.db de un ~/.claude con la base sin migrar; si no,
+    None. Una base nueva sí se crea: el migrador también corre en una máquina sin neb.db."""
+    full = os.path.abspath(db_path)
+    if os.path.basename(full) != _db_shared.NEB_DB_NAME or os.path.basename(os.path.dirname(full)) != ".claude":
+        return None
+    return _db_shared.unmigrated_legacy(os.path.dirname(os.path.dirname(full)))
+
+
 def run(src_path, db_path, do_apply):
     """Núcleo testeable. Devuelve (plan, counts|None). counts solo en --apply."""
     _utf8_stdout()
@@ -506,6 +515,11 @@ def run(src_path, db_path, do_apply):
 
     if not do_apply:
         print(render_report(plan, src_path))
+        return plan, None
+
+    err = _unmigrated(db_path)
+    if err is not None:
+        print(f"[migrate-pendings] ERROR: {err.detalle} Cómo: {err.accion}. A mano: {err.comando}", file=sys.stderr)
         return plan, None
 
     # --apply: escritura idempotente dentro de una transacción.
@@ -542,8 +556,8 @@ def main(argv):
                    help="ejecuta la migración (sin él = DRY-RUN, solo reporta).")
     args = p.parse_args(argv)
     db_path = args.db or _db_shared.resolve_db_path(os.path.expanduser("~"))
-    plan, _ = run(args.src, db_path, args.apply)
-    return 0 if plan is not None else 1
+    plan, counts = run(args.src, db_path, args.apply)
+    return 1 if plan is None or (args.apply and counts is None) else 0
 
 
 if __name__ == "__main__":

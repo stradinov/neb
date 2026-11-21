@@ -9,7 +9,7 @@ los consumidores que corren fuera del Bash tool lo descartan (hooks/lib/neb_root
     de valores inválidos en NEB_HOOKS / NEB_PROJECT_HOOKS
   • bootstrap/setup-workspace.sh --dry-run: no toma el NEB_HOME del caché
 
-Framework: unittest (stdlib). HOME temporal; nunca toca ~/.claude.
+Framework: unittest (stdlib). HOME y USERPROFILE temporales; nunca toca ~/.claude.
   py -m unittest discover -s hooks/tests -p test_neb_root.py
 """
 import os
@@ -18,6 +18,9 @@ import subprocess
 import sys
 import tempfile
 import unittest
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -102,9 +105,12 @@ class TestCliConNebHomeEnCache(unittest.TestCase):
 class TestArranque(unittest.TestCase):
 
     def _bootstrap(self, **env):
+        home = tempfile.mkdtemp(prefix="neb-test-")
+        self.addCleanup(shutil.rmtree, home, True)
         e = {k: v for k, v in os.environ.items()
              if k not in ("NEB_HOME", "CLAUDE_PLUGIN_ROOT", "NEB_HOOKS", "NEB_PROJECT_HOOKS", "NEB_WORKSPACE",
                           "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION", "CLAUDE_PROJECT_DIR")}
+        e.update(HOME=home, USERPROFILE=home)
         e.update(env)
         r = subprocess.run([sys.executable, os.path.join(NEB, "bootstrap", "neb-bootstrap-context.py")],
                            env=e, capture_output=True, timeout=60)
