@@ -561,6 +561,23 @@ class Apply(PluginsBase):
         self.assertIsNone(changes)
         self.assertEqual(self.load(), self.before)
 
+    def test_quita_una_subclave_y_lo_verifica(self):
+        def mutate(d):
+            del d["enabledPlugins"][self.pid]
+            return [("enabledPlugins", self.pid, ut.DELETE)]
+        changes, err = ut.update_json(self.settings, mutate)
+        self.assertIsNone(err)
+        after = self.load()
+        self.assertNotIn(self.pid, after["enabledPlugins"])
+        after["enabledPlugins"][self.pid] = self.before["enabledPlugins"][self.pid]
+        self.assertEqual(after, self.before)                           # nada más cambió
+
+    def test_borrado_declarado_que_no_ocurrio_no_escribe(self):
+        changes, err = ut.update_json(self.settings, lambda d: [("enabledPlugins", self.pid, ut.DELETE)])
+        self.assertIsNone(changes)
+        self.assertIn("no quedó como se esperaba", err)
+        self.assertEqual(self.load(), self.before)
+
     def test_settings_invalido_no_se_toca(self):
         self._put(self.settings, "{no es json")
         self.assertEqual(self.run_apply("disable"), 2)                 # lo rechaza antes de escribir

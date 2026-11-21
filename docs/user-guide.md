@@ -71,6 +71,13 @@ python <ruta>/hooks/lib/autoupdate.py disable    # la apaga
 - `py <ruta>/bootstrap/neb-migrate.py status` muestra la versión de esquema de tu base y del código, si algo detiene un cambio y qué respaldos hay.
 - Para volver a una versión anterior: regresa primero plugin y clon, y después `neb-migrate.py restore <respaldo>`. Detalle en `tooling/migrations.md`.
 
+**Cuando una versión pide configurar tu máquina** (desde 6.49.0). Algunas versiones piden algo más que cambiar la base: quitar una clave de tu `settings.json` o una variable de entorno que ya no se usa. Eso es una **migración guiada**:
+
+- Al abrir sesión, Claude te avisa que hay una migración pendiente y te ofrece abrirla en una sesión nueva: en la app de escritorio, con una tarjeta de sesión nueva cuando la sesión trae esa herramienta (aún no se ha observado con el plugin publicado); si no, con el comando `claude "/neb:migrate"`. La sesión en la que estás trabajando no la empieza por su cuenta.
+- En esa sesión, `/neb:migrate` corre solo lo que deja con qué deshacerlo (p. ej. quitar una clave no secreta de `settings.json`, guardando el par quitado en `~/.claude/neb-backups/`). Lo que no deja respaldo, como quitar un token o una variable de entorno, te lo pregunta en un solo menú: aplicarlo, no aplicarlo (deja de ofrecerse) o después.
+- Las sesiones y terminales que ya estaban abiertas conservan en su entorno las variables quitadas hasta que las reinicies.
+- A mano: `neb-migrate.py status` lista lo pendiente, `apply` corre lo que corre solo, `apply --include <id>` un paso que pide tu OK y `skip <id>` guarda tu «no».
+
 ## Conectarse al espacio de trabajo del equipo
 
 Si tu equipo ya tiene un **repositorio del espacio de trabajo** (overlay + `changes/` + `personal/` centralizados), no creas nada: lo conectas. Tres pasos:

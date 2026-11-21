@@ -9,5 +9,5 @@ Extensiones personales del flujo de trabajo con Claude: hooks automáticos y rec
 3. [Prompt preprocessing](prompt-preprocessing.md) — hook `UserPromptSubmit` que corrige prompts antes de pasar a Claude (lineamiento, script Python, slash command — opcional personal).
 4. [Redacción es](redaccion-es.md) — taxonomía de errores de redacción en español + plantilla YAML para correctores (recurso de referencia, no obligatorio).
 5. [Logbook](logbook.md) — backend y captura de la bitácora de relevo (hook `logbook-sync` + SQLite local; de activación voluntaria con `NEB_HOOKS` / `NEB_PROJECT_HOOKS`).
-6. [Migraciones](migrations.md) — versión de esquema de `neb.db`, pasos de base, respaldo y vuelta atrás (`bootstrap/neb-migrate.py`); corre solo con cada actualización.
+6. [Migraciones](migrations.md) — versión de esquema de `neb.db`, pasos de base, respaldo y vuelta atrás (`bootstrap/neb-migrate.py`), que corren solos con cada actualización; y migración guiada (`migrations/`, `/neb:migrate`), que configura la máquina del dev.
 7. [Revisión editorial externa](revision-editorial-externa.md) — guía para usar un agente LLM externo (ChatGPT u otro) como consultor editorial de los `.md`: prompts, contrato de salida `[ACTUAL]`/`[PROPUESTO]`, allowlist de anglicismos, protecciones y lecciones aprendidas (recurso de referencia, no obligatorio).

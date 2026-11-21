@@ -203,12 +203,71 @@ def _db_notice(bootstrap_dir, neb_home=None, home=None):
     return text
 
 
+GUIDED_NOTICE_MAX = 900  # unidades UTF-16 del aviso de migración guiada pendiente, con su envoltura
+GUIDED_NOTICE = (
+    "Hay una migración de Neb pendiente (%s): %s. No la inicies por tu cuenta en esta sesión, salvo que se haya "
+    "abierto con `/neb:migrate` o el dev lo pida. Si hay una persona presente, al cierre de tu primera respuesta y una "
+    "sola vez por conversación ofrécele abrirla en una sesión nueva: con la herramienta de tu entorno para "
+    "proponer una sesión, con el encargo «Corre la migración pendiente de neb con /neb:migrate»; si tu entorno "
+    "no la trae, dale el comando `claude \"/neb:migrate\"`.")
+_SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
+
+
+def _guided_notice(bootstrap_dir, home=None):
+    """Aviso de migración guiada pendiente (pasos guiados de su propio árbol que la detección marca y el dev
+    no omitió), o None. Solo lee: la base en mode=ro y la detección de cada paso. Un `migrations/<versión>.py`
+    que no carga no rompe el arranque."""
+    own_root = os.path.dirname(bootstrap_dir)
+    lib = os.path.join(own_root, 'hooks', 'lib')
+    if not os.path.isdir(os.path.join(own_root, 'migrations')):
+        return None
+    try:
+        if lib not in sys.path:
+            sys.path.insert(0, lib)              # _guided importa _machine de su carpeta
+        guided = _load_module(os.path.join(lib, '_guided.py'), 'neb_guided_own')
+        migrations, _errors = guided.load(own_root)
+        if not migrations:
+            return None
+        mig = _load_module(os.path.join(lib, '_migrations.py'), 'neb_migrations_own')
+        home = home or os.path.expanduser('~')
+        db = _readonly_db(mig, home)
+        skips = set()
+        if db:
+            con = mig.open_readonly(db)
+            if con is not None:
+                try:
+                    skips = guided.read_skips(con)
+                finally:
+                    con.close()
+        rows = guided.survey(guided._machine.Ctx(home, db_path=db), migrations, skips)
+    except (Exception, SystemExit):  # noqa: BLE001 — el aviso es accesorio; sin los omitidos, tampoco avisa
+        return None
+    pending = [r for r in rows if not r['omitido'] and not r['error'] and r['clase']]
+    if not pending:
+        return None
+    versions = []
+    for r in pending:
+        if _SEMVER_RE.match(r['version']) and r['version'] not in versions:
+            versions.append(r['version'])
+    n = len(pending)
+    count = '1 paso que pide configurar la máquina' if n == 1 else '%d pasos que piden configurar la máquina' % n
+    for k in range(len(versions), 0, -1):
+        shown = ', '.join('`%s`' % v for v in versions[:k]) + ('' if k == len(versions) else ', …')
+        text = GUIDED_NOTICE % (shown, count)
+        if _u16(ENV_NOTICE % text) <= GUIDED_NOTICE_MAX:
+            return text
+    return None
+
+
 def _env_notices(bootstrap_dir, neb_home=None):
     """Avisos sobre el entorno de Neb que Claude debe trasladar al dev. Vacio si todo esta en orden."""
     notices = []
     db = _db_notice(bootstrap_dir, neb_home)
     if db:
         notices.append(db)
+    guided = _guided_notice(bootstrap_dir)
+    if guided:
+        notices.append(guided)
     stale = stale_neb_home()
     if stale:
         notices.append(

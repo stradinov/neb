@@ -117,7 +117,7 @@ Un solo `CHANGELOG.md` con orden DESC es punto de conflicto entre sesiones paral
 
 Claude ejecuta estos pasos como parte de Fase 6/7, antes del push del REQ:
 
-1. En el repo `neb`, si el REQ cambia el esquema de `neb.db`, Claude verifica que su paso de base (escrito y probado en Fase 4) esté en `hooks/lib/_migrations.py` y declara en el fragmento qué hace y si sube la mínima compatible. El esquema inicial (`hooks/logbook-schema.sql`) no se edita. Mecánica: [`../tooling/migrations.md`](../tooling/migrations.md) § "Escribir un paso".
+1. En el repo `neb`, si el REQ cambia el esquema de `neb.db`, Claude verifica que su paso de base (escrito y probado en Fase 4) esté en `hooks/lib/_migrations.py` y declara en el fragmento qué hace y si sube la mínima compatible. El esquema inicial (`hooks/logbook-schema.sql`) no se edita. Mecánica: [`../tooling/migrations.md`](../tooling/migrations.md) § "Escribir un paso". Si el REQ pide configurar la máquina del dev o un paso que necesita al dev, Claude verifica que traiga `migrations/<X.Y.Z>.md` y `migrations/<X.Y.Z>.py` (escritos y probados en Fase 4), con su fila en `migrations/README.md`, y lo declara en el fragmento; si alguno de sus pasos libres corre solo, verifica que el gate de Fase 4 haya tenido al rol Security Reviewer ([`../profiles/self-applied/roles.md`](../profiles/self-applied/roles.md) § "Subagentes por fase"). Mecánica: [`../tooling/migrations.md`](../tooling/migrations.md) § "Migración guiada".
 2. Crear `changelog.d/<X.Y.Z>.md` con el entry del REQ. Naming: el stem del archivo es la versión SemVer en `<major>.<minor>.<patch>` (sin prefijo `v`).
 3. Bumpear `VERSION` al mismo número.
 4. Correr `py bootstrap/assemble-changelog.py` — regenera `CHANGELOG.md`.
@@ -137,7 +137,7 @@ Bypass: `git push --no-verify` — requiere autorización explícita del dev (ve
 Dos sesiones paralelas pueden crear `changelog.d/1.5.0.md` cada una con contenido distinto, o ambas bumpear `VERSION` al mismo valor. Reglas:
 
 - La primera en cerrar Fase 4 hace commit primero y reclama el número.
-- La segunda renombra su fragmento al siguiente valor disponible (e.g. `changelog.d/1.5.0.md` → `changelog.d/1.6.0.md`) y bumpea `VERSION` al mismo valor.
+- La segunda renombra su fragmento al siguiente valor disponible (e.g. `changelog.d/1.5.0.md` → `changelog.d/1.6.0.md`) y bumpea `VERSION` al mismo valor; si trae migración guiada, renombra también `migrations/<X.Y.Z>.md` y `.py` y su fila de `migrations/README.md` (el id de cada paso guiado lleva la versión).
 - Un hueco en la historia (e.g. v1.5.0 saltado entre v1.4.0 y v1.6.0) es aceptable y no se reescribe historia.
 - `VERSION` sigue siendo single-line por convención SemVer; la colisión sobre `VERSION` es trivial (1 número, primera en hacer commit gana).
 - Entre la incorporación de un PR, que parte de la principal publicada ([`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Incorporar un PR"), y un REQ sin publicar del clon principal, conserva el número lo que se publica primero, aunque el otro haya hecho commit antes: la principal publicada no se reescribe. El otro se renumera al actualizarse, como la segunda sesión.

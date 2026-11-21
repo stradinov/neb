@@ -1,6 +1,6 @@
-# Migraciones de `neb.db` — versión de esquema y pasos de base
+# Migraciones de `neb.db` — versión de esquema, pasos de base y migración guiada
 
-Cómo cambia el esquema de `~/.claude/neb.db` de una versión de Neb a otra sin que plugin, clon y sesiones abiertas tengan que coincidir de versión. Desde 6.48.0. La regla de qué debe traer una versión que cambia el esquema vive en [`../process/version-control.md`](../process/version-control.md) § "Flujo al cerrar REQ"; aquí, la mecánica. Código: `hooks/lib/_migrations.py` (mecanismo y pasos), `hooks/lib/_db_shared.py` (conexión y reparaciones), `bootstrap/neb-migrate.py` (estado y operación).
+Cómo cambia el esquema de `~/.claude/neb.db` de una versión de Neb a otra sin que plugin, clon y sesiones abiertas tengan que coincidir de versión (desde 6.48.0), y cómo una versión configura la máquina del dev (migración guiada, desde 6.49.0). La regla de qué debe traer una versión que cambia el esquema o pide configurar la máquina vive en [`../process/version-control.md`](../process/version-control.md) § "Flujo al cerrar REQ"; aquí, la mecánica. Código: `hooks/lib/_migrations.py` (mecanismo y pasos de base), `hooks/lib/_db_shared.py` (conexión y reparaciones), `hooks/lib/_guided.py` y `hooks/lib/_machine.py` (pasos guiados y su catálogo), `bootstrap/neb-migrate.py` (estado y operación).
 
 ## Esquema con el módulo
 
@@ -65,8 +65,60 @@ Con la base en versión 1 o más, el esquema inicial ya no se reaplica en cada c
   - respalda antes la base actual como `neb.pre-restore.<fecha UTC>.db` (queda 1, aparte de los de los pasos) y nunca borra el archivo del que restaura;
   - escribe con la API de backup hacia la base viva, con una conexión directa; nunca copia ni renombra archivos (un `-wal` vivo corrompería la copia).
 
+## Migración guiada
+
+Una **migración guiada** es lo que una versión pide además de sus pasos de base: configurar la máquina del dev (quitar una clave de `settings.json`, una variable de entorno de usuario) o un paso que necesita al dev. La versión trae dos archivos en `migrations/`, con su versión semántica de nombre (formato y ejemplo en [`../migrations/README.md`](../migrations/README.md)):
+
+- `migrations/<X.Y.Z>.md`: el prompt. Qué cambia, en qué orden van los pasos, qué se le dice al dev, cómo se verifica y qué se reporta.
+- `migrations/<X.Y.Z>.py`: los **pasos guiados** (`STEPS`), cada uno con `id`, `titulo` y `exclusivo` (pide las demás sesiones de Claude cerradas). Dos clases:
+  - **De catálogo**: el paso es un dato, el nombre de una operación de `hooks/lib/_machine.py` y sus argumentos; detectar y aplicar los hace el catálogo.
+  - **Libre**: trae sus propias `detectar(ctx)` y `aplicar(ctx)`, para lo que el catálogo no cubre (p. ej. invocar otro programa del repo). Si deja con qué deshacerlo, lo declara (`respaldo=True`) y `aplicar` devuelve la ruta.
+
+### Qué está pendiente y qué se guarda
+
+**Pendiente** es lo que la detección dice en el momento: se lee del estado real de la máquina y no se persiste. La detección solo lee; la de un paso libre no escribe ni llama a nada que escriba (se revisa en el gate de la versión que lo trae). Un paso aplicado no deja constancia: si el estado vuelve, la detección lo vuelve a marcar.
+
+Lo único que se guarda es el «no» del dev a un paso, en una tabla del mecanismo que el programa crea con `IF NOT EXISTS`, fuera de los pasos de base:
+
+```sql
+CREATE TABLE IF NOT EXISTS migration_skip (
+  id          TEXT PRIMARY KEY,   -- '<versión>:<paso>'
+  neb_version TEXT NOT NULL,
+  at          TEXT NOT NULL,
+  detail      TEXT                -- nunca el valor de una variable
+);
+```
+
+Con fila, el paso sale de lo pendiente hasta que el dev lo pida con `apply --include`; si entonces corre bien, la fila se borra (si no se puede borrar, `apply` lo reporta en `omision_sin_borrar`). Su forma queda fija: un cambio a esta tabla entraría como paso de base. `neb-migrate.py schema` la imprime aparte. Si la tabla no se puede leer por otra causa que no existir, `apply` no corre ningún paso guiado.
+
+### Qué corre solo y qué pide al dev
+
+- **Corre solo** todo paso que deja con qué deshacerlo: un paso de catálogo cuya operación deja respaldo en esa corrida, o un paso libre que lo declara. `apply` sin `--include` no ejecuta nada más; lo hace cumplir el programa, no el prompt.
+  - El respaldo que declara un paso libre se comprueba al volver `aplicar`: que sea un archivo nuevo (no existía antes del paso), no vacío y de esa corrida; que esté directamente en `~/.claude` o en `neb-backups/`; que no sea un enlace ni un archivo vivo (la base y sus `-wal`/`-shm`, un `settings*.json`); y, si es una base SQLite, que esté en un solo archivo (`journal_mode=DELETE`, sin `-wal`) y pase `integrity_check` (abierta como inmutable, sin dejarle archivos). Si no, el paso es un fallo.
+  - Un paso `exclusivo` comprueba su condición antes de actuar y la vuelve a comprobar con `ctx.exclusivo_ok()` justo antes de la acción que no se deshace (las operaciones del catálogo ya lo hacen); si no se cumple, no hace nada y queda pendiente con su motivo. La condición por omisión es que ninguna otra conexión tenga la base abierta **en ese momento**: en WAL, pasar a `DELETE` pide acceso exclusivo (una conexión ajena, aunque esté ociosa, lo impide) y se exige volver a WAL; fuera de WAL, un `BEGIN EXCLUSIVE`. No prueba que las demás sesiones estén cerradas (sus hooks abren y cierran la base), y mira la base de `resolve_db_path`: un paso cuya acción no tolera que otra sesión abra la base justo después, o que actúa sobre otro archivo, declara su propia `condicion` y retiene su candado.
+  - `apply --sin-exclusivos` deja pendientes los exclusivos y corre lo demás (la opción «Después» del menú de `/neb:migrate`).
+  - Sin base, `apply` no la crea (la crea la primera captura): corre solo los pasos guiados.
+- **Pide al dev** lo que no deja con qué deshacerlo: quitar un secreto o una variable de usuario, o un paso libre sin respaldo. Solo corre con `apply --include <versión>:<paso>`, y `/neb:migrate` lo pone en un solo menú. Donde no hay herramienta de preguntas (sesión sin interfaz, tarea programada), queda pendiente.
+
+### Catálogo de operaciones
+
+| Operación | Argumentos | Qué hace | Clase |
+|---|---|---|---|
+| `settings_env_remove` | `claves`, `secretas` (opcional, subconjunto de `claves`), `ruta` (opcional: `settings.json`, por omisión, o `settings.local.json`) | Quita claves del bloque `env` del settings del dir de configuración en uso (`CLAUDE_CONFIG_DIR` o `~/.claude`, supuesto R26) con `update_json`, que verifica el borrado y que nada más cambió. Si ninguna clave está presente, no escribe; si un valor cambió entre la lectura y la escritura, tampoco. El respaldo **no es una copia del archivo** (llevaría cualquier secreto que el dev tenga ahí): guarda solo los pares quitados en `neb-backups/settings-env.<fecha UTC>.json`, un archivo nuevo con permiso solo para el usuario donde el sistema lo respeta (en Windows hereda los permisos de la carpeta, los mismos que el settings). Quedan los de la última corrida | Corre solo; pide al dev, y sin respaldo, si alguna clave presente es de las `secretas` o un valor trae algo con `@` tras el esquema de una URL (`usuario:clave@`, `token@`) |
+| `user_env_remove` | `nombre` | Variable de entorno de usuario, solo con nombre `NEB_[A-Z0-9_]+` completo. En Windows, la presencia se lee del registro de usuario sin leer el valor (los procesos abiertos conservan el viejo en su entorno); el borrado quita el valor con `winreg` y avisa al sistema con `SendMessageTimeoutW`, sin terminal. Una variable del mismo nombre a nivel de máquina, o cualquier variable fuera de Windows, responde `manual` con la instrucción, y sigue pendiente hasta que el dev la quite o responda «No aplicarlo». Fuera de Windows la presencia se lee del entorno del proceso, sin las variables que declara el settings (`[asumido]` Claude Code pasa el bloque `env` al entorno de sus hooks y de su Bash) | Pide al dev siempre: el valor no se guarda en ningún archivo ni se imprime |
+
+Nada del catálogo imprime ni guarda el valor de una variable.
+
+### Dónde corre
+
+1. El arranque de cada sesión detecta, en solo lectura, los pasos guiados pendientes del árbol del plugin y avisa con un tope de 900 unidades UTF-16. El aviso pide a Claude no iniciar la migración por su cuenta y ofrecer abrirla en una sesión nueva (supuesto R30 de [`../methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)).
+2. En esa sesión, [`/neb:migrate`](../commands/migrate.md), con el mismo árbol del plugin (no el clon de `NEB_HOME`, cuyas migraciones pueden no estar publicadas): estado, prompt de cada versión, `apply`, el menú con lo que pide al dev, verificación por presencia y reporte. Nunca corre `restore`, `apply --include` ni `skip` sin la respuesta del dev en el menú de esa sesión. `[asumido]` una sesión interactiva abierta con `claude "/neb:migrate"` ejecuta el comando con su menú; lo probado es la sesión sin interfaz (R30).
+3. A mano: `py bootstrap/neb-migrate.py status`, `apply [--include <id>…] [--sin-exclusivos]` y `skip <id>`.
+
+**Quién controla lo que se ejecuta**: quien publica en el repo `neb`, igual que con el resto del plugin. Un paso libre es código de la versión que lo trae, y el gate de esa versión revisa que haga solo lo que declara (quién revisa: `profiles/self-applied/roles.md` § "Subagentes por fase"). El mensaje de una excepción de un paso libre no se reporta, porque puede traer valores: su `detalle` lleva solo el tipo.
+
 ## Estado
 
-`py bootstrap/neb-migrate.py status` (o `--json`) muestra, sin escribir ni crear la base, la versión de Neb y la de esquema del código, la versión y la mínima compatible de la base, su estado (`al-dia`, `atras`, `mas-nueva-compatible`, `incompatible`), los pasos detenidos con su motivo y los respaldos. `apply` abre la base como lo hace la captura (aplica los pasos pendientes y las reparaciones): sirve después de corregir lo que detenía un paso.
+`py bootstrap/neb-migrate.py status` (o `--json`) muestra, sin escribir ni crear la base, la versión de Neb y la de esquema del código, la versión y la mínima compatible de la base, su estado (`sin-base`, `ilegible`, `al-dia`, `atras`, `mas-nueva-compatible`, `incompatible`), los pasos detenidos con su motivo, los respaldos y los pasos guiados pendientes (con su clase) y omitidos. `apply` abre la base como lo hace la captura (aplica los pasos pendientes y las reparaciones; reintenta ya un paso con fallo reciente) y corre los pasos guiados que corren solos: sirve después de corregir lo que detenía un paso.
 
-El arranque de cada sesión avisa, en solo lectura, cuando un árbol de Neb (el del plugin o el clon de `NEB_HOME`) ya no puede operar la base, o cuando un paso de base está detenido. Que plugin y clon tengan versiones distintas no es aviso mientras los dos entiendan la base, ni lo es que la base esté atrás (lo normal en la primera sesión tras actualizar).
+El arranque de cada sesión avisa, en solo lectura, cuando un árbol de Neb (el del plugin o el clon de `NEB_HOME`) ya no puede operar la base, cuando un paso de base está detenido, o cuando hay una migración guiada pendiente. Que plugin y clon tengan versiones distintas no es aviso mientras los dos entiendan la base, ni lo es que la base esté atrás (lo normal en la primera sesión tras actualizar).

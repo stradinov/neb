@@ -19,7 +19,7 @@ Meta-instrucciones para Claude cuando edita la metodología misma.
 ## Convenciones internas
 
 - Archivos: `kebab-case.md`, sin prefijos numéricos.
-- Cada carpeta de lineamientos (`general/`, `methodology/`, `process/`, `workflow/`, `tooling/`, `profiles/` y cada `profiles/<profile>/`) tiene su `index.md` con orden de lectura. Las demás llevan `README.md` (`skills/`, `hooks/`, `research/`) o ninguno (`agents/`, `commands/`, `docs/`, `bootstrap/`, `templates/`).
+- Cada carpeta de lineamientos (`general/`, `methodology/`, `process/`, `workflow/`, `tooling/`, `profiles/` y cada `profiles/<profile>/`) tiene su `index.md` con orden de lectura. Las demás llevan `README.md` (`skills/`, `hooks/`, `research/`, `migrations/`) o ninguno (`agents/`, `commands/`, `docs/`, `bootstrap/`, `templates/`).
 - Forma única de términos y de citas de sección (`§ "Título"`): la verifica `bootstrap/check-style.py` en el pre-push; los canónicos viven en [`methodology/vocabulary.md`](methodology/vocabulary.md) § "Índice de términos canónicos".
 - Imports internos: paths relativos (`../methodology/principles.md`). Los del propio `CLAUDE.md` también son relativos — funcionan en cualquier ubicación del clon.
 - Proyectos externos **no importan el framework**: lo inyecta el plugin (hook `SessionStart`).
@@ -89,6 +89,15 @@ Cuándo toca y qué declara la versión: [`process/version-control.md`](process/
 1. Un paso de base al final de `STEPS` en `hooks/lib/_migrations.py` y `SCHEMA_VERSION` al mismo número; `hooks/logbook-schema.sql` (esquema inicial) no se edita. Atributos y forma de `aplicar`: [`tooling/migrations.md`](tooling/migrations.md) § "Escribir un paso".
 2. Pruebas en `hooks/tests/` con la lista de pasos inyectable (`_connect(..., steps=...)`), cada una vista fallar con su falla sembrada, y el paso sobre una copia de una base real antes del gate de Fase 4 ([`profiles/self-applied/deployment.md`](profiles/self-applied/deployment.md) § "Validación").
 3. Bump minor; major si sube la mínima compatible. El fragmento declara el paso.
+
+## Agregar una migración guiada
+
+Cuándo toca y qué declara la versión: [`process/version-control.md`](process/version-control.md) § "Flujo al cerrar REQ". Mecánica:
+
+1. `migrations/<X.Y.Z>.md` (el prompt) y `migrations/<X.Y.Z>.py` (`STEPS` con los pasos guiados), con la versión del REQ; fila en el índice de `migrations/README.md`. Formato: [`migrations/README.md`](migrations/README.md); qué corre solo y qué pide al dev: [`tooling/migrations.md`](tooling/migrations.md) § "Migración guiada".
+2. Para lo que el catálogo no cubre, un paso libre; si hace falta una operación nueva en `hooks/lib/_machine.py`, va con su detección, su respaldo (o «pide al dev») y sus pruebas en `test_machine_config.py`.
+3. Pruebas de la migración en `hooks/tests/` con su falla sembrada. Quién revisa en Fase 4: [`profiles/self-applied/roles.md`](profiles/self-applied/roles.md) § "Subagentes por fase".
+4. Bump minor (major si la versión también sube la mínima compatible). El fragmento declara la migración.
 
 ## Cambiar paths o nombres de archivos importados
 

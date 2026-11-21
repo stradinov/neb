@@ -1,11 +1,18 @@
 #!/usr/bin/env python3
 """
-neb-migrate.py — estado y operación de la versión de esquema de neb.db (Neb, desde 6.48.0).
+neb-migrate.py — estado y operación de la versión de esquema de neb.db y de las migraciones guiadas
+(Neb, desde 6.48.0; migraciones guiadas desde 6.49.0).
 
   status [--json]            versiones del código y de la base, pasos de base detenidos y su motivo,
-                             respaldos. Solo lectura: no crea la base ni escribe.
-  apply                      abre la base como lo hace la captura: aplica los pasos de base pendientes y
-                             las reparaciones. Útil tras corregir lo que detenía un paso.
+                             pasos guiados pendientes y omitidos, respaldos. Solo lectura: no crea la base
+                             ni escribe.
+  apply [--include <id>…] [--sin-exclusivos]
+                             abre la base como lo hace la captura (pasos de base pendientes y reparaciones;
+                             reintenta ya un paso con fallo reciente; sin base no la crea) y corre los pasos
+                             guiados que dejan con qué deshacerlos. Los que piden al dev corren solo con
+                             --include <versión>:<paso>; --sin-exclusivos deja pendientes los exclusivos.
+  skip <id>                  guarda el «no» del dev a un paso guiado: sale de lo pendiente hasta que se pida
+                             con apply --include.
   restore <archivo> [--remigrar]
                              vuelve la base al contenido de un respaldo de neb-backups/ (neb.pre-paso-*.db
                              o neb.pre-restore.*.db). Antes respalda la base actual. Se niega si el código
@@ -33,7 +40,11 @@ _LIB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hooks", "
 sys.path.insert(0, _LIB)
 
 import _db_shared    # noqa: E402
+import _guided       # noqa: E402
+import _machine      # noqa: E402
 import _migrations   # noqa: E402
+
+ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
 _BACKUP_NAME_RE = re.compile(r"^neb\.pre-(paso-(\d+)|restore)\.[0-9TZ]+\.db$")
 
@@ -76,17 +87,24 @@ def status(home):
     c = _migrations.code_version()
     out = {"neb_version": _migrations.neb_version(), "schema_version_code": c, "db": None,
            "schema_version_db": None, "min_compatible_db": None, "estado": "sin-base",
-           "pasos_detenidos": [], "respaldos": []}
+           "pasos_detenidos": [], "respaldos": [], "guiados": None}
     db = _existing_db(home)
     if db is None:
+        out["guiados"] = _guided_status(home, None, set())
         return out
     out["db"] = db
     out["respaldos"] = [{"archivo": p, "bytes": n} for p, n in _migrations.list_backups(db)]
     con = _migrations.open_readonly(db)
     if con is None:
         out["estado"] = "ilegible"
+        out["guiados"] = _guided_status(home, db, set())
         return out
+    skips, skips_error = set(), None
     try:
+        try:
+            skips = _guided.read_skips(con)
+        except sqlite3.Error as e:
+            skips_error = str(e)
         v, f = _migrations.read_version(con)
         out["schema_version_db"], out["min_compatible_db"] = v, f
         if v > c:
@@ -103,7 +121,18 @@ def status(home):
         out["error"] = str(e)
     finally:
         con.close()
+    out["guiados"] = _guided_status(home, db, skips, skips_error)
     return out
+
+
+def _guided_status(home, db, skips, skips_error=None):
+    """Pasos guiados pendientes (lo que la detección dice ahora) y omitidos por el dev. Solo lee."""
+    migrations, errors = _guided.load(ROOT)
+    rows = _guided.survey(_machine.Ctx(home, db_path=db), migrations, skips)
+    return {"pendientes": [r for r in rows if not r["omitido"]],
+            "omitidos": [r for r in rows if r["omitido"]],
+            "errores_de_carga": [{"archivo": a, "motivo": m} for a, m in errors],
+            "error_omitidos": skips_error}
 
 
 _ESTADOS = {
@@ -116,10 +145,27 @@ _ESTADOS = {
 }
 
 
+def _print_guided(g):
+    for r in (g or {}).get("pendientes", []):
+        if r["error"]:
+            print(f"paso guiado {r['id']} ({r['titulo']}): falló la detección: {r['error']}")
+            continue
+        clase = "corre solo con apply" if r["clase"] == "solo" else "pide al dev (apply --include)"
+        print(f"paso guiado pendiente {r['id']} ({r['titulo']}): {clase}"
+              + (" · pide cerrar las demás sesiones" if r["exclusivo"] else ""))
+    for r in (g or {}).get("omitidos", []):
+        print(f"paso guiado omitido por el dev: {r['id']} ({r['titulo']})")
+    for e in (g or {}).get("errores_de_carga", []):
+        print(f"migración guiada que no carga: {e['archivo']}: {e['motivo']}")
+    if (g or {}).get("error_omitidos"):
+        print(f"no se pudieron leer los pasos omitidos: {g['error_omitidos']}")
+
+
 def _print_status(s):
     print(f"neb {s['neb_version']} · versión de esquema del código: {s['schema_version_code']}")
     if s["db"] is None:
         print("base: " + _ESTADOS["sin-base"])
+        _print_guided(s.get("guiados"))
         return
     print(f"base: {s['db']}")
     if s["schema_version_db"] is not None:
@@ -133,33 +179,127 @@ def _print_status(s):
         print(f"paso de base {p['paso']} ({p['titulo']}) detenido: {p['motivo']}")
     for r in s["respaldos"]:
         print(f"respaldo: {r['archivo']} ({r['bytes']} bytes)")
+    _print_guided(s.get("guiados"))
 
 
 # --------------------------------------------------------------------------- apply
 
-def apply(home):
+def apply(home, include=(), sin_exclusivos=False):
+    """Pasos de base y reparaciones (como la captura) si hay base; sin base no la crea (la crea la primera
+    captura, y un paso guiado puede necesitar ver la máquina sin ella). Luego, los pasos guiados."""
+    db = _db_shared.resolve_db_path(home)
+    v, skips, skips_error = None, set(), None
+    if _existing_db(home) is not None:
+        try:
+            con = _db_shared._connect(db, retry=True)
+        except _db_shared.DbUnavailable as e:
+            print(json.dumps(e.to_dict(), ensure_ascii=False))
+            return 1
+        if con is None:
+            print(json.dumps({"ok": False, "motivo": "sin-conexion",
+                              "detalle": "no se pudo abrir la base (candado ocupado o error de SQLite)",
+                              "accion": "reintenta en unos segundos"}, ensure_ascii=False))
+            return 1
+        try:
+            v, _f = _migrations.read_version(con)
+            try:
+                skips = _guided.read_skips(con)
+            except sqlite3.Error as e:
+                skips_error = str(e)
+        finally:
+            con.close()                   # cerrada antes de los pasos guiados: un paso exclusivo no la vería libre
+    if skips_error:
+        guided = _guided_out()
+        guided["error"] = f"no se pudo leer migration_skip ({skips_error}): no corrió ningún paso guiado"
+    else:
+        guided = _apply_guided(home, db, skips, include, sin_exclusivos)
+    s = status(home)
+    c = _migrations.code_version()
+    # Un paso con `espera` que no corrió (candado ocupado) no deja fila de error: ok exige también V >= C.
+    ok = (not s["pasos_detenidos"] and (v is None or v >= c) and not guided["error"]
+          and not guided["fallos"] and not guided["no_encontrados"])
+    print(json.dumps({"ok": ok, "base": s["db"], "schema_version_db": v, "schema_version_code": c,
+                      "pasos_detenidos": s["pasos_detenidos"], "guiados": guided}, ensure_ascii=False))
+    return 0 if ok else 1
+
+
+def _guided_out():
+    return {"aplicados": [], "pendientes": [], "manual": [], "fallos": [], "no_encontrados": [],
+            "errores_de_carga": [], "omision_sin_borrar": [], "error": None}
+
+
+def _apply_guided(home, db, skips, include, sin_exclusivos=False):
+    """Corre los pasos guiados pendientes que dejan con qué deshacerlos y los pedidos con --include. Un paso
+    omitido por el dev no corre salvo que se incluya; si corre bien, su «no» se borra. Con sin_exclusivos, los
+    pasos exclusivos quedan pendientes (el dev eligió «Después»)."""
+    migrations, errors = _guided.load(ROOT)
+    ctx = _machine.Ctx(home, db_path=db)
+    include = set(include)
+    out = _guided_out()
+    out["no_encontrados"] = sorted(k for k in include if _guided.find(migrations, k)[1] is None)
+    out["errores_de_carga"] = [{"archivo": a, "motivo": m} for a, m in errors]
+    unskip = []
+    for m in migrations:
+        for step in m.steps:
+            key = _guided.step_key(m, step)
+            included = key in include
+            if key in skips and not included:
+                continue
+            if step.exclusivo and sin_exclusivos:
+                r = {"estado": "pendiente", "respaldo": None, "detalle": "exclusivo: el dev lo dejó para después"}
+                try:
+                    if not _guided.detect(ctx, step):
+                        r = {"estado": "sin-cambio", "respaldo": None, "detalle": ""}
+                except (Exception, SystemExit) as e:  # noqa: BLE001
+                    r = {"estado": "fallo", "respaldo": None, "detalle": "detección: " + _guided.error_text(step, e)}
+            else:
+                r = _guided.run(ctx, step, allow_dev=included)
+            bucket = {"aplicado": "aplicados", "pendiente": "pendientes", "manual": "manual",
+                      "fallo": "fallos"}.get(r["estado"])
+            if bucket:
+                out[bucket].append({"id": key, "titulo": step.titulo, "detalle": r["detalle"],
+                                    "respaldo": r["respaldo"]})
+            if r["estado"] in ("aplicado", "sin-cambio") and key in skips:
+                unskip.append(key)
+    if unskip:
+        try:
+            con = _db_shared._connect(db)
+        except _db_shared.DbUnavailable:
+            con = None
+        if con is None:
+            out["omision_sin_borrar"] = unskip
+        else:
+            try:
+                out["omision_sin_borrar"] = [k for k in unskip if not _guided.remove_skip(con, k)]
+            finally:
+                con.close()
+    return out
+
+
+# --------------------------------------------------------------------------- skip
+
+def skip(home, key):
+    migrations, _errors = _guided.load(ROOT)
+    if _guided.find(migrations, key)[1] is None:
+        return _refuse("paso-desconocido", f"no hay un paso guiado {key}",
+                       "usa un id <versión>:<paso> de `neb-migrate.py status`")
     db = _db_shared.resolve_db_path(home)
     try:
-        con = _db_shared._connect(db, retry=True)
+        con = _db_shared._connect(db)
     except _db_shared.DbUnavailable as e:
         print(json.dumps(e.to_dict(), ensure_ascii=False))
         return 1
     if con is None:
-        print(json.dumps({"ok": False, "motivo": "sin-conexion",
-                          "detalle": "no se pudo abrir la base (candado ocupado o error de SQLite)",
-                          "accion": "reintenta en unos segundos"}, ensure_ascii=False))
-        return 1
+        return _refuse("sin-conexion", "no se pudo abrir la base (candado ocupado o error de SQLite)",
+                       "reintenta en unos segundos")
     try:
-        v, _f = _migrations.read_version(con)
+        _guided.add_skip(con, key, _migrations.neb_version())
+    except sqlite3.Error as e:
+        return _refuse("skip-fallido", f"no se pudo guardar el «no»: {e}", "reintenta en unos segundos")
     finally:
         con.close()
-    s = status(home)
-    c = _migrations.code_version()
-    # Un paso con `espera` que no corrió (candado ocupado) no deja fila de error: ok exige también V >= C.
-    ok = not s["pasos_detenidos"] and v >= c
-    print(json.dumps({"ok": ok, "schema_version_db": v, "schema_version_code": c,
-                      "pasos_detenidos": s["pasos_detenidos"]}, ensure_ascii=False))
-    return 0 if ok else 1
+    print(json.dumps({"ok": True, "omitido": key}, ensure_ascii=False))
+    return 0
 
 
 # --------------------------------------------------------------------------- restore
@@ -279,6 +419,9 @@ def schema():
               f"(neb {_migrations.neb_version()})")
         for _t, _n, sql in rows:
             print(sql.strip() + ";\n")
+        print("-- fuera de los pasos de base (la crea `skip` con IF NOT EXISTS; su forma no cambia: un cambio "
+              "entraría como paso de base):")
+        print(_guided.SKIP_DDL + ";")
         return 0
     finally:
         shutil.rmtree(tmp, ignore_errors=True)
@@ -294,7 +437,11 @@ def main(argv):
     sub = p.add_subparsers(dest="cmd", required=True)
     st = sub.add_parser("status")
     st.add_argument("--json", action="store_true")
-    sub.add_parser("apply")
+    ap = sub.add_parser("apply")
+    ap.add_argument("--include", nargs="+", default=[], metavar="ID")
+    ap.add_argument("--sin-exclusivos", action="store_true")
+    sk = sub.add_parser("skip")
+    sk.add_argument("id")
     rs = sub.add_parser("restore")
     rs.add_argument("archivo")
     rs.add_argument("--remigrar", action="store_true")
@@ -309,7 +456,9 @@ def main(argv):
             _print_status(s)
         return 0
     if args.cmd == "apply":
-        return apply(home)
+        return apply(home, args.include, args.sin_exclusivos)
+    if args.cmd == "skip":
+        return skip(home, args.id)
     if args.cmd == "restore":
         return restore(home, args.archivo, args.remigrar)
     return schema()

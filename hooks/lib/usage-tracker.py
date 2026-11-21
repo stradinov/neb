@@ -848,9 +848,13 @@ def _dumps(data, indent):
     return json.dumps(data, indent=indent, ensure_ascii=False)
 
 
+DELETE = object()   # valor de un cambio (clave, subclave, DELETE): mutate quitó esa subclave
+
+
 def update_json(path, mutate, dumps=_dumps):
     """Relee path justo antes, aplica mutate(data) → [(clave, subclave, valor)], escribe a un temporal del mismo
-    directorio, verifica que parsea, que trae los cambios y que nada más cambió, y reemplaza.
+    directorio, verifica que parsea, que trae los cambios y que nada más cambió, y reemplaza. Un cambio con
+    valor DELETE dice que mutate quitó esa subclave, y se verifica que ya no esté.
     Devuelve (cambios, None) o (None, motivo); con motivo, el archivo quedó intacto."""
     try:
         with open(path, encoding="utf-8", newline="") as f:
@@ -885,7 +889,11 @@ def update_json(path, mutate, dumps=_dumps):
             want = before.get(key)
             if key in touched:
                 want = dict(want or {})
-                want.update(touched[key])
+                for sub, value in touched[key].items():
+                    if value is DELETE:
+                        want.pop(sub, None)
+                    else:
+                        want[sub] = value
             if check.get(key) != want:
                 raise ValueError("la clave `%s` no quedó como se esperaba" % key)
         shutil.copymode(path, tmp)         # mkstemp crea con 0600 en POSIX

@@ -4,6 +4,34 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [6.49.0] - 2026-11-20
+
+> **Minor**: migración guiada. Una versión que pide configurar la máquina del dev (quitar una clave de `settings.json`, una variable de entorno de usuario) lo trae como pasos guiados en `migrations/<versión>.py`, con su prompt en `migrations/<versión>.md`. El arranque avisa y ofrece abrirla en una sesión nueva; `/neb:migrate` la corre. Segunda mitad del REQ `neb-migraciones-de-version` (la primera fue 6.48.0). 6.49.0 trae el mecanismo y ninguna migración guiada: la primera será la de 7.0.0.
+>
+> - **Paso guiado**: de catálogo (una operación de `hooks/lib/_machine.py` con sus argumentos) o libre (`detectar` y `aplicar` propios). Pendiente es lo que la detección dice en el momento; lo único que se guarda es el «no» del dev, en la tabla `migration_skip`.
+> - **Corre solo lo que deja con qué deshacerlo**: un paso de catálogo cuya operación deja respaldo, o un paso libre que lo declara (el programa comprueba que el respaldo declarado sea un archivo nuevo, no vivo y, si es SQLite, en un solo archivo e íntegro). Lo demás, como quitar un secreto o una variable de usuario, solo con `apply --include`, que `/neb:migrate` pide al dev en un solo menú.
+> - **Catálogo**: `settings_env_remove` (en el settings del dir de configuración en uso; respalda solo los pares que quita, nunca el archivo; con una clave secreta o una URL con credenciales, sin respaldo y pide al dev) y `user_env_remove` (registro de usuario de Windows; nunca guarda ni imprime el valor; a nivel de máquina o fuera de Windows, `manual`).
+> - **Cambia fuerza normativa**: en el repo `neb`, un REQ que pide configurar la máquina trae `migrations/<X.Y.Z>.md` y `.py`, probados en Fase 4 (`CLAUDE.md` § "Agregar una migración guiada"); `process/version-control.md` § "Flujo al cerrar REQ" lo verifica. Una versión con un paso libre que corre solo suma el rol Security Reviewer a su gate de Fase 4 (`profiles/self-applied/roles.md`). La colisión de versión renombra también `migrations/<X.Y.Z>.*`.
+> - **Comportamiento que cambia**: `neb-migrate.py apply` ya no crea la base si no existe.
+> - **Adoptantes**: nada que hacer en esta versión.
+
+### Added
+- **`hooks/lib/_guided.py`**: `GuidedStep`, registro de `migrations/<versión>.py` (orden por versión semántica; un nombre que no es versión se ignora; un archivo que no carga se reporta sin detener a los demás; argumentos de catálogo validados al cargar), detección, `migration_skip`, comprobación del respaldo declarado de un paso libre y de la condición de un paso `exclusivo` (antes de actuar y otra vez con `ctx.exclusivo_ok()`; la condición por omisión exige que ninguna otra conexión tenga la base abierta en ese momento). El mensaje de una excepción de un paso libre no se reporta: puede traer valores.
+- **`hooks/lib/_machine.py`**: catálogo `settings_env_remove` y `user_env_remove`.
+- **`bootstrap/neb-migrate.py`**: `status` suma los pasos guiados pendientes (con su clase) y omitidos; `apply [--include <id>…] [--sin-exclusivos]` corre los pasos guiados que corren solos y los incluidos; `skip <id>`; `schema` imprime también `migration_skip`.
+- **`commands/migrate.md`**: `/neb:migrate`, con el árbol del plugin (el mismo que mira el aviso).
+- **`migrations/README.md`**: índice (vacío) y formato de los dos archivos.
+- **`bootstrap/neb-bootstrap-context.py`**: aviso de migración guiada pendiente, con tope `GUIDED_NOTICE_MAX` (900 unidades UTF-16); solo lee.
+- **`methodology/platform-assumptions.md`**: R30 (un aviso del arranque puede pedir proponer una sesión nueva; un comando de plugin como prompt de esa sesión corre).
+- **`methodology/vocabulary.md`**: «migración guiada», «paso guiado».
+- **`CLAUDE.md`** § "Agregar una migración guiada"; `migrations/` en la lista de carpetas con `README.md`.
+- **Pruebas**: `test_migrations_guided.py` (38, con el aviso del arranque) y `test_machine_config.py` (24), contra un árbol y un registro de prueba (nunca el registro real); `test_usage_tracker.py` suma 2.
+
+### Changed
+- **`hooks/lib/usage-tracker.py`**: `update_json` acepta quitar una subclave (marca `DELETE` en la tupla de cambios) y verifica que ya no esté.
+- **`profiles/self-applied/roles.md`** § "Subagentes por fase": Security Reviewer en el gate de Fase 4 de una versión con un paso guiado libre que corre solo.
+- **`tooling/migrations.md`** § "Migración guiada" y § "Estado", **`tooling/index.md`**, **`process/version-control.md`**, **`docs/user-guide.md`** § "Mantener Neb al día", **`hooks/README.md`**.
+
 ## [6.48.0] - 2026-11-20
 
 > **Minor**: `neb.db` guarda su versión de esquema y cada módulo usa el esquema de su propio árbol. Arregla la mezcla de versiones que destapó el REQ de 7.0.0: un módulo con `NEB_HOME` apuntando a un árbol de otra versión tomaba de ahí el esquema y la conexión fallaba en silencio (`pendings.py list` respondía `[]`). Primera mitad del REQ `neb-migraciones-de-version`; la migración guiada (configuración de la máquina) llega en 6.49.0.
