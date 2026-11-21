@@ -166,6 +166,19 @@ class TestSettingsEnvRemove(Base):
             self.assertNotIn(SECRET, json.dumps(r))
         self.assertEqual(self.backups(), [])
 
+    def test_nombre_de_secreto_o_url_con_consulta_pide_al_dev_sin_marcarlo(self):
+        # Un olvido en `secretas` no deja el valor copiado en neb-backups/.
+        for env in ({"NEB_PRUEBA_WEBHOOK": SECRET}, {"NEB_PRUEBA_API_KEY": SECRET},
+                    {"NEB_PRUEBA_A": "https://ejemplo.test/api?token=" + SECRET},
+                    {"NEB_PRUEBA_A": "https://hooks.ejemplo.test/services/T/B#" + SECRET}):
+            self.put({"env": env})
+            claves = list(env)
+            self.assertEqual(_machine.settings_env_mode(self.ctx, claves), "dev", env)
+            r = _machine.settings_env_apply(self.ctx, claves)                  # sin la respuesta del dev
+            self.assertEqual(r["estado"], "fallo", env)
+            self.assertEqual(self.load(), {"env": env})
+        self.assertEqual(self.backups(), [])
+
     def test_settings_invalido_es_fallo_y_no_se_toca(self):
         with open(self.settings, "w", encoding="utf-8") as fh:
             fh.write("{roto " + SECRET)
@@ -290,6 +303,21 @@ class TestUserEnvRemove(Base):
         self.assertTrue(_machine.user_env_detect(ctx, "NEB_PRUEBA_X"))
         self.put({"env": {"NEB_PRUEBA_X": SECRET}})
         self.assertFalse(_machine.user_env_detect(ctx, "NEB_PRUEBA_X"))
+
+    def test_fuera_de_windows_lo_del_settings_local_tampoco_cuenta(self):
+        env = FakeUserEnv(kind="posix", user={"NEB_PRUEBA_X": SECRET})
+        ctx = _machine.Ctx(self.home, user_env=env)
+        self.put({"env": {"NEB_PRUEBA_X": SECRET}}, os.path.join(self.claude, "settings.local.json"))
+        self.assertFalse(_machine.user_env_detect(ctx, "NEB_PRUEBA_X"))
+
+    def test_quitada_por_otra_sesion_antes_del_borrado_es_sin_cambio(self):
+        class Gone(FakeUserEnv):
+            def delete_user(self, name):
+                del self.user[name]
+                raise FileNotFoundError(2, "no está")
+        env = Gone(user={"NEB_PRUEBA_X": SECRET})
+        r = _machine.user_env_apply(_machine.Ctx(self.home, user_env=env), "NEB_PRUEBA_X", allow_no_backup=True)
+        self.assertEqual(r["estado"], "sin-cambio")
 
     def test_ausente_es_sin_cambio(self):
         r = _machine.user_env_apply(self.ctx, "NEB_PRUEBA_X", allow_no_backup=True)

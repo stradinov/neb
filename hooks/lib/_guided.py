@@ -69,25 +69,30 @@ def migrations_dir(root):
     return os.path.join(root, "migrations")
 
 
+class InvalidMigration(ValueError):
+    """Error de forma de una migración (texto de neb, sin valores): su mensaje se reporta."""
+
+
 def _validate(version, steps):
     if not isinstance(steps, (list, tuple)):
-        raise ValueError("STEPS debe ser una lista de GuidedStep")
+        raise InvalidMigration("STEPS debe ser una lista de GuidedStep")
     seen = set()
     for s in steps:
         if not isinstance(s, GuidedStep):
-            raise ValueError("STEPS trae algo que no es GuidedStep")
+            raise InvalidMigration("STEPS trae algo que no es GuidedStep")
         if not STEP_ID_RE.match(str(s.id)) or s.id in seen:
-            raise ValueError(f"id de paso inválido o repetido: {s.id!r}")
+            raise InvalidMigration(f"id de paso inválido o repetido: {str(s.id)[:40]!r}")
         seen.add(s.id)
         if s.catalog:
             if s.op not in _machine.OPS:
-                raise ValueError(f"{s.id}: operación desconocida {s.op!r}")
+                raise InvalidMigration(f"{s.id}: operación desconocida {str(s.op)[:40]!r}")
             try:
                 _machine.OPS[s.op].validate(**s.args)
-            except TypeError as e:
-                raise ValueError(f"{s.id}: argumentos de {s.op}: {e}") from None
+            except (TypeError, ValueError) as e:
+                # validate de catálogo: mensajes fijos de neb; TypeError: nombres de argumentos, no valores
+                raise InvalidMigration(f"{s.id}: argumentos de {s.op}: {e}") from None
         elif not (callable(s.detectar) and callable(s.aplicar)):
-            raise ValueError(f"{s.id}: un paso libre trae detectar y aplicar")
+            raise InvalidMigration(f"{s.id}: un paso libre trae detectar y aplicar")
 
 
 def _self_module():
@@ -121,7 +126,7 @@ def load(root):
                 steps = list(getattr(mod, "STEPS", []))
                 _validate(version, steps)
             except (Exception, SystemExit) as e:  # noqa: BLE001 — una migración rota no tumba el arranque
-                errors.append((os.path.basename(path), f"{type(e).__name__}: {e}"))
+                errors.append((os.path.basename(path), load_error_text(e)))
                 continue
             prompt = os.path.join(migrations_dir(root), version + ".md")
             out.append(Migration(version, steps, prompt if os.path.isfile(prompt) else None))
@@ -132,6 +137,16 @@ def load(root):
             sys.modules["_guided"] = prev
     out.sort(key=lambda m: m.key)
     return out, errors
+
+
+def load_error_text(e):
+    """Motivo de una migración que no carga: el tipo y, si es de sintaxis, la línea. Sin el mensaje, como el
+    de un paso libre (error_text): viaja al JSON y al contexto de Claude. Un InvalidMigration (forma de la
+    migración, texto de neb) conserva el suyo."""
+    if isinstance(e, InvalidMigration):
+        return f"migración inválida: {e}"
+    line = getattr(e, "lineno", None) if isinstance(e, SyntaxError) else None
+    return type(e).__name__ + (f" en la línea {line}" if line else "") + " (mensaje omitido)"
 
 
 def step_key(migration, step):
@@ -236,6 +251,7 @@ def base_sin_otras_conexiones(ctx):
         con = sqlite3.connect(ctx.db_path, timeout=0, isolation_level=None)
     except sqlite3.Error as e:
         return f"no se pudo abrir la base: {e}"
+    switched = False
     try:
         mode_now = str(con.execute("PRAGMA journal_mode").fetchone()[0]).lower()
         if mode_now != "wal":
@@ -245,13 +261,24 @@ def base_sin_otras_conexiones(ctx):
         got = str(con.execute("PRAGMA journal_mode=DELETE").fetchone()[0]).lower()
         if got != "delete":
             return "otra sesión tiene la base abierta"
+        switched = True
         back = str(con.execute("PRAGMA journal_mode=WAL").fetchone()[0]).lower()
         if back != "wal":
             return "la base no volvió a WAL tras la prueba: otra sesión la abrió en ese momento"
+        switched = False
         return None
-    except sqlite3.Error:
-        return "otra sesión tiene la base abierta"
+    except sqlite3.OperationalError as e:
+        if "locked" in str(e) or "busy" in str(e):
+            return "otra sesión tiene la base abierta"
+        return f"la prueba de exclusividad falló ({type(e).__name__})"
+    except sqlite3.Error as e:
+        return f"la prueba de exclusividad falló ({type(e).__name__})"
     finally:
+        if switched:          # quedó en DELETE: un lector mode=ro posterior no la regresaría a WAL
+            try:
+                con.execute("PRAGMA journal_mode=WAL")
+            except sqlite3.Error:
+                pass
         con.close()
 
 
@@ -265,8 +292,12 @@ def _snapshot(ctx):
     """Archivos que ya existen en las carpetas donde un respaldo declarado puede quedar."""
     seen = set()
     for d in (ctx.claude_dir, ctx.backups_dir):
-        for p in glob.glob(os.path.join(d, "*")):
-            seen.add(_norm(p))
+        try:
+            with os.scandir(d) as it:          # glob("*") no ve los que empiezan con punto (.credentials.json)
+                for entry in it:
+                    seen.add(_norm(entry.path))
+        except OSError:
+            pass
     return seen
 
 
@@ -307,6 +338,8 @@ def _check_declared_backup(ctx, path, started, before):
     if head[:16] == b"SQLite format 3\x00":
         if len(head) < 20 or head[18] == 2 or head[19] == 2 or os.path.exists(real + "-wal"):
             return f"el respaldo {path} está en modo WAL: debe quedar en un solo archivo (journal_mode=DELETE)"
+        if os.path.exists(real + "-journal"):      # con immutable=1 SQLite no aplica un journal caliente
+            return f"el respaldo {path} tiene un -journal al lado: la copia quedó a medias"
         try:
             con = sqlite3.connect(Path(real).as_uri() + "?mode=ro&immutable=1", uri=True)
             try:
@@ -317,6 +350,10 @@ def _check_declared_backup(ctx, path, started, before):
             return f"el respaldo {path} no abre: {e}"
         if ok != "ok":
             return f"el respaldo {path} no pasa integrity_check"
+    try:
+        os.chmod(real, 0o600)          # puede estar directamente en ~/.claude, que no es 0700
+    except OSError:
+        pass
     return None
 
 
@@ -336,7 +373,7 @@ def run(ctx, step, allow_dev=False):
         motivo = cond(ctx)
         if motivo:
             return {"estado": "pendiente", "respaldo": None,
-                    "detalle": f"{motivo}: cierra las demás sesiones y vuelve a correr apply"}
+                    "detalle": f"{motivo}: cierra las demás sesiones y vuelve a correr apply --guiados"}
         ctx.exclusivo_ok = lambda: cond(ctx)
     started = time.time()
     before = set() if step.catalog else _snapshot(ctx)

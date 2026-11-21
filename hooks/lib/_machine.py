@@ -30,7 +30,8 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 
 USER_ENV_NAME_RE = re.compile(r"NEB_[A-Z0-9_]+")
 ENV_KEY_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
-CRED_URL_RE = re.compile(r"://\S*@")          # algo@ tras el esquema: usuario:clave@, token@ (conservador)
+CRED_URL_RE = re.compile(r"://\S*[@?#]")      # usuario:clave@, token@, ?token=, #… tras el esquema (conservador)
+SECRET_KEY_RE = re.compile(r"TOKEN|SECRET|PASS|KEY|AUTH|CRED|WEBHOOK", re.I)   # nombre que suena a secreto
 SETTINGS_FILES = ("settings.json", "settings.local.json")
 SETTINGS_BACKUP_PREFIX = "settings-env."
 BACKUP_DIR_NAME = "neb-backups"
@@ -117,7 +118,9 @@ def _present(env, claves):
 
 
 def _needs_dev(env, present, secretas):
-    return any(k in secretas for k in present) or \
+    """Sin respaldo (pide al dev) si la clave es secreta o lo parece, o si el valor parece llevar una
+    credencial en la URL: un olvido en `secretas` no deja un secreto copiado en neb-backups/."""
+    return any(k in secretas or SECRET_KEY_RE.search(k) for k in present) or \
         any(isinstance(env[k], str) and CRED_URL_RE.search(env[k]) for k in present)
 
 
@@ -174,7 +177,7 @@ def settings_env_apply(ctx, claves, secretas=(), ruta=None, allow_no_backup=Fals
     def mutate(data):
         block = data.get("env")
         if not isinstance(block, dict) or any(block.get(k, ut.DELETE) != v for k, v in pairs.items()):
-            raise ValueError("el settings cambió mientras corría el paso; vuelve a correr apply")
+            raise ValueError("el settings cambió mientras corría el paso; vuelve a correr /neb:migrate")
         for k in present:
             del block[k]
         return [("env", k, ut.DELETE) for k in present]
@@ -318,11 +321,12 @@ def user_env_detect(ctx, nombre):
         return False
     env = ctx.user_env
     if env.kind != "windows":
-        try:
-            if nombre in _read_env(ctx.settings_path()):
-                return False                   # viene del settings, no del perfil del shell
-        except (OSError, ValueError):
-            pass
+        for ruta in SETTINGS_FILES:
+            try:
+                if nombre in _read_env(ctx.settings_path(ruta)):
+                    return False               # viene de un settings, no del perfil del shell
+            except (OSError, ValueError):
+                pass
     return env.present_user(nombre) or env.present_machine(nombre)
 
 
@@ -351,6 +355,8 @@ def user_env_apply(ctx, nombre, allow_no_backup=False):
         return {"estado": "pendiente", "respaldo": None, "detalle": ctx_check}
     try:
         env.delete_user(nombre)
+    except FileNotFoundError:                  # otra sesión la quitó entre la detección y el borrado
+        return {"estado": "sin-cambio", "respaldo": None, "detalle": f"`{nombre}` ya no está"}
     except OSError as e:
         return {"estado": "fallo", "respaldo": None,
                 "detalle": f"no se pudo quitar `{nombre}`: {getattr(e, 'strerror', '') or type(e).__name__}"}

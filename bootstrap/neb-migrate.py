@@ -6,13 +6,15 @@ neb-migrate.py — estado y operación de la versión de esquema de neb.db y de 
   status [--json]            versiones del código y de la base, pasos de base detenidos y su motivo,
                              pasos guiados pendientes y omitidos, respaldos. Solo lectura: no crea la base
                              ni escribe.
-  apply [--include <id>…] [--sin-exclusivos]
+  apply [--guiados] [--include <id>…] [--sin-exclusivos]
                              abre la base como lo hace la captura (pasos de base pendientes y reparaciones;
-                             reintenta ya un paso con fallo reciente; sin base no la crea) y corre los pasos
-                             guiados que dejan con qué deshacerlos. Los que piden al dev corren solo con
-                             --include <versión>:<paso>; --sin-exclusivos deja pendientes los exclusivos.
+                             reintenta ya un paso con fallo reciente; sin base no la crea). Solo con --guiados
+                             (lo pasa /neb:migrate) corre además los pasos guiados que dejan con qué deshacerlos;
+                             los que piden al dev corren solo con --include <versión>:<paso>; --sin-exclusivos
+                             deja pendientes los exclusivos. --include y --sin-exclusivos implican --guiados.
   skip <id>                  guarda el «no» del dev a un paso guiado: sale de lo pendiente hasta que se pida
-                             con apply --include.
+                             con apply --include. Sin base, o con una base más nueva que no tiene la tabla,
+                             se niega.
   restore <archivo> [--remigrar]
                              vuelve la base al contenido de un respaldo de neb-backups/ (neb.pre-paso-*.db
                              o neb.pre-restore.*.db). Antes respalda la base actual. Se niega si el código
@@ -150,7 +152,7 @@ def _print_guided(g):
         if r["error"]:
             print(f"paso guiado {r['id']} ({r['titulo']}): falló la detección: {r['error']}")
             continue
-        clase = "corre solo con apply" if r["clase"] == "solo" else "pide al dev (apply --include)"
+        clase = "corre solo con apply --guiados" if r["clase"] == "solo" else "pide al dev (apply --include)"
         print(f"paso guiado pendiente {r['id']} ({r['titulo']}): {clase}"
               + (" · pide cerrar las demás sesiones" if r["exclusivo"] else ""))
     for r in (g or {}).get("omitidos", []):
@@ -184,9 +186,11 @@ def _print_status(s):
 
 # --------------------------------------------------------------------------- apply
 
-def apply(home, include=(), sin_exclusivos=False):
+def apply(home, include=(), sin_exclusivos=False, guiados=False):
     """Pasos de base y reparaciones (como la captura) si hay base; sin base no la crea (la crea la primera
-    captura, y un paso guiado puede necesitar ver la máquina sin ella). Luego, los pasos guiados."""
+    captura, y un paso guiado puede necesitar ver la máquina sin ella). Luego, solo con guiados (lo pide
+    /neb:migrate), los pasos guiados: reintentar un paso de base no corre la migración guiada."""
+    guiados = bool(guiados or include or sin_exclusivos)
     db = _db_shared.resolve_db_path(home)
     v, skips, skips_error = None, set(), None
     if _existing_db(home) is not None:
@@ -208,7 +212,9 @@ def apply(home, include=(), sin_exclusivos=False):
                 skips_error = str(e)
         finally:
             con.close()                   # cerrada antes de los pasos guiados: un paso exclusivo no la vería libre
-    if skips_error:
+    if not guiados:
+        guided = None
+    elif skips_error:
         guided = _guided_out()
         guided["error"] = f"no se pudo leer migration_skip ({skips_error}): no corrió ningún paso guiado"
     else:
@@ -216,8 +222,11 @@ def apply(home, include=(), sin_exclusivos=False):
     s = status(home)
     c = _migrations.code_version()
     # Un paso con `espera` que no corrió (candado ocupado) no deja fila de error: ok exige también V >= C.
-    ok = (not s["pasos_detenidos"] and (v is None or v >= c) and not guided["error"]
-          and not guided["fallos"] and not guided["no_encontrados"])
+    # Una migración guiada que no carga tampoco es ok: sus pasos nunca correrían, en silencio.
+    ok = not s["pasos_detenidos"] and (v is None or v >= c)
+    if guided is not None:
+        ok = ok and not (guided["error"] or guided["fallos"] or guided["no_encontrados"]
+                         or guided["errores_de_carga"])
     print(json.dumps({"ok": ok, "base": s["db"], "schema_version_db": v, "schema_version_code": c,
                       "pasos_detenidos": s["pasos_detenidos"], "guiados": guided}, ensure_ascii=False))
     return 0 if ok else 1
@@ -283,6 +292,9 @@ def skip(home, key):
     if _guided.find(migrations, key)[1] is None:
         return _refuse("paso-desconocido", f"no hay un paso guiado {key}",
                        "usa un id <versión>:<paso> de `neb-migrate.py status`")
+    if _existing_db(home) is None:                 # como apply: sin base no la crea
+        return _refuse("sin-base", "no hay base donde guardar el «no»",
+                       "el paso sigue pendiente; se podrá omitir cuando la primera captura cree la base")
     db = _db_shared.resolve_db_path(home)
     try:
         con = _db_shared._connect(db)
@@ -293,6 +305,13 @@ def skip(home, key):
         return _refuse("sin-conexion", "no se pudo abrir la base (candado ocupado o error de SQLite)",
                        "reintenta en unos segundos")
     try:
+        v, _f = _migrations.read_version(con)
+        has_table = con.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'migration_skip'"
+                                ).fetchone() is not None
+        if v > _migrations.code_version() and not has_table:
+            # Base más nueva que opera sin migrar: este código no le agrega tablas (E1, regla de compatibilidad).
+            return _refuse("base-mas-nueva", "la base es de una versión de neb más nueva y no tiene migration_skip",
+                           "actualiza neb (plugin y clon) y vuelve a correr /neb:migrate")
         _guided.add_skip(con, key, _migrations.neb_version())
     except sqlite3.Error as e:
         return _refuse("skip-fallido", f"no se pudo guardar el «no»: {e}", "reintenta en unos segundos")
@@ -438,6 +457,7 @@ def main(argv):
     st = sub.add_parser("status")
     st.add_argument("--json", action="store_true")
     ap = sub.add_parser("apply")
+    ap.add_argument("--guiados", action="store_true")
     ap.add_argument("--include", nargs="+", default=[], metavar="ID")
     ap.add_argument("--sin-exclusivos", action="store_true")
     sk = sub.add_parser("skip")
@@ -456,7 +476,7 @@ def main(argv):
             _print_status(s)
         return 0
     if args.cmd == "apply":
-        return apply(home, args.include, args.sin_exclusivos)
+        return apply(home, args.include, args.sin_exclusivos, args.guiados)
     if args.cmd == "skip":
         return skip(home, args.id)
     if args.cmd == "restore":

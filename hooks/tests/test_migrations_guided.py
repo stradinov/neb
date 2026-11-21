@@ -168,10 +168,10 @@ class Base(unittest.TestCase):
         with open(os.path.join(self.claude, "settings.json"), encoding="utf-8") as fh:
             return json.load(fh)["env"]
 
-    def apply(self, include=(), sin_exclusivos=False):
+    def apply(self, include=(), sin_exclusivos=False, guiados=True):
         out = io.StringIO()
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
-            rc = nm.apply(self.home, include, sin_exclusivos)
+            rc = nm.apply(self.home, include, sin_exclusivos, guiados)
         return rc, json.loads(out.getvalue())
 
     def skip(self, key):
@@ -216,6 +216,7 @@ class TestRegistro(Base):
             self.write_migration("1.0.0", "from _guided import GuidedStep\n" + text)
             _migrations, errors = _guided.load(self.tree)
             self.assertEqual([a for a, _m in errors], ["1.0.0.py"], text)
+            self.assertIn("migración inválida: ", errors[0][1], text)  # forma de la migración: el mensaje se conserva
 
     def test_carga_aunque_el_modulo_tenga_otro_nombre(self):
         # El arranque carga _guided por ruta con otro nombre: los pasos siguen siendo GuidedStep de ese módulo.
@@ -538,10 +539,8 @@ class TestApply(Base):
     def test_omitidos_ilegibles_no_corren_pasos_guiados(self):
         con = sqlite3.connect(self.db)
         try:
-            con.execute("CREATE VIEW migration_skip AS SELECT columna_que_no_existe AS id FROM work")
+            con.execute("CREATE TABLE migration_skip (x TEXT)")          # «no such column: id», no «no such table»
             con.commit()
-        except sqlite3.Error:
-            self.skipTest("este SQLite valida la vista al crearla")
         finally:
             con.close()
         self.touch("libre.txt")
@@ -585,6 +584,135 @@ class TestApply(Base):
         self.assertNotIn("sin acceso", rows[0]["error"])            # mensaje de un paso libre: omitido
         rc, out = self.apply()
         self.assertEqual(self.ids(out["guiados"]["fallos"]), ["d"])
+
+    def test_apply_a_secas_no_corre_pasos_guiados(self):
+        # Reintentar un paso de base (lo que sugiere el aviso de un paso detenido) no corre la migración guiada.
+        self.settings({"NEB_PRUEBA_A": "x"})
+        self.touch("libre.txt")
+        rc, out = self.apply(guiados=False)
+        self.assertEqual(rc, 0)
+        self.assertIsNone(out["guiados"])
+        self.assertTrue(os.path.exists(os.path.join(self.claude, "libre.txt")))
+        self.assertEqual(self.settings_env(), {"NEB_PRUEBA_A": "x"})
+        rc, out = self.apply(sin_exclusivos=True, guiados=False)     # --sin-exclusivos implica --guiados
+        self.assertEqual(self.ids(out["guiados"]["aplicados"]), ["libre-respaldo", "settings-solo"])
+
+    def test_migracion_que_no_carga_deja_apply_sin_ok_y_sin_su_mensaje(self):
+        self.write_migration("9.9.8", "raise RuntimeError('s3cr3t-v4l0r')\n")
+        self.write_migration("9.9.6", "def f(:\n")
+        rc, out = self.apply()
+        self.assertEqual(rc, 1)
+        errores = {e["archivo"]: e["motivo"] for e in out["guiados"]["errores_de_carga"]}
+        self.assertEqual(sorted(errores), ["9.9.6.py", "9.9.8.py"])
+        self.assertIn("RuntimeError", errores["9.9.8.py"])
+        self.assertIn("SyntaxError en la línea 1", errores["9.9.6.py"])
+        self.assertNotIn("s3cr3t-v4l0r", json.dumps(out))
+        self.assertNotIn("s3cr3t-v4l0r", json.dumps(nm.status(self.home)))
+
+    def remove_db(self):
+        for s in ("", "-wal", "-shm"):
+            if os.path.exists(self.db + s):
+                os.remove(self.db + s)
+
+    def test_skip_sin_base_se_niega_y_no_la_crea(self):
+        self.remove_db()
+        self.touch("dev.txt")
+        rc, out = self.skip(V + ":libre-dev")
+        self.assertEqual((rc, out["motivo"]), (1, "sin-base"))
+        self.assertEqual([n for n in os.listdir(self.claude) if n.startswith("neb")], [])
+        self.assertIn(V + ":libre-dev", self.pending()[0])
+
+    def test_skip_en_base_mas_nueva_sin_la_tabla_se_niega(self):
+        import _migrations
+        c = _migrations.code_version()
+        con = sqlite3.connect(self.db)
+        try:
+            con.execute("INSERT INTO schema_step (step, min_code, title, neb_version, applied_at, backup) "
+                        "VALUES (?, 1, 'futuro', '99.0.0', '2099-01-01', NULL)", (c + 1,))
+            con.commit()
+        finally:
+            con.close()
+        rc, out = self.skip(V + ":libre-dev")
+        self.assertEqual((rc, out["motivo"]), (1, "base-mas-nueva"))
+        con = sqlite3.connect(self.db)
+        try:
+            self.assertIsNone(con.execute("SELECT name FROM sqlite_master WHERE name = 'migration_skip'").fetchone())
+            con.execute(_guided.SKIP_DDL)                            # con la tabla, la base más nueva sí lo guarda
+            con.commit()
+        finally:
+            con.close()
+        rc, out = self.skip(V + ":libre-dev")
+        self.assertEqual((rc, out["ok"]), (0, True))
+
+    def test_respaldo_oculto_que_ya_existia_no_cuenta(self):
+        self.touch(".credentials.json")
+
+        def aplicar(c):
+            p = os.path.join(c.claude_dir, ".credentials.json")
+            with open(p, "w", encoding="utf-8") as fh:
+                fh.write("reescrito")
+            return {"respaldo": p}
+        r = self.run_declaring(aplicar)
+        self.assertEqual(r["estado"], "fallo")
+        self.assertIn("ya existía", r["detalle"])
+
+    def sqlite_copy(self, name):
+        bak = os.path.join(self.claude, name)
+        src, dst = sqlite3.connect(self.db), sqlite3.connect(bak)
+        try:
+            src.backup(dst)
+            dst.execute("PRAGMA journal_mode=DELETE").fetchone()
+        finally:
+            dst.close()
+            src.close()
+        return bak
+
+    def test_respaldo_sqlite_con_journal_no_cuenta(self):
+        def aplicar(c):
+            bak = self.sqlite_copy("neb.pre-journal.db")
+            with open(bak + "-journal", "wb") as fh:
+                fh.write(b"\x00" * 512)
+            return {"respaldo": bak}
+        r = self.run_declaring(aplicar)
+        self.assertEqual(r["estado"], "fallo")
+        self.assertIn("-journal", r["detalle"])
+
+    def test_respaldo_que_sirve_queda_solo_para_el_usuario(self):
+        calls = []
+        real_chmod = os.chmod
+        with mock.patch.object(_guided.os, "chmod", lambda p, m: (calls.append((p, m)), real_chmod(p, m))):
+            r = self.run_declaring(lambda c: {"respaldo": self.sqlite_copy("neb.pre-chmod.db")})
+        self.assertEqual(r["estado"], "aplicado")
+        self.assertEqual([(_guided._norm(p), m) for p, m in calls],
+                         [(_guided._norm(os.path.join(self.claude, "neb.pre-chmod.db")), 0o600)])
+
+    def test_exclusividad_con_un_archivo_que_no_es_base_reporta_su_tipo(self):
+        bad = os.path.join(self.claude, "no-es-base.db")
+        with open(bad, "wb") as fh:
+            fh.write(b"esto no es sqlite" * 100)
+        motivo = _guided.base_sin_otras_conexiones(_machine.Ctx(self.home, db_path=bad, user_env=self.env))
+        self.assertIn("DatabaseError", motivo)
+        self.assertNotIn("otra sesión", motivo)
+
+    def test_exclusividad_que_no_vuelve_a_wal_la_regresa(self):
+        real_connect = sqlite3.connect
+
+        class Con:
+            def __init__(self, con):
+                self.con, self.fooled = con, False
+
+            def execute(self, sql, *a):
+                if sql == "PRAGMA journal_mode=WAL" and not self.fooled:   # la primera vuelta «falla»
+                    self.fooled = True
+                    return real_connect(":memory:").execute("SELECT 'delete'")
+                return self.con.execute(sql, *a)
+
+            def close(self):
+                self.con.close()
+        with mock.patch.object(_guided.sqlite3, "connect", lambda *a, **k: Con(real_connect(*a, **k))):
+            motivo = _guided.base_sin_otras_conexiones(_machine.Ctx(self.home, db_path=self.db, user_env=self.env))
+        self.assertIn("no volvió a WAL", motivo)
+        self.assertEqual(self.journal_mode(), "wal")
 
 
 class TestAvisoGuiado(Base):
@@ -636,8 +764,34 @@ class TestAvisoGuiado(Base):
     def test_archivo_roto_no_rompe_el_arranque(self):
         self.write_migration("9.9.8", "raise RuntimeError('rota')\n")
         self.touch("libre.txt")
-        self.assertIn("1 paso", self.notice())
+        text = self.notice()
+        self.assertIn("1 paso", text)
+        self.assertIn("1 que no carga", text)
+        self.assertNotIn("rota", text)
         os.remove(os.path.join(self.tree, "hooks", "lib", "_guided.py"))
+        self.assertIsNone(self.notice())
+
+    def test_lo_que_no_carga_avisa_aunque_no_haya_pendientes(self):
+        # Si callara, los pasos de esa versión nunca correrían y nadie lo sabría.
+        os.remove(os.path.join(self.tree, "migrations", V + ".py"))
+        self.write_migration("9.9.8", "def f(:\n")
+        text = self.notice()
+        self.assertIsNotNone(text)
+        self.assertIn("`9.9.8`", text)
+        self.assertIn("1 que no carga o cuya detección falla", text)
+        self.assertNotIn("paso que pide", text)
+        self.assertIn("No hay nada que correr", text)                # sin oferta de una sesión que nada podría correr
+        self.assertNotIn("sesión nueva", text)
+        self.assertLessEqual(nb._u16(nb.ENV_NOTICE % text), nb.GUIDED_NOTICE_MAX)
+
+    def test_detección_que_falla_avisa(self):
+        self.write_migration("9.9.10", "from _guided import GuidedStep\n"
+                             "def d(ctx):\n    raise OSError('sin acceso')\n"
+                             "STEPS = [GuidedStep('d', 'd', detectar=d, aplicar=lambda c: {})]\n")
+        text = self.notice()
+        self.assertIn("`9.9.10`", text)
+        self.assertIn("1 que no carga o cuya detección falla", text)
+        self.skip("9.9.10:d")                                        # «No aplicarlo»: deja de avisar
         self.assertIsNone(self.notice())
 
     def test_tope_con_muchas_versiones(self):

@@ -20,7 +20,7 @@ NEB_SRC="${CLAUDE_PLUGIN_ROOT}"
 py "$NEB_SRC/bootstrap/neb-migrate.py" status --json   # o python / python3
 ```
 
-Lee `guiados.pendientes` (cada fila: `id` `<versión>:<paso>`, `titulo`, `clase` `solo` o `dev`, `exclusivo`, `error`), `guiados.omitidos` y `guiados.errores_de_carga`. Sin pendientes, dilo en una línea (con los omitidos, si los hay, y que se piden con `apply --include <id>`) y termina. Un error de carga o de detección se reporta tal cual y no detiene lo demás.
+Lee `guiados.pendientes` (cada fila: `id` `<versión>:<paso>`, `titulo`, `clase` `solo` o `dev`, `exclusivo`, `error`), `guiados.omitidos` y `guiados.errores_de_carga`. Si `guiados.error_omitidos` no es nulo, repórtalo y termina: no se sabe qué omitió el dev, y el menú le volvería a ofrecer lo que ya rechazó. Sin pendientes, dilo en una línea (con los omitidos, si los hay, y que se piden con `apply --include <id>`) y termina. Un error de carga o de detección se reporta tal cual y no detiene lo demás: esos pasos no corren hasta que una versión de neb lo corrija. Un paso cuya detección falla (fila con `error`) entra en el menú del paso 4 solo con «No aplicarlo» y «Después», para que el dev pueda dejar de verlo en el aviso.
 
 ## 2. El prompt de cada versión
 
@@ -28,21 +28,21 @@ Por cada versión con pasos pendientes, en orden de versión, lee `"$NEB_SRC/mig
 
 ## 3. Pasos que corren solos
 
-Si algún pendiente es `exclusivo`, antes pide al dev cerrar las demás sesiones de Claude Code (las que abren `neb.db`) con un menú de selección (`general/communication.md` § "Elecciones: menú de selección"): «Ya las cerré» primero y «Después» (Claude corre lo demás y los exclusivos quedan pendientes). Luego:
+Si algún pendiente es `exclusivo`, antes pide al dev cerrar las demás sesiones de Claude Code (las que abren `neb.db`) con un menú de selección (`general/communication.md` § "Elecciones: menú de selección"): «Ya las cerré» primero y «Después» (Claude corre lo demás y los exclusivos quedan pendientes). Ninguna va marcada «(Recomendado)», ni aquí ni en el menú del paso 4: decide el dev. Luego:
 
 ```bash
-py "$NEB_SRC/bootstrap/neb-migrate.py" apply                    # con «Ya las cerré», o si no hay exclusivos
-py "$NEB_SRC/bootstrap/neb-migrate.py" apply --sin-exclusivos   # con «Después»
+py "$NEB_SRC/bootstrap/neb-migrate.py" apply --guiados                    # con «Ya las cerré», o si no hay exclusivos
+py "$NEB_SRC/bootstrap/neb-migrate.py" apply --guiados --sin-exclusivos   # con «Después»
 ```
 
-Corre los pasos de base y los pasos guiados que dejan con qué deshacerlos; ninguno más. Un exclusivo cuya condición no se cumple queda en `guiados.pendientes` con su motivo: díselo al dev y ofrécele volver a correr este paso cuando cierre las demás sesiones. Si la salida trae `guiados.error`, no corrió ningún paso guiado: repórtalo y termina.
+Corre los pasos de base y los pasos guiados que dejan con qué deshacerlos; ninguno más. Sin `--guiados`, `apply` solo corre los pasos de base. Un exclusivo cuya condición no se cumple queda en `guiados.pendientes` con su motivo: díselo al dev y ofrécele volver a correr este paso cuando cierre las demás sesiones. Si la salida trae `guiados.error`, no corrió ningún paso guiado: repórtalo y termina. Si no trae `guiados` (la base no abrió: `motivo`, `accion`), tampoco corrió ningún paso guiado: reporta `detalle` y `accion` y termina.
 
 ## 4. Pasos que piden al dev
 
-Los pendientes con `clase: dev` no dejan con qué deshacerlos (quitar un secreto o una variable de usuario, un paso libre sin respaldo). Van todos en **un solo menú**: la herramienta de preguntas al usuario, con una pregunta por paso (hasta cuatro por llamada; si son más, la siguiente llamada sigue el mismo menú). Cada pregunta nombra el paso (`titulo` e `id`) y lo que el prompt de su versión diga de él; opciones, en este orden:
+Los pendientes con `clase: dev` (y los de detección fallida, sin «Aplicarlo») no dejan con qué deshacerlos (quitar un secreto o una variable de usuario, un paso libre sin respaldo). Van todos en **un solo menú**: la herramienta de preguntas al usuario, con una pregunta por paso (hasta cuatro por llamada `[asumido: límite de la herramienta, sin fila de supuesto de plataforma]`; si son más, la siguiente llamada sigue el mismo menú). Cada pregunta nombra el paso (`titulo` e `id`) y lo que el prompt de su versión diga de él; opciones, en este orden:
 
 - **«Aplicarlo»** — *Claude lo corre; no deja respaldo.*
-- **«No aplicarlo»** — *Claude guarda tu «no» y deja de ofrecerlo; se pide después con `apply --include`.*
+- **«No aplicarlo»** — *Claude guarda tu «no» y deja de ofrecerlo; se pide después con `apply --include`.* En una fila con `error` (detección fallida), en su lugar: *Claude guarda tu «no»: aunque una versión de neb corrija la detección, este paso no se vuelve a ofrecer; se pide con `apply --include <id>`.*
 - **«Después»** — *queda pendiente y el arranque lo vuelve a avisar.*
 
 Sin la herramienta de preguntas (sesión sin interfaz, tarea programada), estos pasos quedan pendientes: no corras `apply --include` ni `skip`, y dilo en el reporte.
@@ -54,7 +54,7 @@ py "$NEB_SRC/bootstrap/neb-migrate.py" apply --include <id> [<id> …]   # los �
 py "$NEB_SRC/bootstrap/neb-migrate.py" skip <id>                       # uno por cada «No aplicarlo»
 ```
 
-Si en el paso 3 el dev eligió «Después», agrega `--sin-exclusivos` también a `apply --include`. Un paso que responde `manual` (una variable a nivel de máquina, o fuera de Windows) sigue pendiente hasta que el dev la quite a mano: díselo y ofrécele «No aplicarlo» para que el arranque deje de avisar.
+Si en el paso 3 el dev eligió «Después», agrega `--sin-exclusivos` también a `apply --include`. `skip` se niega sin base o con una base de una versión de neb más nueva (`motivo`): el paso sigue pendiente; díselo al dev. Un paso que responde `manual` (una variable a nivel de máquina, o fuera de Windows) sigue pendiente hasta que el dev la quite a mano: díselo y ofrécele «No aplicarlo» para que el arranque deje de avisar.
 
 Nunca corras `restore`, ni `apply --include` o `skip` de un paso que el dev no eligió en el menú de esta sesión.
 
@@ -67,5 +67,5 @@ Reporta, conclusión primero:
 - lo aplicado, con el respaldo que dejó cada paso (`respaldo` en la salida de `apply`);
 - lo que queda pendiente y por qué (un exclusivo con otras sesiones abiertas, «Después», sin menú);
 - lo `manual`, con la instrucción que trae su `detalle` (una variable a nivel de máquina, fuera de Windows);
-- los fallos, con su `detalle`; y `guiados.omision_sin_borrar` (pasos aplicados cuyo «no» no se pudo borrar: siguen como omitidos);
+- los fallos, con su `detalle`, y `guiados.errores_de_carga` (esos pasos no corrieron); y `guiados.omision_sin_borrar` (pasos aplicados cuyo «no» no se pudo borrar: siguen como omitidos);
 - si se quitó alguna variable de entorno: las sesiones y terminales ya abiertas la conservan hasta reiniciarse.

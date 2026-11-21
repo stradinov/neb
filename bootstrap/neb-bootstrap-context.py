@@ -205,18 +205,23 @@ def _db_notice(bootstrap_dir, neb_home=None, home=None):
 
 GUIDED_NOTICE_MAX = 900  # unidades UTF-16 del aviso de migración guiada pendiente, con su envoltura
 GUIDED_NOTICE = (
-    "Hay una migración de Neb pendiente (%s): %s. No la inicies por tu cuenta en esta sesión, salvo que se haya "
-    "abierto con `/neb:migrate` o el dev lo pida. Si hay una persona presente, al cierre de tu primera respuesta y una "
-    "sola vez por conversación ofrécele abrirla en una sesión nueva: con la herramienta de tu entorno para "
-    "proponer una sesión, con el encargo «Corre la migración pendiente de neb con /neb:migrate»; si tu entorno "
-    "no la trae, dale el comando `claude \"/neb:migrate\"`.")
+    "Hay una migración guiada de Neb pendiente (%s): %s. No la inicies por tu cuenta en esta sesión, salvo que se "
+    "haya abierto con `/neb:migrate` o el dev lo pida. Si hay una persona presente, al cierre de tu primera respuesta "
+    "y una sola vez por conversación ofrécele abrirla en una sesión nueva: con la herramienta de tu entorno para "
+    "proponer una sesión, con el encargo «Corre la migración guiada pendiente de neb con /neb:migrate»; si tu "
+    "entorno no la trae, dale el comando `claude \"/neb:migrate\"`.")
+GUIDED_BROKEN_NOTICE = (
+    "Una migración guiada de Neb no carga o su detección falla (%s): %s. No hay nada que correr ni que ofrecer; "
+    "díselo al dev en una línea al cierre de tu primera respuesta (lo detalla `neb-migrate.py status`): lo "
+    "corrige una versión de neb, o el dev responde «No aplicarlo» a un paso cuya detección falla en `/neb:migrate`.")
 _SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
 
 
 def _guided_notice(bootstrap_dir, home=None):
     """Aviso de migración guiada pendiente (pasos guiados de su propio árbol que la detección marca y el dev
     no omitió), o None. Solo lee: la base en mode=ro y la detección de cada paso. Un `migrations/<versión>.py`
-    que no carga no rompe el arranque."""
+    que no carga, o un paso cuya detección falla, no rompe el arranque y se cuenta en el aviso: si callara, sus
+    pasos nunca correrían."""
     own_root = os.path.dirname(bootstrap_dir)
     lib = os.path.join(own_root, 'hooks', 'lib')
     if not os.path.isdir(os.path.join(own_root, 'migrations')):
@@ -225,8 +230,8 @@ def _guided_notice(bootstrap_dir, home=None):
         if lib not in sys.path:
             sys.path.insert(0, lib)              # _guided importa _machine de su carpeta
         guided = _load_module(os.path.join(lib, '_guided.py'), 'neb_guided_own')
-        migrations, _errors = guided.load(own_root)
-        if not migrations:
+        migrations, load_errors = guided.load(own_root)
+        if not migrations and not load_errors:
             return None
         mig = _load_module(os.path.join(lib, '_migrations.py'), 'neb_migrations_own')
         home = home or os.path.expanduser('~')
@@ -243,17 +248,26 @@ def _guided_notice(bootstrap_dir, home=None):
     except (Exception, SystemExit):  # noqa: BLE001 — el aviso es accesorio; sin los omitidos, tampoco avisa
         return None
     pending = [r for r in rows if not r['omitido'] and not r['error'] and r['clase']]
-    if not pending:
+    broken = [r['version'] for r in rows if not r['omitido'] and r['error']]
+    broken += [os.path.splitext(a)[0] for a, _m in load_errors]
+    if not pending and not broken:
         return None
     versions = []
-    for r in pending:
-        if _SEMVER_RE.match(r['version']) and r['version'] not in versions:
-            versions.append(r['version'])
+    for v in [r['version'] for r in pending] + broken:
+        if _SEMVER_RE.match(v) and v not in versions:
+            versions.append(v)
     n = len(pending)
-    count = '1 paso que pide configurar la máquina' if n == 1 else '%d pasos que piden configurar la máquina' % n
+    parts = []
+    if n:
+        parts.append('1 paso que pide configurar la máquina' if n == 1
+                     else '%d pasos que piden configurar la máquina' % n)
+    if broken:
+        parts.append('%d que no carga o cuya detección falla (lo detalla `neb-migrate.py status`)' % len(broken))
+    count = '; '.join(parts)
+    template = GUIDED_NOTICE if n else GUIDED_BROKEN_NOTICE      # solo algo roto: una sesión no podría correr nada
     for k in range(len(versions), 0, -1):
         shown = ', '.join('`%s`' % v for v in versions[:k]) + ('' if k == len(versions) else ', …')
-        text = GUIDED_NOTICE % (shown, count)
+        text = template % (shown, count)
         if _u16(ENV_NOTICE % text) <= GUIDED_NOTICE_MAX:
             return text
     return None
