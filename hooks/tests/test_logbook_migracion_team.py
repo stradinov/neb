@@ -19,6 +19,10 @@ Cubre:
     nombra cada objeto y cómo quitarlo; un objeto creado entre el precheck y aplicar revierte el paso, que
     se reintenta. Candado ocupado, concurrencia entre procesos, candado ajeno sobre una base ya migrada y
     journal_mode=DELETE.
+  • Con los pasos de 7.3.0, la base 6.45.0 llega también por el paso 3 (eje proyecto): su raíz 'cliente' queda
+    como 'proyecto' y el único respaldo que queda es el del paso 3. Las pruebas que prueban el paso 2 detenido
+    corren con los pasos de 7.0.0–7.2.x (STEPS_7_2), donde el paso 2 tiene `espera` y nada lo sigue; con los
+    de 7.3.0 el paso 3 no tiene `espera` y un paso 2 detenido responde paso-bloqueado (TestPaso2BloqueadoEn730).
   • _add_missing_columns: tolera la carrera «duplicate column name» y propaga cualquier otro error.
 
 Invariantes: DBs y homes temporales (tempfile); nunca ~/.claude; ningún test hace red.
@@ -56,6 +60,7 @@ HOOK = os.path.join(HERE, "..", "neb-hook.py")
 PS1 = os.path.join(HERE, "..", "logbook-sync.ps1")
 SH = os.path.join(HERE, "..", "logbook-sync.sh")
 STEP1 = _migrations.STEPS[0]
+STEPS_7_2 = _migrations.STEPS[:2]       # pasos de 7.0.0–7.2.x: el paso 2 con `espera` y nada después
 
 
 RETIRED_WORK = ("owner", "lock_state", "takeover_by", "locked_at", "payload_version", "origin_dev", "dirty",
@@ -196,6 +201,27 @@ def _hashes(path):
         return out
     finally:
         c.close()
+
+
+def _sin_topic(hashes):
+    """Hashes sin `topic`: el paso 3 renombra la raíz 'cliente' (lo comprueba _topics)."""
+    return {k: v for k, v in hashes.items() if k != "topic"}
+
+
+def _topics(path):
+    c = sqlite3.connect(path)
+    try:
+        return c.execute("SELECT id, slug, name, parent_id FROM topic ORDER BY id").fetchall()
+    finally:
+        c.close()
+
+
+TOPICS_7_3 = [(1, "proyecto", "Proyecto", None), (2, "alpha", "Alpha", 1)]     # la siembra de _base_645 tras el paso 3
+
+
+def _code_version():
+    """(V, F) que deja el código con los pasos vigentes (los de 7.3.0, o STEPS_7_2 donde se parchan)."""
+    return _migrations.code_version(), _migrations.STEPS[-1].min_code
 
 
 def _schema_version(path):
@@ -583,12 +609,23 @@ class _Paso2(unittest.TestCase):
     def assert_como_nueva(self):
         con, err = _connect_quiet(self.path)
         try:
-            self.assertEqual(self._version(), (2, 2), err)
+            self.assertEqual(self._version(), _code_version(), err)
             self.assertEqual(self._cols(con, "work"), list(KEPT_WORK))
             self.assertEqual(self._cols(con, "session_sync"), list(KEPT_SESSION))
             self.assertFalse({"event", *RETIRED_INDEXES} & self._nombres(con))
         finally:
             con.close()
+
+
+class _Paso2Aislado(_Paso2):
+    """El paso 2 con los pasos de 7.0.0–7.2.x: con `espera` y sin pasos después, un paso 2 detenido deja la
+    conexión y la captura en la versión 1. Con los de 7.3.0 eso ya no vale (TestPaso2BloqueadoEn730)."""
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(_migrations, "STEPS", STEPS_7_2)
+        p.start()
+        self.addCleanup(p.stop)
 
 
 class TestMigracion645(_Paso2):
@@ -611,9 +648,34 @@ class TestMigracion645(_Paso2):
         self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
         con.close()
-        self.assertEqual(_hashes(self.path), antes)
-        self.assertEqual(self._version(), (2, 2))
+        self.assertEqual(_sin_topic(_hashes(self.path)), _sin_topic(antes))
+        self.assertEqual(_topics(self.path), TOPICS_7_3)
+        self.assertEqual(self._version(), (3, 3))
 
+    def test_critico_de_645_a_7_3_queda_el_respaldo_del_paso_3(self):
+        """Los pasos 2 y 3 son destructivos y la poda es por paso: quedan los dos respaldos. El del paso 3 ya no
+        trae lo de equipo y tiene la raíz 'cliente'; el del paso 2 sigue siendo la vía de vuelta a 6.x."""
+        _connect_quiet(self.path)[0].close()
+        backups = self._backups()
+        self.assertEqual(len(backups), 2, backups)
+        self.assertTrue(backups[0].startswith("neb.pre-paso-2."), backups)
+        self.assertTrue(backups[1].startswith("neb.pre-paso-3."), backups)
+        bak = os.path.join(_migrations.backup_dir(self.path), backups[1])
+        c = sqlite3.connect(self.path)
+        rows = c.execute("SELECT step, min_code FROM schema_step ORDER BY step").fetchall()
+        row3 = c.execute("SELECT backup FROM schema_step WHERE step = 3").fetchone()[0]
+        c.close()
+        self.assertEqual(rows, [(1, 1), (2, 2), (3, 3)])
+        self.assertEqual(row3, bak)
+        c = sqlite3.connect(bak)
+        try:
+            self.assertEqual(c.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertNotIn("owner", self._cols(c, "work"))
+            self.assertEqual(c.execute("SELECT slug FROM topic WHERE id = 1").fetchone()[0], "cliente")
+        finally:
+            c.close()
+
+    @mock.patch.object(_migrations, "STEPS", STEPS_7_2)
     def test_respaldo_verificado_con_lo_retirado_y_constancia_en_schema_step(self):
         _connect_quiet(self.path)[0].close()
         backups = self._backups()
@@ -639,7 +701,7 @@ class TestMigracion645(_Paso2):
         path = os.path.join(d, "neb.db")
         _db_shared._connect(path, SCHEMA).close()
         self.assertFalse(os.path.exists(_migrations.backup_dir(path)))
-        self.assertEqual(_schema_step_version(path), (2, 2))
+        self.assertEqual(_schema_step_version(path), (3, 3))
 
     def test_segunda_conexion_mismo_schema_version_y_sin_aviso(self):
         _connect_quiet(self.path)[0].close()
@@ -671,6 +733,7 @@ class TestMigracion645(_Paso2):
         self.assertIsNone(con.execute("SELECT session_ref FROM pending WHERE id=2").fetchone()[0])
         con.close()
 
+    @mock.patch.object(_migrations, "STEPS", STEPS_7_2)
     def test_columna_generada_que_nombra_locked_at_guarda_el_fallo(self):
         """El precheck no ve columnas generadas: el DROP COLUMN falla nombrando work.locked_at, y eso no es
         candado ocupado: el fallo se guarda (con su espera) y no hay respaldo en cada conexión."""
@@ -682,6 +745,7 @@ class TestMigracion645(_Paso2):
         self.assertEqual([e[0] for e in self._errores()], [2])
         self.assertEqual(self._backups(), [])
 
+    @mock.patch.object(_migrations, "STEPS", STEPS_7_2)
     def test_candado_ocupado_la_conexion_sigue_en_la_version_1_y_se_reintenta(self):
         with mock.patch.object(_migrations, "STEPS", (STEP1,)):
             _connect_quiet(self.path)[0].close()
@@ -705,7 +769,7 @@ class TestMigracion645(_Paso2):
         self.assert_como_nueva()
 
 
-class TestSqliteSinDropColumn(_Paso2):
+class TestSqliteSinDropColumn(_Paso2Aislado):
     """D13: neb 7.0.0 pide SQLite 3.35.5 o superior. Con uno anterior (simulado) el precheck del paso 2 lo detiene
     con un motivo que dice el requisito y de dónde bajar un Python que lo trae: no se borra nada, no hay
     respaldo, la conexión y la captura siguen en la versión 1."""
@@ -768,7 +832,7 @@ class TestSqliteSinDropColumn(_Paso2):
             c.close()
 
 
-class TestObjetosDelUsuario(_Paso2):
+class TestObjetosDelUsuario(_Paso2Aislado):
     """D12: una vista, un trigger o un índice creado a mano que usa lo retirado detiene el paso 2 en su
     precheck: no se borra nada, no hay respaldo, la conexión y la captura funcionan, y el motivo nombra cada
     objeto y cómo quitarlo. Al quitarlo, la siguiente conexión aplica el paso completo."""
@@ -899,7 +963,29 @@ class TestObjetosDelUsuario(_Paso2):
         self._quitar_y_aplicar("DROP VIEW v_duenos", "DROP INDEX mi_idx_dirty")
 
 
-class TestObjetoEntrePrecheckYAplicar(_Paso2):
+class TestPaso2BloqueadoEn730(_Paso2):
+    """Con los pasos de 7.3.0, el paso 3 no tiene `espera`: una base en la versión 1 cuyo paso 2 está detenido
+    (aquí, un SQLite anterior a 3.35.5 simulado) ya no queda operable en la versión 1, como con 7.0.0–7.2.x:
+    _connect responde paso-bloqueado con el motivo del paso 2 y no cambia nada."""
+
+    def test_critico_paso_bloqueado_con_el_motivo_del_paso_2_y_sin_cambios(self):
+        antes = _hashes(self.path)
+        with mock.patch.object(_migrations, "SQLITE_VERSION", (3, 35, 4)), \
+                mock.patch.object(sys, "stderr", io.StringIO()):
+            with self.assertRaises(_db_shared.DbUnavailable) as cm:
+                _db_shared._connect(self.path, SCHEMA)
+            motivo = self._detenido()
+        self.assertEqual(cm.exception.motivo, "paso-bloqueado")
+        self.assertIn("paso de base 2", cm.exception.detalle)
+        self.assertIn("SQLite 3.35.5", cm.exception.detalle)
+        self.assertIn("SQLite 3.35.5", motivo)
+        self.assertEqual(self._version(), (1, 1), "el paso 1 sí queda: corre en su propia transacción")
+        self.assertEqual(self._backups(), [])
+        self.assertEqual(_hashes(self.path), antes)
+        self.assertEqual(_topics(self.path)[0][1], "cliente")
+
+
+class TestObjetoEntrePrecheckYAplicar(_Paso2Aislado):
     """Un objeto del usuario creado después del precheck (con el candado todavía libre) hace que `aplicar` lo
     vea dentro de la transacción: el paso revierte entero, deja su motivo en schema_step_error, borra su
     respaldo y se reintenta."""
@@ -978,10 +1064,13 @@ class TestConcurrencia(unittest.TestCase):
         con, err = _connect_quiet(path)
         self.assertEqual(err, "")
         self.assertEqual(_schema_shape(con), _fresh_shape())
-        self.assertEqual(con.execute("SELECT step FROM schema_step ORDER BY step").fetchall(), [(1,), (2,)])
+        self.assertEqual(con.execute("SELECT step FROM schema_step ORDER BY step").fetchall(), [(1,), (2,), (3,)])
         con.close()
-        self.assertEqual(_hashes(path), antes)
-        self.assertEqual(len(os.listdir(_migrations.backup_dir(path))), 1)
+        self.assertEqual(_sin_topic(_hashes(path)), _sin_topic(antes))
+        self.assertEqual(_topics(path), TOPICS_7_3)
+        # Pasos 2 y 3 destructivos, poda por paso: un respaldo de cada uno.
+        self.assertEqual(sorted(n.split(".")[1] for n in os.listdir(_migrations.backup_dir(path))),
+                         ["pre-paso-2", "pre-paso-3"])
 
 
 class TestBaseMigradaSinCandado(unittest.TestCase):
@@ -1018,10 +1107,13 @@ class TestJournalDelete(unittest.TestCase):
         con.commit()
         self.assertEqual(con.execute("SELECT count(*) FROM work").fetchone()[0], 3)
         con.close()
-        self.assertEqual({k: v for k, v in _hashes(path).items() if k != "work"},
-                         {k: v for k, v in antes.items() if k != "work"})
-        self.assertEqual(_schema_step_version(path), (2, 2))
-        self.assertEqual(len(os.listdir(_migrations.backup_dir(path))), 1)
+        self.assertEqual({k: v for k, v in _hashes(path).items() if k not in ("work", "topic")},
+                         {k: v for k, v in antes.items() if k not in ("work", "topic")})
+        self.assertEqual(_topics(path), TOPICS_7_3)
+        self.assertEqual(_schema_step_version(path), (3, 3))
+        # Pasos 2 y 3 destructivos, poda por paso: un respaldo de cada uno.
+        self.assertEqual(sorted(n.split(".")[1] for n in os.listdir(_migrations.backup_dir(path))),
+                         ["pre-paso-2", "pre-paso-3"])
 
 
 # =========================================================================== _add_missing_columns

@@ -7,6 +7,7 @@ Una versión de Neb que pide algo más que pasos de base (configurar la máquina
 | Versión | Pasos guiados | Qué hace |
 |---|---|---|
 | [7.0.0](7.0.0.md) | `renombrar-base`, `quitar-logbook-settings`, `quitar-endpoint-entorno`, `quitar-token-entorno`, `borrar-respaldos-settings` | Cambia el nombre de la base de `neb-logbook.db` a `neb.db` y quita la configuración del backend central que 7.0.0 retiró: las dos variables de `settings.json` y de las variables de usuario, y los respaldos `settings.json.bak-neb-*` que traen el token |
+| [7.3.0](7.3.0.md) | `compas-proyectos`, `vacuum-neb-db` | Pasa `~/.claude/compas.md` al eje proyecto y sin roadmap (`Clientes:` → `Proyectos:`, sin `Roadmap:`, `version: 3`) y compacta `neb.db` (`VACUUM`): se ofrece cada vez que la base acumula páginas libres (más de una cuarta parte y más de 1 MB) y conserva solo la copia previa más reciente |
 
 ## Formato
 

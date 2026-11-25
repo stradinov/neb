@@ -78,7 +78,7 @@ python <ruta>/hooks/lib/autoupdate.py disable    # la apaga
 
 **Qué pasa con tu base al actualizar** (desde 6.48.0). Tus pendientes y tu bitácora viven en `~/.claude/neb.db`. Cuando una versión cambia el esquema de esa base, el cambio corre solo en la primera conexión de la versión nueva, sin que tengas que hacer nada:
 
-- Si el cambio borra o reescribe datos, Neb copia antes la base, verificada, a `~/.claude/neb-backups/` y conserva la última copia.
+- Si el cambio borra o reescribe datos, Neb copia antes la base, verificada, a `~/.claude/neb-backups/` y conserva la última copia de cada paso.
 - Plugin y clon (si tienes `NEB_HOME`) pueden tener versiones distintas: los dos operan la base mientras la entiendan. Si uno ya no la entiende, no la toca, sus comandos responden `base-incompatible` y el arranque de la sesión te dice cuál actualizar.
 - `py <ruta>/bootstrap/neb-migrate.py status` muestra la versión de esquema de tu base y del código, si algo detiene un cambio y qué respaldos hay.
 - Para volver a una versión anterior: regresa primero plugin y clon, y después `neb-migrate.py restore <respaldo>`. Detalle en `tooling/migrations.md`.

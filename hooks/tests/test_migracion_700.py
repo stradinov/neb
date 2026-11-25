@@ -189,7 +189,10 @@ class TestRenombrarBase(Base):
         finally:
             c.close()
         self.assertNotIn("owner", cols)
-        self.assertEqual(len(glob.glob(os.path.join(glob.escape(self.claude), "neb-backups", "neb.pre-paso-2.*.db"))), 1)
+        # La poda es por paso: queda el último respaldo de cada paso destructivo (el 2 de 7.0.0 y el 3 de 7.3.0).
+        baks = sorted(os.path.basename(p) for p in
+                      glob.glob(os.path.join(glob.escape(self.claude), "neb-backups", "neb.pre-paso-*.db")))
+        self.assertEqual([b.split(".")[1] for b in baks], ["pre-paso-2", "pre-paso-3"], baks)
         self.assertNotIn("renombrar-base", self.pending())
 
     def test_critico_condicion_propia_con_la_base_vieja_abierta(self):

@@ -8,6 +8,7 @@ Cubre el CRUD + ciclo de vida de pendings.py contra DBs TEMPORALES (tempfile):
   validación de entradas inválidas (type, obsolete_cause)
   resolve_session_context para pending type='session'
   on_work_archived (auto-obsolescencia reversible vía SAVEPOINT)
+  archive / on_work_archived borran las sugerencias (curated=0) del pendiente que vuelve obsoleto
   base sin migrar: cada verbo del CLI que abre la base responde el JSON de base-sin-migrar
 
 Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db.
@@ -117,6 +118,65 @@ class TestPendingsCrud(unittest.TestCase):
                          "no-longer-applies")
         # el no-ligado sigue abierto
         self.assertEqual(con.execute("SELECT status FROM pending WHERE id=?", (unlinked,)).fetchone()[0], "open")
+        con.close()
+
+    def _con_with_suggestions(self, n=2, work_ref=None):
+        """Base con un tema curable y n pendientes con sugerencias del matching (curated=0) más una
+        fila curada en el primero."""
+        con = _fresh_con()
+        tid = con.execute("INSERT INTO topic (slug, name, keywords, status) "
+                          "VALUES ('seguridad','Seguridad','token, seguridad','active')").lastrowid
+        otro = con.execute("INSERT INTO topic (slug, name, keywords, status) "
+                           "VALUES ('tooling','Tooling','hook','active')").lastrowid
+        pids = [pendings.create(con, "task", f"token expuesto {i} con un hook", work_ref=work_ref)
+                for i in range(n)]
+        for pid in pids:
+            pendings.classify(con, pid, manage_tx=False)
+        con.execute("UPDATE pending_topic SET curated=1 WHERE pending_id=? AND topic_id=?", (pids[0], otro))
+        con.commit()
+        self.assertTrue(all(self._suggestions(con, pid) > 0 for pid in pids[1:]))
+        return con, pids, tid
+
+    @staticmethod
+    def _suggestions(con, pid):
+        return con.execute("SELECT count(*) FROM pending_topic WHERE pending_id=? AND curated=0",
+                           (pid,)).fetchone()[0]
+
+    def test_archive_drops_suggestions_keeps_curated(self):
+        con, pids, _tid = self._con_with_suggestions()
+        self.assertEqual(pendings.archive(con, pids[0], "no-longer-applies"), 1)
+        self.assertEqual(pendings.archive(con, pids[1], "resolved-otherwise"), 1)
+        con.commit()
+        for pid in pids:
+            self.assertEqual(self._suggestions(con, pid), 0)
+        self.assertEqual(con.execute("SELECT count(*) FROM pending_topic WHERE pending_id=? AND curated=1",
+                                     (pids[0],)).fetchone()[0], 1)        # lo curado se conserva
+        con.close()
+
+    def test_on_work_archived_drops_suggestions_inside_its_savepoint(self):
+        con, pids, _tid = self._con_with_suggestions(n=3)
+        wid = con.execute("INSERT INTO work (mode, created_at, updated_at) VALUES ('req',?,?)",
+                          (_db_shared.now_iso(), _db_shared.now_iso())).lastrowid
+        con.execute("UPDATE pending SET work_ref=? WHERE id IN (?,?)", (wid, pids[0], pids[1]))
+        con.commit()
+        pendings.on_work_archived(con, wid)
+        con.commit()
+        self.assertEqual([self._suggestions(con, p) for p in pids[:2]], [0, 0])
+        self.assertGreater(self._suggestions(con, pids[2]), 0)              # no ligado: intacto
+        # falla sembrada: un error dentro del SAVEPOINT revierte también el borrado de sugerencias
+        pendings.revive(con, pids[1]); pendings.classify(con, pids[1], manage_tx=False); con.commit()
+        before = self._suggestions(con, pids[1])
+        real_drop = pendings._drop_suggestions
+
+        def drop_then_fail(c, pid):
+            real_drop(c, pid)
+            raise sqlite3.OperationalError("falla sembrada")
+        with mock.patch.object(pendings, "_drop_suggestions", drop_then_fail):
+            with self.assertRaises(sqlite3.OperationalError):
+                pendings.on_work_archived(con, wid)
+        con.commit()
+        self.assertEqual(self._suggestions(con, pids[1]), before)
+        self.assertEqual(con.execute("SELECT status FROM pending WHERE id=?", (pids[1],)).fetchone()[0], "open")
         con.close()
 
     def test_resolve_session_context(self):

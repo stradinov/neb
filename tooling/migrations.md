@@ -44,7 +44,7 @@ El **paso 1** es el esquema inicial: las sentencias del archivo (sin sus `PRAGMA
 
 ### Paso 2: retiro de lo de equipo
 
-Desde 7.0.0 (`SCHEMA_VERSION = 2`). Borra lo que era del backend central y del candado de relevo: 14 columnas de `work` (`owner`, `lock_state`, `takeover_by`, `locked_at`, `payload_version`, `origin_dev`, `dirty`, `synced_at`, `remote_id`, `conflict`, `last_error`, `last_error_at`, `transcript_error`, `transcript_error_at`), 5 de `session_sync` (`work_id`, `synced_byte`, `transcript_error`, `transcript_error_at`, `root_cwd`), los índices `idx_work_dirty` e `idx_session_sync_work` y la tabla `event`. `min_code = 2`: una 6.48.x o 6.49.x deja de operar la base y lo dice el arranque. Es `destructivo` (respaldo previo verificado) y tiene `espera`: 7.0.0 funciona con esas columnas presentes, así que, si el paso no corre, la captura sigue con la base en la versión 1.
+Desde 7.0.0 (`SCHEMA_VERSION = 2`). Borra lo que era del backend central y del candado de relevo: 14 columnas de `work` (`owner`, `lock_state`, `takeover_by`, `locked_at`, `payload_version`, `origin_dev`, `dirty`, `synced_at`, `remote_id`, `conflict`, `last_error`, `last_error_at`, `transcript_error`, `transcript_error_at`), 5 de `session_sync` (`work_id`, `synced_byte`, `transcript_error`, `transcript_error_at`, `root_cwd`), los índices `idx_work_dirty` e `idx_session_sync_work` y la tabla `event`. `min_code = 2`: una 6.48.x o 6.49.x deja de operar la base y lo dice el arranque. Es `destructivo` (respaldo previo verificado) y tiene `espera`: 7.0.0 funciona con esas columnas presentes, así que, con 7.0.0 a 7.2.x, si el paso no corre, la captura sigue con la base en la versión 1. Desde 7.3.0 lo sigue el paso 3, que no tiene `espera`: un paso 2 detenido responde `paso-bloqueado` (§ "Paso 3: eje proyecto").
 
 - **Todo o nada.** Su `precheck` lo detiene sin borrar nada en dos casos, y el arranque y `neb-migrate.py status` dicen el motivo:
   - el SQLite del Python que corre neb es anterior a 3.35.5 (sin `DROP COLUMN`, o con los defectos de `DROP COLUMN` que 3.35.5 corrigió): el motivo dice la versión y pide instalar un Python que lo traiga desde https://www.python.org/downloads/ (en Windows, Python 3.12 o superior). neb no descarga nada;
@@ -57,6 +57,23 @@ Fuera de los pasos quedan dos reparaciones que corren después de ellos en cada 
 
 Con la base en versión 1 o más, el esquema inicial ya no se reaplica en cada conexión: una tabla borrada a mano deja de recrearse sola.
 
+### Paso 3: eje proyecto
+
+Desde 7.3.0 (`SCHEMA_VERSION = 3`). Renombra la raíz del eje curado de los pendientes: el tema raíz (`parent_id IS NULL`) con slug `cliente` pasa a slug `proyecto` y nombre `Proyecto` ([`pendings.md`](pendings.md)); su descripción también cambia si es la que puso el seed («Raíz del eje cliente (contenedor; no es un tema)» pasa a la del eje proyecto), y una escrita a mano se conserva. Solo esa fila: los hijos siguen colgando del mismo `id`, así que las curaciones de `pending_topic`, los `topic_link` y el resto de las tablas no cambian, y las `keywords` de la raíz tampoco. Sin raíz `cliente` no hace nada: una base nueva, una con triage pero sin taxonomía sembrada (solo el sentinel `sin-clasificar` y temas planos) o un tema `cliente` que no es raíz; la raíz `proyecto` la crea el seed (`bootstrap/seed-pendings-taxonomy.py`).
+
+| Atributo | Valor | Por qué |
+|---|---|---|
+| `min_code` | 3 | El código hasta 7.2.x busca la raíz `cliente`: una 7.2.x deja de operar la base y lo dice el arranque |
+| `destructivo` | sí | Reescribe una fila: respaldo previo verificado (`neb.pre-paso-3.<fecha UTC>.db`) aunque no haya raíz que renombrar, salvo en una base recién creada |
+| `espera` | no | 7.3.0 no opera el eje sin la raíz `proyecto`. Si el paso no corre, la conexión responde `paso-bloqueado` (o queda vacía con el candado ocupado); también cuando el que se detiene es el paso 2 de una base que sigue en la versión 1 |
+| `precheck` | colisión de slug | `topic.slug` es `UNIQUE`: si la raíz `cliente` existe y ya hay un tema con slug `proyecto` (en cualquier posición), el paso se detiene sin respaldo ni cambios. El motivo nombra los dos `id` y el `UPDATE topic SET slug='…' WHERE id=…;` que lo quita, con un slug libre; al aplicarlo, la siguiente conexión corre el paso. El slug viejo también se cita fuera de la base: si `proyecto` aparece en «- **Temas:**» de `~/.claude/compas.md`, hay que cambiarlo ahí por el nuevo, o el peso de ese objetivo deja de aplicarse sin aviso (`compas.md` resuelve por slug) |
+
+- **Relectura dentro del candado.** `aplicar` vuelve a buscar la raíz `cliente` (si ya no está, no escribe) y la colisión: un tema `proyecto` creado entre el `precheck` y el candado revierte el paso, su motivo queda en `schema_step_error` y se reintenta tras la espera o con `apply`.
+- **Respaldo que queda.** La poda es por paso (§ "Respaldo y vuelta atrás"): el respaldo del paso 3 se toma siempre, haya o no raíz `cliente`, y solo reemplaza a un `neb.pre-paso-3.*` anterior:
+  - una base ya en la versión 2 (toda instalación con 7.0.0 a 7.2.x) conserva el `neb.pre-paso-2.*` que dejó 7.0.0, la única copia con las 19 columnas de equipo, junto al `neb.pre-paso-3.*`; la fila del paso 2 en `schema_step` sigue apuntando a él;
+  - una base que llega de 6.x pasa por los pasos 2 y 3 en la misma conexión y queda con los dos: `neb.pre-paso-2.*` (con lo de equipo) y `neb.pre-paso-3.*` (tomado ya sin lo que retiró el paso 2).
+- **El resto del cambio del eje** (llaves del triage, `compas.md`, el seed) no es del paso de base: el CLI de [`pendings.md`](pendings.md) y la migración guiada de 7.3.0 (`migrations/7.3.0.md`).
+
 ### Escribir un paso
 
 1. Agrega un `Step` al final de `STEPS` con el siguiente número y sube `SCHEMA_VERSION` (una sola línea literal: el arranque la lee de otro árbol como texto).
@@ -68,9 +85,9 @@ Con la base en versión 1 o más, el esquema inicial ya no se reaplica en cada c
 ## Respaldo y vuelta atrás
 
 - Antes de un paso destructivo, el mecanismo copia la base con la API de backup de SQLite desde una conexión aparte a `<carpeta de la base>/neb-backups/neb.pre-paso-<n>.<fecha UTC>.db` y la verifica con `integrity_check`. La copia queda en un solo archivo (`journal_mode=DELETE`): leerla no le deja `-wal` ni `-shm`. Si el respaldo falla, el paso no corre. La carpeta tiene permiso solo para el usuario donde el sistema lo respeta.
-- Al confirmar el paso se borran los demás `neb.pre-paso-*.db`: queda 1 (en Windows, uno que otro proceso tenga abierto se queda hasta la siguiente poda). Si el paso falla, ese respaldo se borra. Los respaldos hechos a mano no se tocan.
+- Al confirmar el paso se borran los `neb.pre-paso-<n>.*.db` anteriores de ese mismo paso: queda el último respaldo de cada paso destructivo, y el de un paso no poda el de otro (así el `neb.pre-paso-2.*` de 7.0.0 sobrevive al paso 3). En Windows, uno que otro proceso tenga abierto se queda hasta la siguiente poda de su paso. Si el paso falla, ese respaldo se borra. Los respaldos hechos a mano no se tocan. `neb-migrate.py status` los lista todos y `restore` acepta cualquiera.
 - **Volver atrás**: regresar primero plugin y clon a la versión anterior, y después `py bootstrap/neb-migrate.py restore <archivo>` (el script vive en el clon y en el caché del plugin). No hay pasos inversos. De 6.48.0 a 6.47.0 no hace falta `restore`: el paso 1 no es destructivo y 6.47.0 opera la base marcada. `restore`:
-  - solo acepta un `neb.pre-paso-*.db` o un `neb.pre-restore.*.db` que esté directamente en `neb-backups/`; ni el archivo ni `neb-backups/` pueden ser enlace o junction (un enlace en una carpeta superior, como `.claude` movida, sí se acepta);
+  - solo acepta un `neb.pre-paso-*.db` o un `neb.pre-restore.*.db` que esté directamente en `neb-backups/` (no el `neb.pre-vacuum.*.db` que deja el paso `vacuum-neb-db` de la migración guiada 7.3.0: es la base de antes de compactar, con el mismo contenido, y no sirve para volver de versión); ni el archivo ni `neb-backups/` pueden ser enlace o junction (un enlace en una carpeta superior, como `.claude` movida, sí se acepta);
   - conviene correrlo con las sesiones cerradas: lo que otra sesión escriba entre el respaldo de la base actual y la restauración se pierde;
   - se niega si el código que lo corre no podría operar la base restaurada, o si la siguiente conexión volvería a aplicar los pasos que el respaldo no tiene (la actualización automática del plugin puede traer de vuelta la versión nueva); `--remigrar` permite lo segundo a propósito, para recuperar datos y dejar que el paso corra otra vez;
   - respalda antes la base actual como `neb.pre-restore.<fecha UTC>.db` (queda 1, aparte de los de los pasos) y nunca borra el archivo del que restaura;

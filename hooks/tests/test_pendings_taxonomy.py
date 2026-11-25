@@ -12,13 +12,16 @@ Cubre contra DBs TEMPORALES (tempfile; NUNCA ~/.claude/*.db) y ejemplos GENÉRIC
   • classify/reclassify: no tocan lo curado; escriben curated=0; nunca sugieren raíces; el delta incluye
     a los que quedaron solo sobre temas archivados.
   • triage_pass: grupos SOLO por pending_link entre open; suggested/unclassified disjuntos.
-  • compas v2: `Clientes:` (bonus por cliente), v1 sin la línea, write_compas round-trip; peso por eje.
+  • compas v3: `Proyectos:` (bonus por proyecto), sin la línea, write_compas round-trip; peso por eje;
+    las líneas viejas `Clientes:`/`Roadmap:` se ignoran; write-compas con 5 elementos es error JSON.
   • recommend_priority: banda curada > compas; curado sin banda -> compas.
   • curate: reemplazo por eje, is_primary solo en tópico, banda EN, slug único, raíz rechazada,
     related -> link; cli_curate emite JSON ok/error por stdout.
   • seed-pendings-taxonomy.py: dry-run no escribe; apply (raíces, reuso, archivo, curaduría, slugs,
     links, backfill, respaldo verificado); invariante de bandas; idempotente; no pisa curaduría posterior
     salvo --force; colisión de slug reportada; rollback restaura las 4 tablas.
+    Dry-run sobre una base en esquema 2 con raíz 'cliente': simula el paso de base 3, da el plan del
+    --apply y lo avisa (con choque de slug 'proyecto', avisa que el paso se detendrá).
 
 Framework: unittest (stdlib), NO pytest.
 """
@@ -104,12 +107,12 @@ def _topic(con, slug, name=None, keywords="", status="active", parent=None):
 
 
 def _axes(con):
-    """Raíces + hijos genéricos. cliente: alpha, beta · topico: seguridad, tooling."""
+    """Raíces + hijos genéricos. proyecto: alpha, beta · topico: seguridad, tooling."""
     ids = {}
     for axis in pendings.AXIS_ROOTS:
         ids[axis] = _topic(con, axis, axis.capitalize(), "")
-    ids["alpha"] = _topic(con, "alpha", "Alpha", "alpha", parent=ids["cliente"])
-    ids["beta"] = _topic(con, "beta", "Beta", "beta", parent=ids["cliente"])
+    ids["alpha"] = _topic(con, "alpha", "Alpha", "alpha", parent=ids["proyecto"])
+    ids["beta"] = _topic(con, "beta", "Beta", "beta", parent=ids["proyecto"])
     ids["seguridad"] = _topic(con, "seguridad", "Seguridad", "seguridad, token, credenciales", parent=ids["topico"])
     ids["tooling"] = _topic(con, "tooling", "Tooling", "tooling, hook, script", parent=ids["topico"])
     return ids
@@ -318,7 +321,7 @@ class TestClassifyCurated(unittest.TestCase):
 
     def test_curated_pending_is_untouched_and_returned(self):
         pid = _pending(self.con, "token de alpha expuesto, tooling roto")
-        pendings.curate(self.con, pid, cliente="alpha", topico="seguridad", band="alta"); self.con.commit()
+        pendings.curate(self.con, pid, proyecto="alpha", topico="seguridad", band="alta"); self.con.commit()
         before = _rows(self.con, pid)
         reviewed = self.con.execute("SELECT last_reviewed_at FROM pending WHERE id=?", (pid,)).fetchone()[0]
         out = pendings.classify(self.con, pid)
@@ -328,12 +331,12 @@ class TestClassifyCurated(unittest.TestCase):
         self.assertNotIn(pid, pendings.reclassify(self.con))
 
     def test_uncurated_gets_suggestions_curated_0_and_never_roots(self):
-        pid = _pending(self.con, "el cliente pide rotar el token; el topico es otro")
+        pid = _pending(self.con, "el proyecto pide rotar el token; el topico es otro")
         out = pendings.classify(self.con, pid)
         rows = _rows(self.con, pid)
         self.assertIn(self.ids["seguridad"], out)
         self.assertTrue(all(r[3] == 0 for r in rows.values()))          # curated=0
-        self.assertNotIn("cliente", rows); self.assertNotIn("topico", rows)   # raíces jamás
+        self.assertNotIn("proyecto", rows); self.assertNotIn("topico", rows)   # raíces jamás
         # replace=True solo borra lo suyo: una fila curada sobre otro tema sobrevive
         _pt(self.con, pid, self.ids["alpha"], curated=1)
         pendings.classify(self.con, _pending(self.con, "otro"))       # no afecta a pid
@@ -352,7 +355,7 @@ class TestClassifyCurated(unittest.TestCase):
         self.assertNotIn(ruido, out)                                   # solo stopwords: no matchea
 
     def test_roots_only_text_falls_to_sentinel(self):
-        pid = _pending(self.con, "cliente topico cliente")
+        pid = _pending(self.con, "proyecto topico proyecto")
         out = pendings.classify(self.con, pid)
         sent = self.con.execute("SELECT id FROM topic WHERE slug=?", (pendings.SENTINEL_SLUG,)).fetchone()[0]
         self.assertEqual(out, [sent])
@@ -362,7 +365,7 @@ class TestClassifyCurated(unittest.TestCase):
         pendiente, deja de contar como curado: triage lo devuelve a suggested/unclassified y
         reclassify vuelve a sugerir (el skill lo verá en el paso 3)."""
         pid = _pending(self.con, "token expuesto en alpha")
-        pendings.curate(self.con, pid, cliente="alpha", topico="tooling", band="alta"); self.con.commit()
+        pendings.curate(self.con, pid, proyecto="alpha", topico="tooling", band="alta"); self.con.commit()
         self.assertNotIn(pid, pendings.triage_pass(self.con)["suggested"] + pendings.triage_pass(self.con)["unclassified"])
         self.con.execute("UPDATE topic SET status='archived' WHERE slug IN ('alpha','tooling')"); self.con.commit()
         self.assertEqual(pendings._curated_topic_ids(self.con, pid), [])
@@ -387,7 +390,7 @@ class TestTriageSets(unittest.TestCase):
         con, _ = _connect_fresh(_fresh_home())
         ids = _axes(con)
         p1 = _pending(con, "curado")
-        pendings.curate(con, p1, cliente="alpha", topico="tooling", band="baja"); con.commit()
+        pendings.curate(con, p1, proyecto="alpha", topico="tooling", band="baja"); con.commit()
         p2 = _pending(con, "token expuesto")                           # sugerencia: seguridad
         p3 = _pending(con, "nada que matchee")                         # sentinel
         p4 = _pending(con, "obsoleto vinculado", status="obsolete")
@@ -403,28 +406,102 @@ class TestTriageSets(unittest.TestCase):
         self.assertEqual(set(out["suggested"]) | set(out["unclassified"]), {p2, p3, p5})
         con.close()
 
+    @staticmethod
+    def _cli_triage(home, db, argv):
+        """cli_triage contra la base temporal y con HOME/USERPROFILE temporales (compas.md de prueba)."""
+        def _con():
+            return _db_shared._connect(db, SCHEMA)
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {"HOME": home, "USERPROFILE": home}), \
+                mock.patch.object(pendings, "_db_for_cli", _con), contextlib.redirect_stdout(buf):
+            pendings.cli_triage(argv)
+        return json.loads(buf.getvalue())
+
     def test_cli_triage_exposes_catalog_and_rejects_unknown_filter(self):
         home = _fresh_home()
         con, db = _connect_fresh(home)
         _axes(con); con.close()
-
-        def _con():
-            return _db_shared._connect(db, SCHEMA)
-        buf = io.StringIO()
-        with mock.patch.object(pendings, "_db_for_cli", _con), contextlib.redirect_stdout(buf):
-            pendings.cli_triage([])
-        out = json.loads(buf.getvalue())
-        self.assertEqual(out["catalog"], {"cliente": ["alpha", "beta"], "topico": ["seguridad", "tooling"]})
-        buf = io.StringIO()
-        with mock.patch.object(pendings, "_db_for_cli", _con), contextlib.redirect_stdout(buf):
-            pendings.cli_triage(["--cliente", "nope"])
-        err = json.loads(buf.getvalue())
+        out = self._cli_triage(home, db, [])
+        self.assertEqual(out["catalog"], {"proyecto": ["alpha", "beta"], "topico": ["seguridad", "tooling"]})
+        err = self._cli_triage(home, db, ["--proyecto", "nope"])
         self.assertFalse(err["ok"]); self.assertIn("nope", err["error"]); self.assertIn("catalog", err)
+        err = self._cli_triage(home, db, ["--cliente", "alpha"])          # corte limpio: sin alias
+        self.assertFalse(err["ok"]); self.assertIn("--cliente", err["error"])
+
+    def test_cli_triage_axis_filters_in_sql_match_unfiltered_subset(self):
+        """Los filtros --proyecto/--topico (en SQL) devuelven exactamente el subconjunto del triage sin
+        filtro cuyos ejes curados coinciden, con las mismas llaves, banda, score, source y orden."""
+        home = _fresh_home()
+        con, db = _connect_fresh(home)
+        _axes(con)
+        p1 = _pending(con, "token de alpha"); pendings.curate(con, p1, proyecto="alpha", topico="seguridad", band="alta")
+        p2 = _pending(con, "hook de beta"); pendings.curate(con, p2, proyecto="beta", topico="tooling")
+        p3 = _pending(con, "script de alpha"); pendings.curate(con, p3, proyecto="alpha", topico="tooling")
+        p4 = _pending(con, "token sin curar en alpha")                   # sugerido: no entra a ningún filtro
+        p5 = _pending(con, "relacionado"); pendings.curate(con, p5, topico="seguridad")
+        con.execute("INSERT INTO pending_link (a, b, relation) VALUES (?,?,'related')", (p4, p1))
+        con.commit(); con.close()
+        pendings.write_compas(home, [("Tool", 40, ["tooling"], {"alpha": 20})])
+        full = self._cli_triage(home, db, [])
+        self.assertEqual(len(full["items"]), 5)
+        keys = {"id", "slug", "type", "status", "proyecto", "topico", "curated", "suggested_proyecto",
+                "suggested_topico", "suggestions", "context_origin", "band", "score", "source",
+                "rationale", "by_topic"}
+        self.assertEqual(set(full["items"][0]), keys)
+        self.assertNotIn("cliente", json.dumps(full))
+        for argv, pred in ((["--proyecto", "alpha"], lambda it: it["proyecto"] == "alpha"),
+                           (["--topico", "seguridad"], lambda it: it["topico"] == "seguridad"),
+                           (["--proyecto", "alpha", "--topico", "tooling"],
+                            lambda it: it["proyecto"] == "alpha" and it["topico"] == "tooling"),
+                           (["--proyecto", "alpha", "--proyecto", "beta"],
+                            lambda it: it["proyecto"] in ("alpha", "beta"))):
+            with self.subTest(argv=argv):
+                # ruta SQL: la lectura en lote de temas y señales recibe SOLO los ids filtrados (un
+                # filtro en Python tras recomendar todos los abiertos los pasaría todos)
+                seen = {"_topic_rows": [], "_intrinsic_signals": []}
+
+                def _spy(name, real):
+                    def _wrapped(con, ids):
+                        seen[name].append(list(ids))
+                        return real(con, ids)
+                    return _wrapped
+                with mock.patch.object(pendings, "_topic_rows", _spy("_topic_rows", pendings._topic_rows)), \
+                        mock.patch.object(pendings, "_intrinsic_signals",
+                                          _spy("_intrinsic_signals", pendings._intrinsic_signals)):
+                    out = self._cli_triage(home, db, argv)
+                expected = sorted(it["id"] for it in full["items"] if pred(it))
+                self.assertLess(len(expected), len(full["items"]))
+                for name, calls in seen.items():
+                    self.assertEqual([sorted(c) for c in calls], [expected], name)
+                self.assertEqual(out["items"], [it for it in full["items"] if pred(it)])
+                keep = {it["id"] for it in out["items"]}
+                self.assertEqual(out["groups"], [g for g in full["groups"] if set(g) & keep])
+                self.assertEqual(out["suggested"], [])                  # p4 sin curar nunca pasa un filtro
+        self.assertEqual(self._cli_triage(home, db, ["--proyecto", "alpha"])["groups"], [[p1, p4]])
+        self.assertEqual({it["id"]: it["source"] for it in full["items"]}[p3], "compas")   # 40 + 20
+
+    def test_revived_obsolete_recovers_suggestions_on_next_triage(self):
+        con, _db = _connect_fresh(_fresh_home())
+        ids = _axes(con)
+        pid = _pending(con, "token expuesto en el hook de beta")
+        pendings.triage_pass(con); con.commit()
+        sug = {s for s in _rows(con, pid)}
+        self.assertTrue({"seguridad", "tooling"} <= sug)
+        pendings.archive(con, pid, "no-longer-applies"); con.commit()
+        self.assertEqual(_rows(con, pid), {})                          # obsoleto: sin sugerencias
+        self.assertNotIn(pid, pendings.triage_pass(con)["suggested"])
+        pendings.revive(con, pid); con.commit()
+        out = pendings.triage_pass(con); con.commit()
+        self.assertIn(pid, out["suggested"])
+        self.assertEqual(set(_rows(con, pid)), sug)                    # mismas sugerencias que antes
+        self.assertEqual(pendings.pending_axes(con, pid)["suggested_proyecto"], "beta")
+        self.assertTrue(ids)
+        con.close()
 
 
-# =========================================================================== compas v2 + recomendador
+# =========================================================================== compas v3 + recomendador
 
-class TestCompasV2(unittest.TestCase):
+class TestCompasV3(unittest.TestCase):
     def setUp(self):
         self.home = _fresh_home()
         self.con, _ = _connect_fresh(self.home)
@@ -433,55 +510,112 @@ class TestCompasV2(unittest.TestCase):
     def tearDown(self):
         self.con.close()
 
-    def test_write_and_parse_v2_and_v1(self):
-        path = pendings.write_compas(self.home, [("Seg", 60, ["seguridad"], None, {"alpha": 15})])
+    def _compas_path(self):
+        return os.path.join(self.home, ".claude", pendings.COMPAS_NAME)
+
+    def test_write_and_parse_v3_with_and_without_projects(self):
+        path = pendings.write_compas(self.home, [("Seg", 60, ["seguridad"], {"alpha": 15})])
         txt = open(path, encoding="utf-8").read()
-        self.assertIn("version: 2", txt); self.assertIn("- **Clientes:** alpha=+15", txt)
+        self.assertIn("version: 3", txt); self.assertIn("- **Proyectos:** alpha=+15", txt)
+        self.assertNotIn("Roadmap", txt); self.assertNotIn("Clientes", txt)
         c = pendings.parse_compas(self.home)
-        self.assertEqual(c["topic_weight"], {"seguridad": 60}); self.assertEqual(c["client_bonus"], {"alpha": 15})
-        pendings.write_compas(self.home, [("Seg", 60, ["seguridad"], None)])   # sin 5º elemento = v1
+        self.assertEqual(c["topic_weight"], {"seguridad": 60}); self.assertEqual(c["project_bonus"], {"alpha": 15})
+        self.assertEqual(c["objectives"], [{"name": "Seg", "weight": 60, "topics": ["seguridad"],
+                                            "projects": {"alpha": 15}}])
+        pendings.write_compas(self.home, [("Seg", 60, ["seguridad"])])     # sin 4º elemento: sin Proyectos
+        self.assertNotIn("- **Proyectos:**", open(path, encoding="utf-8").read())
         c = pendings.parse_compas(self.home)
-        self.assertEqual(c["client_bonus"], {}); self.assertEqual(c["topic_weight"], {"seguridad": 60})
-        self.assertEqual(pendings.parse_compas(_fresh_home())["client_bonus"], {})   # ausente
+        self.assertEqual(c["project_bonus"], {}); self.assertEqual(c["topic_weight"], {"seguridad": 60})
+        self.assertEqual(pendings.parse_compas(_fresh_home())["project_bonus"], {})   # ausente
+
+    def test_parse_ignores_old_clientes_and_roadmap_lines(self):
+        """Corte limpio (7.3.0): un compas v2 sin migrar no aporta bonos ni roadmap; las líneas viejas
+        no se leen como Proyectos ni se confunden con Temas (la migración guiada 7.3.0 las reescribe)."""
+        with open(self._compas_path(), "w", encoding="utf-8") as fh:
+            fh.write("---\nversion: 2\n---\n\n## Objetivo: Viejo\n- **Peso:** 40\n- **Temas:** seguridad\n"
+                     "- **Roadmap:** alpha\n- **Clientes:** alpha=+15, beta=+10\n")
+        c = pendings.parse_compas(self.home)
+        self.assertEqual(c["objectives"], [{"name": "Viejo", "weight": 40, "topics": ["seguridad"], "projects": {}}])
+        self.assertEqual(c["project_bonus"], {}); self.assertEqual(c["topic_weight"], {"seguridad": 40})
+        self.assertNotIn("client_bonus", c); self.assertNotIn("roadmap", c["objectives"][0])
+
+    def test_write_compas_rejects_five_elements_and_other_shapes(self):
+        for bad in ([("Seg", 60, ["seguridad"], None, {"alpha": 15})],      # forma vieja con roadmap
+                    [("Seg", 60, ["seguridad"], "alpha")],                  # 4º elemento no es objeto
+                    [("Seg", 60)],                                          # incompleto
+                    [("Seg", 60, "seguridad")]):                            # tópicos no es lista
+            with self.subTest(bad=bad), self.assertRaises(ValueError):
+                pendings.write_compas(self.home, bad)
+        self.assertFalse(os.path.exists(self._compas_path()))             # nada escrito
+
+    def test_cli_write_compas_five_elements_is_json_error_and_writes_nothing(self):
+        def _cli(arg):
+            buf = io.StringIO()
+            with mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home}), \
+                    contextlib.redirect_stdout(buf):
+                pendings.cli_write_compas([arg])
+            return buf.getvalue()
+        err = json.loads(_cli('[["Seg", 60, ["seguridad"], null, {"alpha": 15}]]'))
+        self.assertFalse(err["ok"]); self.assertIn("5 elementos", err["error"])
+        self.assertFalse(os.path.exists(self._compas_path()))
+        err = json.loads(_cli("no es json"))
+        self.assertFalse(err["ok"])
+        # tipos de valor inválidos: error JSON por stdout (no TypeError por stderr) y nada escrito
+        for bad in ('[["Seg", 60, ["seguridad"], {"alpha": null}]]',
+                    '[["Seg", {"x": 1}, ["seguridad"]]]',
+                    '[["Seg", [60], ["seguridad"]]]',
+                    '[["Seg", true, ["seguridad"]]]',
+                    '[["Seg", 60, ["seguridad", 7]]]',
+                    '[["Seg", 60, ["seguridad"], {"alpha": "mucho"}]]'):
+            with self.subTest(bad=bad):
+                err = json.loads(_cli(bad))
+                self.assertFalse(err["ok"]); self.assertIn("Seg", err["error"])
+                self.assertFalse(os.path.exists(self._compas_path()))
+        out = _cli('[["Seg", "60", ["seguridad"]], ["Tool", 30.0, ["tooling"], {"alpha": "15"}]]')
+        self.assertIn("compas.md escrito", out)
+        c = pendings.parse_compas(self.home)
+        self.assertEqual((c["topic_weight"], c["project_bonus"]), ({"seguridad": 60, "tooling": 30}, {"alpha": 15}))
+        out = _cli('[["Seg", 60, ["seguridad"]], ["Tool", 30, ["tooling"], {"alpha": 15}]]')
+        self.assertIn("compas.md escrito", out)
+        c = pendings.parse_compas(self.home)
+        self.assertEqual((c["topic_weight"], c["project_bonus"]), ({"seguridad": 60, "tooling": 30}, {"alpha": 15}))
 
     def test_parse_all_temas_of_an_objective_and_empty_temas_line(self):
         """Regresión (bug previo a 6.7.0): solo el primer tema de cada objetivo ponderaba (los demás
         quedaban con espacio inicial) y una línea `Temas:` vacía capturaba la línea siguiente."""
-        pendings.write_compas(self.home, [("Varios", 70, ["seguridad", "tooling", "memoria"], None),
-                                          ("Solo clientes", 0, [], None, {"beta": 10})])
+        pendings.write_compas(self.home, [("Varios", 70, ["seguridad", "tooling", "memoria"]),
+                                          ("Solo proyectos", 0, [], {"beta": 10})])
         c = pendings.parse_compas(self.home)
         self.assertEqual(c["topic_weight"], {"seguridad": 70, "tooling": 70, "memoria": 70})
-        self.assertEqual(c["client_bonus"], {"beta": 10})
-        self.assertEqual(c["objectives"][1]["topics"], [])          # nada de '- **roadmap:** —' como tema
+        self.assertEqual(c["project_bonus"], {"beta": 10})
+        self.assertEqual(c["objectives"][1]["topics"], [])          # nada de '- **proyectos:** ...' como tema
 
     def test_hand_edited_empty_temas_line_without_trailing_space(self):
         """Regresión PD-517 (6.7.1): un compas editado a mano con '- **Temas:**' SIN espacio final
         (write_compas siempre deja uno, por eso el test de 6.7.0 pasaba) devolvía '*' como tema:
         con `(.+?)` el `\\**` retrocedía un asterisco. Ahora: sin temas, y la línea siguiente
-        (`Roadmap:`) no se captura como valor."""
-        path = os.path.join(self.home, ".claude", pendings.COMPAS_NAME)
-        os.makedirs(os.path.dirname(path), exist_ok=True)
-        with open(path, "w", encoding="utf-8") as fh:
-            fh.write("---\nversion: 2\n---\n\n## Objetivo: Solo clientes\n- **Peso:** 40\n"
-                     "- **Temas:**\n- **Roadmap:** —\n- **Clientes:** beta=+10\n")
+        (`Proyectos:`) no se captura como valor."""
+        with open(self._compas_path(), "w", encoding="utf-8") as fh:
+            fh.write("---\nversion: 3\n---\n\n## Objetivo: Solo proyectos\n- **Peso:** 40\n"
+                     "- **Temas:**\n- **Proyectos:** beta=+10\n")
         c = pendings.parse_compas(self.home)
         self.assertEqual(c["objectives"][0]["topics"], [])
         self.assertEqual(c["topic_weight"], {})
-        self.assertEqual(c["client_bonus"], {"beta": 10})
-        self.assertEqual(pendings._field_value("- **Temas:**\n- **Roadmap:** x\n", "Temas"), "")
+        self.assertEqual(c["project_bonus"], {"beta": 10})
+        self.assertEqual(pendings._field_value("- **Temas:**\n- **Proyectos:** x\n", "Temas"), "")
         self.assertEqual(pendings._field_value("- **Temas:**", "Temas"), "")
 
-    def test_weight_by_topico_plus_client_bonus_axis_aware(self):
-        pendings.write_compas(self.home, [("Seg", 60, ["seguridad", "alpha"], None, {"alpha": 15})])
+    def test_weight_by_topico_plus_project_bonus_axis_aware(self):
+        pendings.write_compas(self.home, [("Seg", 60, ["seguridad", "alpha"], {"alpha": 15})])
         pid = _pending(self.con, "x")
-        pendings.curate(self.con, pid, cliente="alpha", topico="seguridad"); self.con.commit()  # curado SIN banda
+        pendings.curate(self.con, pid, proyecto="alpha", topico="seguridad"); self.con.commit()  # curado SIN banda
         r = pendings.recommend_priority(self.con, pid, home=self.home)
         self.assertEqual(r["source"], "compas")
         self.assertGreaterEqual(r["score"], 75)                        # 60 + 15 (+ intrínsecas)
         self.assertLess(r["score"], 95)                                # 'alpha' en Temas NO cuenta como peso
-        self.assertIn("bonus por cliente +15", r["rationale"])
+        self.assertIn("bonus por proyecto +15", r["rationale"])
         only_client = _pending(self.con, "y")
-        pendings.curate(self.con, only_client, cliente="alpha"); self.con.commit()
+        pendings.curate(self.con, only_client, proyecto="alpha"); self.con.commit()
         r2 = pendings.recommend_priority(self.con, only_client, home=self.home)
         self.assertEqual(r2["source"], "compas")                       # bonus 15 > 0 -> compas
         self.assertLess(r2["score"], 34)                               # sin peso de tópico: baja
@@ -490,13 +624,13 @@ class TestCompasV2(unittest.TestCase):
         """Observado en dogfooding: un texto largo matchea decenas de temas; tomar el máximo inflaba a
         'alta' a cualquier pendiente sin curar que rozara 'seguridad'. Cuenta solo la mejor
         sugerencia por eje (por score del matching)."""
-        pendings.write_compas(self.home, [("Seg", 95, ["seguridad"], None), ("Tool", 35, ["tooling"], None,
+        pendings.write_compas(self.home, [("Seg", 95, ["seguridad"]), ("Tool", 35, ["tooling"],
                                                                               {"alpha": 15, "beta": 3})])
         pid = _pending(self.con, "hook script tooling roto en beta; de paso un token de alpha")
         pendings.classify(self.con, pid)                     # tooling: 3 tokens · seguridad: 1 · alpha/beta: 1
         ax = pendings.pending_axes(self.con, pid)
         self.assertEqual(ax["suggested_topico"], "tooling")
-        self.assertIn(ax["suggested_cliente"], ("alpha", "beta"))   # empate a 1 token: cualquiera, pero uno solo
+        self.assertIn(ax["suggested_proyecto"], ("alpha", "beta"))   # empate a 1 token: cualquiera, pero uno solo
         self.assertLessEqual(len(ax["suggestions"]), 2 * pendings.SUGGESTIONS_PER_AXIS)
         sug = pendings._suggested_by_axis(self.con, pid)
         self.assertEqual(sug["topico"][0][0], "tooling")           # ordenadas por score dentro del eje
@@ -507,13 +641,13 @@ class TestCompasV2(unittest.TestCase):
         self.assertEqual(r["source"], "compas")
         self.assertLess(r["score"], 67)                             # 35 + bonus, no 95: no es 'alta'
         # tras curar, los temas efectivos son los curados
-        pendings.curate(self.con, pid, cliente="alpha", topico="seguridad"); self.con.commit()
+        pendings.curate(self.con, pid, proyecto="alpha", topico="seguridad"); self.con.commit()
         self.assertEqual({t[0] for t in pendings._effective_topics(self.con, pid)}, {"alpha", "seguridad"})
 
     def test_curated_band_wins_over_compas(self):
-        pendings.write_compas(self.home, [("Todo", 10, ["seguridad", "tooling"], None)])
+        pendings.write_compas(self.home, [("Todo", 10, ["seguridad", "tooling"])])
         pid = _pending(self.con, "urgente crítico bloqueante")         # señales intrínsecas fuertes
-        pendings.curate(self.con, pid, cliente="beta", topico="tooling", band="alta"); self.con.commit()
+        pendings.curate(self.con, pid, proyecto="beta", topico="tooling", band="alta"); self.con.commit()
         r = pendings.recommend_priority(self.con, pid, home=self.home)
         self.assertEqual((r["source"], r["band"], r["score"]), ("curated", "alta", 80.0))
         self.assertEqual(set(r["by_topic"]), {"beta", "tooling"})
@@ -521,11 +655,11 @@ class TestCompasV2(unittest.TestCase):
         self.assertEqual(pendings.recommend_priority(self.con, pid, prompt_criterion="tooling", home=self.home)["source"],
                          "prompt")
 
-    def test_infer_objectives_skips_cliente_axis_and_archived(self):
+    def test_infer_objectives_skips_proyecto_axis_and_archived(self):
         old = _topic(self.con, "old-req", "Old", "old", status="archived")
         legacy = _topic(self.con, "gamma", "Gamma", "gamma")           # sin raíz: se propone
         pid = _pending(self.con, "z")
-        pendings.curate(self.con, pid, cliente="alpha", topico="seguridad"); self.con.commit()
+        pendings.curate(self.con, pid, proyecto="alpha", topico="seguridad"); self.con.commit()
         _pt(self.con, pid, old); _pt(self.con, pid, legacy)
         proposed = {t for o in pendings.infer_objectives(self.con, home=self.home)["proposed"] for t in o["topics"]}
         self.assertEqual(proposed, {"seguridad", "gamma"})
@@ -546,9 +680,9 @@ class TestCurate(unittest.TestCase):
         pid = _pending(self.con, "p")
         other = _pending(self.con, "q", slug="q-slug")
         pendings.classify(self.con, _pending(self.con, "token"))      # ruido ajeno, no afecta
-        out = pendings.curate(self.con, pid, cliente="alpha", topico="seguridad", band="media",
+        out = pendings.curate(self.con, pid, proyecto="alpha", topico="seguridad", band="media",
                               slug="p-slug", related=["q-slug"])
-        pendings.curate(self.con, pid, cliente="beta")                 # reemplaza el eje cliente
+        pendings.curate(self.con, pid, proyecto="beta")                 # reemplaza el eje proyecto
         self.con.commit()
         rows = _rows(self.con, pid)
         self.assertEqual(set(rows), {"beta", "seguridad"})             # exactamente una fila por eje
@@ -561,7 +695,7 @@ class TestCurate(unittest.TestCase):
 
     def test_errors_are_value_errors(self):
         pid = _pending(self.con, "p"); _pending(self.con, "q", slug="taken")
-        with self.assertRaises(ValueError): pendings.curate(self.con, pid, cliente="cliente")     # raíz
+        with self.assertRaises(ValueError): pendings.curate(self.con, pid, proyecto="proyecto")    # raíz
         with self.assertRaises(ValueError): pendings.curate(self.con, pid, topico="alpha")       # eje cruzado
         with self.assertRaises(ValueError): pendings.curate(self.con, pid, slug="taken")         # colisión
         with self.assertRaises(ValueError): pendings.curate(self.con, pid, slug="Bad Slug")      # formato
@@ -569,8 +703,8 @@ class TestCurate(unittest.TestCase):
 
     def test_band_with_single_axis_applies_to_all_curated_rows(self):
         pid = _pending(self.con, "p")
-        pendings.curate(self.con, pid, cliente="alpha", topico="seguridad", band="alta")
-        out = pendings.curate(self.con, pid, cliente="beta", band="baja"); self.con.commit()
+        pendings.curate(self.con, pid, proyecto="alpha", topico="seguridad", band="alta")
+        out = pendings.curate(self.con, pid, proyecto="beta", band="baja"); self.con.commit()
         self.assertEqual(out["band"], "baja")
         self.assertEqual(pendings._curated_band(self.con, pid), ("low", 20.0))
         rows = _rows(self.con, pid)
@@ -594,12 +728,12 @@ class TestCurate(unittest.TestCase):
             return _db_shared._connect(self.db, SCHEMA)
         buf = io.StringIO()
         with mock.patch.object(pendings, "_db_for_cli", _con), contextlib.redirect_stdout(buf):
-            pendings.cli_curate(["zeta", "--cliente", "alpha"])       # substring: NO cura
+            pendings.cli_curate(["zeta", "--proyecto", "alpha"])       # substring: NO cura
         err = json.loads(buf.getvalue())
         self.assertFalse(err["ok"]); self.assertIn("no exacta", err["error"])
         buf = io.StringIO()
         with mock.patch.object(pendings, "_db_for_cli", _con), contextlib.redirect_stdout(buf):
-            pendings.cli_curate([str(pid), "--cliente", "alpha", "--topico", "tooling", "--slug", "p-x",
+            pendings.cli_curate([str(pid), "--proyecto", "alpha", "--topico", "tooling", "--slug", "p-x",
                                  "--relacionado", "no-existe"])       # falla al final -> nada persiste
         err = json.loads(buf.getvalue())
         self.assertFalse(err["ok"]); self.assertIn("no encontrado", err["error"])
@@ -616,9 +750,9 @@ class TestCurate(unittest.TestCase):
             return _db_shared._connect(self.db, SCHEMA)
         buf = io.StringIO()
         with mock.patch.object(pendings, "_db_for_cli", _con), contextlib.redirect_stdout(buf):
-            pendings.cli_curate([str(pid), "--cliente", "alpha", "--topico", "tooling", "--band", "alta", "--slug", "p-uno"])
+            pendings.cli_curate([str(pid), "--proyecto", "alpha", "--topico", "tooling", "--band", "alta", "--slug", "p-uno"])
         ok = json.loads(buf.getvalue())
-        self.assertTrue(ok["ok"]); self.assertEqual((ok["cliente"], ok["topico"], ok["band"], ok["slug"]),
+        self.assertTrue(ok["ok"]); self.assertEqual((ok["proyecto"], ok["topico"], ok["band"], ok["slug"]),
                                                     ("alpha", "tooling", "alta", "p-uno"))
         buf = io.StringIO()
         with mock.patch.object(pendings, "_db_for_cli", _con), contextlib.redirect_stdout(buf):
@@ -638,7 +772,7 @@ class TestSeed(unittest.TestCase):
     def setUp(self):
         self.home = _fresh_home()
         self.con, self.db = _connect_fresh(self.home)
-        old_alpha = _topic(self.con, "alpha", "Alpha", "alpha")           # se reusa como cliente
+        old_alpha = _topic(self.con, "alpha", "Alpha", "alpha")           # se reusa como proyecto
         old_req = _topic(self.con, "old-req", "Old req", "old, req")     # se archiva
         self.p1 = _pending(self.con, "[alpha-viejo] cosa uno")
         _pt(self.con, self.p1, old_req, band="high", score=95.0, primary=1)
@@ -657,21 +791,21 @@ class TestSeed(unittest.TestCase):
         self.con.commit()
         self.con.close()
         self.catalog = os.path.join(self.home, "taxonomy.json")
-        json.dump({"cliente": [{"slug": "alpha", "name": "Alpha", "keywords": "alpha"},
+        json.dump({"proyecto": [{"slug": "alpha", "name": "Alpha", "keywords": "alpha"},
                                {"slug": "beta", "name": "Beta", "keywords": "beta"}],
                    "topico": [{"slug": "seguridad", "name": "Seguridad", "keywords": "token"},
                               {"slug": "tooling", "name": "Tooling", "keywords": "hook"}]},
                   open(self.catalog, "w", encoding="utf-8"))
         self.dataset = os.path.join(self.home, "triage.json")
         json.dump({"items": [
-            {"id": self.p1, "slug": "alpha-uno-nuevo", "cliente": "alpha", "topico": "seguridad", "grupo": "g1", "prioridad": "P0", "veredicto_final": "vigente"},
-            {"id": self.p2, "slug": "beta-dos", "cliente": "beta", "topico": "tooling", "grupo": "g1", "prioridad": "P2", "veredicto_final": "requiere_verificacion"},
-            {"id": self.p3, "slug": "gamma-tres", "cliente": "alpha", "topico": "tooling", "grupo": None, "prioridad": "P3", "veredicto_final": "vigente"},
-            {"id": self.p4, "slug": "obs-cuatro", "cliente": "alpha", "topico": "tooling", "grupo": "g1", "prioridad": "P1", "veredicto_final": "vigente"},
-            {"id": 9999, "slug": "no-existe", "cliente": "alpha", "topico": "tooling", "grupo": None, "prioridad": "P3", "veredicto_final": "vigente"},
-            {"id": self.p6, "slug": "seis", "cliente": "alpha", "topico": "tooling", "grupo": None, "prioridad": "P3", "veredicto_final": "vigente"},
-            {"id": self.p8, "slug": "beta-dos", "cliente": "beta", "topico": "seguridad", "grupo": None, "prioridad": "P3", "veredicto_final": "vigente"},
-            {"id": self.p9, "slug": "Bad Slug", "cliente": "alpha", "topico": "tooling", "grupo": None, "prioridad": "P9", "veredicto_final": "vigente"},
+            {"id": self.p1, "slug": "alpha-uno-nuevo", "proyecto": "alpha", "topico": "seguridad", "grupo": "g1", "prioridad": "P0", "veredicto_final": "vigente"},
+            {"id": self.p2, "slug": "beta-dos", "proyecto": "beta", "topico": "tooling", "grupo": "g1", "prioridad": "P2", "veredicto_final": "requiere_verificacion"},
+            {"id": self.p3, "slug": "gamma-tres", "proyecto": "alpha", "topico": "tooling", "grupo": None, "prioridad": "P3", "veredicto_final": "vigente"},
+            {"id": self.p4, "slug": "obs-cuatro", "proyecto": "alpha", "topico": "tooling", "grupo": "g1", "prioridad": "P1", "veredicto_final": "vigente"},
+            {"id": 9999, "slug": "no-existe", "proyecto": "alpha", "topico": "tooling", "grupo": None, "prioridad": "P3", "veredicto_final": "vigente"},
+            {"id": self.p6, "slug": "seis", "proyecto": "alpha", "topico": "tooling", "grupo": None, "prioridad": "P3", "veredicto_final": "vigente"},
+            {"id": self.p8, "slug": "beta-dos", "proyecto": "beta", "topico": "seguridad", "grupo": None, "prioridad": "P3", "veredicto_final": "vigente"},
+            {"id": self.p9, "slug": "Bad Slug", "proyecto": "alpha", "topico": "tooling", "grupo": None, "prioridad": "P9", "veredicto_final": "vigente"},
         ]}, open(self.dataset, "w", encoding="utf-8"))
 
     def _pre_curate_p6(self):
@@ -722,6 +856,39 @@ class TestSeed(unittest.TestCase):
         self.assertFalse(res["plan"]["migrated"]); self.assertEqual(res["plan"]["backfill"], 1)
         self.assertIn("DB sin migrar", out)
 
+    def test_old_cliente_key_in_catalog_or_dataset_is_explicit_error(self):
+        """Corte limpio 7.3.0: una llave 'cliente' en --catalog o en un item de --from aborta con el
+        renombre a hacer, antes de respaldar o escribir nada (dry-run y --apply)."""
+        con = _db_shared._connect(self.db, SCHEMA); before = seed.digest(con); con.close()
+        cat = json.load(open(self.catalog, encoding="utf-8"))
+        old_cat = os.path.join(self.home, "taxonomy-vieja.json")
+        with open(old_cat, "w", encoding="utf-8") as fh:
+            json.dump({"cliente": cat["proyecto"], "topico": cat["topico"]}, fh)
+        data = json.load(open(self.dataset, encoding="utf-8"))
+        data["items"][1]["cliente"] = data["items"][1].pop("proyecto")
+        old_ds = os.path.join(self.home, "triage-viejo.json")
+        with open(old_ds, "w", encoding="utf-8") as fh:
+            json.dump(data, fh)
+        for catalog, dataset, where in ((old_cat, self.dataset, "catálogo"), (self.catalog, old_ds, "dataset")):
+            for apply in (False, True):
+                with self.subTest(where=where, apply=apply), self.assertRaises(ValueError) as cm:
+                    with contextlib.redirect_stdout(io.StringIO()):
+                        seed.run(self.db, catalog, dataset, apply=apply, backup_dir=self.home)
+                self.assertIn("'cliente'", str(cm.exception)); self.assertIn("'proyecto'", str(cm.exception))
+                self.assertIn(where, str(cm.exception))
+        self.assertIn(f"item {self.p2}", str(cm.exception))
+        self.assertFalse([f for f in os.listdir(self.home) if ".bak-pre-taxonomy-" in f])
+        con = _db_shared._connect(self.db, SCHEMA); self.assertEqual(seed.digest(con), before)
+        self.assertIsNone(con.execute("SELECT id FROM topic WHERE slug='proyecto'").fetchone())
+        con.close()
+        res, _ = self._run(apply=True)                                    # la forma nueva sí siembra
+        con = _db_shared._connect(self.db, SCHEMA)
+        root = con.execute("SELECT id, name, parent_id FROM topic WHERE slug='proyecto'").fetchone()
+        self.assertEqual(root[1:], ("Proyecto", None))
+        self.assertIsNone(con.execute("SELECT id FROM topic WHERE slug='cliente'").fetchone())
+        self.assertEqual(con.execute("SELECT parent_id FROM topic WHERE slug='beta'").fetchone()[0], root[0])
+        con.close()
+
     def test_missing_db_path_is_an_error_not_a_new_db(self):
         ghost = os.path.join(self.home, "typo.db")
         with self.assertRaises(RuntimeError):
@@ -747,7 +914,7 @@ class TestSeed(unittest.TestCase):
         con = _db_shared._connect(self.db, SCHEMA)
         t = {r[0]: r[1:] for r in con.execute("SELECT slug, status, parent_id, id FROM topic")}
         self.assertEqual(t["alpha"][2], alpha_id)                          # reusado: mismo id
-        self.assertEqual(t["alpha"][1], t["cliente"][2]); self.assertEqual(t["seguridad"][1], t["topico"][2])
+        self.assertEqual(t["alpha"][1], t["proyecto"][2]); self.assertEqual(t["seguridad"][1], t["topico"][2])
         self.assertEqual(t["old-req"][0], "archived"); self.assertEqual(t["beta"][0], "active")
         r1 = _rows(con, self.p1)
         self.assertEqual(r1["seguridad"], ("high", 95.0, 1, 1)); self.assertEqual(r1["alpha"], ("high", 95.0, 0, 1))
@@ -784,7 +951,7 @@ class TestSeed(unittest.TestCase):
         self.assertFalse(res2["changed"]); self.assertEqual(res2["counts"]["curated"], 0)
         self.assertEqual(res2["plan"]["backfill"], 0)                        # el estimado también converge
         con = _db_shared._connect(self.db, SCHEMA); self.assertEqual(seed.digest(con), d1)
-        pendings.curate(con, self.p1, cliente="beta"); con.commit(); con.close()   # curaduría posterior
+        pendings.curate(con, self.p1, proyecto="beta"); con.commit(); con.close()   # curaduría posterior
         self._run(apply=True)
         con = _db_shared._connect(self.db, SCHEMA)
         self.assertIn("beta", _rows(con, self.p1)); self.assertNotIn("alpha", _rows(con, self.p1))
@@ -854,6 +1021,45 @@ class TestSeed(unittest.TestCase):
         self.assertEqual(con.execute("SELECT curated FROM pending_topic WHERE pending_id=1").fetchone()[0], 0)
         con.close()
 
+    def _bak_with_old_root(self, name, extra_sql=None):
+        """Respaldo de la base ya sembrada con la raíz del eje como 'cliente' (forma anterior a 7.3.0)."""
+        bak = seed.backup_db(self.db, os.path.join(self.home, name))
+        c = sqlite3.connect(bak)
+        c.execute("UPDATE topic SET slug='cliente', name='Cliente' WHERE slug='proyecto' AND parent_id IS NULL")
+        if extra_sql:
+            c.execute(extra_sql)
+        c.commit(); c.close()
+        return bak
+
+    def test_rollback_from_pre_7_3_backup_renames_cliente_root(self):
+        """Un respaldo anterior a 7.3.0 (raíz 'cliente') se restaura con la raíz renombrada a 'proyecto':
+        el paso de base 3 no vuelve a correr y sin esto el eje quedaría sin raíz."""
+        self._run(apply=True)
+        con = _db_shared._connect(self.db, SCHEMA); seeded = pendings.axis_catalog(con); con.close()
+        self.assertTrue(seeded["proyecto"])
+        bak = self._bak_with_old_root("pre-7.3.0.bak")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            seed.rollback(self.db, bak)
+        self.assertIn("cliente", err.getvalue())
+        con = _db_shared._connect(self.db, SCHEMA)
+        roots = con.execute("SELECT slug, name FROM topic WHERE parent_id IS NULL AND slug IN ('cliente','proyecto')").fetchall()
+        self.assertEqual(roots, [("proyecto", "Proyecto")])
+        self.assertEqual(pendings.axis_catalog(con), seeded)              # los hijos siguen colgando del eje
+        con.close()
+
+    def test_rollback_with_cliente_root_and_existing_proyecto_aborts_without_changes(self):
+        self._run(apply=True)
+        con = _db_shared._connect(self.db, SCHEMA); before = seed.digest(con); con.close()
+        bak = self._bak_with_old_root(
+            "choque.bak", "INSERT INTO topic (slug, name, status) VALUES ('proyecto', 'Proyecto suelto', 'active')")
+        with self.assertRaises(RuntimeError) as cm:
+            seed.rollback(self.db, bak)
+        self.assertIn("UPDATE topic SET slug=", str(cm.exception))
+        con = _db_shared._connect(self.db, SCHEMA)
+        self.assertEqual(seed.digest(con), before)                             # transacción revertida completa
+        con.close()
+
     def test_archived_catalog_topic_is_skipped_without_force_and_reactivated_with_force(self):
         con = _db_shared._connect(self.db, SCHEMA)
         con.execute("UPDATE topic SET status='archived' WHERE slug='alpha'"); con.commit(); con.close()
@@ -873,6 +1079,94 @@ class TestSeed(unittest.TestCase):
         self.assertEqual(_rows(con, self.p1)["alpha"][3], 1)
         self.assertIn(self.p1, res2["plan"]["curate"])
         con.close()
+
+
+class TestSeedDryRunPasoTresPendiente(unittest.TestCase):
+    """Base aún en esquema 2 con la raíz 'cliente' ya sembrada: el DRY-RUN (conexión plana, no migra) debe
+    dar el mismo plan que el --apply, que primero corre el paso de base 3 (renombre de la raíz) al abrir.
+    Sin la simulación, el dry-run reportaba crear 'proyecto', re-parentar a todos los hijos y archivar
+    'cliente'."""
+
+    def setUp(self):
+        import _migrations
+        self.home = _fresh_home()
+        self.db = _db_shared.resolve_db_path(self.home)
+        con = _db_shared._connect(self.db, SCHEMA, steps=_migrations.STEPS[:2])
+        root = con.execute("INSERT INTO topic (slug, name, description, keywords, status) VALUES "
+                           "('cliente', 'Cliente', 'Raíz del eje cliente (contenedor; no es un tema)', '', "
+                           "'active')").lastrowid
+        top = _topic(con, "topico", "Tópico")
+        alpha = _topic(con, "alpha", "Alpha", "alpha", parent=root)
+        _topic(con, "beta", "Beta", "beta", parent=root)
+        _topic(con, "seguridad", "Seguridad", "token", parent=top)
+        _topic(con, "tooling", "Tooling", "hook", parent=top)
+        self.p1 = _pending(con, "[alpha-uno] cosa uno")
+        self.p2 = _pending(con, "[beta-dos] cosa dos")
+        _pt(con, self.p2, alpha, band="high", score=95.0, primary=0, curated=1)   # curado sobre un hijo
+        self.assertEqual(_migrations.read_version(con)[0], 2)
+        con.close()
+        self.catalog = os.path.join(self.home, "taxonomy.json")
+        with open(self.catalog, "w", encoding="utf-8") as fh:
+            json.dump({"proyecto": [{"slug": "alpha", "name": "Alpha", "keywords": "alpha"},
+                                    {"slug": "beta", "name": "Beta", "keywords": "beta"}],
+                       "topico": [{"slug": "seguridad", "name": "Seguridad", "keywords": "token"},
+                                  {"slug": "tooling", "name": "Tooling", "keywords": "hook"}]}, fh)
+        self.dataset = os.path.join(self.home, "triage.json")
+        with open(self.dataset, "w", encoding="utf-8") as fh:
+            json.dump({"items": [
+                {"id": self.p1, "slug": "alpha-uno", "proyecto": "alpha", "topico": "seguridad", "grupo": None,
+                 "prioridad": "P1", "veredicto_final": "vigente"}]}, fh)
+
+    def _run_on(self, db, apply):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            res = seed.run(db, self.catalog, self.dataset, apply=apply, backup_dir=os.path.dirname(db))
+        return res, buf.getvalue()
+
+    def test_dry_run_simula_el_paso_3_y_da_el_plan_del_apply(self):
+        import _migrations
+        raw = sqlite3.connect(self.db); before = seed.digest(raw); raw.close()
+        dry, out = self._run_on(self.db, apply=False)
+        raw = sqlite3.connect(self.db)
+        self.assertEqual(seed.digest(raw), before)                            # el dry-run no escribe
+        self.assertEqual(_migrations.read_version(raw)[0], 2)                 # ni migra
+        raw.close()
+        plan = dry["plan"]
+        self.assertEqual(plan["topics_create"], [])
+        self.assertEqual(plan["topics_reparent"], [])
+        self.assertEqual(plan["topics_archive"], [])
+        self.assertIn("aún no pasa el paso 3 de 7.3.0", out)
+        self.assertIn("el --apply lo aplica antes de sembrar", out)
+        # --apply sobre una copia de la base (respaldo de SQLite: la original queda en esquema 2)
+        d = tempfile.mkdtemp(prefix="neb-tax-paso3-")
+        copia = seed.backup_db(self.db, os.path.join(d, "neb.db"))
+        applied, out_apply = self._run_on(copia, apply=True)
+        self.assertNotIn("aún no pasa el paso", out_apply)
+        ignore = ("axis_step_note",)
+        self.assertEqual({k: v for k, v in plan.items() if k not in ignore},
+                         {k: v for k, v in applied["plan"].items() if k not in ignore})
+        con = sqlite3.connect(copia)
+        self.assertEqual(con.execute("SELECT slug FROM topic WHERE parent_id IS NULL AND slug IN "
+                                     "('cliente','proyecto')").fetchall(), [("proyecto",)])
+        con.close()
+
+    def test_dry_run_con_tema_proyecto_avisa_que_el_paso_se_detendra(self):
+        """Raíz 'cliente' y un tema 'proyecto' suelto: el paso 3 se detiene (slug UNIQUE) y el --apply no
+        llega a sembrar. El dry-run no simula el renombre y el aviso trae el motivo del paso."""
+        con = sqlite3.connect(self.db)
+        con.execute("INSERT INTO topic (slug, name, status) VALUES ('proyecto', 'Proyecto suelto', 'active')")
+        con.commit(); con.close()
+        dry, out = self._run_on(self.db, apply=False)
+        self.assertIn("se detendrá", out)
+        self.assertIn("UPDATE topic SET slug=", out)
+        self.assertIn("cliente", dry["plan"]["topics_archive"])           # sin simular: lo que hay hoy
+
+    def test_base_al_dia_no_lleva_aviso(self):
+        con = _db_shared._connect(self.db, SCHEMA); con.close()           # corre el paso 3
+        dry, out = self._run_on(self.db, apply=False)
+        self.assertIsNone(dry["plan"]["axis_step_note"])
+        self.assertNotIn("aún no pasa el paso", out)
+        self.assertEqual(dry["plan"]["topics_create"], [])
 
 
 class TestSeedBaseSinMigrar(unittest.TestCase):

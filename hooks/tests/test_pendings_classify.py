@@ -7,7 +7,8 @@ Cubre contra DBs TEMPORALES (tempfile):
   • classify por ruta FTS5 y por ruta LIKE (simulando FTS5 ausente con monkeypatch)
   • classify con match -> pending_topic; sin match -> sentinel
   • LIKE sin falso positivo de substring ('expedido' no matchea 'pedido')
-  • normalización (acentos/idempotencia) con tokens reales del roadmap (catalogo, pedidos)
+  • normalización (acentos/idempotencia) con tokens acentuados reales (catalogo, pedidos)
+  • neb_fts solo indexa temas (7.3.0); classify persiste solo las mejores SUGGESTIONS_PER_AXIS por eje
   • prioridad por tema: mismo pending con banda distinta en dos temas
   • reclassify solo toca el delta (last_reviewed_at)
   • triage_pass agrupa por topic compartido, NO O(N²) (sentinel no forma grupo gigante)
@@ -107,6 +108,84 @@ class TestClassifyFTS(_Base):
         self.assertEqual(prim, tid)
 
 
+    def test_ensure_fts_indexes_only_topics_and_drops_old_pending_rows(self):
+        """7.3.0: neb_fts solo indexa temas; las filas kind='pending' que dejó 7.2.x se van en el
+        primer rebuild."""
+        _new_topic(self.con, "catalogo", "Catálogo", "catalogo, pedidos")
+        _new_pending(self.con, "pedido por catalogo")
+        self.con.execute(pendings._FTS_CREATE)
+        self.con.execute("INSERT INTO neb_fts(rowid, kind, ref_id, body) VALUES (1, 'pending', 1, 'viejo')")
+        self.assertTrue(pendings._ensure_fts(self.con))
+        kinds = self.con.execute("SELECT kind, count(*) FROM neb_fts GROUP BY kind").fetchall()
+        n_topics = self.con.execute("SELECT count(*) FROM topic").fetchone()[0]
+        self.assertEqual(kinds, [("topic", n_topics)])
+
+    def test_triage_drops_old_pending_rows_even_with_empty_delta(self):
+        """Las filas kind='pending' de 7.2.x se van en el primer triage aunque reclassify no traiga
+        delta (base madura: todo clasificado), sin esperar a que se cree un pendiente nuevo."""
+        _new_topic(self.con, "catalogo", "Catálogo", "catalogo, pedidos")
+        _new_pending(self.con, "pedido por catalogo")
+        pendings.triage_pass(self.con); self.con.commit()          # clasifica: el delta queda vacío
+        self.con.execute("INSERT INTO neb_fts(rowid, kind, ref_id, body) VALUES (1, 'pending', 1, 'viejo')")
+        self.con.commit()
+        out = pendings.triage_pass(self.con); self.con.commit()
+        self.assertEqual(out["classified"], 0)                       # delta vacío: sin rebuild
+        n_pending = self.con.execute("SELECT count(*) FROM neb_fts WHERE kind='pending'").fetchone()[0]
+        self.assertEqual(n_pending, 0)
+        self.assertGreater(self.con.execute("SELECT count(*) FROM neb_fts WHERE kind='topic'").fetchone()[0], 0)
+
+    def test_drop_legacy_fts_rows_without_table_is_noop(self):
+        self.assertIsNone(self.con.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='neb_fts'").fetchone())
+        pendings._drop_legacy_fts_rows(self.con)                    # sin neb_fts: no la crea ni falla
+        self.assertIsNone(self.con.execute(
+            "SELECT 1 FROM sqlite_master WHERE name='neb_fts'").fetchone())
+
+
+# --------------------------------------------------------------------------- poda de sugerencias
+
+class TestSuggestionsPerAxis(_Base):
+    """classify persiste solo las SUGGESTIONS_PER_AXIS mejores por eje (las de temas sin eje, todas)."""
+
+    def _seed_axes(self):
+        roots = {a: _new_topic(self.con, a, a, "") for a in pendings.AXIS_ROOTS}
+        # 5 tópicos que matchean 'token' (uno con 3 tokens, uno con 2, tres con 1) y 4 proyectos con 1
+        _new_topic(self.con, "t-tres", "T3", "token, llave, ssh", parent_id=roots["topico"])
+        _new_topic(self.con, "t-dos", "T2", "token, llave", parent_id=roots["topico"])
+        for s in ("t-a", "t-b", "t-c"):
+            _new_topic(self.con, s, s, "token", parent_id=roots["topico"])
+        for s in ("p-a", "p-b", "p-c", "p-d"):
+            _new_topic(self.con, s, s, "bastion", parent_id=roots["proyecto"])
+        for s in ("legado-1", "legado-2", "legado-3", "legado-4"):
+            _new_topic(self.con, s, s, "token")                       # sin eje
+        return _new_pending(self.con, "rotar token llave ssh del bastion")
+
+    def _check(self):
+        pid = self._seed_axes()
+        pendings.classify(self.con, pid)
+        rows = self.con.execute(
+            "SELECT t.slug, r.slug, pt.is_primary FROM pending_topic pt JOIN topic t ON t.id = pt.topic_id "
+            "LEFT JOIN topic r ON r.id = t.parent_id WHERE pt.pending_id=? AND pt.curated=0", (pid,)).fetchall()
+        by_axis = {}
+        for slug, root, _p in rows:
+            by_axis.setdefault(root, []).append(slug)
+        self.assertEqual(sorted(by_axis["topico"]), ["t-a", "t-dos", "t-tres"])    # top 3 por score, empate por slug
+        self.assertEqual(sorted(by_axis["proyecto"]), ["p-a", "p-b", "p-c"])
+        self.assertEqual(len(by_axis[None]), 4)                                       # sin eje: todas
+        self.assertEqual([s for s, _r, p in rows if p], ["t-tres"])                   # primaria = mejor score
+        ax = pendings.pending_axes(self.con, pid)
+        self.assertEqual((ax["suggested_topico"], ax["suggested_proyecto"]), ("t-tres", "p-a"))
+
+    def test_fts_path_keeps_top_per_axis(self):
+        if not pendings._fts5_available(self.con):
+            self.skipTest("FTS5 no compilado en este Python")
+        self._check()
+
+    def test_like_path_keeps_top_per_axis(self):
+        with mock.patch.object(pendings, "_fts5_available", lambda con: False):
+            self._check()
+
+
 # --------------------------------------------------------------------------- T3 ruta LIKE (fallback)
 
 class TestClassifyLike(_Base):
@@ -140,8 +219,8 @@ class TestClassifyLike(_Base):
 # --------------------------------------------------------------------------- T4 normalización
 
 class TestNormalization(_Base):
-    def test_roadmap_tokens_match_with_accents_and_spaces(self):
-        # roadmap real alpha: 'catalogo, pedidos' (con acentos/espacios en el origen)
+    def test_accented_tokens_match_with_spaces(self):
+        # keywords reales 'catalogo, pedidos' (con acentos/espacios en el origen)
         tid = _new_topic(self.con, "alpha-catalogo", "Catálogo alpha", "catálogo, pedidos")
         pid = _new_pending(self.con, "Revisar el CATÁLOGO de Pedidos en alpha")
         assigned = pendings.classify(self.con, pid)
@@ -287,7 +366,9 @@ class TestTriageEndToEnd(unittest.TestCase):
             return _db_shared._connect(self.db, SCHEMA)
 
         buf = io.StringIO()
-        with mock.patch.object(pendings, "_db_for_cli", _temp_con), \
+        # HOME/USERPROFILE temporales: triage lee compas.md del home, nunca el ~/.claude real
+        with mock.patch.dict(os.environ, {"HOME": self.tmp, "USERPROFILE": self.tmp}), \
+                mock.patch.object(pendings, "_db_for_cli", _temp_con), \
                 contextlib.redirect_stdout(buf):
             pendings.cli_triage([])           # NO debe lanzar (antes: OperationalError en ROLLBACK)
         out = json.loads(buf.getvalue())      # salida útil = JSON parseable

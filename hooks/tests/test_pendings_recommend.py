@@ -2,18 +2,18 @@
 """
 test_pendings_recommend.py — Sub-entrega C (REQ neb-pendings-sqlite): recomendador + priorización.
 
-Cubre contra DBs TEMPORALES (tempfile) + compas.md temporal (home= bajo el tmp) +
-roadmap mock temporal (NEB_ROADMAP_DIR):
+Cubre contra DBs TEMPORALES (tempfile) + compas.md temporal (home= bajo el tmp):
   • normalize: minúsculas + sin acentos (reusa la de B; aquí solo se consume)
   • jerarquía prompt > compas > intrínsecas (T2/T3)
   • compas = fuente única de pesos -> banda alta (T3)
-  • orden fino por roadmap REAL con tokens acentuados 'catálogo, pedidos' (T4 — CIERRA HUECO #5)
+  • sin roadmap (7.3.0): un criterio con 'roadmap' es texto libre como cualquier otro (T4)
   • prioridad POR TEMA: el mismo pending difiere en dos temas (T5)
   • sin compas -> infer_objectives propone, NO inventa pesos ni escribe (T6)
   • sentinel sin-clasificar -> source unclassified, banda baja, score 0 (T7)
   • enums en INGLES consistentes en DB (T8)
   • señal intrínseca: un pending que BLOQUEA a otro sube de prioridad (T9)
   • parse_compas defensivo + traducción band_to_db (extra)
+  • lote: triage parsea compas.md UNA vez por llamada y sus consultas no crecen con los pendientes (extra)
 
 Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db ni ~/.claude/compas.md.
 """
@@ -71,7 +71,7 @@ def _seed_pending(con, pid, status="open", topic=None, topics=None, is_primary_f
 
 def _write_compas(home, objectives):
     """Materializa compas.md vía el writer del módulo (mismo formato que parse_compas espera).
-    objectives = [(name, weight, [topics], roadmap_or_None), ...]."""
+    objectives = [(name, weight, [topics][, {proyecto: bonus}]), ...]."""
     return P.write_compas(home, objectives)
 
 
@@ -99,63 +99,36 @@ class RecommendTests(unittest.TestCase):
     # T2 — jerarquía: prompt manda sobre compas
     def test_prompt_overrides_compas(self):
         _seed_pending(self.con, pid=1, status="open", topic="alpha")
-        _write_compas(self.home, [("Deuda", 40, ["alpha"], None)])   # compas daría 40
+        _write_compas(self.home, [("Deuda", 40, ["alpha"])])   # compas daría 40
         r = P.recommend_priority(self.con, 1, prompt_criterion="urgente alpha", home=self.home)
         self.assertEqual(r["source"], "prompt")
 
     # T3 — compas es fuente única de pesos: tema con peso alto -> banda alta
     def test_compas_single_source_of_weights(self):
         _seed_pending(self.con, pid=2, status="open", topic="alpha")
-        _write_compas(self.home, [("Clientes", 90, ["alpha"], None)])
+        _write_compas(self.home, [("Tienda", 90, ["alpha"])])
         r = P.recommend_priority(self.con, 2, home=self.home)
         self.assertEqual(r["source"], "compas")
         self.assertEqual(r["band"], "alta")
         self.assertGreaterEqual(r["score"], 67)
 
-    # T4 — orden fino por roadmap REAL (tokens reales 'catalogo','pedidos') — CIERRA HUECO #5
-    def test_roadmap_fine_order_real_tokens(self):
-        _seed_pending(self.con, pid=3, status="open", topic="catalogo")   # tema sin acento en DB
-        rmdir = os.path.join(self.tmp, "roadmap", "alpha")
-        os.makedirs(os.path.join(rmdir, "initiatives", "INIT-001-x"), exist_ok=True)
-        # frontmatter REAL: subsystems con acentos 'catálogo, pedidos', priority alta
-        with open(os.path.join(rmdir, "initiatives", "INIT-001-x", "initiative.md"), "w",
-                  encoding="utf-8") as f:
-            f.write("---\nid: INIT-001\npriority: alta\nstatus: En análisis\n"
-                    "subsystems: [catálogo, pedidos]\n---\n# x\n")
-        os.environ["NEB_ROADMAP_DIR"] = os.path.join(self.tmp, "roadmap")
-        try:
-            _write_compas(self.home, [("Roadmap alpha", 60, ["catalogo"], "alpha")])
-            r = P.recommend_priority(self.con, 3, home=self.home)
-            # base 60 (compas) + bonus 'alta' (15) por match catálogo<->catalogo vía normalize/token
-            self.assertEqual(r["source"], "compas")
-            self.assertGreater(r["score"], 60)        # el roadmap afinó al alza
-        finally:
-            del os.environ["NEB_ROADMAP_DIR"]
-
-    # T4b — fallback a la tabla maestra de roadmap.md (sin initiatives/)
-    def test_roadmap_fine_order_master_table(self):
+    # T4 — sin roadmap (7.3.0): la palabra 'roadmap' en el criterio ya no busca un repo roadmap ni
+    # afina por iniciativas; puntúa por tokens como cualquier criterio de texto libre.
+    def test_roadmap_word_is_plain_criterion(self):
+        _seed_pending(self.con, pid=3, status="open", topic="catalogo")
         _seed_pending(self.con, pid=30, status="open", topic="pedidos")
-        rmdir = os.path.join(self.tmp, "roadmap", "alpha")
-        os.makedirs(rmdir, exist_ok=True)
-        with open(os.path.join(rmdir, "roadmap.md"), "w", encoding="utf-8") as f:
-            f.write(
-                "## Tabla maestra\n\n"
-                "| ID | Nombre | Prioridad | Estado | Owner | status-since | Subsistemas |\n"
-                "|---|---|---|---|---|---|---|\n"
-                "| INIT-001 | Pedido por catálogo | alta | En análisis | business | 2026-06-12 | catálogo, pedidos |\n")
-        os.environ["NEB_ROADMAP_DIR"] = os.path.join(self.tmp, "roadmap")
-        try:
-            _write_compas(self.home, [("Roadmap alpha", 60, ["pedidos"], "alpha")])
-            r = P.recommend_priority(self.con, 30, home=self.home)
-            self.assertGreater(r["score"], 60)
-        finally:
-            del os.environ["NEB_ROADMAP_DIR"]
+        self.assertFalse(hasattr(P, "_roadmap_fine_order"))
+        self.assertFalse(hasattr(P, "_detect_roadmap_project"))
+        r = P.rank_by_external_criterion(self.con, [3, 30], "roadmap pedidos")
+        self.assertEqual(r["order"], [30, 3])
+        self.assertEqual(r["scores"], {30: 50.0, 3: 0.0})       # 1 de 2 tokens ('pedidos'), 'roadmap' no matchea
+        self.assertIn("match de tokens", r["rationale"])
 
     # T5 — prioridad por tema: el mismo pending difiere en dos temas
     def test_priority_per_topic(self):
         _seed_pending(self.con, pid=4, status="open", topics=["alpha", "neb"])
-        _write_compas(self.home, [("Clientes", 90, ["alpha"], None),
-                                  ("Deuda", 30, ["neb"], None)])
+        _write_compas(self.home, [("Tienda", 90, ["alpha"]),
+                                  ("Deuda", 30, ["neb"])])
         r = P.recommend_priority(self.con, 4, home=self.home)
         self.assertIn("alpha", r["by_topic"])
         self.assertIn("neb", r["by_topic"])
@@ -210,10 +183,87 @@ class RecommendTests(unittest.TestCase):
 
     # extra — parse_compas: un tema en >1 objetivo gana el mayor peso
     def test_parse_compas_max_weight(self):
-        _write_compas(self.home, [("A", 40, ["alpha"], None),
-                                  ("B", 80, ["alpha"], None)])
+        _write_compas(self.home, [("A", 40, ["alpha"]),
+                                  ("B", 80, ["alpha"])])
         c = P.parse_compas(self.home)
         self.assertEqual(c["topic_weight"]["alpha"], 80)
+
+
+
+class TriageBatchTests(unittest.TestCase):
+    """Eficiencia de `triage` (7.3.0): compas.md se parsea una vez por llamada (no por pendiente) y,
+    con el delta de classify vacío, el número de sentencias SQL no depende de cuántos pendientes hay
+    (sin N+1 en pending_topic, banda curada, sugerencias ni señales intrínsecas)."""
+
+    def setUp(self):
+        import _db_shared
+        self._db_shared = _db_shared
+        self.home = tempfile.mkdtemp(prefix="neb-recommend-batch-")
+        os.makedirs(os.path.join(self.home, ".claude"), exist_ok=True)
+        P.write_compas(self.home, [("Seg", 70, ["seguridad"], {"alpha": 10})])
+
+    def tearDown(self):
+        shutil.rmtree(self.home, ignore_errors=True)
+
+    def _db(self, n):
+        path = os.path.join(self.home, ".claude", f"neb-{n}.db")
+        con = self._db_shared._connect(path, SCHEMA)
+        roots = {}
+        for axis in P.AXIS_ROOTS:
+            roots[axis] = con.execute("INSERT INTO topic (slug, name, keywords, status) VALUES (?,?,'','active')",
+                                      (axis, axis)).lastrowid
+        con.execute("INSERT INTO topic (slug, name, keywords, status, parent_id) VALUES "
+                    "('alpha','Alpha','alpha','active',?)", (roots["proyecto"],))
+        con.execute("INSERT INTO topic (slug, name, keywords, status, parent_id) VALUES "
+                    "('seguridad','Seguridad','token, seguridad','active',?)", (roots["topico"],))
+        for i in range(n):
+            pid = P.create(con, "task", f"token expuesto en alpha {i}")
+            if i % 3 == 0:
+                P.curate(con, pid, proyecto="alpha", topico="seguridad", band="media")
+        con.commit(); con.close()
+        return path
+
+    def _triage(self, path, trace=None):
+        def _con():
+            con = self._db_shared._connect(path, SCHEMA)
+            if trace is not None:
+                con.set_trace_callback(trace.append)
+            return con
+        from unittest import mock
+        import contextlib, io, json
+        buf = io.StringIO()
+        with mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home}), \
+                mock.patch.object(P, "_db_for_cli", _con), contextlib.redirect_stdout(buf):
+            P.cli_triage([])
+        return json.loads(buf.getvalue())
+
+    def test_compas_parsed_once_per_triage(self):
+        from unittest import mock
+        path = self._db(12)
+        calls = []
+        real = P.parse_compas
+
+        def counting(*a, **kw):
+            calls.append(a)
+            return real(*a, **kw)
+        with mock.patch.object(P, "parse_compas", counting):
+            out = self._triage(path)
+        self.assertEqual(len(out["items"]), 12)
+        self.assertEqual(len(calls), 1)
+        curated = [it for it in out["items"] if it["curated"]]
+        self.assertTrue(curated and all(it["source"] == "curated" for it in curated))
+        self.assertTrue(any(it["source"] == "compas" for it in out["items"] if not it["curated"]))
+
+    def test_statement_count_does_not_grow_with_pendings(self):
+        counts = {}
+        for n in (4, 40):
+            path = self._db(n)
+            self._triage(path)                      # 1er pase: classify del delta (crece con n, es escritura)
+            trace = []
+            out = self._triage(path, trace)         # 2º pase: delta vacío -> solo lectura por lotes
+            self.assertEqual(out["classified"], 0)
+            counts[n] = len(trace)
+        self.assertEqual(counts[4], counts[40], counts)
 
 
 if __name__ == "__main__":

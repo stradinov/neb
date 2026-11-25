@@ -4,7 +4,8 @@ test_logbook_cli_local.py — verbos locales de `/logbook`: list, show, rename y
 
   • list: works activos, sin columnas de equipo.
   • show: lista explícita de columnas (_SHOW_COLS); sobre una base que aún tiene las columnas retiradas
-    (el paso de base 2 se detuvo, p. ej. con SQLite < 3.35.5) no las muestra, y ya no trae eventos.
+    (el paso de base 2 se detuvo, p. ej. con SQLite < 3.35.5) no las muestra, y ya no trae eventos; desde
+    7.3.0 esa base responde paso-bloqueado, porque el paso 3 no tiene espera.
   • rename: solo works `req`.
   • archive: archiva el work y, por pendings.on_work_archived, deja obsoletos sus pendientes abiertos.
 
@@ -95,7 +96,7 @@ class TestShow(_Cli):
         self.assertEqual(list(out), SHOW_COLS)
         self.assertEqual((out["req_slug"], out["origin_machine"], out["archived_at"]), ("uno", "maq", None))
 
-    def test_critico_base_con_las_columnas_retiradas_no_las_muestra(self):
+    def _legacy_base(self):
         path = os.path.join(tempfile.mkdtemp(prefix="neb-test-show-"), "neb.db")
         raw = sqlite3.connect(path)
         with open(SCHEMA, encoding="utf-8") as fh:            # esquema inicial = el de 6.45.0
@@ -105,8 +106,22 @@ class TestShow(_Cli):
         raw.execute("INSERT INTO event (work_id, ts, dev, action) VALUES (7, 't', 'dev', 'publish')")
         raw.commit()
         raw.close()
-        self.path = path
+        return path
+
+    def test_paso_2_detenido_bloquea_la_base_desde_7_3_0(self):
+        # El paso 3 no tiene `espera`: con el paso 2 detenido la base ya no se opera (paso-bloqueado).
+        self.path = self._legacy_base()
         with mock.patch.object(_migrations, "SQLITE_VERSION", (3, 34, 1)):
+            out = json.loads(self._cli("show", "7"))
+        self.assertEqual((out["ok"], out["motivo"]), (False, "paso-bloqueado"), out)
+        self.assertIn("paso de base 2", out["detalle"])
+
+    def test_critico_base_con_las_columnas_retiradas_no_las_muestra(self):
+        # Con solo los pasos 1 y 2 (como hasta 7.2.x) un paso 2 detenido deja operar la base: `show` no
+        # expone las columnas retiradas aunque sigan en la tabla.
+        self.path = self._legacy_base()
+        path = self.path
+        with mock.patch.object(_migrations, "SQLITE_VERSION", (3, 34, 1)),                 mock.patch.object(_migrations, "STEPS", tuple(s for s in _migrations.STEPS if s.n <= 2)):
             out = json.loads(self._cli("show", "7"))
         c = sqlite3.connect(path)
         cols = {r[1] for r in c.execute("PRAGMA table_info(work)")}

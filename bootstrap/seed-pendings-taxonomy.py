@@ -1,12 +1,14 @@
 #!/usr/bin/env python3
 """
-seed-pendings-taxonomy.py — siembra en neb.db la taxonomía curada de pendientes (ejes cliente/tópico),
+seed-pendings-taxonomy.py — siembra en neb.db la taxonomía curada de pendientes (ejes proyecto/tópico),
 los slugs, las bandas y los grupos de un pase de triage (REQ pendings-taxonomia-cliente-topico).
 Reusa hooks/lib (pendings.curate, pendings.backfill_slugs, _db_shared.with_write_tx): NO reimplementa.
 
 Entradas — NUNCA hardcodeadas aquí (este script viaja al repo público; los nombres viven en los JSON):
-  --catalog <taxonomy.json>   {"cliente": [{"slug","name","keywords"}...], "topico": [...]}
-  --from    <triage.json>     {"items": [{"id","slug","cliente","topico","grupo","prioridad","veredicto_final"}...]}
+  --catalog <taxonomy.json>   {"proyecto": [{"slug","name","keywords"}...], "topico": [...]}
+  --from    <triage.json>     {"items": [{"id","slug","proyecto","topico","grupo","prioridad","veredicto_final"}...]}
+  Desde 7.3.0 el eje se llama "proyecto": una llave "cliente" (forma anterior) en el catálogo o en un
+  item es error explícito con el renombre a hacer (corte limpio, sin lectura dual).
 
 Contrato CLI:
   py bootstrap/seed-pendings-taxonomy.py --from T.json --catalog C.json [--db P]           # DRY-RUN (default)
@@ -17,7 +19,7 @@ Contrato CLI:
 
 Qué hace --apply (UNA transacción with_write_tx, después de un respaldo verificado; el plan se
 calcula DENTRO de la transacción, así una curaduría hecha por otra sesión un instante antes no se pisa):
-  1. Raíces 'cliente'/'topico' + hijos del catálogo: INSERT ... ON CONFLICT(slug) DO UPDATE parent_id,
+  1. Raíces 'proyecto'/'topico' + hijos del catálogo: INSERT ... ON CONFLICT(slug) DO UPDATE parent_id,
      name, keywords — un tema viejo con el mismo slug se REUSA (conserva id e historial) y se re-parenta;
      su status solo cambia a 'active' con --force (sin --force, los items que usan un tema del catálogo
      archivado se saltan y se reportan). Todo tema activo que no sea sentinel/raíz/hijo del catálogo
@@ -26,7 +28,7 @@ calcula DENTRO de la transacción, así una curaduría hecha por otra sesión un
      pendientes abiertos sin curar se borran para que el siguiente `PD triage` las recalcule con el
      catálogo nuevo; lo curado no se toca. Así, afinar keywords = editar taxonomy.json + --apply.
   2. Por cada item vivo del dataset cuyo id exista con status='open' y SIN curaduría previa (o con
-     --force): filas curated=1 vía pendings.curate (cliente is_primary=0, tópico is_primary=1) con
+     --force): filas curated=1 vía pendings.curate (proyecto is_primary=0, tópico is_primary=1) con
      banda P0/P1->high, P2->medium, P3->low; el score se HEREDA de la fila primaria previa cuando su
      banda coincide (así el score que el pase escribió no cambia) y si no, 95/75/50/20; una prioridad
      desconocida cura SIN banda (compas aplica) y se reporta; borra sus sugerencias (curated=0) sobre
@@ -66,6 +68,7 @@ _LIB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hooks", "
 sys.path.insert(0, _LIB)
 
 import _db_shared          # noqa: E402
+import _migrations         # noqa: E402
 import pendings            # noqa: E402
 
 _SCHEMA = _db_shared.INITIAL_SCHEMA_PATH          # esquema inicial del árbol de este script (6.48.0)
@@ -86,7 +89,7 @@ PENDING_TABLES = ("pending", "pending_note", "pending_link", "topic", "topic_lin
 LOGBOOK_TABLES = ("work", "event", "session_sync")
 ALL_TABLES = LOGBOOK_TABLES + PENDING_TABLES
 SEED_TABLES = ("pending", "pending_topic", "topic", "topic_link", "pending_link")   # lo que toca el seed/rollback
-AXIS_NAMES = {"cliente": "Cliente", "topico": "Tópico"}
+AXIS_NAMES = {"proyecto": "Proyecto", "topico": "Tópico"}
 
 
 def _stamp():
@@ -112,11 +115,18 @@ def _require_db(db_path):
 
 # =========================================================================== entradas
 
+_OLD_AXIS_KEY = "cliente"   # nombre del eje hasta 7.2.x
+
+
 def load_catalog(path):
     """Valida y normaliza taxonomy.json: dos ejes no vacíos, slugs kebab-case únicos, sin cruzar ejes,
-    sin raíces ni sentinel como hijos. Devuelve {'cliente': [{slug,name,keywords}], 'topico': [...]}."""
+    sin raíces ni sentinel como hijos. Devuelve {'proyecto': [{slug,name,keywords}], 'topico': [...]}.
+    Una llave 'cliente' (anterior a 7.3.0) es ValueError: se renombra a 'proyecto'."""
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
+    if isinstance(data, dict) and _OLD_AXIS_KEY in data:
+        raise ValueError(f"el catálogo {path} usa la llave {_OLD_AXIS_KEY!r} (anterior a 7.3.0): "
+                         "renómbrala a 'proyecto' (mismo contenido)")
     cat = {}
     for axis in pendings.AXIS_ROOTS:
         entries = data.get(axis)
@@ -134,14 +144,15 @@ def load_catalog(path):
             seen.add(slug)
             out.append({"slug": slug, "name": e.get("name") or slug, "keywords": e.get("keywords") or ""})
         cat[axis] = out
-    both = {e["slug"] for e in cat["cliente"]} & {e["slug"] for e in cat["topico"]}
+    both = {e["slug"] for e in cat["proyecto"]} & {e["slug"] for e in cat["topico"]}
     if both:
         raise ValueError(f"slug presente en ambos ejes: {sorted(both)}")
     return cat
 
 
 def load_dataset(path):
-    """Lee el dataset del pase (lista `items` o lista cruda). Cada item: id entero + campos del pase."""
+    """Lee el dataset del pase (lista `items` o lista cruda). Cada item: id entero + campos del pase.
+    Un item con la llave 'cliente' (anterior a 7.3.0) es ValueError: se renombra a 'proyecto'."""
     with open(path, encoding="utf-8") as f:
         data = json.load(f)
     items = data.get("items") if isinstance(data, dict) else data
@@ -153,7 +164,10 @@ def load_dataset(path):
             pid = int(it["id"])
         except (KeyError, TypeError, ValueError):
             raise ValueError(f"item sin id entero: {str(it)[:120]!r}")
-        out.append({"id": pid, "slug": it.get("slug"), "cliente": it.get("cliente"),
+        if _OLD_AXIS_KEY in it:
+            raise ValueError(f"el dataset {path} usa la llave {_OLD_AXIS_KEY!r} (anterior a 7.3.0) en el "
+                             f"item {pid}: renómbrala a 'proyecto' en todos los items")
+        out.append({"id": pid, "slug": it.get("slug"), "proyecto": it.get("proyecto"),
                     "topico": it.get("topico"), "grupo": it.get("grupo") or None,
                     "prioridad": it.get("prioridad"),
                     "veredicto": it.get("veredicto_final") or "vigente"})
@@ -201,13 +215,41 @@ def _db_state(con):
             "migrated": has_slug and has_cur}
 
 
-def build_plan(con, catalog, dataset, force=False):
+# Paso de base que renombra la raíz 'cliente' a 'proyecto' (7.3.0); se busca por su función para no
+# fijar el número a mano.
+_AXIS_STEP = next(s.n for s in _migrations.STEPS if s.aplicar is _migrations._project_axis_apply)
+
+
+def _axis_step_preview(con):
+    """Para el DRY-RUN, que abre la base sin migrar: (renombrar, aviso). Si la base no ha pasado el paso
+    de base del eje proyecto, el --apply lo aplica al abrir con _connect ANTES de sembrar; el dry-run lo
+    simula en el estado leído (renombrar=True cuando hay raíz 'cliente' sin choque de slug) para que su
+    plan sea el del --apply. Con un tema 'proyecto' ya existente el paso se detiene y el --apply aborta:
+    el aviso lleva ese motivo y no se simula nada. Solo lectura. (False, None) si el paso ya pasó."""
+    if _migrations.read_version(con)[0] >= _AXIS_STEP:
+        return False, None
+    aviso = (f"la base aún no pasa el paso {_AXIS_STEP} de 7.3.0; el --apply lo aplica antes de sembrar")
+    root_id = _migrations._old_axis_root(con)
+    if root_id is None:
+        return False, aviso
+    clash = _migrations._project_slug_clash(con, root_id)
+    if clash:
+        return False, f"{aviso}, pero se detendrá: {clash}"
+    return True, f"{aviso} (el plan ya simula el renombre de la raíz '{_OLD_AXIS_KEY}' a 'proyecto')"
+
+
+def build_plan(con, catalog, dataset, force=False, rename_old_root=False):
     """Simula la siembra sin escribir. Devuelve el plan (listas/conteos) que --apply ejecuta y que el
-    DRY-RUN reporta. En --apply se construye DENTRO de la transacción."""
+    DRY-RUN reporta. En --apply se construye DENTRO de la transacción. rename_old_root (solo dry-run):
+    lee la raíz 'cliente' como si ya se llamara 'proyecto', como la dejará el paso de base al abrir."""
     st = _db_state(con)
+    old_root = st["topics"].get(_OLD_AXIS_KEY)
+    if (rename_old_root and old_root is not None and old_root["parent_id"] is None
+            and pendings.AXIS_ROOTS[0] not in st["topics"]):
+        st["topics"][pendings.AXIS_ROOTS[0]] = st["topics"].pop(_OLD_AXIS_KEY)
     cat_slugs = {axis: [e["slug"] for e in catalog[axis]] for axis in pendings.AXIS_ROOTS}
-    all_cat = set(cat_slugs["cliente"]) | set(cat_slugs["topico"])
-    plan = {"migrated": st["migrated"],
+    all_cat = set(cat_slugs["proyecto"]) | set(cat_slugs["topico"])
+    plan = {"migrated": st["migrated"], "axis_step_note": None,
             "topics_create": [], "topics_reparent": [], "topics_reactivate": [], "topics_archive": [],
             "curate": [], "sin_banda": [],
             "skipped": {"missing": [], "obsolete": [], "cerrable": [], "curated": [],
@@ -249,10 +291,10 @@ def build_plan(con, catalog, dataset, force=False):
             plan["skipped"]["cerrable"].append(pid)
             continue
         alive_open.append(it)
-        if it["cliente"] not in cat_slugs["cliente"] or it["topico"] not in cat_slugs["topico"]:
+        if it["proyecto"] not in cat_slugs["proyecto"] or it["topico"] not in cat_slugs["topico"]:
             plan["skipped"]["axis_unknown"].append(pid)
             continue
-        if it["cliente"] in unusable or it["topico"] in unusable:
+        if it["proyecto"] in unusable or it["topico"] in unusable:
             plan["skipped"]["axis_archived"].append(pid)
             continue
         if pid in st["curated"] and not force:
@@ -353,7 +395,7 @@ def apply_plan(con, catalog, dataset, plan, force=False):
             prev = _previous_primary(con, pid)
             if prev and prev[0] == band_en and prev[1] is not None:
                 score = prev[1]                            # el score del pase no cambia
-        pendings.curate(con, pid, cliente=it["cliente"], topico=it["topico"],
+        pendings.curate(con, pid, proyecto=it["proyecto"], topico=it["topico"],
                         band=(pendings._BAND_EN_TO_ES[band_en] if band_en else None), score=score)
         counts["curated"] += 1
         slug = slug_for.get(pid)
@@ -430,10 +472,35 @@ def backup_db(db_path, dst_path):
     return dst_path
 
 
+def _rename_old_axis_root(con, bak_path):
+    """Tras restaurar `topic` desde un respaldo anterior a 7.3.0: renombra la raíz del eje 'cliente'
+    a 'proyecto', igual que el paso de base 3 (que no vuelve a correr: la base ya está en versión 3).
+    Sin esto los hijos del eje quedarían como temas sin eje y se perderían los filtros y los bonos
+    por proyecto sin aviso. Si ya existe un tema 'proyecto' (slug UNIQUE) es RuntimeError y la
+    transacción del rollback se revierte completa."""
+    new = pendings.AXIS_ROOTS[0]
+    old = con.execute("SELECT id FROM topic WHERE slug=? AND parent_id IS NULL", (_OLD_AXIS_KEY,)).fetchone()
+    if old is None:
+        return
+    clash = con.execute("SELECT id FROM topic WHERE slug=?", (new,)).fetchone()
+    if clash is not None:
+        raise RuntimeError(
+            f"el respaldo {bak_path} trae la raíz {_OLD_AXIS_KEY!r} (anterior a 7.3.0) y también un tema "
+            f"{new!r} (id {clash[0]}); no se restauró nada. Renombra ese tema en el respaldo "
+            f"(UPDATE topic SET slug='<otro-slug>' WHERE id={clash[0]}) y vuelve a correr --rollback")
+    old_desc = f"Raíz del eje {_OLD_AXIS_KEY} (contenedor; no es un tema)"
+    con.execute("UPDATE topic SET slug=?, name=?, description = CASE WHEN description=? THEN ? "
+                "ELSE description END WHERE id=?",
+                (new, AXIS_NAMES[new], old_desc, f"Raíz del eje {new} (contenedor; no es un tema)", old[0]))
+    print(f"[seed-taxonomy] aviso: el respaldo trae la raíz {_OLD_AXIS_KEY!r} (anterior a 7.3.0); "
+          f"se renombró a {new!r}", file=sys.stderr)
+
+
 def rollback(db_path, bak_path):
     """Restauración LÓGICA de las tablas del seed desde el respaldo (ATTACH), en una transacción:
     pending.slug + pending.last_reviewed_at, pending_topic, topic, topic_link y pending_link.
-    work, event y session_sync no se tocan. Devuelve conteos restaurados."""
+    work, event y session_sync no se tocan. Un respaldo anterior a 7.3.0 (raíz 'cliente') se
+    restaura con la raíz renombrada a 'proyecto' (_rename_old_axis_root). Devuelve conteos restaurados."""
     _require_db(db_path)
     if not os.path.isfile(bak_path):
         raise RuntimeError(f"no existe el respaldo {bak_path}")
@@ -454,7 +521,8 @@ def rollback(db_path, bak_path):
             n_topic = c.execute(
                 "INSERT INTO topic (id, slug, name, description, keywords, status, parent_id) "
                 "SELECT id, slug, name, description, keywords, status, parent_id FROM bak.topic").rowcount
-            n_tl = (c.execute("INSERT INTO topic_link (topic_a, topic_b, relation) "
+            _rename_old_axis_root(c, bak_path)
+            n_tl =(c.execute("INSERT INTO topic_link (topic_a, topic_b, relation) "
                               "SELECT topic_a, topic_b, relation FROM bak.topic_link").rowcount
                     if bak_tl else 0)                      # respaldo sin la tabla: queda vacía
             n_pt = c.execute(
@@ -468,7 +536,11 @@ def rollback(db_path, bak_path):
                       "last_reviewed_at = (SELECT b.last_reviewed_at FROM bak.pending b WHERE b.id = pending.id)")
             return {"topic": n_topic, "topic_link": n_tl, "pending_topic": n_pt, "pending_link": n_link}
 
-        counts = _db_shared.with_write_tx(con, _restore)
+        try:
+            counts = _db_shared.with_write_tx(con, _restore)
+        except Exception:
+            con.rollback()        # with_write_tx solo revierte OperationalError; aquí también el RuntimeError
+            raise
         con.execute("DETACH DATABASE bak")
     finally:
         con.close()
@@ -483,6 +555,8 @@ def render_report(plan, db_path, apply=False, counts=None, backup=None, changed=
     out.append(f"[seed-taxonomy] {mode} sobre: {db_path}")
     if not plan["migrated"]:
         out.append("  (DB sin migrar: el plan asume slug NULL y curated=0; --apply migra antes de sembrar)")
+    if plan.get("axis_step_note"):
+        out.append(f"  aviso: {plan['axis_step_note']}")
     sk = plan["skipped"]
     out.append("TEMAS")
     out.append(f"  a crear (raíces + hijos) : {len(plan['topics_create'])}")
@@ -526,7 +600,8 @@ def _utf8_stdout():
 
 def run(db_path, catalog_path, dataset_path, apply=False, force=False, backup_dir=None):
     """Núcleo testeable. DRY-RUN abre la DB con sqlite3.connect plano (sin _connect: no migra ni
-    escribe). --apply: respaldo verificado -> _connect (migra) -> [plan + siembra] en UNA transacción
+    escribe); si la base no ha pasado el paso de base del eje proyecto, simula su renombre y lo avisa
+    (_axis_step_preview). --apply: respaldo verificado -> _connect (migra) -> [plan + siembra] en UNA transacción
     -> reporte. Devuelve {'plan', 'counts'|None, 'backup'|None, 'changed'|None}."""
     _require_db(db_path)
     catalog = load_catalog(catalog_path)
@@ -534,7 +609,9 @@ def run(db_path, catalog_path, dataset_path, apply=False, force=False, backup_di
     if not apply:
         con = sqlite3.connect(db_path)
         try:
-            plan = build_plan(con, catalog, dataset, force)
+            rename, note = _axis_step_preview(con)
+            plan = build_plan(con, catalog, dataset, force, rename_old_root=rename)
+            plan["axis_step_note"] = note
         finally:
             con.close()
         print(render_report(plan, db_path))
@@ -562,9 +639,9 @@ def run(db_path, catalog_path, dataset_path, apply=False, force=False, backup_di
 def main(argv):
     _utf8_stdout()
     p = argparse.ArgumentParser(
-        description="Siembra la taxonomía curada (ejes cliente/tópico), slugs, bandas y grupos en neb.db.")
-    p.add_argument("--from", dest="src", help="triage.json del pase (items con id, slug, cliente, topico, grupo, prioridad)")
-    p.add_argument("--catalog", dest="catalog", help="taxonomy.json (ejes cliente/topico con slug, name, keywords)")
+        description="Siembra la taxonomía curada (ejes proyecto/tópico), slugs, bandas y grupos en neb.db.")
+    p.add_argument("--from", dest="src", help="triage.json del pase (items con id, slug, proyecto, topico, grupo, prioridad)")
+    p.add_argument("--catalog", dest="catalog", help="taxonomy.json (ejes proyecto/topico con slug, name, keywords)")
     p.add_argument("--db", dest="db", default=None, help="neb.db destino (default: resolve_db_path(~)); debe existir")
     p.add_argument("--apply", action="store_true", help="ejecuta (sin él = DRY-RUN)")
     p.add_argument("--force", action="store_true", help="re-cura pendientes ya curados y re-activa temas archivados del catálogo")

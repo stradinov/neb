@@ -41,6 +41,7 @@ nb = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(nb)
 
 BOOTSTRAP_DIR = os.path.join(NEB, "bootstrap")
+N = _db_shared._migrations.SCHEMA_VERSION          # versión del propio árbol; las pruebas van una o dos adelante
 
 
 def u16(s):
@@ -84,12 +85,12 @@ class TestAvisoBase(unittest.TestCase):
         self.assertIsNone(self.notice(self.clone))
 
     def test_versiones_distintas_que_entienden_la_base_sin_aviso(self):
-        self.make_db([(3, 2)])                        # base más nueva, mínima 2: plugin (2) y clon (2) la operan
-        self.clone_version(2)
+        self.make_db([(N + 1, N)])                    # base más nueva, mínima N: plugin (N) y clon (N) la operan
+        self.clone_version(N)
         self.assertIsNone(self.notice(self.clone))
 
     def test_aviso_por_cada_arbol_que_no_opera_la_base(self):
-        self.make_db([(3, 3)])                        # mínima 3: el propio (2) y un clon sin el archivo (1) no
+        self.make_db([(N + 1, N + 1)])                # mínima N+1: el propio (N) y un clon sin el archivo (1) no
         n = self.notice(self.clone)
         self.assertIsNotNone(n)
         self.assertIn(NEB, n)
@@ -98,8 +99,8 @@ class TestAvisoBase(unittest.TestCase):
         self.assertIn("anterior a 6.48.0", n)                       # el clon sin _migrations.py no
 
     def test_clon_al_dia_no_aparece(self):
-        self.make_db([(3, 3)])
-        self.clone_version(3)
+        self.make_db([(N + 1, N + 1)])
+        self.clone_version(N + 1)
         n = self.notice(self.clone)
         self.assertIn(NEB, n)
         self.assertNotIn(self.clone, n)
@@ -111,12 +112,12 @@ class TestAvisoBase(unittest.TestCase):
         def patched(path, name):
             mod = real(path, name)
             if name == "neb_migrations_own":
-                mod.STEPS = mod.STEPS + (mod.Step(3, "paso de prueba", lambda c: None, espera=True,
+                mod.STEPS = mod.STEPS + (mod.Step(N + 1, "paso de prueba", lambda c: None, espera=True,
                                                   precheck=lambda c: "vista v_mia"),)
             return mod
         with mock.patch.object(nb, "_load_module", patched):
             n = self.notice()
-        self.assertIn("paso de base 3", n)
+        self.assertIn("paso de base %d" % (N + 1), n)
         self.assertIn("vista v_mia", n)
         self.assertIn("neb-migrate.py", n)
 
@@ -127,27 +128,27 @@ class TestAvisoBase(unittest.TestCase):
         def patched(path, name):
             mod = real(path, name)
             if name == "neb_migrations_own":
-                mod.STEPS = mod.STEPS + (mod.Step(3, "paso de prueba", lambda c: None),)
+                mod.STEPS = mod.STEPS + (mod.Step(N + 1, "paso de prueba", lambda c: None),)
             return mod
         with mock.patch.object(nb, "_load_module", patched):
             self.assertIsNone(self.notice())
 
     def test_mismo_texto_en_dos_corridas_y_otro_si_el_estado_cambia(self):
-        self.make_db([(3, 3)])
+        self.make_db([(N + 1, N + 1)])
         with mock.patch.object(os.path, "expanduser", lambda p: self.home if p == "~" else p):
             a = nb._env_notices(BOOTSTRAP_DIR, self.clone)
             b = nb._env_notices(BOOTSTRAP_DIR, self.clone)
             self.assertEqual(a, b)
             self.assertTrue(any("base-incompatible" in x for x in a))
             con = sqlite3.connect(self.db)
-            con.execute("INSERT INTO schema_step VALUES (4, 4, 'otro', 'x', 'x', NULL)")
+            con.execute("INSERT INTO schema_step VALUES (?, ?, 'otro', 'x', 'x', NULL)", (N + 2, N + 2))
             con.commit()
             con.close()
             c = nb._env_notices(BOOTSTRAP_DIR, self.clone)
         self.assertNotEqual(a, c)
 
     def test_tope_del_aviso(self):
-        self.make_db([(3, 3)])
+        self.make_db([(N + 1, N + 1)])
         largo = os.path.join(self.clone, *(["x" * 200] * 4))   # no se crea: un árbol ausente cuenta como 1
         n = self.notice(largo)
         self.assertIn("…", n)
@@ -157,7 +158,7 @@ class TestAvisoBase(unittest.TestCase):
         viejo = tempfile.mkdtemp(prefix="neb-test-viejo-")
         self.addCleanup(shutil.rmtree, viejo, True)
         os.makedirs(os.path.join(viejo, "bootstrap"))
-        self.make_db([(3, 3)])
+        self.make_db([(N + 1, N + 1)])
         self.assertIsNone(nb._db_notice(os.path.join(viejo, "bootstrap"), None, home=self.home))
 
 

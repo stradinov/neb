@@ -3,16 +3,20 @@
 test_migrations_db.py — versión de esquema y pasos de base de neb.db (REQ neb-migraciones-de-version, 6.48.0).
 
 Cubre hooks/lib/_migrations.py a través de _db_shared._connect, con una lista de pasos inyectable (pasos
-ficticios en lugar del paso 2 de producción; el paso 2 real lo prueba test_logbook_migracion_team.py):
+ficticios en lugar de los pasos 2 y 3 de producción; el paso 2 real lo prueba test_logbook_migracion_team.py):
   • base nueva y base de 6.47.0 sin tabla de versión (mismo contenido, segunda conexión sin cambio de esquema);
   • dos procesos a la vez con la base en V = 0;
   • las cuatro filas de la regla de compatibilidad;
-  • paso destructivo: respaldo verificado antes, uno solo después, ninguno si falla, base idéntica tras el fallo;
+  • paso destructivo: respaldo verificado antes, uno por paso después, ninguno si falla, base idéntica tras el fallo;
   • `espera`, `precheck`, candado ocupado sin `espera`, `paso-bloqueado`, `schema_step_error`;
   • isolation_level intacto; un paso que rompe su transacción;
   • reparaciones: sin DDL sobre una base más nueva; la limpieza de transcripts no toma respaldo;
   • el código de 6.47.0 sobre una base ya marcada por 6.48.0;
   • `neb-migrate.py`: status de solo lectura, restore (WAL activo, validaciones, negativas, retención).
+  • paso 3 real (7.3.0, eje proyecto): base en la versión 2 con raíz 'cliente' (renombra, el resto igual,
+    respaldo previo), base nueva y base solo con el sentinel y temas planos (no hace nada ni bloquea),
+    colisión con un tema 'proyecto' (precheck con motivo, nada cambia), carrera entre precheck y aplicar,
+    idempotencia y un código 7.2.x sobre la base migrada.
 
 Invariantes: homes y bases temporales; nunca ~/.claude; sin NEB_HOME ni NEB_LOGBOOK_* heredados.
   py -m unittest discover -s hooks/tests -p test_migrations_db.py
@@ -255,7 +259,7 @@ class TestRegla(Base):
 
 class TestDestructivo(Base):
 
-    def test_respaldo_verificado_antes_y_uno_solo_despues(self):
+    def test_respaldo_verificado_antes_y_uno_por_paso_despues(self):
         legacy_647_db(self.db)
         self.connect([STEP1]).close()
         before = table_hashes(self.db)
@@ -271,8 +275,51 @@ class TestDestructivo(Base):
         con.close()
         self.connect([STEP1, drop_column_step(2), drop_column_step(3, col="transcript_error_at")]).close()
         b = self.backups()
-        self.assertEqual(len(b), 1)
-        self.assertTrue(b[0].startswith("neb.pre-paso-3."))
+        self.assertEqual(len(b), 2, b)
+        self.assertEqual(b[0], os.path.basename(bak), "el respaldo del paso 2 sobrevive al paso 3")
+        self.assertTrue(b[1].startswith("neb.pre-paso-3."), b)
+
+    def test_pasos_2_y_3_en_la_misma_corrida_conservan_un_respaldo_de_cada_uno(self):
+        """Una base en la versión 1 que aplica dos pasos destructivos en la misma conexión: queda el respaldo de
+        cada paso, cada uno con lo que había antes de ese paso."""
+        legacy_647_db(self.db)
+        self.connect([STEP1]).close()
+        self.connect([STEP1, drop_column_step(2), drop_column_step(3, col="transcript_error_at")]).close()
+        self.assertEqual(self.version()[0], 3)
+        b = self.backups()
+        self.assertEqual(len(b), 2, b)
+        self.assertTrue(b[0].startswith("neb.pre-paso-2.") and b[1].startswith("neb.pre-paso-3."), b)
+        folder = _migrations.backup_dir(self.db)
+        self.assertIn("transcript_error", columns(os.path.join(folder, b[0]), "work"))
+        self.assertNotIn("transcript_error", columns(os.path.join(folder, b[1]), "work"))
+        self.assertIn("transcript_error_at", columns(os.path.join(folder, b[1]), "work"))
+        con = sqlite3.connect(self.db)
+        try:
+            rows = con.execute("SELECT step, backup FROM schema_step WHERE step > 1 ORDER BY step").fetchall()
+        finally:
+            con.close()
+        self.assertEqual(rows, [(2, os.path.join(folder, b[0])), (3, os.path.join(folder, b[1]))])
+
+    def test_dos_corridas_del_mismo_paso_conservan_solo_el_ultimo_de_ese_paso(self):
+        """La base vuelve a la versión 1 (restore --remigrar de su respaldo) y el paso 2 corre otra vez: su respaldo
+        nuevo reemplaza al anterior del mismo paso; el de otro paso no se toca."""
+        legacy_647_db(self.db)
+        self.connect([STEP1]).close()
+        folder = _migrations.backup_dir(self.db)
+        otro = os.path.join(folder, "neb.pre-paso-3.20200101T000000Z.db")
+        self.connect([STEP1, drop_column_step(2)]).close()
+        primero = os.path.join(folder, self.backups()[0])
+        shutil.copyfile(primero, otro)                    # respaldo de otro paso: la poda del 2 no lo toca
+        shutil.copyfile(primero, self.db)                 # vuelve a la versión 1
+        self.assertEqual(self.version()[0], 1)
+        self.connect([STEP1, drop_column_step(2)]).close()
+        self.assertEqual(self.version()[0], 2)
+        b = self.backups()
+        self.assertEqual(len(b), 2, b)
+        self.assertTrue(b[0].startswith("neb.pre-paso-2."), b)
+        self.assertNotEqual(os.path.join(folder, b[0]), primero, "queda el respaldo de la segunda corrida")
+        self.assertFalse(os.path.exists(primero))
+        self.assertEqual(os.path.join(folder, b[1]), otro)
 
     def test_respaldo_en_un_solo_archivo_y_la_poda_no_deja_restos(self):
         legacy_647_db(self.db)
@@ -285,12 +332,15 @@ class TestDestructivo(Base):
         ro.execute("SELECT count(*) FROM work").fetchone()
         ro.close()
         self.assertEqual(sorted(os.listdir(folder)), [os.path.basename(bak)])
-        for suf in ("-wal", "-shm"):                      # restos de una copia anterior a la corrección
-            open(bak + suf, "wb").close()
+        viejo = os.path.join(folder, "neb.pre-paso-3.20200101T000000Z.db")   # respaldo anterior del mismo paso
+        for suf in ("", "-wal", "-shm"):                  # con restos de una copia anterior a la corrección
+            open(viejo + suf, "wb").close()
         self.connect([STEP1, drop_column_step(2), drop_column_step(3, col="transcript_error_at")]).close()
         left = sorted(os.listdir(folder))
-        self.assertEqual(len(left), 1)
-        self.assertTrue(left[0].startswith("neb.pre-paso-3.") and left[0].endswith(".db"))
+        self.assertEqual(len(left), 2, left)
+        self.assertEqual(left[0], os.path.basename(bak))
+        self.assertTrue(left[1].startswith("neb.pre-paso-3.") and left[1].endswith(".db"), left)
+        self.assertNotEqual(left[1], os.path.basename(viejo))
 
     def test_paso_que_falla_deja_la_base_identica_sin_respaldo_y_con_su_fallo(self):
         legacy_647_db(self.db)
@@ -901,6 +951,299 @@ class TestRutaConCorchetes(Base):
         self.assertFalse(os.path.exists(own))           # queda solo el pre-restore nuevo
         self.assertEqual(sum(n.startswith("neb.pre-restore.") for n in self.backups()), 1)
         self.assertTrue(os.path.exists(decoy))
+
+
+
+# --------------------------------------------------------------------------- paso 3 real: eje proyecto (7.3.0)
+
+STEPS_7_2 = _migrations.STEPS[:2]          # los pasos de 7.0.0–7.2.x: una base en la versión 2
+
+
+class TestPaso3EjeProyecto(Base):
+    """Paso de base 3 de producción (7.3.0): renombra la raíz 'cliente' a 'proyecto' (slug y name) y nada más.
+    Sin raíz 'cliente' no hace nada; un tema con slug 'proyecto' ya presente lo detiene en su precheck."""
+
+    def v2_db(self, cliente=True, extra=()):
+        """Base en la versión 2 (como la deja 7.2.x) con el eje curado: raíces 'cliente' y 'topico', hijos,
+        pendientes curados (uno abierto, uno obsoleto), una sugerencia y el sentinel; `extra` son INSERT
+        adicionales."""
+        self.connect(STEPS_7_2).close()
+        self.assertEqual(self.version(), (2, 2))
+        con = sqlite3.connect(self.db)
+        con.execute("PRAGMA foreign_keys=ON")
+        if cliente:
+            con.execute("INSERT INTO topic (id, slug, name, keywords) VALUES (33, 'cliente', 'Cliente', 'cliente')")
+            con.execute("INSERT INTO topic (id, slug, name, parent_id) VALUES (40, 'alpha', 'Alpha', 33)")
+            con.execute("INSERT INTO topic (id, slug, name, parent_id) VALUES (41, 'beta', 'Beta', 33)")
+        con.execute("INSERT INTO topic (id, slug, name) VALUES (34, 'topico', 'Tópico')")
+        con.execute("INSERT INTO topic (id, slug, name, parent_id) VALUES (50, 'seguridad', 'Seguridad', 34)")
+        con.execute("INSERT INTO topic (id, slug, name) VALUES (60, 'sin-clasificar', 'Sin clasificar')")
+        con.execute("INSERT INTO pending (id, context_origin, created_at, slug) VALUES (1, 'uno', 't', 'uno')")
+        con.execute("INSERT INTO pending (id, context_origin, status, created_at, slug) "
+                    "VALUES (2, 'dos', 'obsolete', 't', 'dos')")
+        if cliente:
+            con.execute("INSERT INTO pending_topic (pending_id, topic_id, priority_band, is_primary, curated) "
+                        "VALUES (1, 40, 'high', 1, 1)")
+            con.execute("INSERT INTO pending_topic (pending_id, topic_id, priority_band, curated) "
+                        "VALUES (2, 41, 'low', 1)")
+            con.execute("INSERT INTO topic_link (topic_a, topic_b, relation) VALUES (40, 50, 'related')")
+        con.execute("INSERT INTO pending_topic (pending_id, topic_id, priority_score, curated) "
+                    "VALUES (1, 50, 0.5, 0)")
+        for sql in extra:
+            con.execute(sql)
+        con.commit()
+        con.close()
+
+    def topics(self):
+        con = sqlite3.connect(self.db)
+        try:
+            return con.execute("SELECT * FROM topic ORDER BY id").fetchall()
+        finally:
+            con.close()
+
+    def without_topic(self, hashes):
+        return {k: v for k, v in hashes.items() if k != "topic"}
+
+    def test_critico_base_v2_con_raiz_cliente_renombra_y_lo_demas_queda_igual(self):
+        self.v2_db()
+        before, topics_before = table_hashes(self.db), self.topics()
+        con = self.connect()
+        self.assertIsNotNone(con)
+        self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+        self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
+        con.close()
+        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(self.without_topic(table_hashes(self.db)), self.without_topic(before))
+        cols = columns(self.db, "topic")
+        renamed = list([r for r in topics_before if r[0] == 33][0])
+        renamed[cols.index("slug")], renamed[cols.index("name")] = "proyecto", "Proyecto"
+        self.assertEqual(self.topics(), [tuple(renamed) if r[0] == 33 else r for r in topics_before])
+        self.assertEqual(renamed[cols.index("keywords")], "cliente", "solo cambian slug y name")
+
+    def test_descripcion_del_seed_se_renombra_y_la_escrita_a_mano_se_conserva(self):
+        """La descripción que puso el seed ('Raíz del eje cliente (…)') pasa a la de 'proyecto'; otra se queda."""
+        for desc, esperada in (("Raíz del eje cliente (contenedor; no es un tema)",
+                                "Raíz del eje proyecto (contenedor; no es un tema)"),
+                               ("mi nota", "mi nota")):
+            with self.subTest(desc=desc):
+                if os.path.exists(self.db):
+                    os.remove(self.db)
+                    shutil.rmtree(_migrations.backup_dir(self.db), ignore_errors=True)
+                self.v2_db(extra=(f"UPDATE topic SET description = '{desc}' WHERE id = 33",))
+                self.connect().close()
+                con = sqlite3.connect(self.db)
+                try:
+                    self.assertEqual(con.execute("SELECT slug, description FROM topic WHERE id = 33").fetchone(),
+                                     ("proyecto", esperada))
+                finally:
+                    con.close()
+
+    def test_critico_respaldo_previo_con_la_raiz_cliente_y_constancia(self):
+        self.v2_db()
+        self.connect().close()
+        backups = self.backups()
+        self.assertEqual(len(backups), 1)
+        self.assertTrue(backups[0].startswith("neb.pre-paso-3."), backups)
+        bak = os.path.join(_migrations.backup_dir(self.db), backups[0])
+        con = sqlite3.connect(self.db)
+        row = con.execute("SELECT min_code, title, backup FROM schema_step WHERE step = 3").fetchone()
+        con.close()
+        self.assertEqual(row, (3, "eje proyecto (7.3.0)", bak))
+        con = sqlite3.connect(bak)
+        try:
+            self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
+            self.assertEqual(con.execute("SELECT slug, name FROM topic WHERE id = 33").fetchone(),
+                             ("cliente", "Cliente"))
+            self.assertEqual(_migrations.read_version(con), (2, 2))
+        finally:
+            con.close()
+
+    def test_critico_base_v2_de_700_conserva_el_respaldo_del_paso_2_junto_al_del_paso_3(self):
+        """Una base que 7.0.0 llevó de la versión 1 a la 2 guarda su neb.pre-paso-2 (la única copia con las
+        columnas de equipo). El paso 3 respalda aunque no haya raíz 'cliente', y la poda es por paso: el
+        neb.pre-paso-2 sobrevive y la fila del paso 2 en schema_step sigue apuntando a él (tooling/migrations.md
+        § "Paso 3: eje proyecto")."""
+        legacy_647_db(self.db)
+        self.connect([STEP1]).close()
+        self.connect(STEPS_7_2).close()
+        self.assertEqual(self.version(), (2, 2))
+        backups = self.backups()
+        self.assertEqual(len(backups), 1)
+        self.assertTrue(backups[0].startswith("neb.pre-paso-2."), backups)
+        con = sqlite3.connect(self.db)
+        try:
+            self.assertIsNone(con.execute("SELECT 1 FROM topic WHERE slug = 'cliente'").fetchone())
+            paso2 = con.execute("SELECT backup FROM schema_step WHERE step = 2").fetchone()[0]
+        finally:
+            con.close()
+        self.assertEqual(paso2, os.path.join(_migrations.backup_dir(self.db), backups[0]))
+        self.connect().close()
+        self.assertEqual(self.version(), (3, 3))
+        backups = self.backups()
+        self.assertEqual(len(backups), 2, backups)
+        self.assertEqual(os.path.join(_migrations.backup_dir(self.db), backups[0]), paso2)
+        self.assertTrue(backups[1].startswith("neb.pre-paso-3."), backups)
+        con = sqlite3.connect(self.db)
+        try:
+            self.assertEqual(con.execute("SELECT backup FROM schema_step WHERE step = 2").fetchone()[0], paso2)
+        finally:
+            con.close()
+        self.assertTrue(os.path.exists(paso2), "la poda conserva el respaldo de 7.0.0")
+
+    def test_base_nueva_no_hace_nada(self):
+        con = self.connect()
+        self.assertIsNotNone(con)
+        self.assertEqual(con.execute("SELECT count(*) FROM topic").fetchone()[0], 0)
+        con.close()
+        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(self.backups(), [])
+
+    def test_critico_solo_sentinel_y_temas_planos_no_hace_nada_ni_bloquea(self):
+        self.connect(STEPS_7_2).close()
+        con = sqlite3.connect(self.db)
+        con.execute("INSERT INTO topic (id, slug, name) VALUES (1, 'sin-clasificar', 'Sin clasificar')")
+        con.execute("INSERT INTO topic (id, slug, name) VALUES (2, 'ventas', 'Ventas')")
+        con.execute("INSERT INTO topic (id, slug, name) VALUES (3, 'infra', 'Infra')")
+        con.execute("INSERT INTO topic (id, slug, name, parent_id) VALUES (4, 'cliente', 'Cliente', 3)")
+        con.execute("INSERT INTO pending (id, context_origin, created_at, slug) VALUES (1, 'uno', 't', 'uno')")
+        con.execute("INSERT INTO pending_topic (pending_id, topic_id, curated) VALUES (1, 1, 0)")
+        con.commit()
+        con.close()
+        before = table_hashes(self.db)
+        con = self.connect()
+        self.assertIsNotNone(con, "no bloquea")
+        con.close()
+        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(table_hashes(self.db), before, "un 'cliente' que no es raíz no se toca")
+
+    def test_tema_proyecto_sin_raiz_cliente_no_bloquea(self):
+        self.v2_db(cliente=False, extra=("INSERT INTO topic (id, slug, name) VALUES (70, 'proyecto', 'Proyecto')",))
+        before = table_hashes(self.db)
+        self.connect().close()
+        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(table_hashes(self.db), before)
+
+    def test_critico_falla_sembrada_hijo_proyecto_detiene_el_paso_sin_cambiar_nada(self):
+        self.v2_db(extra=("INSERT INTO topic (id, slug, name, parent_id) VALUES (51, 'proyecto', 'Proyecto', 34)",
+                          "INSERT INTO topic (id, slug, name) VALUES (52, 'proyecto-51', 'Ocupado')"))
+        before = table_hashes(self.db)
+        with self.assertRaises(_migrations.DbUnavailable) as cm:
+            self.connect()
+        e = cm.exception
+        self.assertEqual(e.motivo, "paso-bloqueado")
+        self.assertIn("paso de base 3", e.detalle)
+        self.assertIn("topic id 51, hijo de 'topico'", e.detalle)
+        self.assertIn("UPDATE topic SET slug='proyecto-51-2' WHERE id=51;", e.detalle, "propone un slug libre")
+        self.assertIn("No se cambió nada", e.detalle)
+        self.assertIn("«- **Temas:**» de ~/.claude/compas.md", e.detalle, "avisa que el slug se cita en compas.md")
+        self.assertEqual(table_hashes(self.db), before)
+        self.assertEqual(self.version(), (2, 2))
+        self.assertEqual(self.backups(), [], "el precheck corre antes del respaldo")
+        con = _migrations.open_readonly(self.db)
+        try:
+            self.assertEqual(_migrations.read_errors(con), [], "el motivo de un precheck no se guarda")
+            report = _migrations.blocked_report(con)
+        finally:
+            con.close()
+        self.assertEqual([(n, t) for n, t, _m in report], [(3, "eje proyecto (7.3.0)")])
+        self.assertIn("UPDATE topic SET slug='proyecto-51-2' WHERE id=51;", report[0][2])
+        con = sqlite3.connect(self.db)
+        con.execute("UPDATE topic SET slug='proyecto-51-2' WHERE id=51")
+        con.commit()
+        con.close()
+        self.connect().close()
+        self.assertEqual(self.version(), (3, 3))
+        topics = {r[0]: r[1] for r in self.topics()}
+        self.assertEqual((topics[33], topics[51]), ("proyecto", "proyecto-51-2"))
+
+    def test_tema_proyecto_creado_tras_el_precheck_revierte_y_se_reintenta(self):
+        self.v2_db()
+        before = table_hashes(self.db)
+        real = _migrations.STEPS[2]
+        db = self.db
+
+        def precheck(con):
+            motivo = real.precheck(con)
+            otro = sqlite3.connect(db)
+            otro.execute("INSERT INTO topic (id, slug, name) VALUES (80, 'proyecto', 'Tarde')")
+            otro.commit()
+            otro.close()
+            return motivo
+        paso3 = Step(3, real.titulo, real.aplicar, min_code=real.min_code, destructivo=real.destructivo,
+                     espera=real.espera, precheck=precheck)
+        with self.assertRaises(_migrations.DbUnavailable) as cm:
+            self.connect(STEPS_7_2 + (paso3,))
+        self.assertIn("topic id 80", cm.exception.detalle)
+        self.assertIn("el paso se reintenta", cm.exception.detalle)
+        self.assertEqual(self.version(), (2, 2))
+        self.assertEqual(self.backups(), [], "el respaldo del intento revertido se borra")
+        con = sqlite3.connect(self.db)
+        try:
+            errors = _migrations.read_errors(con)
+            self.assertEqual(con.execute("SELECT slug FROM topic WHERE id = 33").fetchone()[0], "cliente")
+        finally:
+            con.close()
+        self.assertEqual([r[0] for r in errors], [3])
+        self.assertIn("topic id 80", errors[0][3])
+        self.assertEqual(self.without_topic(table_hashes(self.db)), self.without_topic(before))
+        con = sqlite3.connect(self.db)
+        con.execute("DELETE FROM topic WHERE id = 80")
+        con.commit()
+        con.close()
+        self.connect(retry=True).close()
+        self.assertEqual(self.version(), (3, 3))
+        con = sqlite3.connect(self.db)
+        try:
+            self.assertEqual(_migrations.read_errors(con), [])
+            self.assertEqual(con.execute("SELECT slug FROM topic WHERE id = 33").fetchone()[0], "proyecto")
+        finally:
+            con.close()
+
+    def test_critico_idempotente_la_segunda_conexion_no_hace_nada(self):
+        self.v2_db()
+        self.connect().close()
+        after, backups = table_hashes(self.db), self.backups()
+        con = sqlite3.connect(self.db)
+        sv = con.execute("PRAGMA schema_version").fetchone()[0]
+        con.close()
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            con = _db_shared._connect(self.db, SCHEMA)
+        self.assertIsNotNone(con)
+        con.close()
+        self.assertEqual(err.getvalue(), "")
+        self.assertEqual(table_hashes(self.db), after)
+        self.assertEqual(self.backups(), backups, "sin respaldo nuevo")
+        con = sqlite3.connect(self.db)
+        try:
+            self.assertEqual(con.execute("PRAGMA schema_version").fetchone()[0], sv)
+            self.assertEqual(con.execute("SELECT count(*) FROM schema_step WHERE step = 3").fetchone()[0], 1)
+        finally:
+            con.close()
+
+    def test_aplicar_sin_raiz_cliente_no_escribe(self):
+        """Relectura dentro del candado: si la raíz ya no está (otro proceso la renombró), aplicar no hace nada.
+        El tema 'proyecto' (la raíz que dejó el otro proceso) hace que, sin esa guarda, aplicar lance por choque
+        de slug en vez de salir sin escribir."""
+        self.v2_db(cliente=False,
+                   extra=("INSERT INTO topic (id, slug, name) VALUES (70, 'proyecto', 'Proyecto')",))
+        con = sqlite3.connect(self.db)
+        con.isolation_level = None
+        con.execute("BEGIN IMMEDIATE")
+        try:
+            before = con.total_changes
+            _migrations.STEPS[2].aplicar(_migrations._StepConnection(con))
+            self.assertEqual(con.total_changes, before)
+        finally:
+            con.execute("ROLLBACK")
+            con.close()
+
+    def test_un_codigo_7_2_no_opera_la_base_migrada(self):
+        self.v2_db()
+        self.connect().close()
+        with self.assertRaises(_migrations.IncompatibleDb) as cm:
+            self.connect(STEPS_7_2)
+        self.assertIn("pide al menos la 3", cm.exception.detalle)
 
 
 if __name__ == "__main__":

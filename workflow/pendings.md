@@ -8,7 +8,7 @@
 - **Alta:** `PD create task "[<slug>] <contexto>"`, sin pedir confirmación al dev. `PD` es `hooks/lib/pendings.py` del núcleo en uso; el skill `pendings-review` trae la forma de resolverlo desde cualquier proyecto.
 - **Consulta:** la del dev se sirve por el skill [`pendings-review`](../skills/pendings-review/SKILL.md), que prioriza por banda y por la brújula `compas.md`; el `list` del CLI es acceso de bajo nivel.
 - **Cita canónica:** el `[slug]` del pendiente y, si se necesita el número, el `id` de `neb.db` como `PD-<id>`; nunca `#NNN`. Contrato de resolución en [`../tooling/pendings.md`](../tooling/pendings.md) § "Cómo citar un pendiente".
-- **Clasificación:** cada pendiente curado lleva un cliente y un tópico, decididos por el dev; la banda curada manda sobre la brújula. Ver [`../tooling/pendings.md`](../tooling/pendings.md) § "Ejes curados".
+- **Clasificación:** cada pendiente curado lleva un proyecto y un tópico, decididos por el dev; la banda curada manda sobre la brújula. Ver [`../tooling/pendings.md`](../tooling/pendings.md) § "Ejes curados".
 
 ## Cuándo Claude lo escribe / lee
 

@@ -12,7 +12,7 @@ La base guarda sus pasos aplicados en `schema_step`; el código trae `SCHEMA_VER
 
 Un paso de base es un cambio del esquema escrito en código. Corre dentro de BEGIN IMMEDIATE junto con
 su fila de `schema_step` (todo o nada); el paso 1 (esquema inicial) también, y además es idempotente.
-Un paso destructivo lleva respaldo previo verificado en `<carpeta de la base>/neb-backups/` (queda 1).
+Un paso destructivo lleva respaldo previo verificado en `<carpeta de la base>/neb-backups/` (queda el último de cada paso).
 
 Este módulo NO importa módulos hermanos: el arranque lee `SCHEMA_VERSION` de otro árbol como texto
 (regex sobre este archivo) sin cargarlo. Mantener la asignación en una sola línea literal.
@@ -29,11 +29,16 @@ import time
 from datetime import datetime, timezone
 
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 BACKUP_DIR_NAME   = "neb-backups"
-STEP_BACKUP_GLOB  = "neb.pre-paso-*.db"
+STEP_BACKUP_GLOB  = "neb.pre-paso-*.db"                 # todos los pasos: lo que listan status y restore
 RESTORE_BACKUP_GLOB = "neb.pre-restore.*.db"
+
+
+def step_backup_glob(n):
+    """Respaldos de un solo paso: la poda es por paso. El punto tras el número evita que el 1 tome al 12."""
+    return f"neb.pre-paso-{n}.*.db"
 
 RETRY_BACKOFF_SECONDS = 600         # tras un fallo guardado, las conexiones esperan esto antes de reintentar
 ADVANCED = object()                 # la base ya estaba en el paso: se vuelve a decidir la compatibilidad
@@ -303,10 +308,80 @@ def _team_apply(con):
         con.execute(f"ALTER TABLE {table} DROP COLUMN {col}")
 
 
+# --------------------------------------------------------------------------- paso 3: eje proyecto
+# 7.3.0 renombra la raíz del eje curado 'cliente' a 'proyecto' (slug y name; también la descripción si es la
+# que puso el seed: una escrita a mano se conserva). Los hijos cuelgan de la misma fila
+# (mismo id), así que las curaciones de pending_topic no se tocan. Sin raíz 'cliente' (base nueva, o con triage
+# pero sin taxonomía sembrada: solo el sentinel y temas planos) el paso no hace nada; la raíz 'proyecto' la crea
+# el seed. El código <= 7.2.x busca la raíz 'cliente': por eso sube la mínima compatible.
+
+_OLD_AXIS_ROOT = "cliente"
+_NEW_AXIS_ROOT = ("proyecto", "Proyecto")
+# Descripción que bootstrap/seed-pendings-taxonomy.py da a cada raíz ("Raíz del eje <slug> (…)").
+_OLD_ROOT_DESCRIPTION = "Raíz del eje cliente (contenedor; no es un tema)"
+_NEW_ROOT_DESCRIPTION = "Raíz del eje proyecto (contenedor; no es un tema)"
+
+
+def _old_axis_root(con):
+    """id de la raíz 'cliente' (parent_id IS NULL), o None."""
+    if not _table_exists(con, "topic"):
+        return None
+    row = con.execute("SELECT id FROM topic WHERE slug = ? AND parent_id IS NULL ORDER BY id LIMIT 1",
+                      (_OLD_AXIS_ROOT,)).fetchone()
+    return row[0] if row else None
+
+
+def _project_slug_clash(con, root_id, siguiente="y la siguiente conexión aplica el paso"):
+    """Motivo si ya existe un tema con slug 'proyecto' (topic.slug es UNIQUE: el renombre fallaría), o None.
+    Solo lectura. Propone un slug libre para el UPDATE que lo quita del camino."""
+    row = con.execute("SELECT t.id, p.slug FROM topic t LEFT JOIN topic p ON p.id = t.parent_id "
+                      "WHERE t.slug = ?", (_NEW_AXIS_ROOT[0],)).fetchone()
+    if row is None:
+        return None
+    clash_id, parent_slug = row
+    free, i = f"{_NEW_AXIS_ROOT[0]}-{clash_id}", 2
+    while con.execute("SELECT 1 FROM topic WHERE slug = ?", (free,)).fetchone() is not None:
+        free, i = f"{_NEW_AXIS_ROOT[0]}-{clash_id}-{i}", i + 1
+    where = f"hijo de '{parent_slug}'" if parent_slug else "sin padre"
+    return (f"neb 7.3.0 renombra la raíz del eje 'cliente' (topic id {root_id}) a 'proyecto', y ya existe un tema "
+            f"con slug 'proyecto' (topic id {clash_id}, {where}). No se cambió nada; renómbralo (p. ej. "
+            f"UPDATE topic SET slug='{free}' WHERE id={clash_id};); si 'proyecto' aparece en «- **Temas:**» de "
+            f"~/.claude/compas.md, cámbialo ahí por el nuevo slug (compas.md resuelve por slug: si no, el peso de "
+            f"ese objetivo deja de aplicarse), {siguiente}")
+
+
+def _project_axis_precheck(con):
+    root_id = _old_axis_root(con)
+    if root_id is None:
+        return None
+    return _project_slug_clash(con, root_id)
+
+
+class ProjectSlugInTheWay(Exception):
+    """No es de SQLite a propósito (como UserObjectsInTheWay): el fallo se guarda con su motivo legible."""
+
+
+def _project_axis_apply(con):
+    """Relee dentro de la transacción: sin raíz 'cliente' no hace nada (otra versión o el seed ya dejó el eje
+    como está); un tema 'proyecto' aparecido después del precheck revierte el paso, que se reintenta."""
+    root_id = _old_axis_root(con)
+    if root_id is None:
+        return
+    clash = _project_slug_clash(con, root_id, siguiente="y el paso se reintenta")  # el mecanismo agrega cuándo
+    if clash:
+        raise ProjectSlugInTheWay(clash)
+    # La descripción solo se cambia si es la que puso el seed; una escrita a mano se conserva.
+    con.execute("UPDATE topic SET slug = ?, name = ?, description = CASE WHEN description = ? THEN ? "
+                "ELSE description END WHERE id = ?",
+                (*_NEW_AXIS_ROOT, _OLD_ROOT_DESCRIPTION, _NEW_ROOT_DESCRIPTION, root_id))
+
+
 STEPS = (
     Step(1, "esquema inicial", min_code=1, inicial=True),
     Step(2, "retiro del esquema de equipo (7.0.0)", aplicar=_team_apply, min_code=2, destructivo=True,
          espera=True, precheck=_team_precheck),
+    Step(3, "eje proyecto (7.3.0)", aplicar=_project_axis_apply, min_code=3, destructivo=True,
+         espera=False, precheck=_project_axis_precheck),
 )
 
 
@@ -439,7 +514,7 @@ def take_backup(db_path, name):
 
 
 def prune_backups(db_path, pattern, keep_path):
-    """Borra los archivos de <pattern> en neb-backups/ salvo keep_path (queda 1)."""
+    """Borra los archivos de <pattern> en neb-backups/ salvo keep_path (queda 1 de ese patrón)."""
     keep = os.path.normcase(os.path.abspath(keep_path)) if keep_path else None
     for p in glob.glob(os.path.join(glob.escape(backup_dir(db_path)), pattern)):
         if keep and os.path.normcase(os.path.abspath(p)) == keep:
@@ -715,7 +790,9 @@ def _apply_step(con, db_path, step, fresh, retry=False):
     finally:
         con.isolation_level = saved
     if backup:
-        prune_backups(db_path, STEP_BACKUP_GLOB, backup)
+        # Poda por paso: queda el último respaldo de cada paso destructivo (el neb.pre-paso-2 de 7.0.0, única
+        # copia con las columnas de equipo, sobrevive al paso 3).
+        prune_backups(db_path, step_backup_glob(step.n), backup)
     return None
 
 
