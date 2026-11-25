@@ -127,7 +127,7 @@ class TestValores(Base):
         self.assertIn("falta el sonido por defecto", reason)
 
     def test_ruta_absoluta(self):
-        self.os_(False)
+        self.os_(os.name == "nt")                                   # la ruta temporal es de la plataforma real
         otro = os.path.join(self.tmp, "otro.wav")
         write_wav(otro, [1, 2])
         self.cfg({"wav": otro})
@@ -135,6 +135,45 @@ class TestValores(Base):
         falta = os.path.join(self.tmp, "falta.wav")
         self.cfg({"wav": falta})
         self.assertEqual(self.resolve(), (self.default, "no existe %s" % falta))
+
+    def test_rutas_de_windows_iguales_con_cualquier_python(self):
+        # PD-993: desde Python 3.13, os.path.isabs('/x') da False en Windows; la regla no depende de la versión.
+        self.os_(True)
+        existe = os.path.join(self.tmp, "existe.wav")
+        write_wav(existe, [1, 2])
+        con_unidad = existe.replace(os.sep, "/")
+        self.cfg({"wav": con_unidad})
+        if os.name == "nt":                                          # isfile de una ruta C:/ solo existe en Windows
+            self.assertEqual(self.resolve(), (con_unidad, None))
+        falta = "C:/neb-prueba-pd993/falta.wav"
+        self.cfg({"wav": falta})
+        self.assertEqual(self.resolve(), (self.default, "no existe %s" % falta))
+        unc = r"\\localhost\neb-pd993-no-existe$\x.wav"             # localhost: isfile no sale a la red
+        self.cfg({"wav": unc})
+        self.assertEqual(self.resolve(), (self.default, "no existe %s" % unc))
+        sin_unidad = os.path.splitdrive(existe)[1]                   # con raíz y sin unidad; en Windows, el archivo existe
+        for wav in (sin_unidad, sin_unidad.replace("\\", "/"), "/Windows/Media/chimes.wav"):
+            with self.subTest(wav=wav):
+                self.cfg({"wav": wav})
+                path, reason = self.resolve()
+                self.assertEqual(path, self.default)
+                self.assertIn("en Windows la ruta de `wav` lleva la unidad", reason)
+        for wav in ("C:relativo.wav", "C:", "//x.wav", "\\\\srv", "\\\\srv\\rec"):   # UNC incompleta: igual en 3.8 y 3.11+
+            with self.subTest(wav=wav):
+                self.cfg({"wav": wav})
+                self.assertEqual(self.resolve(), (self.default, "valor de `wav` no reconocido: %r" % (wav,)))
+        for wav in ("//srv/rec/x.wav", "\\\\?\\C:\\x.wav"):
+            with self.subTest(wav=wav):
+                self.assertTrue(ns._full_path(wav))
+
+    def test_rutas_posix(self):
+        self.os_(False)
+        self.assertTrue(ns._full_path("/no/existe.wav"))
+        self.assertFalse(ns._full_path("relativo.wav"))
+        for wav in ("C:\\x.wav", "C:/x.wav", "\\\\srv\\rec\\x.wav"):                # en un POSIX real no son rutas completas
+            with self.subTest(wav=wav):
+                self.assertFalse(ns._full_path(wav))
+        self.assertFalse(ns._rooted_without_drive("/x.wav"), "fuera de Windows /x es ruta completa")
 
     def test_valor_no_reconocido(self):
         self.os_(False)
@@ -284,8 +323,12 @@ class TestReproductorYDiagnostico(Base):
         self.assertIsNone(ns.diagnose(HOOK, self.env, self.home))
         self.cfg({"enabled": False, "wav": "/falta.wav"})
         self.assertIsNone(ns.diagnose(HOOK, self.env, self.home))
-        self.cfg({"wav": os.path.join(self.tmp, "falta.wav")})
+        self.cfg({"wav": "/neb-pd993-no-existe/falta.wav"})
         self.assertTrue(ns.diagnose(HOOK, self.env, self.home).startswith("usa el sonido por defecto: no existe"))
+        with mock.patch.object(ns, "IS_WINDOWS", True):              # el aviso del arranque muestra el motivo nuevo
+            self.cfg({"wav": "/Windows/Media/x.wav"})
+            self.assertIn("en Windows la ruta de `wav` lleva la unidad", ns.diagnose(HOOK, self.env, self.home))
+        self.cfg({"wav": "/neb-pd993-no-existe/falta.wav"})
         os.remove(self.default)
         self.assertTrue(ns.diagnose(HOOK, self.env, self.home).startswith("no suena: no existe"))
 

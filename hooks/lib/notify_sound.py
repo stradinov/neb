@@ -10,7 +10,8 @@ Valores de `wav` (lineamiento: tooling/notify-on-stop.md):
   null / ausente / "neb"  → hooks/sounds/neb-chime.wav (CC0, en todo SO)
   "chimes"                → %WINDIR%\\Media\\chimes.wav (solo Windows)
   "chimes-loud"           → chimes.wav amplificado, generado en local en ~/.claude/neb-sounds/ (solo Windows)
-  ruta absoluta           → esa ruta, si existe
+  ruta completa           → esa ruta, si existe: en Windows, con unidad o UNC (`C:/…`, `\\\\srv\\rec\\…`);
+                            fuera, empieza con `/`. En Windows, `/x.wav` (sin unidad) tiene motivo propio
 Cualquier otro caso cae en neb-chime.wav con su motivo. No se redistribuye audio de terceros sin licencia:
 chimes.wav se lee de la máquina del dev y la versión fuerte se genera ahí.
 
@@ -20,7 +21,9 @@ Solo stdlib. Defensivo: nunca levanta hacia el hook.
 """
 import array
 import json
+import ntpath
 import os
+import posixpath
 import shutil
 import sys
 import tempfile
@@ -40,6 +43,24 @@ DISABLED_RC = 3     # salida de la CLI cuando el hook está apagado en su JSON
 
 def _home(home):
     return os.path.expanduser("~") if home is None else home
+
+
+def _full_path(wav):
+    """True si `wav` es una ruta completa en la plataforma de IS_WINDOWS, igual con cualquier Python: en Windows,
+    con unidad o UNC y separador tras ella (`C:/x.wav`, `\\\\srv\\rec\\x.wav`; no `/x.wav` ni `C:x.wav`); fuera,
+    empieza con `/`. No usa os.path.isabs: desde Python 3.13, en Windows da False para `/x.wav`, y con 3.12 True."""
+    if not IS_WINDOWS:
+        return posixpath.isabs(wav)
+    drive, rest = ntpath.splitdrive(wav)
+    return bool(drive) and rest[:1] in ("/", "\\")
+
+
+def _rooted_without_drive(wav):
+    """En Windows, una ruta con raíz pero sin unidad (`/x.wav`, `\\x.wav`): su unidad depende de dónde corre el hook.
+    No cuenta lo que empieza con dos separadores (`//x.wav`, `\\\\srv`, UNC incompleta): hasta Python 3.10 su unidad
+    sale vacía y desde 3.11 no; sin esta excepción el motivo cambiaría con la versión."""
+    sep = ("/", "\\")
+    return IS_WINDOWS and not ntpath.splitdrive(wav)[0] and wav[:1] in sep and wav[1:2] not in sep
 
 
 def load_config(hook, home=None):
@@ -174,10 +195,12 @@ def resolve(hook, env=None, home=None, generate=True):
             return loud_cache(home), None
         except (ValueError, OSError) as e:
             return _fallback("no se pudo generar `chimes-loud`: %s" % e)
-    if os.path.isabs(wav):
+    if _full_path(wav):
         if os.path.isfile(wav):
             return wav, None
         return _fallback("no existe %s" % wav)
+    if _rooted_without_drive(wav):
+        return _fallback("en Windows la ruta de `wav` lleva la unidad (C:/…): %s" % wav)
     return _fallback("valor de `wav` no reconocido: %r" % (wav,))
 
 

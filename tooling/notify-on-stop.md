@@ -78,9 +78,9 @@ Valores de `wav` (los resuelve [`hooks/lib/notify_sound.py`](../hooks/lib/notify
 | `null`, ausente o `"neb"` | `hooks/sounds/neb-chime.wav`, que viene con el plugin (CC0; fuente y licencia en [`hooks/sounds/README.md`](../hooks/sounds/README.md)) | todos |
 | `"chimes"` | El `chimes.wav` original de Windows (`%WINDIR%\Media\chimes.wav`) | Windows |
 | `"chimes-loud"` | El mismo `chimes.wav`, amplificado. Se genera en local la primera vez en `~/.claude/neb-sounds/chimes-loud.wav` y se regenera si el original cambia | Windows |
-| Ruta absoluta | Ese archivo WAV | todos |
+| Ruta absoluta: en Windows, con unidad (`C:/…`, `C:\…`) o UNC (`\\servidor\recurso\…`); fuera, empieza con `/` | Ese archivo WAV | todos |
 
-Si el valor no se puede cumplir (preset de Windows en otro SO, ruta inexistente, valor no reconocido, `chimes.wav` ilegible), suena `neb-chime.wav`. Cuando el hook está activado en `NEB_HOOKS` o `NEB_PROJECT_HOOKS` y no suena como se configuró, o en Linux/Mac no hay reproductor, el arranque de la sesión lo avisa con el motivo; con `enabled: false` no avisa. Los presets de Windows no se distribuyen con Neb: ese audio no se puede redistribuir, así que se lee de la máquina del dev.
+Si el valor no se puede cumplir (preset de Windows en otro SO, ruta inexistente, ruta de Windows sin unidad como `/Windows/Media/x.wav`, valor no reconocido, `chimes.wav` ilegible), suena `neb-chime.wav`. Cuando el hook está activado en `NEB_HOOKS` o `NEB_PROJECT_HOOKS` y no suena como se configuró, o en Linux/Mac no hay reproductor, el arranque de la sesión lo avisa con el motivo; con `enabled: false` no avisa. Los presets de Windows no se distribuyen con Neb: ese audio no se puede redistribuir, así que se lee de la máquina del dev.
 
 ## 6. Activación
 

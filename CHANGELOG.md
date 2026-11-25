@@ -4,6 +4,20 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [7.6.1] - 2026-11-25
+
+> **Patch**: en Windows, la ruta de `wav` de `notify-on-stop` y `notify-on-permission` vale igual con cualquier Python. Lleva unidad (`C:/…`, `C:\…`) o es UNC (`\\servidor\recurso\…`). Desde Python 3.13, `os.path.isabs` da `False` para una ruta con raíz pero sin unidad (`/Windows/Media/chimes.wav`), así que con 3.13 o posterior esa ruta sonaba el sonido por defecto aunque el archivo existiera, y con 3.12 sonaba el archivo. Ahora, en cualquier versión, esa ruta suena el sonido por defecto, y el aviso del arranque dice que lleva la unidad.
+>
+> - **Adoptantes**: quien tenga en Windows `wav` con una ruta sin unidad (`"/x.wav"`) le agrega la unidad (`"C:/x.wav"`). Con `wav: null` o un preset, nada que hacer.
+> - **Volver atrás**: 7.6.0 sin cambios en la base ni en la configuración.
+
+### Fixed
+- **`hooks/lib/notify_sound.py`**: `resolve` decide si `wav` es una ruta completa con `_full_path`, que en Windows usa `ntpath.splitdrive` (unidad o UNC, y separador tras ella) y fuera `posixpath.isabs`, no `os.path.isabs`, que cambió en Python 3.13. Una ruta con raíz sin unidad en Windows tiene motivo propio: «en Windows la ruta de `wav` lleva la unidad (C:/…)». `C:x.wav` (relativa a la unidad) y la UNC incompleta (`//x.wav`, `\\srv`, cuya unidad `ntpath.splitdrive` da vacía hasta 3.10 y no desde 3.11) siguen siendo «no reconocido» en toda versión. Fuera de Windows decide solo `posixpath.isabs`. Salió al correr la suite con Python 3.14.10 en PD-982 (`test_falta_el_default`).
+
+### Changed
+- **`tooling/notify-on-stop.md`**: la fila «Ruta absoluta» de los valores de `wav` dice qué es una ruta completa en Windows, y la lista de casos que caen al sonido por defecto incluye la ruta sin unidad.
+- Pruebas: `test_notify_sound.py` agrega los casos de Windows (con unidad que existe y que no, UNC, con raíz sin unidad aunque el archivo exista, relativa a la unidad, UNC incompleta, `\\?\C:\…`) y de POSIX (`C:\x.wav` no es ruta completa), iguales de 3.8 a 3.14, y el motivo nuevo en `diagnose`. Las que simulan POSIX en Windows usan rutas POSIX.
+
 ## [7.6.0] - 2026-11-25
 
 > **Minor**: si el Python que corre los hooks no alcanza lo que neb pide (SQLite 3.35.5 o Python 3.8), el aviso de migración del inicio de sesión lo dice con el motivo de cada requisito y encarga a Claude ofrecer instalar uno que sí: en Windows con `winget`, un menú con «Instalarlo» (Python 3.14 de python.org, solo para el usuario); fuera de Windows o sin `winget`, una línea con el comando, que Claude no corre. «No volver a ofrecer» lo calla para ese intérprete y esas versiones. Supuesto nuevo R32. Sin paso de base ni migración guiada nuevos.
