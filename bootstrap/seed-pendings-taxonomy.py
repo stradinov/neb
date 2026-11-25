@@ -24,6 +24,8 @@ calcula DENTRO de la transacción, así una curaduría hecha por otra sesión un
      su status solo cambia a 'active' con --force (sin --force, los items que usan un tema del catálogo
      archivado se saltan y se reportan). Todo tema activo que no sea sentinel/raíz/hijo del catálogo
      pasa a status='archived' (sus filas pending_topic se conservan; las lecturas filtran active).
+     Una raíz de eje archivada se re-activa siempre (una raíz es contenedor: el seed de 7.2.x corrido a mano
+     sobre una base de 7.3.0+ archiva 'proyecto' y crea 'cliente'; este --apply lo deja como debe).
      Si el catálogo cambió (keywords, nombres, ejes), las sugerencias del matching (curated=0) de los
      pendientes abiertos sin curar se borran para que el siguiente `PD triage` las recalcule con el
      catálogo nuevo; lo curado no se toca. Así, afinar keywords = editar taxonomy.json + --apply.
@@ -39,6 +41,15 @@ calcula DENTRO de la transacción, así una curaduría hecha por otra sesión un
      solo entre pendientes open del dataset.
   4. pendings.backfill_slugs para el resto (tags [slug] únicos; los repetidos quedan NULL).
 
+Paso de base del eje proyecto pendiente (--apply): si la base no pasó el paso 3 de 7.3.0 y conserva la raíz
+  'cliente' (p. ej. un paso 2 detenido: el paso 3 tiene `espera` y queda pendiente), el --apply aborta
+  sin respaldo ni escritura y dice qué paso falta y cómo resolverlo (`neb-migrate.py status`): sembrar
+  crearía una raíz 'proyecto' junto a 'cliente', y el paso 3, al correr, movería esa raíz recién sembrada a
+  'proyecto-<id>' y dejaría el catálogo partido en dos raíces. Un tema 'proyecto' ya existente no detiene
+  el paso desde 7.4.0 (lo mueve a un slug libre). Se
+  revisa antes del respaldo (lo que el paso detiene, en solo lectura) y otra vez dentro de la transacción,
+  tras abrir con _connect (definitivo: si ahí se detiene, el respaldo recién tomado se borra). El DRY-RUN
+  simula el renombre cuando el paso correrá y, si no, avisa que el --apply abortará.
 Respaldo (--apply): sqlite3.connect(db) PLANO (sin _connect: no migra nada) + Connection.backup() a
   <db>.bak-pre-taxonomy-<stamp> — snapshot consistente aunque haya otras conexiones (WAL). Se verifica
   con PRAGMA integrity_check y count(*) de las tablas de pendings (estricto) y de las del logbook
@@ -220,21 +231,69 @@ def _db_state(con):
 _AXIS_STEP = next(s.n for s in _migrations.STEPS if s.aplicar is _migrations._project_axis_apply)
 
 
+_RESOLVE_AXIS_STEP = ("`py bootstrap/neb-migrate.py status` dice qué lo detiene; corrígelo, corre "
+                      "`py bootstrap/neb-migrate.py apply` (aplica los pasos pendientes) y vuelve a correr la siembra")
+
+
+class AxisStepPending(RuntimeError):
+    """La base no pasó el paso de base del eje proyecto y conserva la raíz 'cliente': el --apply no siembra."""
+
+
+def _axis_step_blockers(con):
+    """Lo que detiene, en solo lectura, el paso de base del eje proyecto o uno anterior (sin ellos, el paso no
+    corre): [(n, titulo, motivo)] de blocked_report (precheck recalculado y fallo guardado)."""
+    return [b for b in _migrations.blocked_report(con) if b[0] <= _AXIS_STEP]
+
+
+def _blockers_text(blockers):
+    return "; ".join(f"paso {n} ({t}): {m}" for n, t, m in blockers)
+
+
+def _axis_step_pending_message(root_id, blockers):
+    why = (f"está detenido: {_blockers_text(blockers)}" if blockers
+           else "no corrió al abrir la base (p. ej. con el candado ocupado por otra sesión)")
+    return (f"la base no pasó el paso de base {_AXIS_STEP} de neb 7.3.0 (renombra la raíz del eje "
+            f"'{_OLD_AXIS_KEY}' a 'proyecto') y conserva la raíz '{_OLD_AXIS_KEY}' (topic id {root_id}); el paso "
+            f"{why}. Sembrar ahora crearía una raíz 'proyecto' junto a '{_OLD_AXIS_KEY}', y el paso, al correr, "
+            f"movería esa raíz a otro slug y dejaría el eje partido en dos: no se sembró nada ni quedó respaldo "
+            f"de la siembra. {_RESOLVE_AXIS_STEP}")
+
+
+def _check_axis_step(con, definitive):
+    """AxisStepPending si la base no pasó el paso de base del eje proyecto y conserva la raíz 'cliente'. Solo
+    lectura. definitive=False (antes del respaldo, sobre una conexión plana que no migra): solo si algo detiene
+    el paso, porque si no lo detiene nada el --apply lo aplica al abrir. definitive=True (tras _connect,
+    dentro de la transacción): con la base todavía antes del paso, siempre."""
+    if _migrations.read_version(con)[0] >= _AXIS_STEP:
+        return
+    root_id = _migrations._old_axis_root(con)
+    if root_id is None:
+        return
+    blockers = _axis_step_blockers(con)
+    if blockers or definitive:
+        raise AxisStepPending(_axis_step_pending_message(root_id, blockers))
+
+
 def _axis_step_preview(con):
     """Para el DRY-RUN, que abre la base sin migrar: (renombrar, aviso). Si la base no ha pasado el paso
     de base del eje proyecto, el --apply lo aplica al abrir con _connect ANTES de sembrar; el dry-run lo
-    simula en el estado leído (renombrar=True cuando hay raíz 'cliente' sin choque de slug) para que su
-    plan sea el del --apply. Con un tema 'proyecto' ya existente el paso se detiene y el --apply aborta:
-    el aviso lleva ese motivo y no se simula nada. Solo lectura. (False, None) si el paso ya pasó."""
+    simula en el estado leído (renombrar=True cuando hay raíz 'cliente' y nada detiene el paso) para que su
+    plan sea el del --apply; un tema 'proyecto' ya existente se simula movido a su slug libre, como lo hace el
+    paso desde 7.4.0. Si algo lo detiene (p. ej. un paso 2 detenido), el
+    paso queda pendiente (tiene `espera`) y, con la raíz 'cliente' presente, el --apply aborta sin escribir:
+    el aviso lo dice con el motivo y no se simula nada. Solo lectura. (False, None) si el paso ya pasó."""
     if _migrations.read_version(con)[0] >= _AXIS_STEP:
         return False, None
     aviso = (f"la base aún no pasa el paso {_AXIS_STEP} de 7.3.0; el --apply lo aplica antes de sembrar")
     root_id = _migrations._old_axis_root(con)
     if root_id is None:
         return False, aviso
-    clash = _migrations._project_slug_clash(con, root_id)
-    if clash:
-        return False, f"{aviso}, pero se detendrá: {clash}"
+    blockers = _axis_step_blockers(con)
+    if blockers:
+        return False, (f"la base aún no pasa el paso {_AXIS_STEP} de 7.3.0 y se detendrá: "
+                       f"{_blockers_text(blockers)}. Con la raíz '{_OLD_AXIS_KEY}' (topic id {root_id}) "
+                       "presente, el --apply abortará sin respaldo ni escritura (sembrar crearía una raíz "
+                       f"'proyecto' junto a '{_OLD_AXIS_KEY}'). {_RESOLVE_AXIS_STEP}")
     return True, f"{aviso} (el plan ya simula el renombre de la raíz '{_OLD_AXIS_KEY}' a 'proyecto')"
 
 
@@ -244,14 +303,16 @@ def build_plan(con, catalog, dataset, force=False, rename_old_root=False):
     lee la raíz 'cliente' como si ya se llamara 'proyecto', como la dejará el paso de base al abrir."""
     st = _db_state(con)
     old_root = st["topics"].get(_OLD_AXIS_KEY)
-    if (rename_old_root and old_root is not None and old_root["parent_id"] is None
-            and pendings.AXIS_ROOTS[0] not in st["topics"]):
+    if rename_old_root and old_root is not None and old_root["parent_id"] is None:
+        clash = st["topics"].get(pendings.AXIS_ROOTS[0])
+        if clash is not None:                    # el paso lo mueve a su slug libre antes de renombrar la raíz
+            st["topics"][_migrations.free_project_slug(con, clash["id"])] = st["topics"].pop(pendings.AXIS_ROOTS[0])
         st["topics"][pendings.AXIS_ROOTS[0]] = st["topics"].pop(_OLD_AXIS_KEY)
     cat_slugs = {axis: [e["slug"] for e in catalog[axis]] for axis in pendings.AXIS_ROOTS}
     all_cat = set(cat_slugs["proyecto"]) | set(cat_slugs["topico"])
     plan = {"migrated": st["migrated"], "axis_step_note": None,
             "topics_create": [], "topics_reparent": [], "topics_reactivate": [], "topics_archive": [],
-            "curate": [], "sin_banda": [],
+            "roots_reactivate": [], "curate": [], "sin_banda": [],
             "skipped": {"missing": [], "obsolete": [], "cerrable": [], "curated": [],
                         "axis_unknown": [], "axis_archived": []},
             "slugs_set": [], "slugs_collide": [], "slugs_invalid": [],
@@ -260,6 +321,8 @@ def build_plan(con, catalog, dataset, force=False, rename_old_root=False):
         root = st["topics"].get(axis)
         if root is None:
             plan["topics_create"].append(axis)
+        elif root["status"] != "active":
+            plan["roots_reactivate"].append(axis)          # siempre, sin --force: una raíz es contenedor
         for slug in cat_slugs[axis]:
             t = st["topics"].get(slug)
             if t is None:
@@ -358,6 +421,7 @@ def apply_plan(con, catalog, dataset, plan, force=False):
             "VALUES (?, ?, ?, '', 'active', NULL)",
             (axis, AXIS_NAMES[axis], f"Raíz del eje {axis} (contenedor; no es un tema)"))
         root_ids[axis] = con.execute("SELECT id FROM topic WHERE slug=?", (axis,)).fetchone()[0]
+        con.execute("UPDATE topic SET status='active' WHERE id=? AND status != 'active'", (root_ids[axis],))
     status_clause = ", status='active'" if force else ""
     for axis in pendings.AXIS_ROOTS:
         for e in catalog[axis]:
@@ -476,18 +540,19 @@ def _rename_old_axis_root(con, bak_path):
     """Tras restaurar `topic` desde un respaldo anterior a 7.3.0: renombra la raíz del eje 'cliente'
     a 'proyecto', igual que el paso de base 3 (que no vuelve a correr: la base ya está en versión 3).
     Sin esto los hijos del eje quedarían como temas sin eje y se perderían los filtros y los bonos
-    por proyecto sin aviso. Si ya existe un tema 'proyecto' (slug UNIQUE) es RuntimeError y la
-    transacción del rollback se revierte completa."""
+    por proyecto sin aviso. Si ya existe un tema 'proyecto' (slug UNIQUE), se mueve a su slug libre
+    (_migrations.free_project_slug), igual que el paso de base desde 7.4.0, y se avisa."""
     new = pendings.AXIS_ROOTS[0]
     old = con.execute("SELECT id FROM topic WHERE slug=? AND parent_id IS NULL", (_OLD_AXIS_KEY,)).fetchone()
     if old is None:
         return
     clash = con.execute("SELECT id FROM topic WHERE slug=?", (new,)).fetchone()
     if clash is not None:
-        raise RuntimeError(
-            f"el respaldo {bak_path} trae la raíz {_OLD_AXIS_KEY!r} (anterior a 7.3.0) y también un tema "
-            f"{new!r} (id {clash[0]}); no se restauró nada. Renombra ese tema en el respaldo "
-            f"(UPDATE topic SET slug='<otro-slug>' WHERE id={clash[0]}) y vuelve a correr --rollback")
+        free = _migrations.free_project_slug(con, clash[0])
+        con.execute("UPDATE topic SET slug=? WHERE id=?", (free, clash[0]))
+        print(f"[seed-taxonomy] aviso: el respaldo {bak_path} trae también un tema {new!r} (id {clash[0]}); "
+              f"pasó a {free!r} (si compas.md lo cita en Temas:, la migración guiada 7.4.0 lo cambia)",
+              file=sys.stderr)
     old_desc = f"Raíz del eje {_OLD_AXIS_KEY} (contenedor; no es un tema)"
     con.execute("UPDATE topic SET slug=?, name=?, description = CASE WHEN description=? THEN ? "
                 "ELSE description END WHERE id=?",
@@ -560,6 +625,8 @@ def render_report(plan, db_path, apply=False, counts=None, backup=None, changed=
     sk = plan["skipped"]
     out.append("TEMAS")
     out.append(f"  a crear (raíces + hijos) : {len(plan['topics_create'])}")
+    if plan.get("roots_reactivate"):
+        out.append(f"  raíces archivadas        : {plan['roots_reactivate']}  (se re-activan)")
     out.append(f"  a re-parentar (reusados) : {len(plan['topics_reparent'])}  {plan['topics_reparent']}")
     out.append(f"  archivados del catálogo  : {len(plan['topics_reactivate'])}  {plan['topics_reactivate']}"
                + ("  (se re-activan: --force)" if plan['topics_reactivate'] else ""))
@@ -601,8 +668,9 @@ def _utf8_stdout():
 def run(db_path, catalog_path, dataset_path, apply=False, force=False, backup_dir=None):
     """Núcleo testeable. DRY-RUN abre la DB con sqlite3.connect plano (sin _connect: no migra ni
     escribe); si la base no ha pasado el paso de base del eje proyecto, simula su renombre y lo avisa
-    (_axis_step_preview). --apply: respaldo verificado -> _connect (migra) -> [plan + siembra] en UNA transacción
-    -> reporte. Devuelve {'plan', 'counts'|None, 'backup'|None, 'changed'|None}."""
+    (_axis_step_preview). --apply: revisión del paso del eje proyecto (_check_axis_step) -> respaldo verificado
+    -> _connect (migra) -> [revisión definitiva + plan + siembra] en UNA transacción -> reporte. Devuelve
+    {'plan', 'counts'|None, 'backup'|None, 'changed'|None}."""
     _require_db(db_path)
     catalog = load_catalog(catalog_path)
     dataset = load_dataset(dataset_path)
@@ -616,6 +684,11 @@ def run(db_path, catalog_path, dataset_path, apply=False, force=False, backup_di
             con.close()
         print(render_report(plan, db_path))
         return {"plan": plan, "counts": None, "backup": None, "changed": None}
+    pre = sqlite3.connect(db_path)                        # plana: no migra ni escribe
+    try:
+        _check_axis_step(pre, definitive=False)
+    finally:
+        pre.close()
     bak_dir = backup_dir or os.path.dirname(os.path.abspath(db_path))
     bak = backup_db(db_path, os.path.join(bak_dir, f"{os.path.basename(db_path)}.bak-pre-taxonomy-{_stamp()}"))
     con = _open(db_path)
@@ -623,11 +696,21 @@ def run(db_path, catalog_path, dataset_path, apply=False, force=False, backup_di
         raise RuntimeError(f"no se pudo abrir la DB {db_path} (respaldo intacto en {bak})")
     try:
         def _seed(c):
+            _check_axis_step(c, definitive=True)               # tras _connect: el paso ya corrió o no corre
             before = digest(c)
             plan = build_plan(c, catalog, dataset, force)      # dentro de la tx: nadie cura en medio
             counts = apply_plan(c, catalog, dataset, plan, force)
             return before, plan, counts
-        before, plan, counts = _db_shared.with_write_tx(con, _seed)
+        try:
+            before, plan, counts = _db_shared.with_write_tx(con, _seed)
+        except AxisStepPending:
+            _db_shared._safe_rollback(con)                     # with_write_tx solo revierte OperationalError
+            for suffix in ("", "-wal", "-shm", "-journal"):    # el respaldo recién tomado no queda
+                try:
+                    os.remove(bak + suffix)
+                except OSError:
+                    pass
+            raise
         after = digest(con)
     finally:
         con.close()

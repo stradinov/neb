@@ -480,7 +480,8 @@ class TestApply(Base):
         finally:
             other.close()
         self.assertEqual(self.ids(out["guiados"]["pendientes"]), ["exclusivo"])
-        self.assertIn("cierra las demás sesiones", out["guiados"]["pendientes"][0]["detalle"])
+        self.assertIn("se reintenta en la siguiente corrida", out["guiados"]["pendientes"][0]["detalle"])
+        self.assertNotIn("cierra", out["guiados"]["pendientes"][0]["detalle"], "nunca pide cerrar sesiones")
         self.assertTrue(os.path.exists(os.path.join(self.claude, "excl.txt")))
         self.assertFalse(os.path.exists(os.path.join(self.claude, "excl.txt.bak")))
         rc, out = self.apply()                                       # ya sin la otra conexión

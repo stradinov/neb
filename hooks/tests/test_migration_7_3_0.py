@@ -8,8 +8,9 @@ Cubre, con el árbol real y homes temporales:
     contenido (bonos idénticos), sin `Roadmap:`, `version: 3`, respaldo nuevo en neb-backups/ con los bytes
     originales; la segunda corrida no lo marca; sin compas, sin-cambio; un compas solo con `version: 2` se
     marca; los fines de línea CRLF y el BOM se conservan;
-  • falla sembrada: compas.md de solo lectura y error al reemplazarlo -> fallo con el original intacto y sin
-    respaldo ni temporal sobrante;
+  • compas.md de solo lectura (desde 7.4.0 se migra y conserva la protección) y de más de 1 MB (se migra);
+    falla sembrada: error al reemplazarlo (también siendo de solo lectura) -> fallo con el original intacto, con
+    su protección y sin respaldo ni temporal sobrante;
   • vacuum-neb-db sobre una base con muchas páginas libres: freelist 0, integridad, la base vuelve a WAL, el
     respaldo es una copia válida (journal_mode=DELETE, íntegra, con los datos) y después ya no se marca; una base
     compacta no se marca; con otra conexión abierta no corre y queda pendiente con su motivo, sin respaldo; si la
@@ -324,17 +325,46 @@ class TestCompasProyectos(Base):
         self.assertIn("\r\nversion: 3\r\n", text)
         self.assertNotIn("\n", text.replace("\r\n", ""))
 
-    def test_falla_sembrada_solo_lectura_deja_el_original(self):
+    def test_solo_lectura_se_migra_y_conserva_la_proteccion(self):
+        """Desde 7.4.0 el paso no pide al dev quitar la protección: la quita, reemplaza y el archivo nuevo la
+        conserva."""
         self.write_compas(COMPAS_V2)
         original = self.read_bytes(self.compas)
         os.chmod(self.compas, stat.S_IREAD)
         r = _guided.run(self.ctx(), _step("compas-proyectos"))
+        self.assertNotIn(r.get("estado"), ("fallo", "manual", "pendiente"), r)
+        self.assertIn("conserva esa protección", r["detalle"])
+        self.assertEqual(_field(self.read_bytes(self.compas).decode("utf-8"), "Proyectos"),
+                         ["alpha=+15, beta=+10, gamma=+5"])
+        self.assertFalse(os.access(self.compas, os.W_OK), "sigue de solo lectura")
+        self.assertEqual([self.read_bytes(p) for p in self.backups_like("compas.pre-7.3.0.*.md")], [original])
+        self.assertEqual([f for f in os.listdir(self.claude) if ".tmp-" in f], [])
+        self.assertFalse(_step("compas-proyectos").detectar(self.ctx()))
+
+    def test_falla_sembrada_solo_lectura_y_error_al_reemplazar_deja_el_original_protegido(self):
+        self.write_compas(COMPAS_V2)
+        original = self.read_bytes(self.compas)
+        os.chmod(self.compas, stat.S_IREAD)
+        with mock.patch("os.replace", side_effect=PermissionError(13, "valor-que-no-sale")):
+            r = _guided.run(self.ctx(), _step("compas-proyectos"))
         self.assertEqual(r["estado"], "fallo", r)
-        self.assertIn("solo lectura", r["detalle"])
         self.assertEqual(self.read_bytes(self.compas), original)
+        self.assertFalse(os.access(self.compas, os.W_OK), "el original vuelve a su protección")
         self.assertEqual(self.backups_like("compas.pre-7.3.0.*.md"), [])
         self.assertEqual([f for f in os.listdir(self.claude) if ".tmp-" in f], [])
         self.assertTrue(_step("compas-proyectos").detectar(self.ctx()), "sigue pendiente")
+
+    def test_compas_de_mas_de_1_mb_se_migra(self):
+        """En 7.3.0 un compas.md de más de 1 MB quedaba en «manual»; desde 7.4.0 lo migra el paso."""
+        relleno = "<!-- " + "x" * (1024 * 1024 + 10) + " -->" + chr(10)
+        self.write_compas(COMPAS_V2 + relleno)
+        self.assertTrue(_step("compas-proyectos").detectar(self.ctx()))
+        r = _guided.run(self.ctx(), _step("compas-proyectos"))
+        self.assertNotIn(r.get("estado"), ("fallo", "manual", "pendiente"), r)
+        new = self.read_bytes(self.compas).decode("utf-8")
+        self.assertEqual(_field(new, "Proyectos"), ["alpha=+15, beta=+10, gamma=+5"])
+        self.assertTrue(new.endswith(relleno))
+        self.assertFalse(_step("compas-proyectos").detectar(self.ctx()))
 
     def test_falla_sembrada_error_al_reemplazar_deja_el_original(self):
         self.write_compas(COMPAS_V2)

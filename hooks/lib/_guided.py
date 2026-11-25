@@ -39,7 +39,9 @@ SKIP_DDL = ("CREATE TABLE IF NOT EXISTS migration_skip ("
 
 class GuidedStep:
     """Un paso guiado. De catálogo: op + args. Libre: detectar + aplicar (+ respaldo, deshacer).
-    exclusivo: pide las demás sesiones cerradas; `condicion(ctx) -> motivo | None` (por omisión, que ninguna
+    exclusivo: corre solo cuando nadie más tiene la base (o el archivo) en uso; si no, queda pendiente y se
+    reintenta en la siguiente corrida, sin pedirle al dev que cierre sesiones (desde 7.4.0; una versión nueva no
+    puede pedir cerrar las sesiones abiertas). `condicion(ctx) -> motivo | None` (por omisión, que ninguna
     otra conexión tenga la base abierta en ese momento). El programa la comprueba antes de actuar, y el paso la
     vuelve a comprobar con ctx.exclusivo_ok() justo antes de la acción que no se deshace (las operaciones del
     catálogo ya lo hacen)."""
@@ -373,7 +375,8 @@ def run(ctx, step, allow_dev=False):
         motivo = cond(ctx)
         if motivo:
             return {"estado": "pendiente", "respaldo": None,
-                    "detalle": f"{motivo}: cierra las demás sesiones y vuelve a correr apply --guiados"}
+                    "detalle": f"{motivo}: queda pendiente y se reintenta en la siguiente corrida de "
+                               "apply --guiados"}
         ctx.exclusivo_ok = lambda: cond(ctx)
     started = time.time()
     before = set() if step.catalog else _snapshot(ctx)

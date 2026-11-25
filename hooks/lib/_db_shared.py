@@ -5,7 +5,7 @@ _db_shared.py — infraestructura compartida de la DB del logbook/pendings (Neb)
 Centraliza (DRY) lo que antes vivía en logbook.py y que ahora también consume pendings.py:
   • ruta de la base (~/.claude/neb.db) y guarda de la base sin migrar — viven AQUI y SOLO aqui.
   • conexión: el esquema inicial sale del árbol de este módulo; la versión de esquema y los pasos de
-    base viven en _migrations.py (6.48.0); aquí, las dos reparaciones que corren en cada conexión.
+    base viven en _migrations.py (6.48.0); aquí, las reparaciones que corren en cada conexión.
   • begin_immediate (transacción de escritura exclusiva inmediata, para concurrencia).
   • helpers puros movidos desde logbook.py (now_iso, posix_to_win, _whoami, ...).
 
@@ -287,7 +287,7 @@ class UnmigratedDb(DbUnavailable):
         super().__init__(
             "base-sin-migrar", detalle,
             "abre una sesión nueva de Claude y corre `/neb:migrate`: su paso 7.0.0:renombrar-base cambia el "
-            "nombre de la base (pide cerrar antes las demás sesiones)")
+            "nombre de la base (si otra sesión la tiene abierta, queda para la siguiente corrida)")
         self.comando = comando
 
     def to_dict(self):
@@ -378,7 +378,7 @@ def raise_if_unmigrated(home_dir):
 
 def _connect(db_path, schema_path=None, timeout=5.0, steps=None, retry=False):
     """Abre la DB y la lleva a la versión de esquema de este código (_migrations.migrate); con V <= C corre
-    las dos reparaciones. Devuelve con o None (defensivo), salvo dos casos que lanzan DbUnavailable:
+    las reparaciones. Devuelve con o None (defensivo), salvo dos casos que lanzan DbUnavailable:
     base incompatible (IncompatibleDb) y paso de base bloqueado sin `espera` (motivo paso-bloqueado). Un
     None ahí haría que los CLI respondan vacío: el fallo silencioso que la versión de esquema quita.
 
@@ -430,11 +430,13 @@ def open_default_db(home_dir):
 
 def _repair(con):
     """Reparaciones que se reintentan hasta lograrse. Corren después de los pasos, solo con V <= C (nunca
-    sobre una base más nueva que el código): el índice uq_pending_slug si falta, y la limpieza de las
-    tablas de transcripts retiradas en 6.41.0 (sin respaldo, como desde 6.41.0)."""
+    sobre una base más nueva que el código): el índice uq_pending_slug si falta, la limpieza de las
+    tablas de transcripts retiradas en 6.41.0 (sin respaldo, como desde 6.41.0) y la mínima compatible del
+    paso 3 que dejó 7.3.0 (de 3 a 2, _migrations.relax_axis_step_min_code; sin respaldo)."""
     _ensure_pending_slug_index(con)
     con.commit()
     _drop_retired_transcript_tables(con)
+    _migrations.relax_axis_step_min_code(con)
 
 
 # Tablas del corpus local y del cursor de subida de transcripts, retiradas. _migrate las borra si existen

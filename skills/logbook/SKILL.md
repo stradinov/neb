@@ -27,7 +27,7 @@ LB() { py "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python "$NEB_SRC/h
 
 Antes de presentar una salida, revisa si es un objeto JSON con `"ok": false` y uno de estos `motivo`:
 
-- **`base-sin-migrar`**: la base conserva el nombre anterior a neb 7.0.0 y ningún verbo la abre hasta migrarla. Muestra al dev el `detalle` y la `accion` tal cual (la migración guiada: `/neb:migrate` en una sesión nueva, que pide cerrar antes las demás sesiones de Claude), y el `comando` como la vía a mano (qué hacer si el migrador se niega: [`../../tooling/logbook.md`](../../tooling/logbook.md) § "Base sin migrar"). No corras el migrador ni la migración guiada sin un OK explícito del dev, y no reintentes con otro verbo: ninguno abre la base hasta migrarla. Detente ahí.
+- **`base-sin-migrar`**: la base conserva el nombre anterior a neb 7.0.0 y ningún verbo la abre hasta migrarla. Muestra al dev el `detalle` y la `accion` tal cual (la migración guiada: `/neb:migrate` en una sesión nueva; no pide cerrar las demás sesiones: si alguna tiene la base abierta, el cambio de nombre queda para la siguiente corrida), y el `comando` como la vía a mano (qué hacer si el migrador se niega: [`../../tooling/logbook.md`](../../tooling/logbook.md) § "Base sin migrar"). No corras el migrador ni la migración guiada sin un OK explícito del dev, y no reintentes con otro verbo: ninguno abre la base hasta migrarla. Detente ahí.
 - **`verbo-retirado`** (llega si una versión anterior del skill llamó al verbo): el verbo ya no existe. Dile al dev que se retiró, con el `detalle`, y sigue con la operación que sí aplica (por lo general, `retomar <ruta-del-Change-MD>`).
 
 ## Operaciones

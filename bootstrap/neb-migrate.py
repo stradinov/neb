@@ -150,7 +150,7 @@ def _print_guided(g):
             continue
         clase = "corre solo con apply --guiados" if r["clase"] == "solo" else "pide al dev (apply --include)"
         print(f"paso guiado pendiente {r['id']} ({r['titulo']}): {clase}"
-              + (" · pide cerrar las demás sesiones" if r["exclusivo"] else ""))
+              + (" · corre cuando ninguna otra sesión tenga la base abierta" if r["exclusivo"] else ""))
     for r in (g or {}).get("omitidos", []):
         print(f"paso guiado omitido por el dev: {r['id']} ({r['titulo']})")
     for e in (g or {}).get("errores_de_carga", []):

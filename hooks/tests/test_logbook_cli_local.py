@@ -4,8 +4,8 @@ test_logbook_cli_local.py — verbos locales de `/logbook`: list, show, rename y
 
   • list: works activos, sin columnas de equipo.
   • show: lista explícita de columnas (_SHOW_COLS); sobre una base que aún tiene las columnas retiradas
-    (el paso de base 2 se detuvo, p. ej. con SQLite < 3.35.5) no las muestra, y ya no trae eventos; desde
-    7.3.0 esa base responde paso-bloqueado, porque el paso 3 no tiene espera.
+    (el paso de base 2 se detuvo, p. ej. con SQLite < 3.35.5) no las muestra, y ya no trae eventos. Esa
+    base sigue operando con los pasos vigentes: desde 7.4.0 el paso 3 tiene espera (7.3.0 la bloqueaba).
   • rename: solo works `req`.
   • archive: archiva el work y, por pendings.on_work_archived, deja obsoletos sus pendientes abiertos.
 
@@ -108,13 +108,21 @@ class TestShow(_Cli):
         raw.close()
         return path
 
-    def test_paso_2_detenido_bloquea_la_base_desde_7_3_0(self):
-        # El paso 3 no tiene `espera`: con el paso 2 detenido la base ya no se opera (paso-bloqueado).
+    def test_paso_2_detenido_no_bloquea_la_base_desde_7_4_0(self):
+        # Desde 7.4.0 el paso 3 tiene `espera`: con el paso 2 detenido, los pasos vigentes siguen operando la
+        # base en la versión 1 (7.3.0 respondía paso-bloqueado). `show` responde el work, sin las columnas retiradas.
         self.path = self._legacy_base()
-        with mock.patch.object(_migrations, "SQLITE_VERSION", (3, 34, 1)):
+        with mock.patch.object(_migrations, "SQLITE_VERSION", (3, 34, 1)), \
+                mock.patch.object(sys, "stderr", io.StringIO()):
             out = json.loads(self._cli("show", "7"))
-        self.assertEqual((out["ok"], out["motivo"]), (False, "paso-bloqueado"), out)
-        self.assertIn("paso de base 2", out["detalle"])
+        self.assertEqual(list(out), SHOW_COLS, out)
+        self.assertEqual((out["id"], out["req_slug"]), (7, "s"))
+        c = sqlite3.connect(self.path)
+        try:
+            self.assertEqual(_migrations.read_version(c), (1, 1))
+            self.assertTrue(set(RETIRED_WORK) <= {r[1] for r in c.execute("PRAGMA table_info(work)")})
+        finally:
+            c.close()
 
     def test_critico_base_con_las_columnas_retiradas_no_las_muestra(self):
         # Con solo los pasos 1 y 2 (como hasta 7.2.x) un paso 2 detenido deja operar la base: `show` no

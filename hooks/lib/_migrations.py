@@ -143,9 +143,11 @@ class Step:
     titulo      nombre corto
     aplicar     fn(con): el cambio; corre dentro de BEGIN IMMEDIATE con una conexión sin control de la
                 transacción (_StepConnection: commit, executescript, BEGIN/COMMIT... lanzan error)
-    min_code    mínima compatible que deja. Sube cuando una escritura válida del código anterior fallaría
-                (NOT NULL sin DEFAULT, UNIQUE, CHECK o trigger nuevos) o cuando un dato que ese código lee
-                desaparece o cambia de significado
+    min_code    mínima compatible que deja. Sube solo si el código anterior escribiría datos inválidos o
+                perdería datos (una escritura válida suya fallaría: NOT NULL sin DEFAULT, UNIQUE, CHECK o
+                trigger nuevos; o escribiría sobre un dato que desaparece o cambia de significado). Si ese
+                código solo ve degradada una vista, no sube: una versión nueva no puede pedir cerrar las
+                sesiones abiertas con la anterior (7.4.0)
     destructivo borra o reescribe datos: respaldo previo verificado (salvo base recién creada)
     espera      el código nuevo funciona aunque el paso no se haya aplicado: si no se puede, la conexión
                 sigue con la base en V y se reintenta en la siguiente
@@ -313,7 +315,14 @@ def _team_apply(con):
 # que puso el seed: una escrita a mano se conserva). Los hijos cuelgan de la misma fila
 # (mismo id), así que las curaciones de pending_topic no se tocan. Sin raíz 'cliente' (base nueva, o con triage
 # pero sin taxonomía sembrada: solo el sentinel y temas planos) el paso no hace nada; la raíz 'proyecto' la crea
-# el seed. El código <= 7.2.x busca la raíz 'cliente': por eso sube la mínima compatible.
+# el seed. Desde 7.4.0 no sube la mínima compatible (min_code=2): el código 7.0.0–7.2.x opera la base
+# renombrada y solo ve degradada su vista de pendientes (catálogo 'cliente' vacío, sin bonos por proyecto); lo
+# único que escribe sobre el eje (sugerencias curated=0 sobre la raíz 'proyecto') lo ignora y lo borra este
+# código (pendings.py). Subirla dejaba sin base a las sesiones abiertas con la versión anterior. Y tiene
+# `espera`: 7.4.0 opera con la raíz 'cliente' presente (eje proyecto vacío, sus hijos como temas sin eje), así
+# que un paso 2 detenido no bloquea la base. Un tema que ya ocupa el slug 'proyecto' ya no lo detiene: aplicar
+# lo mueve a un slug libre. 7.3.0 lo registró con min_code=3: lo baja la reparación relax_axis_step_min_code
+# (y read_version cuenta esa fila como 2 desde antes).
 
 _OLD_AXIS_ROOT = "cliente"
 _NEW_AXIS_ROOT = ("proyecto", "Proyecto")
@@ -331,45 +340,41 @@ def _old_axis_root(con):
     return row[0] if row else None
 
 
-def _project_slug_clash(con, root_id, siguiente="y la siguiente conexión aplica el paso"):
-    """Motivo si ya existe un tema con slug 'proyecto' (topic.slug es UNIQUE: el renombre fallaría), o None.
-    Solo lectura. Propone un slug libre para el UPDATE que lo quita del camino."""
-    row = con.execute("SELECT t.id, p.slug FROM topic t LEFT JOIN topic p ON p.id = t.parent_id "
-                      "WHERE t.slug = ?", (_NEW_AXIS_ROOT[0],)).fetchone()
-    if row is None:
-        return None
-    clash_id, parent_slug = row
+def free_project_slug(con, clash_id):
+    """Slug libre para el tema que ocupa 'proyecto': 'proyecto-<id>' y, si está tomado, 'proyecto-<id>-2', -3…
+    Determinista a partir del id, así que la migración guiada puede reconocerlo después sin que el paso deje
+    otra constancia (migrations/7.4.0.py, paso compas-tema-proyecto). Solo lectura."""
     free, i = f"{_NEW_AXIS_ROOT[0]}-{clash_id}", 2
     while con.execute("SELECT 1 FROM topic WHERE slug = ?", (free,)).fetchone() is not None:
         free, i = f"{_NEW_AXIS_ROOT[0]}-{clash_id}-{i}", i + 1
-    where = f"hijo de '{parent_slug}'" if parent_slug else "sin padre"
-    return (f"neb 7.3.0 renombra la raíz del eje 'cliente' (topic id {root_id}) a 'proyecto', y ya existe un tema "
-            f"con slug 'proyecto' (topic id {clash_id}, {where}). No se cambió nada; renómbralo (p. ej. "
-            f"UPDATE topic SET slug='{free}' WHERE id={clash_id};); si 'proyecto' aparece en «- **Temas:**» de "
-            f"~/.claude/compas.md, cámbialo ahí por el nuevo slug (compas.md resuelve por slug: si no, el peso de "
-            f"ese objetivo deja de aplicarse), {siguiente}")
+    return free
 
 
-def _project_axis_precheck(con):
-    root_id = _old_axis_root(con)
-    if root_id is None:
+def _project_slug_clash(con):
+    """(id, slug libre) del tema que ya tiene el slug 'proyecto' (topic.slug es UNIQUE: el renombre de la raíz
+    fallaría), o None. Solo lectura."""
+    row = con.execute("SELECT id FROM topic WHERE slug = ?", (_NEW_AXIS_ROOT[0],)).fetchone()
+    if row is None:
         return None
-    return _project_slug_clash(con, root_id)
-
-
-class ProjectSlugInTheWay(Exception):
-    """No es de SQLite a propósito (como UserObjectsInTheWay): el fallo se guarda con su motivo legible."""
+    return row[0], free_project_slug(con, row[0])
 
 
 def _project_axis_apply(con):
     """Relee dentro de la transacción: sin raíz 'cliente' no hace nada (otra versión o el seed ya dejó el eje
-    como está); un tema 'proyecto' aparecido después del precheck revierte el paso, que se reintenta."""
+    como está). Si un tema ya ocupa el slug 'proyecto' (creado a mano, en cualquier posición), desde 7.4.0 el
+    paso lo resuelve solo en la misma transacción: ese tema pasa al slug libre de free_project_slug (sus
+    curaciones cuelgan por id y no cambian) y la raíz toma 'proyecto'. En 7.3.0 eso detenía el paso y pedía al
+    dev un UPDATE a mano. Si 'proyecto' se cita en «- **Temas:**» de compas.md, lo cambia el paso guiado
+    7.4.0:compas-tema-proyecto."""
     root_id = _old_axis_root(con)
     if root_id is None:
         return
-    clash = _project_slug_clash(con, root_id, siguiente="y el paso se reintenta")  # el mecanismo agrega cuándo
+    clash = _project_slug_clash(con)
     if clash:
-        raise ProjectSlugInTheWay(clash)
+        clash_id, free = clash
+        con.execute("UPDATE topic SET slug = ? WHERE id = ?", (free, clash_id))
+        print(f"[logbook] paso de base 3: el tema con slug '{_NEW_AXIS_ROOT[0]}' (topic id {clash_id}) pasó a "
+              f"'{free}' para que la raíz del eje tome ese slug", file=sys.stderr)
     # La descripción solo se cambia si es la que puso el seed; una escrita a mano se conserva.
     con.execute("UPDATE topic SET slug = ?, name = ?, description = CASE WHEN description = ? THEN ? "
                 "ELSE description END WHERE id = ?",
@@ -380,9 +385,48 @@ STEPS = (
     Step(1, "esquema inicial", min_code=1, inicial=True),
     Step(2, "retiro del esquema de equipo (7.0.0)", aplicar=_team_apply, min_code=2, destructivo=True,
          espera=True, precheck=_team_precheck),
-    Step(3, "eje proyecto (7.3.0)", aplicar=_project_axis_apply, min_code=3, destructivo=True,
-         espera=False, precheck=_project_axis_precheck),
+    Step(3, "eje proyecto (7.3.0)", aplicar=_project_axis_apply, min_code=2, destructivo=True,
+         espera=True),
 )
+
+
+# --------------------------------------------------------------------------- reparación: mínima compatible del paso 3
+# 7.3.0 registró el paso 3 con min_code=3, y con eso las sesiones abiertas con 7.0.0–7.2.x dejaban de operar
+# la base entera (captura incluida). Desde 7.4.0 el paso deja la 2; esta reparación baja la fila que dejó
+# 7.3.0. Solo esa fila: el paso 3 con min_code=3 y el título de 7.3.0 (una lista de pasos inyectada en las
+# pruebas, con otro título, no se toca). Corre con las demás reparaciones (_db_shared._repair), con V <= C.
+
+_AXIS_STEP_ROW_7_3_0 = (3, "eje proyecto (7.3.0)", 3)     # (paso, título, min_code) que dejó 7.3.0
+_AXIS_STEP_MIN_CODE = 2
+
+
+def relax_axis_step_min_code(con):
+    """Baja a 2 el min_code de la fila del paso 3 que dejó 7.3.0. Idempotente y sin respaldo: sin esa fila no
+    escribe ni pide candado; con ella, una transacción corta (BEGIN IMMEDIATE + UPDATE + COMMIT). Nunca
+    propaga un error de SQLite (candado ocupado incluido): avisa por stderr y se reintenta en la siguiente
+    conexión. Devuelve True si bajó la fila."""
+    step, title, old_min = _AXIS_STEP_ROW_7_3_0
+    sql_where = "WHERE step = ? AND min_code = ? AND title = ?"
+    params = (step, old_min, title)
+    saved = con.isolation_level
+    try:
+        if not _table_exists(con, "schema_step"):
+            return False
+        if con.execute(f"SELECT 1 FROM schema_step {sql_where}", params).fetchone() is None:
+            return False
+        con.isolation_level = None
+        con.execute("BEGIN IMMEDIATE")
+        n = con.execute(f"UPDATE schema_step SET min_code = ? {sql_where}",
+                        (_AXIS_STEP_MIN_CODE,) + params).rowcount
+        con.execute("COMMIT")
+        return n > 0
+    except sqlite3.Error as e:
+        _rollback(con)
+        print(f"[logbook] aviso: no se pudo bajar la mínima compatible del paso {step} ({e}); se reintenta en "
+              "la siguiente conexión", file=sys.stderr)
+        return False
+    finally:
+        con.isolation_level = saved
 
 
 def code_version(steps=None):
@@ -444,10 +488,16 @@ _BOOKKEEPING_DDL = (
 
 
 def read_version(con):
-    """(V, F) de la base: (0, 0) sin tabla de versión."""
+    """(V, F) de la base: (0, 0) sin tabla de versión. F es la mínima compatible efectiva: la fila del paso 3
+    que dejó 7.3.0 (min_code 3) cuenta como 2 aunque relax_axis_step_min_code no la haya bajado todavía, así que
+    la regla de compatibilidad, `neb-migrate.py status` y el aviso del arranque (que leen en solo lectura) no
+    dependen de que alguna conexión de escritura haya corrido la reparación."""
     if not _table_exists(con, "schema_step"):
         return 0, 0
-    v, f = con.execute("SELECT COALESCE(MAX(step), 0), COALESCE(MAX(min_code), 0) FROM schema_step").fetchone()
+    step, title, old_min = _AXIS_STEP_ROW_7_3_0
+    v, f = con.execute(
+        "SELECT COALESCE(MAX(step), 0), COALESCE(MAX(CASE WHEN step = ? AND min_code = ? AND title = ? "
+        "THEN ? ELSE min_code END), 0) FROM schema_step", (step, old_min, title, _AXIS_STEP_MIN_CODE)).fetchone()
     return int(v), int(f)
 
 

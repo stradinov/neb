@@ -21,7 +21,11 @@ Cubre contra DBs TEMPORALES (tempfile; NUNCA ~/.claude/*.db) y ejemplos GENÉRIC
     links, backfill, respaldo verificado); invariante de bandas; idempotente; no pisa curaduría posterior
     salvo --force; colisión de slug reportada; rollback restaura las 4 tablas.
     Dry-run sobre una base en esquema 2 con raíz 'cliente': simula el paso de base 3, da el plan del
-    --apply y lo avisa (con choque de slug 'proyecto', avisa que el paso se detendrá).
+    --apply y lo avisa (con un tema 'proyecto' ya existente, desde 7.4.0 simula que el paso lo mueve a su slug
+    libre, y el --apply siembra). Una raíz de eje archivada (el seed de 7.2.x corrido a mano) se re-activa.
+    Base que no pasó el paso 3 con la raíz 'cliente' y el paso detenido (paso 2 por SQLite < 3.35.5): el
+    --apply aborta sin respaldo ni escritura y dice cómo resolverlo, también si el paso se
+    detiene recién al abrir con _connect (el respaldo recién tomado se borra); el dry-run avisa que abortará.
 
 Framework: unittest (stdlib), NO pytest.
 """
@@ -1048,17 +1052,25 @@ class TestSeed(unittest.TestCase):
         self.assertEqual(pendings.axis_catalog(con), seeded)              # los hijos siguen colgando del eje
         con.close()
 
-    def test_rollback_with_cliente_root_and_existing_proyecto_aborts_without_changes(self):
+    def test_rollback_with_cliente_root_and_existing_proyecto_moves_it_to_a_free_slug(self):
+        """Desde 7.4.0, como el paso de base: el tema 'proyecto' del respaldo pasa a 'proyecto-<id>' y la raíz
+        'cliente' toma 'proyecto', sin pedirle al dev un UPDATE a mano."""
         self._run(apply=True)
-        con = _db_shared._connect(self.db, SCHEMA); before = seed.digest(con); con.close()
+        con = _db_shared._connect(self.db, SCHEMA); seeded = pendings.axis_catalog(con); con.close()
         bak = self._bak_with_old_root(
             "choque.bak", "INSERT INTO topic (slug, name, status) VALUES ('proyecto', 'Proyecto suelto', 'active')")
-        with self.assertRaises(RuntimeError) as cm:
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
             seed.rollback(self.db, bak)
-        self.assertIn("UPDATE topic SET slug=", str(cm.exception))
         con = _db_shared._connect(self.db, SCHEMA)
-        self.assertEqual(seed.digest(con), before)                             # transacción revertida completa
+        suelto = con.execute("SELECT id, slug, parent_id FROM topic WHERE name='Proyecto suelto'").fetchone()
+        roots = con.execute("SELECT slug, name FROM topic WHERE parent_id IS NULL AND slug IN ('cliente','proyecto')").fetchall()
+        catalog = pendings.axis_catalog(con)
         con.close()
+        self.assertEqual(suelto[1], f"proyecto-{suelto[0]}")
+        self.assertIn(f"proyecto-{suelto[0]}", err.getvalue())
+        self.assertEqual(roots, [("proyecto", "Proyecto")])
+        self.assertEqual(catalog["proyecto"], seeded["proyecto"])
 
     def test_archived_catalog_topic_is_skipped_without_force_and_reactivated_with_force(self):
         con = _db_shared._connect(self.db, SCHEMA)
@@ -1157,9 +1169,58 @@ class TestSeedDryRunPasoTresPendiente(unittest.TestCase):
         con.execute("INSERT INTO topic (slug, name, status) VALUES ('proyecto', 'Proyecto suelto', 'active')")
         con.commit(); con.close()
         dry, out = self._run_on(self.db, apply=False)
-        self.assertIn("se detendrá", out)
-        self.assertIn("UPDATE topic SET slug=", out)
-        self.assertIn("cliente", dry["plan"]["topics_archive"])           # sin simular: lo que hay hoy
+        self.assertNotIn("se detendrá", out, "desde 7.4.0 un tema 'proyecto' no detiene el paso")
+        self.assertNotIn("abortará", out)
+        self.assertIn("simula el renombre", out)
+        self.assertNotIn("cliente", dry["plan"]["topics_archive"])        # simulado: la raíz ya es 'proyecto'
+        self.assertNotIn("proyecto", dry["plan"]["topics_create"])
+
+    def test_apply_con_tema_proyecto_siembra_tras_mover_el_tema(self):
+        """Desde 7.4.0 el paso 3 mueve el tema 'proyecto' suelto a su slug libre al abrir con _connect: el --apply
+        siembra sobre una sola raíz 'proyecto' (la que era 'cliente') y el plan del dry-run es el del --apply."""
+        import _migrations
+        con = sqlite3.connect(self.db)
+        cur = con.execute("INSERT INTO topic (slug, name, status) VALUES ('proyecto', 'Proyecto suelto', 'active')")
+        suelto_id = cur.lastrowid
+        root_id = con.execute("SELECT id FROM topic WHERE slug='cliente' AND parent_id IS NULL").fetchone()[0]
+        con.commit(); con.close()
+        dry, _out = self._run_on(self.db, apply=False)
+        res, _out = self._run_on(self.db, apply=True)
+        self.assertEqual(res["plan"]["topics_create"], dry["plan"]["topics_create"])
+        raw = sqlite3.connect(self.db)
+        try:
+            self.assertEqual(_migrations.read_version(raw)[0], 3)
+            roots = raw.execute("SELECT id, slug FROM topic WHERE parent_id IS NULL "
+                                "AND slug IN ('cliente','proyecto')").fetchall()
+            moved = raw.execute("SELECT slug FROM topic WHERE id=?", (suelto_id,)).fetchone()[0]
+        finally:
+            raw.close()
+        self.assertEqual(roots, [(root_id, "proyecto")])
+        self.assertEqual(moved, f"proyecto-{suelto_id}")
+
+    def test_raiz_proyecto_archivada_por_el_seed_7_2_se_reactiva(self):
+        """El seed de 7.2.x corrido a mano sobre una base de 7.3.0+ archiva la raíz 'proyecto' y crea 'cliente'
+        con los hijos: el --apply de este seed re-activa la raíz, devuelve los hijos y archiva 'cliente'."""
+        con = _db_shared._connect(self.db, SCHEMA); con.close()           # corre el paso 3
+        con = sqlite3.connect(self.db)
+        con.execute("UPDATE topic SET status='archived' WHERE slug='proyecto' AND parent_id IS NULL")
+        con.execute("INSERT INTO topic (slug, name, status) VALUES ('cliente', 'Cliente', 'active')")
+        cid = con.execute("SELECT id FROM topic WHERE slug='cliente'").fetchone()[0]
+        con.execute("UPDATE topic SET parent_id=? WHERE parent_id=(SELECT id FROM topic WHERE slug='proyecto')",
+                    (cid,))
+        con.commit(); con.close()
+        res, out = self._run_on(self.db, apply=True)
+        self.assertEqual(res["plan"]["roots_reactivate"], ["proyecto"])
+        self.assertIn("raíces archivadas", out)
+        con = _db_shared._connect(self.db, SCHEMA)
+        try:
+            status = dict(con.execute("SELECT slug, status FROM topic WHERE parent_id IS NULL "
+                                      "AND slug IN ('cliente','proyecto')").fetchall())
+            catalog = pendings.axis_catalog(con)
+        finally:
+            con.close()
+        self.assertEqual(status, {"proyecto": "active", "cliente": "archived"})
+        self.assertTrue(catalog["proyecto"])
 
     def test_base_al_dia_no_lleva_aviso(self):
         con = _db_shared._connect(self.db, SCHEMA); con.close()           # corre el paso 3
@@ -1167,6 +1228,105 @@ class TestSeedDryRunPasoTresPendiente(unittest.TestCase):
         self.assertIsNone(dry["plan"]["axis_step_note"])
         self.assertNotIn("aún no pasa el paso", out)
         self.assertEqual(dry["plan"]["topics_create"], [])
+
+
+class TestSeedPaso2DetenidoAborta(unittest.TestCase):
+    """Base en la versión 1 (paso 2 detenido por un SQLite anterior a 3.35.5, simulado en toda la prueba) con la
+    raíz 'cliente': el paso 3 (con `espera`) queda pendiente. El --apply no siembra: crearía una raíz 'proyecto'
+    junto a 'cliente', y el paso 3, al correr, movería esa raíz a otro slug y partiría el eje en dos."""
+
+    def setUp(self):
+        import _migrations
+        self.mig = _migrations
+        p = mock.patch.object(_migrations, "SQLITE_VERSION", (3, 34, 0))
+        p.start()
+        self.addCleanup(p.stop)
+        self.home = _fresh_home()
+        self.db = _db_shared.resolve_db_path(self.home)
+        with contextlib.redirect_stderr(io.StringIO()):
+            con = _db_shared._connect(self.db, SCHEMA)
+        root = _topic(con, "cliente", "Cliente")
+        top = _topic(con, "topico", "Tópico")
+        _topic(con, "alpha", "Alpha", "alpha", parent=root)
+        _topic(con, "seguridad", "Seguridad", "token", parent=top)
+        self.p1 = _pending(con, "[alpha-uno] cosa uno")
+        con.close()
+        self.catalog = os.path.join(self.home, "taxonomy.json")
+        with open(self.catalog, "w", encoding="utf-8") as fh:
+            json.dump({"proyecto": [{"slug": "alpha", "name": "Alpha", "keywords": "alpha"}],
+                       "topico": [{"slug": "seguridad", "name": "Seguridad", "keywords": "token"}]}, fh)
+        self.dataset = os.path.join(self.home, "triage.json")
+        with open(self.dataset, "w", encoding="utf-8") as fh:
+            json.dump({"items": [{"id": self.p1, "slug": "alpha-uno", "proyecto": "alpha", "topico": "seguridad",
+                                  "grupo": None, "prioridad": "P1", "veredicto_final": "vigente"}]}, fh)
+        self.bak_dir = tempfile.mkdtemp(prefix="neb-tax-bak-")
+
+    def _run(self, apply):
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            res = seed.run(self.db, self.catalog, self.dataset, apply=apply, backup_dir=self.bak_dir)
+        return res, buf.getvalue()
+
+    def _state(self):
+        raw = sqlite3.connect(self.db)
+        try:
+            return seed.digest(raw), self.mig.read_version(raw)[0]
+        finally:
+            raw.close()
+
+    def assert_sin_cambios(self, before):
+        self.assertEqual(self._state(), before)
+        self.assertEqual(before[1], 1)
+        self.assertEqual(os.listdir(self.bak_dir), [], "sin respaldo")
+        raw = sqlite3.connect(self.db)
+        try:
+            self.assertIsNone(raw.execute("SELECT 1 FROM topic WHERE slug='proyecto'").fetchone())
+        finally:
+            raw.close()
+
+    def test_critico_apply_aborta_con_el_paso_que_falta_y_como_resolverlo(self):
+        before = self._state()
+        with self.assertRaises(seed.AxisStepPending) as cm:
+            self._run(apply=True)
+        msg = str(cm.exception)
+        self.assertIn("paso de base 3", msg)
+        self.assertIn("paso 2", msg)
+        self.assertIn("SQLite 3.35.5", msg)
+        self.assertIn("neb-migrate.py status", msg)
+        self.assertIn("raíz 'proyecto' junto a 'cliente'", msg)
+        self.assert_sin_cambios(before)
+
+    def test_si_el_paso_se_detiene_recien_al_abrir_el_respaldo_se_borra(self):
+        """La revisión previa no ve nada que detenga el paso (simulado), pero tras _connect la base sigue antes
+        del paso 3: la revisión definitiva, dentro de la transacción, aborta y borra el respaldo recién tomado."""
+        before = self._state()
+        with mock.patch.object(seed, "_axis_step_blockers", lambda con: []):
+            with self.assertRaises(seed.AxisStepPending) as cm:
+                self._run(apply=True)
+        self.assertIn("no corrió al abrir la base", str(cm.exception))
+        self.assert_sin_cambios(before)
+
+    def test_dry_run_avisa_que_el_apply_abortara(self):
+        before = self._state()
+        dry, out = self._run(apply=False)
+        self.assertIn("se detendrá", out)
+        self.assertIn("SQLite 3.35.5", out)
+        self.assertIn("el --apply abortará sin respaldo ni escritura", out)
+        self.assertIn("neb-migrate.py status", out)
+        self.assertIn("proyecto", dry["plan"]["topics_create"], "sin simular el renombre")
+        self.assertEqual(self._state(), before)
+
+    def test_con_sqlite_al_dia_el_apply_siembra(self):
+        """Control: sin lo que detiene el paso 2, el --apply aplica los pasos 2 y 3 al abrir y siembra."""
+        with mock.patch.object(self.mig, "SQLITE_VERSION", (3, 35, 5)):
+            res, _out = self._run(apply=True)
+        self.assertEqual(res["counts"]["curated"], 1)
+        raw = sqlite3.connect(self.db)
+        try:
+            self.assertEqual(raw.execute("SELECT slug FROM topic WHERE parent_id IS NULL AND slug IN "
+                                         "('cliente','proyecto')").fetchall(), [("proyecto",)])
+        finally:
+            raw.close()
 
 
 class TestSeedBaseSinMigrar(unittest.TestCase):

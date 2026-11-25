@@ -13,10 +13,11 @@ ficticios en lugar de los pasos 2 y 3 de producción; el paso 2 real lo prueba t
   • reparaciones: sin DDL sobre una base más nueva; la limpieza de transcripts no toma respaldo;
   • el código de 6.47.0 sobre una base ya marcada por 6.48.0;
   • `neb-migrate.py`: status de solo lectura, restore (WAL activo, validaciones, negativas, retención).
-  • paso 3 real (7.3.0, eje proyecto): base en la versión 2 con raíz 'cliente' (renombra, el resto igual,
-    respaldo previo), base nueva y base solo con el sentinel y temas planos (no hace nada ni bloquea),
-    colisión con un tema 'proyecto' (precheck con motivo, nada cambia), carrera entre precheck y aplicar,
-    idempotencia y un código 7.2.x sobre la base migrada.
+  • paso 3 real (7.3.0, eje proyecto; min_code 2 y `espera` desde 7.4.0): base en la versión 2 con raíz
+    'cliente' (renombra, el resto igual, respaldo previo), base nueva y base solo con el sentinel y temas planos
+    (no hace nada ni bloquea), choque con un tema 'proyecto' (desde 7.4.0 el paso lo mueve a un slug libre y
+    corre), un tema 'proyecto' que aparece justo antes de aplicar (también se mueve), idempotencia, un código 7.2.x sobre la base migrada (opera sin migrar y su captura escribe) y la reparación
+    que baja a 2 la mínima compatible que dejó 7.3.0 (solo esa fila; status y el arranque leen 2).
 
 Invariantes: homes y bases temporales; nunca ~/.claude; sin NEB_HOME ni NEB_LOGBOOK_* heredados.
   py -m unittest discover -s hooks/tests -p test_migrations_db.py
@@ -961,7 +962,8 @@ STEPS_7_2 = _migrations.STEPS[:2]          # los pasos de 7.0.0–7.2.x: una bas
 
 class TestPaso3EjeProyecto(Base):
     """Paso de base 3 de producción (7.3.0): renombra la raíz 'cliente' a 'proyecto' (slug y name) y nada más.
-    Sin raíz 'cliente' no hace nada; un tema con slug 'proyecto' ya presente lo detiene en su precheck."""
+    Sin raíz 'cliente' no hace nada; un tema con slug 'proyecto' ya presente lo detiene en su precheck. Desde
+    7.4.0 deja la mínima compatible en 2 y tiene `espera`: detenido, la base sigue operando en la versión 2."""
 
     def v2_db(self, cliente=True, extra=()):
         """Base en la versión 2 (como la deja 7.2.x) con el eje curado: raíces 'cliente' y 'topico', hijos,
@@ -1012,7 +1014,7 @@ class TestPaso3EjeProyecto(Base):
         self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
         self.assertEqual(con.execute("PRAGMA foreign_key_check").fetchall(), [])
         con.close()
-        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(self.version(), (3, 2))
         self.assertEqual(self.without_topic(table_hashes(self.db)), self.without_topic(before))
         cols = columns(self.db, "topic")
         renamed = list([r for r in topics_before if r[0] == 33][0])
@@ -1048,7 +1050,7 @@ class TestPaso3EjeProyecto(Base):
         con = sqlite3.connect(self.db)
         row = con.execute("SELECT min_code, title, backup FROM schema_step WHERE step = 3").fetchone()
         con.close()
-        self.assertEqual(row, (3, "eje proyecto (7.3.0)", bak))
+        self.assertEqual(row, (2, "eje proyecto (7.3.0)", bak))
         con = sqlite3.connect(bak)
         try:
             self.assertEqual(con.execute("PRAGMA integrity_check").fetchone()[0], "ok")
@@ -1078,7 +1080,7 @@ class TestPaso3EjeProyecto(Base):
             con.close()
         self.assertEqual(paso2, os.path.join(_migrations.backup_dir(self.db), backups[0]))
         self.connect().close()
-        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(self.version(), (3, 2))
         backups = self.backups()
         self.assertEqual(len(backups), 2, backups)
         self.assertEqual(os.path.join(_migrations.backup_dir(self.db), backups[0]), paso2)
@@ -1095,7 +1097,7 @@ class TestPaso3EjeProyecto(Base):
         self.assertIsNotNone(con)
         self.assertEqual(con.execute("SELECT count(*) FROM topic").fetchone()[0], 0)
         con.close()
-        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(self.version(), (3, 2))
         self.assertEqual(self.backups(), [])
 
     def test_critico_solo_sentinel_y_temas_planos_no_hace_nada_ni_bloquea(self):
@@ -1113,91 +1115,68 @@ class TestPaso3EjeProyecto(Base):
         con = self.connect()
         self.assertIsNotNone(con, "no bloquea")
         con.close()
-        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(self.version(), (3, 2))
         self.assertEqual(table_hashes(self.db), before, "un 'cliente' que no es raíz no se toca")
 
     def test_tema_proyecto_sin_raiz_cliente_no_bloquea(self):
         self.v2_db(cliente=False, extra=("INSERT INTO topic (id, slug, name) VALUES (70, 'proyecto', 'Proyecto')",))
         before = table_hashes(self.db)
         self.connect().close()
-        self.assertEqual(self.version(), (3, 3))
+        self.assertEqual(self.version(), (3, 2))
         self.assertEqual(table_hashes(self.db), before)
 
-    def test_critico_falla_sembrada_hijo_proyecto_detiene_el_paso_sin_cambiar_nada(self):
+    def test_critico_un_tema_proyecto_se_mueve_a_un_slug_libre_y_el_paso_corre(self):
+        """Choque de slug (un tema 'proyecto' hijo de 'topico'): desde 7.4.0 el paso lo resuelve solo, en la misma
+        transacción y con su respaldo: el tema pasa a 'proyecto-51-2' (determinista por id; 'proyecto-51' está
+        tomado) y la raíz 'cliente' toma 'proyecto'. Sus curaciones cuelgan por id y no cambian."""
         self.v2_db(extra=("INSERT INTO topic (id, slug, name, parent_id) VALUES (51, 'proyecto', 'Proyecto', 34)",
-                          "INSERT INTO topic (id, slug, name) VALUES (52, 'proyecto-51', 'Ocupado')"))
+                          "INSERT INTO topic (id, slug, name) VALUES (52, 'proyecto-51', 'Ocupado')",
+                          "INSERT INTO pending_topic (pending_id, topic_id, priority_band, curated) "
+                          "VALUES (2, 51, 'high', 1)"))
         before = table_hashes(self.db)
-        with self.assertRaises(_migrations.DbUnavailable) as cm:
-            self.connect()
-        e = cm.exception
-        self.assertEqual(e.motivo, "paso-bloqueado")
-        self.assertIn("paso de base 3", e.detalle)
-        self.assertIn("topic id 51, hijo de 'topico'", e.detalle)
-        self.assertIn("UPDATE topic SET slug='proyecto-51-2' WHERE id=51;", e.detalle, "propone un slug libre")
-        self.assertIn("No se cambió nada", e.detalle)
-        self.assertIn("«- **Temas:**» de ~/.claude/compas.md", e.detalle, "avisa que el slug se cita en compas.md")
-        self.assertEqual(table_hashes(self.db), before)
-        self.assertEqual(self.version(), (2, 2))
-        self.assertEqual(self.backups(), [], "el precheck corre antes del respaldo")
+        err = io.StringIO()
+        with contextlib.redirect_stderr(err):
+            con = _db_shared._connect(self.db, SCHEMA)
+        self.assertIsNotNone(con)
+        con.close()
+        self.assertEqual(self.version(), (3, 2))
+        topics = {r[0]: r[1] for r in self.topics()}
+        self.assertEqual((topics[33], topics[51], topics[52]), ("proyecto", "proyecto-51-2", "proyecto-51"))
+        self.assertIn("topic id 51", err.getvalue())
+        self.assertIn("'proyecto-51-2'", err.getvalue())
+        self.assertEqual(len(self.backups()), 1, "respaldo previo del paso")
+        self.assertEqual(table_hashes(self.db)["pending_topic"], before["pending_topic"], "curaciones por id")
         con = _migrations.open_readonly(self.db)
         try:
-            self.assertEqual(_migrations.read_errors(con), [], "el motivo de un precheck no se guarda")
-            report = _migrations.blocked_report(con)
+            self.assertEqual(_migrations.blocked_report(con), [])
         finally:
             con.close()
-        self.assertEqual([(n, t) for n, t, _m in report], [(3, "eje proyecto (7.3.0)")])
-        self.assertIn("UPDATE topic SET slug='proyecto-51-2' WHERE id=51;", report[0][2])
-        con = sqlite3.connect(self.db)
-        con.execute("UPDATE topic SET slug='proyecto-51-2' WHERE id=51")
-        con.commit()
-        con.close()
-        self.connect().close()
-        self.assertEqual(self.version(), (3, 3))
-        topics = {r[0]: r[1] for r in self.topics()}
-        self.assertEqual((topics[33], topics[51]), ("proyecto", "proyecto-51-2"))
 
-    def test_tema_proyecto_creado_tras_el_precheck_revierte_y_se_reintenta(self):
+    def test_tema_proyecto_creado_justo_antes_de_aplicar_tambien_se_mueve(self):
+        """Relectura dentro del candado: un tema 'proyecto' que aparece entre la lectura de la versión y aplicar
+        (otra sesión) también se mueve a su slug libre; el paso no se revierte."""
         self.v2_db()
-        before = table_hashes(self.db)
         real = _migrations.STEPS[2]
         db = self.db
 
-        def precheck(con):
-            motivo = real.precheck(con)
-            otro = sqlite3.connect(db)
-            otro.execute("INSERT INTO topic (id, slug, name) VALUES (80, 'proyecto', 'Tarde')")
-            otro.commit()
-            otro.close()
-            return motivo
-        paso3 = Step(3, real.titulo, real.aplicar, min_code=real.min_code, destructivo=real.destructivo,
-                     espera=real.espera, precheck=precheck)
-        with self.assertRaises(_migrations.DbUnavailable) as cm:
-            self.connect(STEPS_7_2 + (paso3,))
-        self.assertIn("topic id 80", cm.exception.detalle)
-        self.assertIn("el paso se reintenta", cm.exception.detalle)
-        self.assertEqual(self.version(), (2, 2))
-        self.assertEqual(self.backups(), [], "el respaldo del intento revertido se borra")
-        con = sqlite3.connect(self.db)
-        try:
-            errors = _migrations.read_errors(con)
-            self.assertEqual(con.execute("SELECT slug FROM topic WHERE id = 33").fetchone()[0], "cliente")
-        finally:
-            con.close()
-        self.assertEqual([r[0] for r in errors], [3])
-        self.assertIn("topic id 80", errors[0][3])
-        self.assertEqual(self.without_topic(table_hashes(self.db)), self.without_topic(before))
-        con = sqlite3.connect(self.db)
-        con.execute("DELETE FROM topic WHERE id = 80")
-        con.commit()
+        def aplicar(con):
+            otro = sqlite3.connect(db, timeout=0)
+            try:
+                with self.assertRaises(sqlite3.OperationalError):     # el candado ya es del paso
+                    otro.execute("INSERT INTO topic (id, slug, name) VALUES (80, 'proyecto', 'Tarde')")
+            finally:
+                otro.close()
+            con.execute("INSERT INTO topic (id, slug, name) VALUES (80, 'proyecto', 'Tarde')")
+            real.aplicar(con)
+        paso3 = Step(3, real.titulo, aplicar, min_code=real.min_code, destructivo=real.destructivo,
+                     espera=real.espera)
+        with contextlib.redirect_stderr(io.StringIO()):
+            con = _db_shared._connect(self.db, SCHEMA, steps=STEPS_7_2 + (paso3,))
+        self.assertIsNotNone(con)
         con.close()
-        self.connect(retry=True).close()
-        self.assertEqual(self.version(), (3, 3))
-        con = sqlite3.connect(self.db)
-        try:
-            self.assertEqual(_migrations.read_errors(con), [])
-            self.assertEqual(con.execute("SELECT slug FROM topic WHERE id = 33").fetchone()[0], "proyecto")
-        finally:
-            con.close()
+        self.assertEqual(self.version(), (3, 2))
+        topics = {r[0]: r[1] for r in self.topics()}
+        self.assertEqual((topics[33], topics[80]), ("proyecto", "proyecto-80"))
 
     def test_critico_idempotente_la_segunda_conexion_no_hace_nada(self):
         self.v2_db()
@@ -1238,12 +1217,216 @@ class TestPaso3EjeProyecto(Base):
             con.execute("ROLLBACK")
             con.close()
 
-    def test_un_codigo_7_2_no_opera_la_base_migrada(self):
+    def test_un_codigo_7_2_opera_la_base_migrada_sin_migrar_ni_reparar(self):
+        """Desde 7.4.0 el paso 3 deja la mínima compatible en 2: un código 7.0.0–7.2.x (C = 2) abre la base en
+        la versión 3 como «más nueva pero compatible», sin tocar su esquema ni sus datos (con 7.3.0, F = 3 y
+        respondía base-incompatible: las sesiones abiertas con la versión anterior perdían la base)."""
         self.v2_db()
         self.connect().close()
-        with self.assertRaises(_migrations.IncompatibleDb) as cm:
-            self.connect(STEPS_7_2)
-        self.assertIn("pide al menos la 3", cm.exception.detalle)
+        before = table_hashes(self.db)
+        con = sqlite3.connect(self.db)
+        sv = con.execute("PRAGMA schema_version").fetchone()[0]
+        con.close()
+        con = self.connect(STEPS_7_2)
+        self.assertIsNotNone(con)
+        con.close()
+        self.assertEqual(self.version(), (3, 2))
+        self.assertEqual(table_hashes(self.db), before)
+        con = sqlite3.connect(self.db)
+        try:
+            self.assertEqual(con.execute("PRAGMA schema_version").fetchone()[0], sv)
+        finally:
+            con.close()
+
+    def test_critico_un_codigo_7_2_captura_sobre_la_base_migrada(self):
+        """La captura de una sesión abierta con 7.0.0–7.2.x (STEPS[:2], C = 2) sigue escribiendo en la base
+        que 7.4.0 llevó a la versión 3."""
+        import logbook
+        self.v2_db()
+        self.connect().close()
+        cwd = os.path.join(self.home, "repo")
+        os.makedirs(cwd)
+        t = os.path.join(self.home, "S9.jsonl")
+        with open(t, "w", encoding="utf-8") as fh:
+            fh.write(json.dumps({"type": "user", "message": {"content": "tema nuevo"}}) + "\n")
+        with mock.patch.object(_migrations, "STEPS", STEPS_7_2), \
+                mock.patch.object(sys, "argv", ["logbook.py", "S9", cwd, t, "Stop", NEB_ROOT, self.home]), \
+                mock.patch.object(sys, "stderr", io.StringIO()):
+            logbook.main()
+        con = sqlite3.connect(self.db)
+        try:
+            row = con.execute("SELECT mode, payload_json FROM work WHERE claude_session_id='S9'").fetchone()
+        finally:
+            con.close()
+        self.assertIsNotNone(row, "la captura de 7.2.x escribe")
+        self.assertEqual((row[0], json.loads(row[1])), ("exploratory", {"summary": "tema nuevo"}))
+        self.assertEqual(self.version(), (3, 2))
+
+
+class TestReparacionMinimaDelPaso3(Base):
+    """7.3.0 registró el paso 3 con min_code = 3; desde 7.4.0 una conexión con V <= C lo baja a 2
+    (_migrations.relax_axis_step_min_code, en _db_shared._repair). Solo esa fila, idempotente y sin respaldo."""
+
+    def migrada_por_7_3_0(self):
+        """Base en la versión 3 con la fila del paso 3 como la dejó 7.3.0 (min_code = 3)."""
+        self.connect().close()
+        con = sqlite3.connect(self.db)
+        con.execute("UPDATE schema_step SET min_code = 3 WHERE step = 3")
+        con.commit()
+        con.close()
+        self.assertEqual(self.raw_min_code(), 3)
+        self.assertEqual(self.version(), (3, 2), "read_version da la mínima efectiva aun sin reparar")
+
+    def raw_min_code(self):
+        """La mínima tal cual está en la base: la que lee el código 7.0.0–7.2.x (MAX(min_code), sin la regla
+        de la fila de 7.3.0 que aplica read_version desde 7.4.0)."""
+        con = sqlite3.connect(self.db)
+        try:
+            return con.execute("SELECT MAX(min_code) FROM schema_step").fetchone()[0]
+        finally:
+            con.close()
+
+    def rows(self):
+        con = sqlite3.connect(self.db)
+        try:
+            return con.execute("SELECT * FROM schema_step ORDER BY step").fetchall()
+        finally:
+            con.close()
+
+    def test_critico_baja_la_minima_del_paso_3_y_nada_mas(self):
+        self.migrada_por_7_3_0()
+        before_rows, before_data = self.rows(), table_hashes(self.db)
+        self.connect().close()
+        self.assertEqual(self.version(), (3, 2))
+        after = self.rows()
+        self.assertEqual([r for r in after if r[0] != 3], [r for r in before_rows if r[0] != 3])
+        cols = [r[1] for r in sqlite3.connect(self.db).execute("PRAGMA table_info(schema_step)")]
+        row3_before = list([r for r in before_rows if r[0] == 3][0])
+        row3_before[cols.index("min_code")] = 2
+        self.assertEqual([r for r in after if r[0] == 3], [tuple(row3_before)], "solo cambia min_code")
+        self.assertEqual(table_hashes(self.db), before_data)
+        self.assertEqual(self.backups(), [], "sin respaldo")
+
+    def test_idempotente_sin_la_fila_no_escribe(self):
+        self.migrada_por_7_3_0()
+        self.connect().close()
+        rows = self.rows()
+        self.connect().close()
+        self.assertEqual(self.rows(), rows)
+        con = sqlite3.connect(self.db)
+        try:
+            before = con.total_changes
+            self.assertFalse(_migrations.relax_axis_step_min_code(con), "sin la fila de 7.3.0, no escribe")
+            self.assertEqual(con.total_changes, before)
+            self.assertFalse(con.in_transaction)
+        finally:
+            con.close()
+
+    def test_un_codigo_7_2_pasa_de_incompatible_a_operar(self):
+        """El código 7.2.x lee MAX(min_code) tal cual: con la fila de 7.3.0 ve 3 (> su C = 2) y no opera; tras la
+        reparación ve 2. STEPS_7_2 corre con el read_version de este código, que ya da la mínima efectiva, así que
+        además opera antes y después."""
+        self.migrada_por_7_3_0()
+        self.assertGreater(self.raw_min_code(), _migrations.code_version(STEPS_7_2))
+        con = self.connect(STEPS_7_2)                             # C = 2 < V = 3: sin reparaciones
+        con.close()
+        self.assertEqual(self.raw_min_code(), 3, "un código con C = 2 no corre la reparación")
+        self.connect().close()                                    # este código: corre la reparación
+        self.assertEqual(self.raw_min_code(), 2)
+        con = self.connect(STEPS_7_2)
+        self.assertIsNotNone(con)
+        con.close()
+
+    def test_critico_status_y_el_arranque_leen_la_minima_2(self):
+        """neb-migrate.py status y el aviso del arranque leen F de la base: tras la reparación, 2, y un árbol
+        con la versión de esquema 2 (un clon en 7.2.x) deja de contar como incapaz de operar la base."""
+        spec = importlib.util.spec_from_file_location(
+            "neb_bootstrap_context_paso3", os.path.join(NEB_ROOT, "bootstrap", "neb-bootstrap-context.py"))
+        nb = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nb)
+        clone = tempfile.mkdtemp(prefix="neb-test-clon-72-")
+        self.addCleanup(shutil.rmtree, clone, True)
+        os.makedirs(os.path.join(clone, "hooks", "lib"))
+        with open(os.path.join(clone, "hooks", "lib", "_migrations.py"), "w", encoding="utf-8") as fh:
+            fh.write("SCHEMA_VERSION = 2\n")
+        bootstrap_dir = os.path.join(NEB_ROOT, "bootstrap")
+        self.migrada_por_7_3_0()
+        # Antes de cualquier conexión de escritura: status y el aviso ya leen la mínima efectiva (2).
+        st = NM.status(self.home)
+        self.assertEqual((st["schema_version_db"], st["min_compatible_db"], st["estado"]), (3, 2, "al-dia"))
+        self.assertIsNone(nb._db_notice(bootstrap_dir, clone, home=self.home))
+        self.assertEqual(self.raw_min_code(), 3, "status y el aviso no escriben")
+        # El arranque baja la fila (para el código 7.2.x, que lee la mínima tal cual), sin tocar nada más.
+        before_data = table_hashes(self.db)
+        self.assertTrue(nb._relax_axis_step(bootstrap_dir, home=self.home))
+        self.assertEqual(self.raw_min_code(), 2)
+        self.assertEqual(table_hashes(self.db), before_data)
+        self.assertEqual(self.backups(), [], "sin respaldo")
+        self.assertFalse(nb._relax_axis_step(bootstrap_dir, home=self.home), "idempotente")
+        st = NM.status(self.home)
+        self.assertEqual((st["schema_version_db"], st["min_compatible_db"], st["estado"]), (3, 2, "al-dia"))
+        self.assertIsNone(nb._db_notice(bootstrap_dir, clone, home=self.home))
+
+    def test_critico_los_avisos_del_arranque_corren_la_reparacion(self):
+        """_env_notices (lo que inyecta SessionStart) baja la fila antes de leer: la primera sesión con este código
+        deja operar la base a las sesiones abiertas con 7.0.0–7.2.x, sin esperar a un CLI o hook de escritura."""
+        spec = importlib.util.spec_from_file_location(
+            "neb_bootstrap_context_paso3c", os.path.join(NEB_ROOT, "bootstrap", "neb-bootstrap-context.py"))
+        nb = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nb)
+        self.migrada_por_7_3_0()
+        nb._env_notices(os.path.join(NEB_ROOT, "bootstrap"), None)
+        self.assertEqual(self.raw_min_code(), 2)
+
+    def test_el_arranque_no_escribe_sin_la_fila_ni_sobre_una_base_mas_nueva(self):
+        spec = importlib.util.spec_from_file_location(
+            "neb_bootstrap_context_paso3b", os.path.join(NEB_ROOT, "bootstrap", "neb-bootstrap-context.py"))
+        nb = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(nb)
+        bootstrap_dir = os.path.join(NEB_ROOT, "bootstrap")
+        self.assertFalse(nb._relax_axis_step(bootstrap_dir, home=self.home), "sin base")
+        self.assertFalse(os.path.exists(self.db), "no crea la base")
+        self.connect().close()
+        st = os.stat(self.db)
+        self.assertFalse(nb._relax_axis_step(bootstrap_dir, home=self.home), "fila ya en 2")
+        self.assertEqual(os.stat(self.db).st_mtime_ns, st.st_mtime_ns)
+        con = sqlite3.connect(self.db)
+        con.execute("UPDATE schema_step SET min_code = 3 WHERE step = 3")
+        con.execute("INSERT INTO schema_step (step, min_code, title, neb_version, applied_at) "
+                    "VALUES (4, 2, 'futuro', 'x', 'x')")
+        con.commit()
+        con.close()
+        self.assertFalse(nb._relax_axis_step(bootstrap_dir, home=self.home), "base más nueva: no repara")
+        self.assertEqual(self.raw_min_code(), 3)
+
+    def test_otra_fila_3_con_otro_titulo_o_minima_no_se_toca(self):
+        """Una lista de pasos inyectada (otro título) o una fila con otra mínima no es la de 7.3.0."""
+        for title, min_code in (("columna extra3", 3), ("eje proyecto (7.3.0)", 4)):
+            with self.subTest(title=title, min_code=min_code):
+                if os.path.exists(self.db):
+                    os.remove(self.db)
+                self.connect([STEP1, add_column_step(2, min_code=2)]).close()
+                con = sqlite3.connect(self.db)
+                con.execute("INSERT INTO schema_step (step, min_code, title, neb_version, applied_at) "
+                            "VALUES (3, ?, ?, 'x', 'x')", (min_code, title))
+                con.commit()
+                rows = con.execute("SELECT * FROM schema_step ORDER BY step").fetchall()
+                self.assertFalse(_migrations.relax_axis_step_min_code(con))
+                self.assertEqual(con.execute("SELECT * FROM schema_step ORDER BY step").fetchall(), rows)
+                con.close()
+
+    def test_no_corre_sobre_una_base_mas_nueva(self):
+        """Las reparaciones solo corren con V <= C: sobre una base más nueva (V = 4, F = 3) el código 7.4.0 (C = 3)
+        opera sin reparaciones y no baja la fila de 7.3.0."""
+        self.migrada_por_7_3_0()
+        con = sqlite3.connect(self.db)
+        con.execute("INSERT INTO schema_step (step, min_code, title, neb_version, applied_at) "
+                    "VALUES (4, 2, 'futuro', 'x', 'x')")
+        con.commit()
+        con.close()
+        self.connect().close()                                    # C = 3 < V = 4: sin reparaciones
+        self.assertEqual(self.raw_min_code(), 3)
+        self.assertEqual(self.version(), (4, 2), "read_version da la mínima efectiva")
 
 
 if __name__ == "__main__":

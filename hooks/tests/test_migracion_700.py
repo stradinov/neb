@@ -205,7 +205,7 @@ class TestRenombrarBase(Base):
             other.close()
         self.assertEqual(rc, 1)
         r = self.by_id(out["guiados"])["pendientes"]["renombrar-base"]
-        self.assertTrue(r["detalle"].startswith("otra sesión tiene la base abierta: cierra las demás sesiones"),
+        self.assertTrue(r["detalle"].startswith("otra sesión tiene la base abierta: queda pendiente y se reintenta"),
                         r["detalle"])
         self.assertIsNone(r["respaldo"])
         self.assertEqual(self.files(), ["neb-logbook.db"])

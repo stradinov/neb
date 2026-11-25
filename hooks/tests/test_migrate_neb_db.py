@@ -404,7 +404,8 @@ class TestRename(_Base):
         finally:
             other.close()
         self.assertEqual(r["codigo"], "ocupada")
-        self.assertIn("Cierra las demás sesiones de Claude", r["mensaje"])
+        self.assertIn("se vuelve a correr cuando nadie más la tenga abierta", r["mensaje"])
+        self.assertNotIn("Cierra", r["mensaje"], "no pide cerrar sesiones")
         self.assertIsNone(r["respaldo"])
         self.assertEqual(self._backups(), [])
         self.assertTrue(os.path.isfile(self.legacy))
@@ -481,6 +482,7 @@ class TestRename(_Base):
         self.assertEqual((r["codigo"], r["escribio"]), ("ok", False))
         self.assertIn("reapareció", r["aviso"])
         self.assertIn("la captura no escribió ahí", r["aviso"])
+        self.assertNotIn("Cierra", r["aviso"], "no pide cerrar sesiones (7.4.0)")
         self.assertTrue(os.path.isfile(self.target))
 
     def test_critico_base_vieja_que_reaparece_con_escrituras(self):
@@ -488,6 +490,7 @@ class TestRename(_Base):
         r = self._reaparece(b"x" * 4096)
         self.assertEqual((r["codigo"], r["escribio"]), ("ok", True))
         self.assertIn("esas capturas no están en neb.db", r["aviso"])
+        self.assertNotIn("Cierra", r["aviso"], "no pide cerrar sesiones (7.4.0)")
         self.assertTrue(os.path.isfile(self.target))
 
 

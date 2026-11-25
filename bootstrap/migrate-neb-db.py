@@ -8,8 +8,8 @@ correr a mano. Usa el módulo sqlite3 de Python porque el binario `sqlite3` no e
 No migra columnas ni llama a _connect: la primera conexión de neb 7.0.0 sobre neb.db aplica los pasos de
 base (el paso 2 retira el esquema de equipo, con su propio respaldo).
 
-ANTES DE CORRER: cierra todas las demás sesiones de Claude (y los procesos `python` de hooks que sigan
-vivos). Si la base está ocupada, el migrador no cambia el nombre y se vuelve a correr después.
+Corre solo cuando ninguna otra sesión ni proceso tiene la base abierta: si está ocupada, no cambia el nombre
+y se vuelve a correr después (desde 7.4.0 no se pide al dev cerrar sesiones).
 
 Qué hace, en este orden:
   1. Solo acepta un neb.db ausente o de 0 bytes. Ante cualquier otro neb.db (usable, sin tabla `work`,
@@ -172,9 +172,10 @@ def _reappeared(legacy):
             "neb abrió la base por su nombre viejo. ")
     if any((_size(p) or 0) > 0 for p in found):
         return text + ("La captura escribió ahí después del cambio de nombre: esas capturas no están en neb.db. "
-                       "Cierra esa sesión, actualiza neb en ella y revisa el archivo antes de borrarlo."), True
-    return text + ("Está vacío: la captura no escribió ahí. Cierra esa sesión, actualiza neb en ella y luego "
-                   "borra el archivo."), False
+                       "Revisa el archivo antes de borrarlo; esa sesión puede seguir escribiendo ahí mientras siga "
+                       "abierta, y su siguiente sesión, ya actualizada, usa neb.db."), True
+    return text + ("Está vacío: la captura no escribió ahí. Se puede borrar cuando esa sesión termine; su "
+                   "siguiente sesión, ya actualizada, usa neb.db."), False
 
 
 def rename(home_dir):
@@ -188,8 +189,8 @@ def rename(home_dir):
     if code != "ok":
         return _result(code, msg)
 
-    busy_msg = ("otra sesión o proceso la usa. Cierra las demás sesiones de Claude y vuelve a correr. No se "
-                "cambió el nombre.")
+    busy_msg = ("otra sesión o proceso la usa: no se cambió el nombre; se vuelve a correr cuando nadie más la "
+                "tenga abierta.")
     try:
         con = sqlite3.connect(legacy, timeout=0, isolation_level=None)
     except sqlite3.Error as e:
@@ -328,7 +329,7 @@ def main(argv):
     _utf8_stdout()
     p = argparse.ArgumentParser(
         description=f"Cambia el nombre de la bitácora de {LEGACY_DB_NAME} a {NEB_DB_NAME} (neb 7.0.0). "
-                    "Corre con las demás sesiones de Claude cerradas.",
+                    "Si otra sesión la tiene abierta, no cambia nada y se vuelve a correr después.",
         epilog=ROLLBACK_HELP)
     p.add_argument("--home", default=os.path.expanduser("~"),
                    help="directorio HOME sobre cuyo .claude opera (por omisión, ~; las pruebas usan uno temporal).")

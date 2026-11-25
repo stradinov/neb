@@ -19,10 +19,12 @@ Cubre:
     nombra cada objeto y cómo quitarlo; un objeto creado entre el precheck y aplicar revierte el paso, que
     se reintenta. Candado ocupado, concurrencia entre procesos, candado ajeno sobre una base ya migrada y
     journal_mode=DELETE.
-  • Con los pasos de 7.3.0, la base 6.45.0 llega también por el paso 3 (eje proyecto): su raíz 'cliente' queda
-    como 'proyecto' y el único respaldo que queda es el del paso 3. Las pruebas que prueban el paso 2 detenido
-    corren con los pasos de 7.0.0–7.2.x (STEPS_7_2), donde el paso 2 tiene `espera` y nada lo sigue; con los
-    de 7.3.0 el paso 3 no tiene `espera` y un paso 2 detenido responde paso-bloqueado (TestPaso2BloqueadoEn730).
+  • Con los pasos vigentes, la base 6.45.0 llega también por el paso 3 (eje proyecto): su raíz 'cliente' queda
+    como 'proyecto', con un respaldo por paso, y la mínima compatible queda en 2 (7.4.0). Las pruebas que
+    prueban el paso 2 detenido corren con los pasos de 7.0.0–7.2.x (STEPS_7_2), donde el paso 2 tiene `espera` y
+    nada lo sigue; desde 7.4.0 el paso 3 también tiene `espera`, así que con los pasos vigentes un paso 2
+    detenido tampoco bloquea: la base sigue operando en la versión 1, captura incluida, con la raíz 'cliente'
+    y el paso 3 pendiente (TestPaso2DetenidoNoBloqueaEn740).
   • _add_missing_columns: tolera la carrera «duplicate column name» y propaga cualquier otro error.
 
 Invariantes: DBs y homes temporales (tempfile); nunca ~/.claude; ningún test hace red.
@@ -220,8 +222,9 @@ TOPICS_7_3 = [(1, "proyecto", "Proyecto", None), (2, "alpha", "Alpha", 1)]     #
 
 
 def _code_version():
-    """(V, F) que deja el código con los pasos vigentes (los de 7.3.0, o STEPS_7_2 donde se parchan)."""
-    return _migrations.code_version(), _migrations.STEPS[-1].min_code
+    """(V, F) que deja el código con los pasos vigentes (o STEPS_7_2 donde se parchan): F es el máximo de
+    min_code."""
+    return _migrations.code_version(), max(s.min_code for s in _migrations.STEPS)
 
 
 def _schema_version(path):
@@ -619,7 +622,8 @@ class _Paso2(unittest.TestCase):
 
 class _Paso2Aislado(_Paso2):
     """El paso 2 con los pasos de 7.0.0–7.2.x: con `espera` y sin pasos después, un paso 2 detenido deja la
-    conexión y la captura en la versión 1. Con los de 7.3.0 eso ya no vale (TestPaso2BloqueadoEn730)."""
+    conexión y la captura en la versión 1. Con los vigentes (paso 3 con `espera` desde 7.4.0) también:
+    TestPaso2DetenidoNoBloqueaEn740."""
 
     def setUp(self):
         super().setUp()
@@ -650,7 +654,7 @@ class TestMigracion645(_Paso2):
         con.close()
         self.assertEqual(_sin_topic(_hashes(self.path)), _sin_topic(antes))
         self.assertEqual(_topics(self.path), TOPICS_7_3)
-        self.assertEqual(self._version(), (3, 3))
+        self.assertEqual(self._version(), (3, 2))
 
     def test_critico_de_645_a_7_3_queda_el_respaldo_del_paso_3(self):
         """Los pasos 2 y 3 son destructivos y la poda es por paso: quedan los dos respaldos. El del paso 3 ya no
@@ -665,7 +669,7 @@ class TestMigracion645(_Paso2):
         rows = c.execute("SELECT step, min_code FROM schema_step ORDER BY step").fetchall()
         row3 = c.execute("SELECT backup FROM schema_step WHERE step = 3").fetchone()[0]
         c.close()
-        self.assertEqual(rows, [(1, 1), (2, 2), (3, 3)])
+        self.assertEqual(rows, [(1, 1), (2, 2), (3, 2)])
         self.assertEqual(row3, bak)
         c = sqlite3.connect(bak)
         try:
@@ -701,7 +705,7 @@ class TestMigracion645(_Paso2):
         path = os.path.join(d, "neb.db")
         _db_shared._connect(path, SCHEMA).close()
         self.assertFalse(os.path.exists(_migrations.backup_dir(path)))
-        self.assertEqual(_schema_step_version(path), (3, 3))
+        self.assertEqual(_schema_step_version(path), (3, 2))
 
     def test_segunda_conexion_mismo_schema_version_y_sin_aviso(self):
         _connect_quiet(self.path)[0].close()
@@ -963,26 +967,51 @@ class TestObjetosDelUsuario(_Paso2Aislado):
         self._quitar_y_aplicar("DROP VIEW v_duenos", "DROP INDEX mi_idx_dirty")
 
 
-class TestPaso2BloqueadoEn730(_Paso2):
-    """Con los pasos de 7.3.0, el paso 3 no tiene `espera`: una base en la versión 1 cuyo paso 2 está detenido
-    (aquí, un SQLite anterior a 3.35.5 simulado) ya no queda operable en la versión 1, como con 7.0.0–7.2.x:
-    _connect responde paso-bloqueado con el motivo del paso 2 y no cambia nada."""
+class TestPaso2DetenidoNoBloqueaEn740(_Paso2):
+    """Con los pasos vigentes (7.4.0), el paso 3 tiene `espera`: una base en la versión 1 cuyo paso 2 está
+    detenido (aquí, un SQLite anterior a 3.35.5 simulado) sigue operable en la versión 1, como con 7.0.0–7.2.x:
+    _connect devuelve la conexión, no cambia nada del esquema, la raíz 'cliente' se queda (el paso 3 queda
+    pendiente) y la captura escribe. 7.3.0 respondía paso-bloqueado y dejaba sin base a todas las sesiones."""
 
-    def test_critico_paso_bloqueado_con_el_motivo_del_paso_2_y_sin_cambios(self):
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(_migrations, "SQLITE_VERSION", (3, 35, 4))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def test_critico_la_base_sigue_en_la_version_1_sin_cambios_y_el_paso_3_pendiente(self):
         antes = _hashes(self.path)
-        with mock.patch.object(_migrations, "SQLITE_VERSION", (3, 35, 4)), \
-                mock.patch.object(sys, "stderr", io.StringIO()):
-            with self.assertRaises(_db_shared.DbUnavailable) as cm:
-                _db_shared._connect(self.path, SCHEMA)
-            motivo = self._detenido()
-        self.assertEqual(cm.exception.motivo, "paso-bloqueado")
-        self.assertIn("paso de base 2", cm.exception.detalle)
-        self.assertIn("SQLite 3.35.5", cm.exception.detalle)
-        self.assertIn("SQLite 3.35.5", motivo)
+        con, err = _connect_quiet(self.path)
+        self.assertIsNotNone(con, err)
+        self.assert_intacta(con)
+        con.close()
+        self.assertIn("paso de base 2", err)
+        self.assertIn("se reintenta en la siguiente conexión", err)
+        self.assertIn("SQLite 3.35.5", self._detenido())
         self.assertEqual(self._version(), (1, 1), "el paso 1 sí queda: corre en su propia transacción")
         self.assertEqual(self._backups(), [])
         self.assertEqual(_hashes(self.path), antes)
-        self.assertEqual(_topics(self.path)[0][1], "cliente")
+        self.assertEqual(_topics(self.path)[0][1], "cliente", "el paso 3 no corre tras un paso 2 detenido")
+
+    def test_critico_la_captura_inserta_con_el_paso_2_detenido(self):
+        cwd = os.path.join(self.home, "repo")
+        os.makedirs(cwd)
+        t = _jsonl(os.path.join(self.home, "S9.jsonl"), "tema nuevo")
+        with mock.patch.object(sys, "argv", ["logbook.py", "S9", cwd, t, "Stop", NEB_ROOT, self.home]), \
+                mock.patch.object(sys, "stderr", io.StringIO()):
+            logbook.main()
+        c = sqlite3.connect(self.path)
+        row = c.execute("SELECT mode, payload_json FROM work WHERE claude_session_id='S9'").fetchone()
+        c.close()
+        self.assertEqual(row[0], "exploratory")
+        self.assertEqual(json.loads(row[1]), {"summary": "tema nuevo"})
+        self.assertEqual(self._version(), (1, 1))
+
+    def test_con_sqlite_al_dia_corren_los_pasos_2_y_3(self):
+        _connect_quiet(self.path)[0].close()
+        with mock.patch.object(_migrations, "SQLITE_VERSION", (3, 35, 5)):
+            self.assert_como_nueva()
+        self.assertEqual(_topics(self.path), TOPICS_7_3)
 
 
 class TestObjetoEntrePrecheckYAplicar(_Paso2Aislado):
@@ -1110,7 +1139,7 @@ class TestJournalDelete(unittest.TestCase):
         self.assertEqual({k: v for k, v in _hashes(path).items() if k not in ("work", "topic")},
                          {k: v for k, v in antes.items() if k not in ("work", "topic")})
         self.assertEqual(_topics(path), TOPICS_7_3)
-        self.assertEqual(_schema_step_version(path), (3, 3))
+        self.assertEqual(_schema_step_version(path), (3, 2))
         # Pasos 2 y 3 destructivos, poda por paso: un respaldo de cada uno.
         self.assertEqual(sorted(n.split(".")[1] for n in os.listdir(_migrations.backup_dir(path))),
                          ["pre-paso-2", "pre-paso-3"])

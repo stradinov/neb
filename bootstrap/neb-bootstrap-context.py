@@ -30,6 +30,8 @@ Defensivo: si algo falta, emite lo que pueda + una guia a /wakeup; nunca aborta.
 import hashlib
 import os
 import re
+import sqlite3
+from pathlib import Path
 import sys
 import importlib.util
 
@@ -136,6 +138,50 @@ def _readonly_db(mig, home):
         return p if mig._table_exists(con, 'work') else None
     except Exception:  # noqa: BLE001
         return None
+    finally:
+        con.close()
+
+
+def _relax_axis_step(bootstrap_dir, home=None):
+    """Baja a 2 la mínima compatible del paso 3 que dejó 7.3.0 (_migrations.relax_axis_step_min_code), para que
+    una sesión abierta con 7.0.0–7.2.x, que lee la mínima tal cual está en la base, la opere desde la primera
+    sesión tras actualizar y no hasta que algún CLI o hook de escritura de este código abra la base. Es la única
+    escritura del arranque: comprueba en solo lectura que la base existe, que no es más nueva que este código y
+    que trae esa fila exacta; si no, no abre la base para escribir. Devuelve True si bajó la fila; un fallo no
+    rompe el arranque (se reintenta en la siguiente conexión)."""
+    own_root = os.path.dirname(bootstrap_dir)
+    try:
+        mig = _load_module(os.path.join(own_root, 'hooks', 'lib', '_migrations.py'), 'neb_migrations_own')
+        relax = mig.relax_axis_step_min_code
+        step, title, old_min = mig._AXIS_STEP_ROW_7_3_0
+    except Exception:  # noqa: BLE001 — un árbol sin la reparación no hace nada
+        return False
+    db = _readonly_db(mig, home or os.path.expanduser('~'))
+    if db is None:
+        return False
+    con = mig.open_readonly(db)
+    if con is None:
+        return False
+    try:
+        v, _f = mig.read_version(con)
+        found = v <= mig.code_version() and con.execute(
+            "SELECT 1 FROM schema_step WHERE step = ? AND min_code = ? AND title = ?",
+            (step, old_min, title)).fetchone() is not None
+    except Exception:  # noqa: BLE001
+        found = False
+    finally:
+        con.close()
+    if not found:
+        return False
+    try:
+        # mode=rw: si la base desapareció entre la lectura y aquí (un restore), no la crea vacía.
+        con = sqlite3.connect(Path(os.path.abspath(db)).as_uri() + '?mode=rw', uri=True, timeout=1.0)
+    except sqlite3.Error:
+        return False
+    try:
+        return bool(relax(con))
+    except Exception:  # noqa: BLE001 — accesorio
+        return False
     finally:
         con.close()
 
@@ -274,6 +320,7 @@ def _guided_notice(bootstrap_dir, home=None):
 def _env_notices(bootstrap_dir, neb_home=None):
     """Avisos sobre el entorno de Neb que Claude debe trasladar al dev. Vacio si todo esta en orden."""
     notices = []
+    _relax_axis_step(bootstrap_dir)
     db = _db_notice(bootstrap_dir, neb_home)
     if db:
         notices.append(db)

@@ -10,6 +10,7 @@ import os
 import re
 import shutil
 import sqlite3
+import stat
 import sys
 from pathlib import Path
 
@@ -22,7 +23,6 @@ import _machine  # noqa: E402
 from _guided import GuidedStep, base_sin_otras_conexiones  # noqa: E402
 
 COMPAS_NAME = "compas.md"
-COMPAS_MAX_BYTES = 1024 * 1024        # compas.md es de unos cientos de bytes; más que esto se revisa a mano
 
 VACUUM_MIN_FREE_BYTES = 1024 * 1024   # menos de 1 MB libre no vale la pena
 VACUUM_MIN_FREE_RATIO = 0.25          # ni menos de una cuarta parte de las páginas
@@ -41,6 +41,15 @@ def _remove_quiet(path):
         os.remove(path)
     except OSError:
         pass
+
+
+def _remove_writable(path):
+    """Borra un temporal que copymode pudo dejar de solo lectura (en Windows no se borraría así)."""
+    try:
+        os.chmod(path, stat.S_IWRITE | stat.S_IREAD)
+    except OSError:
+        pass
+    _remove_quiet(path)
 
 
 # --------------------------------------------------------------------------- compas-proyectos
@@ -114,11 +123,12 @@ def compas_rewrite(text):
 
 
 def _read_compas(path):
-    """Bytes de compas.md, o None si no existe o no es un archivo regular. Lee hasta el tope + 1 byte."""
+    """Bytes de compas.md, o None si no existe o no es un archivo regular. Lo lee completo: desde 7.4.0 no hay
+    tope (en 7.3.0, uno de más de 1 MB quedaba en «manual» para que el dev lo cambiara a mano)."""
     if _machine.is_link(path) or not os.path.isfile(path):
         return None
     with open(path, "rb") as fh:
-        return fh.read(COMPAS_MAX_BYTES + 1)
+        return fh.read()
 
 
 _BOM = b"\xef\xbb\xbf"
@@ -139,7 +149,7 @@ def _detectar_compas(ctx):
         return False
     if raw is None:
         return False
-    data = raw[:COMPAS_MAX_BYTES]
+    data = raw
     if data.startswith(_BOM):
         data = data[len(_BOM):]
     return _compas_sin_migrar(data.decode("utf-8", errors="replace"))
@@ -153,10 +163,6 @@ def _aplicar_compas(ctx):
         return {"estado": "fallo", "detalle": f"no se pudo leer compas.md ({type(e).__name__})"}
     if raw is None:
         return {"estado": "sin-cambio", "detalle": "no hay compas.md"}
-    if len(raw) > COMPAS_MAX_BYTES:
-        return {"estado": "manual",
-                "detalle": "compas.md mide más de 1 MB: revísalo a mano (Clientes: -> Proyectos:, sin Roadmap:, "
-                           "version: 3)"}
     try:
         bom, text = _decode(raw)
     except UnicodeDecodeError:
@@ -166,9 +172,11 @@ def _aplicar_compas(ctx):
     new = bom + compas_rewrite(text).encode("utf-8")
     if new == raw:
         return {"estado": "sin-cambio", "detalle": "compas.md ya está en la forma de 7.3.0"}
-    if not os.access(path, os.W_OK):
-        return {"estado": "fallo", "detalle": "compas.md es de solo lectura: no se tocó; quítale la protección "
-                                              "y vuelve a correr apply --guiados"}
+    # Solo lectura (el atributo de Windows o un modo sin escritura): desde 7.4.0 el paso le quita la protección
+    # justo antes de reemplazarlo y el archivo nuevo la conserva (copymode desde el original), en vez de pedirle
+    # al dev que la quite. Si no se puede quitar (p. ej. una ACL), es un fallo con el original intacto.
+    read_only = not os.access(path, os.W_OK)
+    orig_mode = None
 
     backup = tmp = None
     try:
@@ -181,27 +189,34 @@ def _aplicar_compas(ctx):
             fh.write(new)
             fh.flush()
             os.fsync(fh.fileno())
-        try:
-            shutil.copymode(path, tmp)
-        except OSError:
-            pass
+        shutil.copymode(path, tmp)              # si falla, es fallo: el nuevo perdería permisos o protección
         # Si otra sesión lo reescribió mientras tanto (write-compas), no se pisa su versión.
         if _read_compas(path) != raw:
-            _remove_quiet(tmp)
+            _remove_writable(tmp)
             _remove_quiet(backup)
-            return {"estado": "pendiente", "detalle": "compas.md cambió mientras se migraba: vuelve a correr "
-                                                      "apply --guiados"}
+            return {"estado": "pendiente", "detalle": "compas.md cambió mientras se migraba: se reintenta en "
+                                                      "la siguiente corrida"}
+        if read_only:
+            orig_mode = stat.S_IMODE(os.stat(path).st_mode)
+            os.chmod(path, orig_mode | stat.S_IWRITE)
         os.replace(tmp, path)
         tmp = None
     except OSError as e:
+        if orig_mode is not None:
+            try:
+                os.chmod(path, orig_mode)      # el original vuelve a su protección
+            except OSError:
+                pass
         if tmp:
-            _remove_quiet(tmp)
+            _remove_writable(tmp)
         if backup and os.path.exists(backup):
             _remove_quiet(backup)              # el original quedó intacto: el respaldo no hace falta
         return {"estado": "fallo", "detalle": f"no se pudo reescribir compas.md ({type(e).__name__}): "
                                               f"el original quedó intacto"}
-    return {"respaldo": backup,
-            "detalle": "compas.md pasó a la forma de 7.3.0: Clientes: -> Proyectos:, sin Roadmap:, version: 3"}
+    detalle = "compas.md pasó a la forma de 7.3.0: Clientes: -> Proyectos:, sin Roadmap:, version: 3"
+    if read_only:
+        detalle += "; era de solo lectura y conserva esa protección"
+    return {"respaldo": backup, "detalle": detalle}
 
 
 # --------------------------------------------------------------------------- vacuum-neb-db

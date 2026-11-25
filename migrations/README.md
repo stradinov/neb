@@ -8,6 +8,7 @@ Una versión de Neb que pide algo más que pasos de base (configurar la máquina
 |---|---|---|
 | [7.0.0](7.0.0.md) | `renombrar-base`, `quitar-logbook-settings`, `quitar-endpoint-entorno`, `quitar-token-entorno`, `borrar-respaldos-settings` | Cambia el nombre de la base de `neb-logbook.db` a `neb.db` y quita la configuración del backend central que 7.0.0 retiró: las dos variables de `settings.json` y de las variables de usuario, y los respaldos `settings.json.bak-neb-*` que traen el token |
 | [7.3.0](7.3.0.md) | `compas-proyectos`, `vacuum-neb-db` | Pasa `~/.claude/compas.md` al eje proyecto y sin roadmap (`Clientes:` → `Proyectos:`, sin `Roadmap:`, `version: 3`) y compacta `neb.db` (`VACUUM`): se ofrece cada vez que la base acumula páginas libres (más de una cuarta parte y más de 1 MB) y conserva solo la copia previa más reciente |
+| [7.4.0](7.4.0.md) | `compas-tema-proyecto` | Cambia en «- **Temas:**» de `~/.claude/compas.md` la cita `proyecto` por el slug al que el paso de base 3 movió ese tema (desde 7.4.0 el paso resuelve el choque de slug solo) |
 
 ## Formato
 
@@ -29,7 +30,8 @@ STEPS = [
     GuidedStep("quitar-ejemplo-entorno", "Quitar la variable de usuario NEB_EJEMPLO",
                op="user_env_remove", args={"nombre": "NEB_EJEMPLO"}),
     # Libre: detectar (solo lee) y aplicar propios. respaldo=True si aplicar deja con qué deshacerlo
-    # y devuelve {"respaldo": <ruta>}; exclusivo=True si pide las demás sesiones cerradas.
+    # y devuelve {"respaldo": <ruta>}; exclusivo=True si solo corre sin otra conexión a la base
+    # (si no, queda pendiente y se reintenta; nunca se pide al dev cerrar sesiones).
     GuidedStep("renombrar-algo", "Renombrar algo", detectar=detectar, aplicar=aplicar,
                respaldo=True, exclusivo=True),
 ]

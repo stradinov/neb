@@ -40,6 +40,11 @@ _OBSOLETE_CAUSES = ("no-longer-applies", "resolved-otherwise")
 # Raíces de los ejes curados (topic.parent_id). Son contenedores, NO temas: nunca se sugieren por
 # matching (su `name` tokenizable matchearía "proyecto"/"tópico" en medio corpus) ni se curan.
 AXIS_ROOTS = ("proyecto", "topico")
+# Raíz del eje antes del paso de base 3 (7.3.0): sigue en una base que no lo pasó (p. ej. un paso 2 detenido;
+# el paso 3 tiene `espera`). Ahí 7.4.0 opera degradado: el eje proyecto queda vacío y los hijos de
+# 'cliente' cuentan como temas sin eje. Como raíz (parent_id NULL) tampoco es un tema: no se sugiere y sus
+# sugerencias se ignoran y se borran, igual que las de AXIS_ROOTS. Fuera de la raíz, el slug es libre.
+LEGACY_AXIS_ROOT = "cliente"
 _SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
 _IN_CHUNK = 500   # máximo de parámetros por `IN (...)` (SQLite viejos topan en 999 variables)
 
@@ -309,8 +314,9 @@ def _candidate_topics_fts(con, pending_text):
     rows = con.execute(
         "SELECT f.ref_id, t.keywords, t.name "
         "FROM neb_fts f JOIN topic t ON t.id = f.ref_id "
-        "WHERE f.kind='topic' AND f.body MATCH ? AND t.status='active' AND t.slug NOT IN (?,?)",
-        (match_expr,) + AXIS_ROOTS).fetchall()
+        "WHERE f.kind='topic' AND f.body MATCH ? AND t.status='active' AND t.slug NOT IN (?,?) "
+        "AND NOT (t.slug = ? AND t.parent_id IS NULL)",
+        (match_expr,) + AXIS_ROOTS + (LEGACY_AXIS_ROOT,)).fetchall()
     out = []
     for tid, kw, name in rows:
         score = len(toks & (_topic_tokens(kw) | _match_tokens(name)))
@@ -334,8 +340,9 @@ def _candidate_topics_like(con, pending_text):
         params += [like, like]
     rows = con.execute(
         f"SELECT id, keywords, name FROM topic "
-        f"WHERE status='active' AND slug NOT IN (?,?) AND ({clauses})",
-        list(AXIS_ROOTS) + params).fetchall()
+        f"WHERE status='active' AND slug NOT IN (?,?) AND NOT (slug = ? AND parent_id IS NULL) "
+        f"AND ({clauses})",
+        list(AXIS_ROOTS) + [LEGACY_AXIS_ROOT] + params).fetchall()
     # Verificación exacta por token (evita falsos positivos de substring: 'pedido' vs 'expedido').
     out = []
     for tid, kw, name in rows:
@@ -354,7 +361,8 @@ def _ensure_sentinel(con):
     Devuelve su topic_id. status en INGLES por la decisión de enums; slug/name en español (dominio).
     Sus keywords son vacías, pero su `name` sí participa del matching (FTS indexa keywords+name):
     por eso classify lo EXCLUYE por id de los matches — es destino explícito solo en la rama
-    'sin match'. (Las raíces de AXIS_ROOTS se excluyen por slug en las rutas de candidatos.)"""
+    'sin match'. (Las raíces de AXIS_ROOTS se excluyen por slug en las rutas de candidatos, y la raíz
+    LEGACY_AXIS_ROOT también.)"""
     con.execute(
         "INSERT OR IGNORE INTO topic (slug, name, description, keywords, status) "
         "VALUES (?, 'Sin clasificar', 'Pendientes sin tema inferido (fallback de matching)', '', 'active')",
@@ -390,18 +398,50 @@ def _curated_topic_ids(con, pending_id):
         "WHERE pt.pending_id=? AND pt.curated=1 AND t.status='active'", (pending_id,))]
 
 
+# Ni el sentinel ni una raíz de eje (AXIS_ROOTS por slug; LEGACY_AXIS_ROOT solo como raíz), sobre el alias t.
+# Sus parámetros: _NOT_ROOT_PARAMS.
+_NOT_ROOT_SQL = "t.slug NOT IN (?,?,?) AND NOT (t.slug = ? AND t.parent_id IS NULL)"
 # Sugerencia vigente = fila curated=0 sobre un tema activo que no sea el sentinel ni una raíz.
 _HAS_SUGGESTION_SQL = (
     "EXISTS (SELECT 1 FROM pending_topic pt JOIN topic t ON t.id = pt.topic_id "
     "        WHERE pt.pending_id = p.id AND pt.curated = 0 AND t.status = 'active' "
-    "          AND t.slug NOT IN (?,?,?))"
+    f"          AND {_NOT_ROOT_SQL})"
 )
 # Curado = ≥1 fila curated=1 sobre un tema ACTIVO (ver _curated_topic_ids).
 _HAS_CURATED_SQL = (
     "EXISTS (SELECT 1 FROM pending_topic pt JOIN topic t ON t.id = pt.topic_id "
     "        WHERE pt.pending_id = p.id AND pt.curated = 1 AND t.status = 'active')"
 )
-_NOT_ROOT_PARAMS = (SENTINEL_SLUG,) + AXIS_ROOTS
+_NOT_ROOT_PARAMS = (SENTINEL_SLUG,) + AXIS_ROOTS + (LEGACY_AXIS_ROOT,)
+# Ids de las raíces de eje (parent_id NULL con slug de AXIS_ROOTS o LEGACY_AXIS_ROOT): lo que limpia
+# _drop_root_suggestions. Sus parámetros: _AXIS_ROOT_PARAMS.
+_AXIS_ROOT_PARAMS = AXIS_ROOTS + (LEGACY_AXIS_ROOT,)
+_AXIS_ROOT_IDS_SQL = ("SELECT id FROM topic WHERE parent_id IS NULL AND slug IN "
+                      f"({','.join('?' * len(_AXIS_ROOT_PARAMS))})")
+
+
+def _drop_root_suggestions(con, manage_tx=False):
+    """Borra las sugerencias (curated=0) sobre una raíz de eje (parent_id NULL con slug de AXIS_ROOTS o
+    LEGACY_AXIS_ROOT), de cualquier pendiente; nunca una fila curated=1. Las deja un código anterior que
+    sigue corriendo en una sesión abierta: 7.2.x (raíces 'cliente' y 'topico') no excluye la raíz
+    'proyecto' de sus candidatos y la sugiere como tema. Sin filas así no escribe ni pide candado.
+    manage_tx=True abre su propia transacción corta (reclassify en modo CLI); False: la del caller.
+    Devuelve cuántas borró."""
+    sel = f"SELECT 1 FROM pending_topic WHERE curated=0 AND topic_id IN ({_AXIS_ROOT_IDS_SQL}) LIMIT 1"
+    if con.execute(sel, _AXIS_ROOT_PARAMS).fetchone() is None:
+        return 0
+    if manage_tx:
+        begin_immediate(con)
+    try:
+        n = con.execute(f"DELETE FROM pending_topic WHERE curated=0 AND topic_id IN ({_AXIS_ROOT_IDS_SQL})",
+                        _AXIS_ROOT_PARAMS).rowcount
+        if manage_tx:
+            con.execute("COMMIT")
+        return n
+    except sqlite3.Error:
+        if manage_tx:
+            _safe_rollback(con)
+        raise
 
 
 def _top_matches(con, matches):
@@ -517,7 +557,9 @@ def reclassify(con, since=None, manage_tx=True):
     """Re-sugiere solo el delta: pendings open SIN curaduría que (a) nunca fueron revisados,
     (b) no tienen sugerencia vigente (sus filas quedaron sobre temas archivados o solo en el
     sentinel — así un catálogo nuevo o keywords nuevas sí les llegan), o (c) fueron revisados
-    antes de `since`. Los curados nunca entran al delta."""
+    antes de `since`. Los curados nunca entran al delta. Antes borra las sugerencias sobre raíces de eje
+    (_drop_root_suggestions): un pendiente con otras sugerencias vigentes no entra al delta y la conservaría."""
+    _drop_root_suggestions(con, manage_tx=manage_tx)
     sql = ("SELECT p.id FROM pending p WHERE p.status='open' AND p.archived_at IS NULL "
            f"AND NOT {_HAS_CURATED_SQL} "
            f"AND (p.last_reviewed_at IS NULL OR NOT {_HAS_SUGGESTION_SQL}")
@@ -716,8 +758,9 @@ def parse_compas(home=None):
 # --------------------------------------------------------------------------- lectura por lotes de pending_topic
 
 # Fila de pending_topic JOIN topic (solo temas ACTIVOS) de un pendiente. axis = slug de la raíz
-# ('proyecto' | 'topico') cuando el tema cuelga de un eje curado; None para temas sin raíz.
-_TopicRow = collections.namedtuple("_TopicRow", "slug is_primary axis curated band score topic_id")
+# ('proyecto' | 'topico') cuando el tema cuelga de un eje curado; None para temas sin raíz. axis_root = el tema
+# es una raíz de eje (AXIS_ROOTS, o LEGACY_AXIS_ROOT sin padre): una fila sobre ella no cuenta como sugerencia.
+_TopicRow = collections.namedtuple("_TopicRow", "slug is_primary axis curated band score topic_id axis_root")
 
 
 def _topic_rows(con, pending_ids):
@@ -729,15 +772,16 @@ def _topic_rows(con, pending_ids):
     ids = list(out)
     for i in range(0, len(ids), _IN_CHUNK):
         chunk = ids[i:i + _IN_CHUNK]
-        for pid, slug, prim, root, cur, band, score, tid in con.execute(
+        for pid, slug, prim, root, cur, band, score, tid, top in con.execute(
                 "SELECT pt.pending_id, t.slug, pt.is_primary, r.slug, pt.curated, pt.priority_band, "
-                "pt.priority_score, t.id FROM pending_topic pt "
+                "pt.priority_score, t.id, t.parent_id IS NULL FROM pending_topic pt "
                 "JOIN topic t ON t.id = pt.topic_id "
                 "LEFT JOIN topic r ON r.id = t.parent_id "
                 f"WHERE t.status='active' AND pt.pending_id IN ({','.join('?' * len(chunk))}) "
                 "ORDER BY pt.pending_id, pt.is_primary DESC, t.slug", chunk):
             out[pid].append(_TopicRow(slug, prim, (root if root in AXIS_ROOTS else None),
-                                      cur, band, score, tid))
+                                      cur, band, score, tid,
+                                      slug in AXIS_ROOTS or (slug == LEGACY_AXIS_ROOT and bool(top))))
     return out
 
 
@@ -784,7 +828,7 @@ def _suggested_by_axis(con, pending_id, rows=None):
     out = {axis: [] for axis in AXIS_ROOTS}
     out[None] = []
     sug = [r for r in _rows_for(con, pending_id, rows)
-           if r.curated == 0 and r.slug != SENTINEL_SLUG and r.slug not in AXIS_ROOTS]
+           if r.curated == 0 and r.slug != SENTINEL_SLUG and not r.axis_root]
     sug.sort(key=lambda r: (r.score is None, -(r.score or 0.0), r.slug))
     for r in sug:
         out[r.axis].append((r.slug, r.score))
@@ -992,15 +1036,17 @@ def infer_objectives(con, home=None):
     Salida: {'proposed': [{'name','topics':[...],'suggested_weight'}...], 'reason': str}."""
     compas = parse_compas(home)
     # temas ACTIVOS distintos de los pendings activos, excluyendo el sentinel, las raíces y el eje
-    # proyecto (los proyectos van como bonus, no como objetivo). Temas sin raíz (legado) sí se proponen.
+    # proyecto (los proyectos van como bonus, no como objetivo); también los hijos de la raíz 'cliente' de
+    # una base que no pasó el paso 3 (son proyectos). Temas sin raíz (legado) sí se proponen.
     rows = con.execute(
         "SELECT DISTINCT t.slug FROM pending p "
         "JOIN pending_topic pt ON pt.pending_id = p.id "
         "JOIN topic t ON t.id = pt.topic_id "
         "LEFT JOIN topic r ON r.id = t.parent_id "
         "WHERE p.status='open' AND p.archived_at IS NULL AND t.status='active' "
-        "AND t.slug NOT IN (?,?,?) AND COALESCE(r.slug,'') != 'proyecto'",
-        _NOT_ROOT_PARAMS).fetchall()
+        f"AND {_NOT_ROOT_SQL} AND COALESCE(r.slug,'') != 'proyecto' "
+        "AND NOT (r.slug IS NOT NULL AND r.slug = ? AND r.parent_id IS NULL)",
+        _NOT_ROOT_PARAMS + (LEGACY_AXIS_ROOT,)).fetchall()
     slugs = sorted({r[0] for r in rows})
     # razón: ausencia o cobertura insuficiente (un pending con banda curada no necesita compas)
     if not compas["exists"]:
