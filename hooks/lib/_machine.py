@@ -177,7 +177,8 @@ def settings_env_apply(ctx, claves, secretas=(), ruta=None, allow_no_backup=Fals
     def mutate(data):
         block = data.get("env")
         if not isinstance(block, dict) or any(block.get(k, ut.DELETE) != v for k, v in pairs.items()):
-            raise ValueError("el settings cambió mientras corría el paso; vuelve a correr /neb:migrate")
+            raise ValueError("el settings cambió mientras corría el paso; se reintenta en el siguiente inicio de "
+                             "sesión (o con /neb:migrate)")
         for k in present:
             del block[k]
         return [("env", k, ut.DELETE) for k in present]

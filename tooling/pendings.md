@@ -54,7 +54,7 @@ owner: <usuario>
 - `- **Proyectos:** <slug=+bonus, ...>` (opcional) → **bonus aditivo** por proyecto (eje `proyecto`), `[0,100]`; se suma una sola vez (el mayor bonus entre los proyectos del pendiente) y el total se recorta a 100.
 - Un tema (o proyecto) en >1 objetivo gana el **mayor** peso/bonus (max). No mencionado → 0.
 - `write_compas()` escribe siempre v3 (`PD write-compas` recibe por objetivo `["nombre", peso, ["topico", ...]]` o `["nombre", peso, ["topico", ...], {"<proyecto>": bonus}]`; una lista de 5 elementos, la forma anterior con roadmap, es error).
-- Corte limpio en 7.3.0: el parser no reconoce las líneas `- **Clientes:**` ni `- **Roadmap:**` de v1/v2 (se ignoran sin aviso, y un compas con `Clientes:` pierde sus bonos mientras no se migre). El paso `compas-proyectos` de la migración guiada 7.3.0 (`/neb:migrate`) lo reescribe a v3 con respaldo, y el arranque anuncia la migración mientras esté pendiente.
+- Corte limpio en 7.3.0: el parser no reconoce las líneas `- **Clientes:**` ni `- **Roadmap:**` de v1/v2 (se ignoran sin aviso, y un compas con `Clientes:` pierde sus bonos mientras no se migre). El paso `compas-proyectos` de la migración guiada 7.3.0 lo reescribe a v3 con respaldo; desde 7.5.0 corre solo al iniciar sesión (o con `/neb:migrate`).
 
 El parser **tolera la ausencia** de `compas.md` (degrada a señales intrínsecas). `compas.md` NO se versiona ni se incluye en el repo; este documento es solo su formato y contrato. La plantilla literal la materializa `write_compas()` solo tras OK del dev.
 

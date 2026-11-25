@@ -195,7 +195,7 @@ def _aplicar_compas(ctx):
             _remove_writable(tmp)
             _remove_quiet(backup)
             return {"estado": "pendiente", "detalle": "compas.md cambió mientras se migraba: se reintenta en "
-                                                      "la siguiente corrida"}
+                                                      "el siguiente inicio de sesión"}
         if read_only:
             orig_mode = stat.S_IMODE(os.stat(path).st_mode)
             os.chmod(path, orig_mode | stat.S_IWRITE)
@@ -407,6 +407,14 @@ def _borrar_copias_anteriores(ctx, keep):
             borradas += 1
         except OSError:
             fallidas += 1
+            continue
+        # Desde 7.5.0: una copia cortada a medias (la entrada de migración de SessionStart que la plataforma mató
+        # por su timeout) deja su -journal al lado; se va con ella.
+        for side in ("-journal", "-wal", "-shm"):
+            try:
+                os.remove(entry.path + side)
+            except OSError:
+                pass
     return borradas, fallidas
 
 

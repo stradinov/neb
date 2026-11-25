@@ -1338,7 +1338,7 @@ class TestReparacionMinimaDelPaso3(Base):
         con.close()
 
     def test_critico_status_y_el_arranque_leen_la_minima_2(self):
-        """neb-migrate.py status y el aviso del arranque leen F de la base: tras la reparación, 2, y un árbol
+        """neb-migrate.py status y el aviso de base (de al-iniciar) leen F de la base: tras la reparación, 2, y un árbol
         con la versión de esquema 2 (un clon en 7.2.x) deja de contar como incapaz de operar la base."""
         spec = importlib.util.spec_from_file_location(
             "neb_bootstrap_context_paso3", os.path.join(NEB_ROOT, "bootstrap", "neb-bootstrap-context.py"))
@@ -1367,15 +1367,22 @@ class TestReparacionMinimaDelPaso3(Base):
         self.assertEqual((st["schema_version_db"], st["min_compatible_db"], st["estado"]), (3, 2, "al-dia"))
         self.assertIsNone(nb._db_notice(bootstrap_dir, clone, home=self.home))
 
-    def test_critico_los_avisos_del_arranque_corren_la_reparacion(self):
-        """_env_notices (lo que inyecta SessionStart) baja la fila antes de leer: la primera sesión con este código
-        deja operar la base a las sesiones abiertas con 7.0.0–7.2.x, sin esperar a un CLI o hook de escritura."""
+    def test_critico_al_iniciar_corre_la_reparacion(self):
+        """La entrada de migración de SessionStart (`neb-migrate.py al-iniciar`, desde 7.5.0; antes, las partes del
+        arranque) baja la fila: la primera sesión con este código deja operar la base a las sesiones abiertas con
+        7.0.0–7.2.x, sin esperar a un CLI o hook de escritura. Las partes ya no la bajan."""
         spec = importlib.util.spec_from_file_location(
             "neb_bootstrap_context_paso3c", os.path.join(NEB_ROOT, "bootstrap", "neb-bootstrap-context.py"))
         nb = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(nb)
         self.migrada_por_7_3_0()
-        nb._env_notices(os.path.join(NEB_ROOT, "bootstrap"), None)
+        with mock.patch.object(os.path, "expanduser", lambda p: self.home if p == "~" else p):
+            nb._env_notices(os.path.join(NEB_ROOT, "bootstrap"), None)
+        self.assertEqual(self.raw_min_code(), 3, "las partes no escriben")
+        with mock.patch.dict(os.environ), contextlib.redirect_stdout(io.StringIO()),                 contextlib.redirect_stderr(io.StringIO()):
+            for k in ("CLAUDE_PROJECT_DIR", "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION"):
+                os.environ.pop(k, None)
+            self.assertEqual(NM.al_iniciar(self.home), 0)
         self.assertEqual(self.raw_min_code(), 2)
 
     def test_el_arranque_no_escribe_sin_la_fila_ni_sobre_una_base_mas_nueva(self):

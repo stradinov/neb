@@ -286,8 +286,9 @@ class UnmigratedDb(DbUnavailable):
     def __init__(self, detalle, comando):
         super().__init__(
             "base-sin-migrar", detalle,
-            "abre una sesión nueva de Claude y corre `/neb:migrate`: su paso 7.0.0:renombrar-base cambia el "
-            "nombre de la base (si otra sesión la tiene abierta, queda para la siguiente corrida)")
+            "el siguiente inicio de sesión de Claude le cambia el nombre solo (paso 7.0.0:renombrar-base, con "
+            "respaldo); para hacerlo ya, corre `/neb:migrate` (si otra sesión la tiene abierta, queda para el "
+            "siguiente inicio de sesión)")
         self.comando = comando
 
     def to_dict(self):

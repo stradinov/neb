@@ -63,7 +63,7 @@ def main():
     try:
         con = _open_db(home_dir)                       # esquema del árbol de este módulo, nunca el de NEB_HOME
     except DbUnavailable as e:
-        # El stderr del hook se descarta: lo hacen visible el arranque y `neb-migrate.py status`.
+        # El stderr del hook se descarta: lo hacen visible el aviso de migración del inicio de sesión (al-iniciar) y `neb-migrate.py status`.
         print(f"[logbook] captura omitida ({e.motivo}): {e.detalle}", file=sys.stderr)
         return
     if con is None:

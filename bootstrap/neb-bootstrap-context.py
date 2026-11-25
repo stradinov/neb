@@ -9,7 +9,8 @@ additionalContext de la sesion.
 La plataforma topa cada salida de hook en 10,000 caracteres: arriba de eso, Claude recibe
 solo un adelanto y la ruta de un archivo (supuesto R1 de methodology/platform-assumptions.md).
 Por eso hooks/hooks.json registra MAX_PARTS entradas por matcher (startup, clear, compact) y cada una emite una parte del arranque,
-de LIMIT unidades UTF-16 o menos, con la cabecera «parte k de n · huella».
+de LIMIT unidades UTF-16 o menos, con la cabecera «parte k de n · huella». Las partes no miran la base: en startup y
+clear, una entrada más (`neb-migrate.py al-iniciar`, desde 7.5.0) corre la migración y emite su propio aviso.
 
 Uso:
   neb-bootstrap-context.py                          el arranque completo, sin partes (pruebas, diagnostico)
@@ -145,8 +146,8 @@ def _readonly_db(mig, home):
 def _relax_axis_step(bootstrap_dir, home=None):
     """Baja a 2 la mínima compatible del paso 3 que dejó 7.3.0 (_migrations.relax_axis_step_min_code), para que
     una sesión abierta con 7.0.0–7.2.x, que lee la mínima tal cual está en la base, la opere desde la primera
-    sesión tras actualizar y no hasta que algún CLI o hook de escritura de este código abra la base. Es la única
-    escritura del arranque: comprueba en solo lectura que la base existe, que no es más nueva que este código y
+    sesión tras actualizar y no hasta que algún CLI o hook de escritura de este código abra la base. Desde 7.5.0
+    la llama `neb-migrate.py al-iniciar` con el candado entre corridas, no las partes del arranque: comprueba en solo lectura que la base existe, que no es más nueva que este código y
     que trae esa fila exacta; si no, no abre la base para escribir. Devuelve True si bajó la fila; un fallo no
     rompe el arranque (se reintenta en la siguiente conexión)."""
     own_root = os.path.dirname(bootstrap_dir)
@@ -247,86 +248,14 @@ def _db_notice(bootstrap_dir, neb_home=None, home=None):
     return text
 
 
-GUIDED_NOTICE_MAX = 900  # unidades UTF-16 del aviso de migración guiada pendiente, con su envoltura
-GUIDED_NOTICE = (
-    "Hay una migración guiada de Neb pendiente (%s): %s. No la inicies por tu cuenta en esta sesión, salvo que se "
-    "haya abierto con `/neb:migrate` o el dev lo pida. Si hay una persona presente, al cierre de tu primera respuesta "
-    "y una sola vez por conversación ofrécele abrirla en una sesión nueva: con la herramienta de tu entorno para "
-    "proponer una sesión, con el encargo «Corre la migración guiada pendiente de neb con /neb:migrate»; si tu "
-    "entorno no la trae, dale el comando `claude \"/neb:migrate\"`.")
-GUIDED_BROKEN_NOTICE = (
-    "Una migración guiada de Neb no carga o su detección falla (%s): %s. No hay nada que correr ni que ofrecer; "
-    "díselo al dev en una línea al cierre de tu primera respuesta (lo detalla `neb-migrate.py status`): lo "
-    "corrige una versión de neb, o el dev responde «No aplicarlo» a un paso cuya detección falla en `/neb:migrate`.")
-_SEMVER_RE = re.compile(r'^\d+\.\d+\.\d+$')
-
-
-def _guided_notice(bootstrap_dir, home=None):
-    """Aviso de migración guiada pendiente (pasos guiados de su propio árbol que la detección marca y el dev
-    no omitió), o None. Solo lee: la base en mode=ro y la detección de cada paso. Un `migrations/<versión>.py`
-    que no carga, o un paso cuya detección falla, no rompe el arranque y se cuenta en el aviso: si callara, sus
-    pasos nunca correrían."""
-    own_root = os.path.dirname(bootstrap_dir)
-    lib = os.path.join(own_root, 'hooks', 'lib')
-    if not os.path.isdir(os.path.join(own_root, 'migrations')):
-        return None
-    try:
-        if lib not in sys.path:
-            sys.path.insert(0, lib)              # _guided importa _machine de su carpeta
-        guided = _load_module(os.path.join(lib, '_guided.py'), 'neb_guided_own')
-        migrations, load_errors = guided.load(own_root)
-        if not migrations and not load_errors:
-            return None
-        mig = _load_module(os.path.join(lib, '_migrations.py'), 'neb_migrations_own')
-        home = home or os.path.expanduser('~')
-        db = _readonly_db(mig, home)
-        skips = set()
-        if db:
-            con = mig.open_readonly(db)
-            if con is not None:
-                try:
-                    skips = guided.read_skips(con)
-                finally:
-                    con.close()
-        rows = guided.survey(guided._machine.Ctx(home, db_path=db), migrations, skips)
-    except (Exception, SystemExit):  # noqa: BLE001 — el aviso es accesorio; sin los omitidos, tampoco avisa
-        return None
-    pending = [r for r in rows if not r['omitido'] and not r['error'] and r['clase']]
-    broken = [r['version'] for r in rows if not r['omitido'] and r['error']]
-    broken += [os.path.splitext(a)[0] for a, _m in load_errors]
-    if not pending and not broken:
-        return None
-    versions = []
-    for v in [r['version'] for r in pending] + broken:
-        if _SEMVER_RE.match(v) and v not in versions:
-            versions.append(v)
-    n = len(pending)
-    parts = []
-    if n:
-        parts.append('1 paso que pide configurar la máquina' if n == 1
-                     else '%d pasos que piden configurar la máquina' % n)
-    if broken:
-        parts.append('%d que no carga o cuya detección falla (lo detalla `neb-migrate.py status`)' % len(broken))
-    count = '; '.join(parts)
-    template = GUIDED_NOTICE if n else GUIDED_BROKEN_NOTICE      # solo algo roto: una sesión no podría correr nada
-    for k in range(len(versions), 0, -1):
-        shown = ', '.join('`%s`' % v for v in versions[:k]) + ('' if k == len(versions) else ', …')
-        text = template % (shown, count)
-        if _u16(ENV_NOTICE % text) <= GUIDED_NOTICE_MAX:
-            return text
-    return None
-
-
 def _env_notices(bootstrap_dir, neb_home=None):
-    """Avisos sobre el entorno de Neb que Claude debe trasladar al dev. Vacio si todo esta en orden."""
+    """Avisos sobre el entorno de Neb que Claude debe trasladar al dev. Vacio si todo esta en orden. No abre la
+    base ni detecta pasos guiados (eso es de `neb-migrate.py al-iniciar`, desde 7.5.0)."""
+    # La base no se mira aquí (desde 7.5.0): la entrada de migración de SessionStart (`neb-migrate.py
+    # al-iniciar`) baja la mínima del paso 3 (_relax_axis_step), corre los pasos y emite el aviso de base
+    # (_db_notice) y el de la migración guiada. Las partes dependen solo de archivos y entorno: una migración
+    # en curso no puede cambiar su texto ni partir la huella.
     notices = []
-    _relax_axis_step(bootstrap_dir)
-    db = _db_notice(bootstrap_dir, neb_home)
-    if db:
-        notices.append(db)
-    guided = _guided_notice(bootstrap_dir)
-    if guided:
-        notices.append(guided)
     stale = stale_neb_home()
     if stale:
         notices.append(
@@ -423,7 +352,7 @@ def _intro(neb_home):
         "# Arranque de Neb (inyectado por el plugin)\n\n"
         "Lo que sigue son las instrucciones operativas de la metodología Neb. Aplican "
         "desde el primer prompt de esta sesión y tienen prioridad, igual que un CLAUDE.md "
-        "de proyecto. Llegan en varias partes, una por entrada del hook, y pueden llegar en otro "
+        "de proyecto. Llegan en varias partes, cada una de su propia entrada del hook, y pueden llegar en otro "
         "orden: cada parte abre con «parte k de n» y la misma huella; si falta una parte o las "
         "huellas no coinciden, avisa al dev. La metodología completa vive en NEB_HOME (`%s`); "
         "los links apuntan a rutas absolutas: léelos con Read on-demand cuando necesites una sección.\n"

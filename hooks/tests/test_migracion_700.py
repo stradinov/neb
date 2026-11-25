@@ -141,7 +141,9 @@ class Base(unittest.TestCase):
             return json.load(fh)["env"]
 
     def files(self):
-        return sorted(os.listdir(self.claude))
+        # El candado entre corridas (.neb-migrate.lock, desde 7.5.0) es un archivo vacío que no es base ni
+        # respaldo: lo que estas pruebas cuidan es que no aparezca neb.db junto a la base vieja.
+        return sorted(n for n in os.listdir(self.claude) if n != _guided.LOCK_NAME)
 
     def pending(self):
         g = nm.status(self.home)["guiados"]
@@ -162,12 +164,47 @@ class TestRenombrarBase(Base):
     def test_si_la_base_renombrada_no_abre_el_reporte_conserva_los_guiados(self):
         self.legacy_645(rows=2)
         err = {"ok": False, "motivo": "sin-conexion", "detalle": "x", "accion": "y"}
-        with mock.patch.object(nm, "_open_for_apply", lambda db: (None, err)):
+        with mock.patch.object(nm, "_open_for_apply", lambda db, retry=True: (None, err)):
             rc, out, _raw = self.apply()
         self.assertEqual(rc, 1)
         self.assertEqual(out["motivo"], "sin-conexion")
         r = self.by_id(out["guiados"])["aplicados"]["renombrar-base"]
         self.assertTrue(r["respaldo"])
+
+    def al_iniciar(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc = nm.al_iniciar(self.home)
+        self.assertEqual(rc, 0)
+        return out.getvalue()
+
+    def test_critico_al_iniciar_cambia_el_nombre_y_corren_los_pasos_de_base(self):
+        # Flujo 4(a): al-iniciar sigue el orden de apply --guiados: renombrar-base primero y, en la misma
+        # corrida, los pasos de base sobre la base ya renombrada.
+        self.legacy_645(rows=2)
+        text = self.al_iniciar()
+        self.assertIn("`7.0.0:renombrar-base`", text)
+        self.assertFalse(os.path.exists(self.legacy))
+        self.assertEqual(nm.status(self.home)["schema_version_db"], _migrations.SCHEMA_VERSION)
+
+    def test_al_iniciar_con_el_presupuesto_vencido_deja_los_pasos_de_base(self):
+        # El presupuesto vence justo después de los pasos guiados: el cambio de nombre corrió y el bloque de pasos
+        # de base queda para el siguiente inicio de sesión, que lo corre.
+        self.legacy_645(rows=2)
+        vencido = []
+        real = nm._apply_guided
+
+        def guided(*a, **k):
+            out = real(*a, **k)
+            vencido.append(True)
+            return out
+        with mock.patch.object(nm, "_apply_guided", guided), \
+                mock.patch.object(nm, "_past", lambda deadline: deadline is not None and bool(vencido)):
+            self.al_iniciar()
+        self.assertFalse(os.path.exists(self.legacy))
+        self.assertLess(nm.status(self.home)["schema_version_db"], _migrations.SCHEMA_VERSION)
+        self.al_iniciar()
+        self.assertEqual(nm.status(self.home)["schema_version_db"], _migrations.SCHEMA_VERSION)
 
     def test_critico_apply_guiados_cambia_el_nombre_y_corren_los_pasos_de_base(self):
         self.legacy_645(rows=2)

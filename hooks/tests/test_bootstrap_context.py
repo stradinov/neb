@@ -409,10 +409,11 @@ class TestAvisoActualizacion(unittest.TestCase):
 
 
 class TestAvisoBaseSinMigrar(unittest.TestCase):
-    """La base con el nombre anterior a 7.0.0 se avisa como migración guiada pendiente (el paso
-    7.0.0:renombrar-base); el arranque no crea neb.db ni abre la base vieja, ni en solo lectura."""
+    """La base con el nombre anterior a 7.0.0: las partes del arranque no la miran ni la avisan (desde 7.5.0), no
+    crean neb.db ni abren la base vieja, ni en solo lectura; la entrada de migración de SessionStart
+    (`neb-migrate.py al-iniciar`) corre el paso 7.0.0:renombrar-base, que deja respaldo, y lo reporta."""
 
-    AVISO = "Hay una migración guiada de Neb pendiente (`7.0.0`): 1 paso que pide configurar la máquina"
+    AVISO = "migración guiada de Neb"
 
     def setUp(self):
         self.home_env = _tmp_home(self)
@@ -438,16 +439,31 @@ class TestAvisoBaseSinMigrar(unittest.TestCase):
     def _carpeta(self):
         return sorted(os.listdir(self.base))
 
-    def test_critico_con_solo_la_base_vieja_avisa_la_migracion_guiada(self):
+    def test_critico_las_partes_no_miran_la_base_vieja(self):
         self._base(self.legacy)
         st = os.stat(self.legacy)
         out = self._out()
-        self.assertIn(self.AVISO, out)
-        self.assertIn("/neb:migrate", out)
+        self.assertNotIn(self.AVISO, out)
+        self.assertNotIn("/neb:migrate", out)
         self.assertNotIn("La bitácora sigue con el nombre anterior", out)
         self.assertEqual(self._carpeta(), ["neb-logbook.db"])
         st2 = os.stat(self.legacy)
         self.assertEqual((st.st_size, st.st_mtime_ns), (st2.st_size, st2.st_mtime_ns))
+
+    def test_critico_al_iniciar_renombra_la_base_vieja(self):
+        self._base(self.legacy)
+        e = {k: v for k, v in os.environ.items() if k not in CLEAN}
+        e["NEB_HOME"] = NEB
+        e.update(self.home_env)
+        r = subprocess.run([sys.executable, os.path.join(NEB, "bootstrap", "neb-migrate.py"), "al-iniciar"],
+                           env=e, capture_output=True, timeout=120)
+        self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8"))
+        out = r.stdout.decode("utf-8")
+        self.assertIn("`7.0.0:renombrar-base`", out)
+        self.assertIn("aplicó al iniciar la sesión", out)
+        self.assertNotIn("sesión nueva", out)
+        self.assertTrue(os.path.isfile(self.target))
+        self.assertFalse(os.path.exists(self.legacy))
 
     def test_sin_la_base_vieja_no_avisa(self):
         self._base(self.target)
@@ -468,7 +484,8 @@ class TestAvisoBaseSinMigrar(unittest.TestCase):
                 with mock.patch.dict(os.environ, self.home_env), mock.patch("sqlite3.connect", espia):
                     notices = nb._env_notices(os.path.join(NEB, "bootstrap"))
                 self.assertFalse([p for p in abiertos if "neb-logbook" in p], abiertos)
-                self.assertEqual(any(self.AVISO in n for n in notices), not neb_db, notices)
+                self.assertFalse(abiertos, "las partes no abren ninguna base (7.5.0)")
+                self.assertFalse(any(self.AVISO in n for n in notices), notices)
 
     def test_base_vieja_vacia_no_avisa(self):
         open(self.legacy, "wb").close()

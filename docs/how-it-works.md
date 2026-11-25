@@ -86,7 +86,8 @@ El resto del contenido se carga on-demand según lo que el contexto requiera.
 
 La plataforma topa cada salida de hook en 10,000 caracteres; arriba de eso, Claude
 solo ve un adelanto. Por eso el plugin registra 12 entradas `SessionStart` para cada
-evento (al iniciar, tras `/clear` y al compactar). El arranque sale en tantas partes como
+evento (al iniciar, tras `/clear` y al compactar), más una al iniciar y tras `/clear` que corre la migración
+guiada (desde 7.5.0). El arranque sale en tantas partes como
 necesite, hasta 12, cada una con la cabecera «parte k de n · huella»; las entradas
 que sobran no emiten nada. Un gate del pre-push bloquea publicar un núcleo que no
 quepa.

@@ -6,7 +6,9 @@
   • el placeholder va entre comillas y la cadena de intérpretes es `python … || python3 …`
   • timeouts: notify-* 10 s, preprocess-prompt 35 s (su `claude -p` interno es de 30 s)
   • el SessionStart: un grupo por matcher (`startup`, `clear`, `compact`), cada uno con una entrada
-    `--part k` por parte del arranque (MAX_PARTS de bootstrap/neb-bootstrap-context.py), sin repetidos
+    `--part k` por parte del arranque (MAX_PARTS de bootstrap/neb-bootstrap-context.py), sin repetidos ni
+    `timeout`; y, solo en `startup` y `clear`, al final, la entrada de migración (`neb-migrate.py al-iniciar`,
+    7.5.0) con `timeout` 60 y la misma cadena de intérpretes
   • el gate en un shell real: unión de NEB_HOOKS y NEB_PROJECT_HOOKS, sin falsos positivos por
     prefijo, stdin íntegro hasta el script
 
@@ -45,6 +47,8 @@ GATE_RE = re.compile(
     r'python3 "\$\{CLAUDE_PLUGIN_ROOT\}/hooks/neb-hook\.py" (?P<a2>[a-z-]+) ;; esac$')
 BOOTSTRAP_PART = ('python "${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py" --part %d || '
                   'python3 "${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-bootstrap-context.py" --part %d')
+AL_INICIAR = ('python "${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-migrate.py" al-iniciar || '
+              'python3 "${CLAUDE_PLUGIN_ROOT}/bootstrap/neb-migrate.py" al-iniciar')
 
 sys.path.insert(0, HERE)
 from test_neb_root import BASH  # noqa: E402 — bash como lo resuelve Claude Code (Git Bash en Windows)
@@ -103,10 +107,19 @@ class TestEstructura(unittest.TestCase):
         ss = self.hooks["SessionStart"]
         self.assertEqual([g["matcher"] for g in ss], ["startup", "clear", "compact"])
         for g in ss:
-            cmds = [h["command"] for h in g["hooks"]]
+            hooks = list(g["hooks"])
+            # La entrada de migración (7.5.0): última, solo en startup y clear (en compact solo repetiría a media
+            # sesión lo que ya intentó el startup), con timeout 60 (supuesto R31: al vencer, la plataforma mata
+            # la entrada y su hijo sin entregar salida).
+            if g["matcher"] in ("startup", "clear"):
+                last = hooks.pop()
+                self.assertEqual(last["command"], AL_INICIAR, g["matcher"])
+                self.assertEqual(last["type"], "command")
+                self.assertEqual(last.get("timeout"), 60)
+            cmds = [h["command"] for h in hooks]
             self.assertEqual(cmds, [BOOTSTRAP_PART % (k, k) for k in range(1, nb.MAX_PARTS + 1)], g["matcher"])
             self.assertEqual(len(set(cmds)), len(cmds))
-            for h in g["hooks"]:
+            for h in hooks:
                 self.assertEqual(h["type"], "command")
                 self.assertNotIn("timeout", h)
 

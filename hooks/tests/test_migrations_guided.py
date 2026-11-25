@@ -11,8 +11,10 @@ Con una migración de prueba en un árbol temporal (fixture):
   • un paso `exclusivo` con otra conexión abierta no hace nada y queda pendiente con su motivo;
   • `skip` y su efecto; `--include` de un omitido lo corre y borra el «no»; un paso aplicado cuyo estado
     vuelve se detecta otra vez;
-  • aviso del arranque: aparece con lo pendiente, no con lo omitido ni sin pendientes, cabe en su tope, y un
-    archivo roto no lo rompe.
+  • `al-iniciar` (7.5.0): corre lo que deja respaldo y lo reporta; encarga el menú en la sesión para lo que
+    pide al dev (también sin el candado), no con lo omitido ni sin pendientes; candado entre corridas (dos a la
+    vez: una sola aplica; un proceso muerto lo libera); ventana de exclusivos; presupuesto; sale con 0 ante una
+    excepción; `neb: skip`; tope de la salida; apply/skip/restore con el candado tomado: migracion-en-curso.
 
 Homes temporales; nunca ~/.claude ni el registro real.
   py -m unittest discover -s hooks/tests -p test_migrations_guided.py
@@ -480,7 +482,7 @@ class TestApply(Base):
         finally:
             other.close()
         self.assertEqual(self.ids(out["guiados"]["pendientes"]), ["exclusivo"])
-        self.assertIn("se reintenta en la siguiente corrida", out["guiados"]["pendientes"][0]["detalle"])
+        self.assertIn("se reintenta en el siguiente inicio de sesión", out["guiados"]["pendientes"][0]["detalle"])
         self.assertNotIn("cierra", out["guiados"]["pendientes"][0]["detalle"], "nunca pide cerrar sesiones")
         self.assertTrue(os.path.exists(os.path.join(self.claude, "excl.txt")))
         self.assertFalse(os.path.exists(os.path.join(self.claude, "excl.txt.bak")))
@@ -740,98 +742,422 @@ class TestApply(Base):
         self.assertEqual(self.journal_mode(), "wal")
 
 
-class TestAvisoGuiado(Base):
+class TestAlIniciar(Base):
+    """`neb-migrate.py al-iniciar`, la entrada de migración de SessionStart (7.5.0)."""
 
     def setUp(self):
         super().setUp()
-        # Árbol de prueba con su bootstrap/ y su hooks/: el aviso usa las migraciones de su propio árbol.
+        # Árbol de prueba con su bootstrap/ y su hooks/: al-iniciar carga el arranque y las migraciones de su árbol.
         os.makedirs(os.path.join(self.tree, "bootstrap"))
+        shutil.copyfile(os.path.join(NEB, "bootstrap", "neb-bootstrap-context.py"),
+                        os.path.join(self.tree, "bootstrap", "neb-bootstrap-context.py"))
         shutil.copytree(os.path.join(NEB, "hooks", "lib"), os.path.join(self.tree, "hooks", "lib"),
                         ignore=shutil.ignore_patterns("__pycache__"))
         shutil.copyfile(os.path.join(NEB, "hooks", "logbook-schema.sql"),
                         os.path.join(self.tree, "hooks", "logbook-schema.sql"))
-        self.bootstrap = os.path.join(self.tree, "bootstrap")
+        for k in ("CLAUDE_PROJECT_DIR", "NEB_HOME", "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION"):
+            os.environ.pop(k, None)
 
-    def notice(self):
-        return nb._guided_notice(self.bootstrap, home=self.home)
+    def run_al_iniciar(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc = nm.al_iniciar(self.home)
+        self.assertEqual(rc, 0)
+        return out.getvalue()
 
-    def test_sin_pendientes_no_avisa(self):
-        self.assertIsNone(self.notice())
+    def lock(self):
+        fd = _guided.try_lock(_guided.lock_path(_machine.Ctx(self.home, db_path=self.db)))
+        self.assertIsNotNone(fd)
+        self.addCleanup(_guided.unlock, fd)
+        return fd
 
-    def test_aviso_con_lo_pendiente(self):
+    def exists(self, name):
+        return os.path.exists(os.path.join(self.claude, name))
+
+    def test_sin_pendientes_no_dice_nada(self):
+        self.assertEqual(self.run_al_iniciar(), "")
+
+    def test_critico_corre_lo_que_tiene_respaldo_y_encarga_el_menu(self):
         self.touch("libre.txt")
         self.touch("dev.txt")
-        text = self.notice()
-        self.assertIn("`%s`" % V, text)
-        self.assertIn("2 pasos que piden configurar la máquina", text)
-        self.assertIn("/neb:migrate", text)
-        self.assertIn("No la inicies por tu cuenta", text)
-        self.assertLessEqual(nb._u16(nb.ENV_NOTICE % text), nb.GUIDED_NOTICE_MAX)
-        self.assertEqual(text, self.notice())                        # mismo texto en dos corridas
+        self.settings({"NEB_PRUEBA_A": "1"})
+        text = self.run_al_iniciar()
+        self.assertFalse(self.exists("libre.txt"))                   # corrió solo, con su respaldo
+        self.assertTrue(self.exists("libre.txt.bak"))
+        self.assertNotIn("NEB_PRUEBA_A", self.settings_env())
+        self.assertTrue(self.exists("dev.txt"), "lo que pide al dev no corre solo")
+        self.assertIn("aplicó al iniciar la sesión", text)
+        self.assertIn("`%s:libre-respaldo`" % V, text)
+        self.assertIn("`%s:settings-solo`" % V, text)
+        self.assertIn("`%s:libre-dev`" % V, text)                    # el encargo del menú
+        self.assertIn("pasos 1, 2, 4 y 5 (el 3 ya lo corrió el inicio de sesión) de `", text)
+        self.assertIn("/commands/migrate.md`", text)
+        self.assertIn("No ofrezcas abrir otra sesión", text)
+        self.assertNotIn("\r", text)
+        self.assertIn("no es una parte del arranque", text)
+        self.assertLessEqual(nm._u16(text), nm.AL_INICIAR_MAX)
 
-    def test_un_solo_paso_en_singular(self):
-        self.touch("libre.txt")
-        self.assertIn("1 paso que pide configurar", self.notice())
-
-    def test_lo_omitido_no_avisa(self):
+    def test_lo_omitido_no_se_encarga(self):
         self.touch("dev.txt")
         self.skip(V + ":libre-dev")
-        self.assertIsNone(self.notice())
+        self.assertEqual(self.run_al_iniciar(), "")
 
-    def test_no_crea_la_base(self):
-        for s in ("", "-wal", "-shm"):
-            if os.path.exists(self.db + s):
-                os.remove(self.db + s)
+    def test_critico_sin_candado_no_corre_pero_encarga_el_menu(self):
         self.touch("libre.txt")
-        self.assertIsNotNone(self.notice())
-        self.assertEqual([n for n in os.listdir(self.claude) if n.startswith("neb")], [])
+        self.touch("dev.txt")
+        self.lock()                                                  # otra corrida lo tiene
+        text = self.run_al_iniciar()
+        self.assertTrue(self.exists("libre.txt"), "sin el candado no corre nada")
+        self.assertNotIn("aplicó", text)
+        self.assertIn("`%s:libre-dev`" % V, text, "el encargo sale aunque no tome el candado: solo lee")
 
-    def test_archivo_roto_no_rompe_el_arranque(self):
-        self.write_migration("9.9.8", "raise RuntimeError('rota')\n")
+    def test_critico_apply_skip_y_restore_con_el_candado_tomado(self):
         self.touch("libre.txt")
-        text = self.notice()
-        self.assertIn("1 paso", text)
-        self.assertIn("1 que no carga", text)
-        self.assertNotIn("rota", text)
-        os.remove(os.path.join(self.tree, "hooks", "lib", "_guided.py"))
-        self.assertIsNone(self.notice())
+        self.lock()
+        rc, out = self.apply()
+        self.assertEqual((rc, out["motivo"]), (1, "migracion-en-curso"))
+        self.assertTrue(self.exists("libre.txt"))
+        rc, out = self.skip(V + ":libre-dev")
+        self.assertEqual((rc, out["motivo"]), (1, "migracion-en-curso"))
+        buf = io.StringIO()
+        with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
+            rc = nm.restore(self.home, os.path.join(self.claude, "neb-backups", "neb.pre-paso-1.20260101T000000Z.db"))
+        self.assertEqual((rc, json.loads(buf.getvalue())["motivo"]), (1, "migracion-en-curso"))
 
-    def test_lo_que_no_carga_avisa_aunque_no_haya_pendientes(self):
-        # Si callara, los pasos de esa versión nunca correrían y nadie lo sabría.
-        os.remove(os.path.join(self.tree, "migrations", V + ".py"))
-        self.write_migration("9.9.8", "def f(:\n")
-        text = self.notice()
-        self.assertIsNotNone(text)
-        self.assertIn("`9.9.8`", text)
-        self.assertIn("1 que no carga o cuya detección falla", text)
-        self.assertNotIn("paso que pide", text)
-        self.assertIn("No hay nada que correr", text)                # sin oferta de una sesión que nada podría correr
-        self.assertNotIn("sesión nueva", text)
-        self.assertLessEqual(nb._u16(nb.ENV_NOTICE % text), nb.GUIDED_NOTICE_MAX)
+    def test_critico_un_proceso_muerto_libera_el_candado(self):
+        import subprocess
+        import time as _t
+        path = _guided.lock_path(_machine.Ctx(self.home, db_path=self.db))
+        code = ("import sys, time; sys.path.insert(0, %r); import _guided\n"
+                "fd = _guided.try_lock(%r); print('tomado' if fd is not None else 'ocupado', flush=True)\n"
+                "time.sleep(60)\n") % (os.path.join(NEB, "hooks", "lib"), path)
+        p = subprocess.Popen([sys.executable, "-c", code], stdout=subprocess.PIPE, text=True)
+        try:
+            self.assertEqual(p.stdout.readline().strip(), "tomado")
+            self.assertIsNone(_guided.try_lock(path), "lo tiene el otro proceso")
+            p.kill()                                                 # TerminateProcess en Windows, SIGKILL fuera
+            p.wait(30)
+        finally:
+            if p.poll() is None:
+                p.kill()
+            p.stdout.close()
+        fd = None
+        for _ in range(20):
+            fd = _guided.try_lock(path)
+            if fd is not None:
+                break
+            _t.sleep(0.1)
+        self.assertIsNotNone(fd, "el sistema libera el candado al morir el proceso")
+        _guided.unlock(fd)
 
-    def test_detección_que_falla_avisa(self):
+    def test_critico_dos_al_iniciar_a_la_vez_aplican_una_sola_vez(self):
+        import subprocess
+        import threading
+        self.write_migration("9.9.11", textwrap.dedent('''
+            import os, shutil, time
+            from _guided import GuidedStep
+
+            def _det(ctx):
+                return os.path.exists(os.path.join(ctx.claude_dir, "lento.txt"))
+
+            def _apl(ctx):
+                with open(os.path.join(ctx.claude_dir, "cuenta.txt"), "a") as fh:
+                    fh.write("x")
+                time.sleep(1.5)
+                bak = os.path.join(ctx.claude_dir, "lento.txt.bak-%d" % os.getpid())
+                shutil.move(os.path.join(ctx.claude_dir, "lento.txt"), bak)
+                return {"respaldo": bak}
+
+            STEPS = [GuidedStep("lento", "Paso lento", detectar=_det, aplicar=_apl, respaldo=True)]
+        '''))
+        # Como lo correría la plataforma: el script del árbol de prueba en dos procesos a la vez.
+        shutil.copyfile(os.path.join(NEB, "bootstrap", "neb-migrate.py"),
+                        os.path.join(self.tree, "bootstrap", "neb-migrate.py"))
+        shutil.copyfile(os.path.join(NEB, "VERSION"), os.path.join(self.tree, "VERSION"))
+        self.touch("lento.txt")
+        env = dict(os.environ, HOME=self.home, USERPROFILE=self.home)
+        script = os.path.join(self.tree, "bootstrap", "neb-migrate.py")
+        results = []
+
+        def correr():
+            r = subprocess.run([sys.executable, script, "al-iniciar"], env=env, capture_output=True, timeout=120)
+            results.append(r)
+        hilos = [threading.Thread(target=correr) for _ in range(2)]
+        for h in hilos:
+            h.start()
+        for h in hilos:
+            h.join()
+        self.assertEqual([r.returncode for r in results], [0, 0], [r.stderr for r in results])
+        with open(os.path.join(self.claude, "cuenta.txt"), encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), "x", "un solo proceso corrió el paso")
+        self.assertFalse(self.exists("lento.txt"))
+
+    def test_critico_exclusivo_reintenta_dentro_de_la_ventana(self):
+        import threading
+        self.touch("excl.txt")
+        other = sqlite3.connect(self.db, check_same_thread=False)
+        other.execute("SELECT count(*) FROM work").fetchone()
+        t = threading.Timer(1.0, other.close)                        # la otra conexión se va a 1 s
+        t.start()
+        try:
+            text = self.run_al_iniciar()
+        finally:
+            t.cancel()
+            try:
+                other.close()
+            except sqlite3.Error:
+                pass
+        self.assertFalse(self.exists("excl.txt"), text)
+        self.assertIn("`%s:exclusivo`" % V, text)
+
+    def test_critico_exclusivo_sin_ventana_queda_pendiente_sin_pedir_nada(self):
+        import time as _t
+        self.touch("excl.txt")
+        other = sqlite3.connect(self.db)
+        other.execute("SELECT count(*) FROM work").fetchone()
+        try:
+            t0 = _t.monotonic()
+            text = self.run_al_iniciar()
+            elapsed = _t.monotonic() - t0
+        finally:
+            other.close()
+        self.assertTrue(self.exists("excl.txt"))
+        self.assertIn("Quedan para el siguiente inicio de sesión", text)
+        self.assertIn("`%s:exclusivo`" % V, text)
+        self.assertNotIn("cierra", text, "nunca pide cerrar sesiones")
+        self.assertLess(elapsed, nm.AL_INICIAR_WINDOW + 2.5, "la ventana acota la espera")
+        self.run_al_iniciar()                                        # sin la otra conexión: se aplica
+        self.assertFalse(self.exists("excl.txt"))
+
+    def test_presupuesto_vencido_no_empieza_pasos(self):
+        self.touch("libre.txt")
+        with mock.patch.object(nm, "AL_INICIAR_BUDGET", 0.0):
+            text = self.run_al_iniciar()
+        self.assertTrue(self.exists("libre.txt"))
+        self.assertIn("sin tiempo en este inicio de sesión", text)
+        self.run_al_iniciar()
+        self.assertFalse(self.exists("libre.txt"))
+
+    def test_critico_sale_con_0_ante_una_excepcion(self):
+        with mock.patch.object(nm, "_al_iniciar_run", side_effect=RuntimeError("x")):
+            text = self.run_al_iniciar()
+        self.assertIn("falló al iniciar la sesión (RuntimeError)", text)
+        with mock.patch.object(nm, "_load_bootstrap", side_effect=ImportError("x")):
+            self.assertEqual(self.run_al_iniciar(), "")
+
+    def test_main_al_iniciar_sale_con_0(self):
+        with mock.patch.object(nm, "al_iniciar", return_value=0) as m, \
+                contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(nm.main(["al-iniciar"]), 0)
+        m.assert_called_once()
+
+    def test_neb_skip_no_hace_nada(self):
+        proj = tempfile.mkdtemp(prefix="neb-test-proj-")
+        self.addCleanup(shutil.rmtree, proj, True)
+        with open(os.path.join(proj, "CLAUDE.md"), "w", encoding="utf-8") as fh:
+            fh.write("<!-- neb: skip -->\n")
+        self.touch("libre.txt")
+        self.touch("dev.txt")
+        with mock.patch.dict(os.environ, {"CLAUDE_PROJECT_DIR": proj}):
+            self.assertEqual(self.run_al_iniciar(), "")
+        self.assertTrue(self.exists("libre.txt"))
+
+    def test_omitidos_ilegibles_no_ofrecen_menu(self):
+        self.touch("dev.txt")
+        with mock.patch.object(_guided, "read_skips", side_effect=sqlite3.OperationalError("disk I/O error")):
+            text = self.run_al_iniciar()
+        self.assertIn("no se pudieron leer los pasos que el dev omitió", text)
+        self.assertNotIn("pasos 1, 2, 4 y 5", text)
+        self.assertTrue(self.exists("dev.txt"))
+
+    def test_deteccion_que_falla_entra_al_encargo(self):
         self.write_migration("9.9.10", "from _guided import GuidedStep\n"
                              "def d(ctx):\n    raise OSError('sin acceso')\n"
                              "STEPS = [GuidedStep('d', 'd', detectar=d, aplicar=lambda c: {})]\n")
-        text = self.notice()
-        self.assertIn("`9.9.10`", text)
-        self.assertIn("1 que no carga o cuya detección falla", text)
-        self.skip("9.9.10:d")                                        # «No aplicarlo»: deja de avisar
-        self.assertIsNone(self.notice())
+        text = self.run_al_iniciar()
+        self.assertIn("`9.9.10:d`", text)
+        self.assertIn("su detección falla", text)
+        self.assertNotIn("sin acceso", text)
+        self.skip("9.9.10:d")
+        self.assertNotIn("9.9.10:d", self.run_al_iniciar())
 
-    def test_tope_con_muchas_versiones(self):
+    def test_lo_que_no_carga_se_reporta(self):
+        self.write_migration("9.9.8", "def f(:\n")
+        text = self.run_al_iniciar()
+        self.assertIn("la migración `9.9.8.py` no carga", text)
+        self.assertIn("SyntaxError", text)
+
+    def test_tope_de_la_salida(self):
         for i in range(60):
-            self.write_migration("8.%d.0" % i, "from _guided import GuidedStep\nimport os\n"
-                                 "STEPS = [GuidedStep('p', 'p', detectar=lambda c: True, aplicar=lambda c: {})]\n")
-        text = self.notice()
-        self.assertIsNotNone(text)
-        self.assertLessEqual(nb._u16(nb.ENV_NOTICE % text), nb.GUIDED_NOTICE_MAX)
-        self.assertIn(", …", text)
-        self.assertIn("60 pasos", text)
+            self.write_migration("8.%d.0" % i, "from _guided import GuidedStep\n"
+                                 "STEPS = [GuidedStep('p', 'paso de prueba con un título largo para llenar', "
+                                 "detectar=lambda c: True, aplicar=lambda c: {})]\n")
+        text = self.run_al_iniciar()
+        self.assertLessEqual(nm._u16(text), nm.AL_INICIAR_MAX)
+        self.assertIn("`neb-migrate.py status` da el detalle", text)
+        self.assertIn("piden al dev", text, "el encargo tiene la mayor prioridad")
+        # El recorte acorta la lista de pasos, nunca la instrucción del encargo (va antes de la lista).
+        for frase in ("pasos 1, 2, 4 y 5 (el 3 ya lo corrió el inicio de sesión) de `", "/commands/migrate.md`", "NEB_SRC=", "No ofrezcas abrir otra sesión",
+                      "«Aplicarlo», «No aplicarlo» y «Después»"):
+            self.assertIn(frase, text)
+        self.assertRegex(text, r"y \d+ más")
 
-    def test_arbol_sin_migrations_no_avisa(self):
-        shutil.rmtree(os.path.join(self.tree, "migrations"))
-        self.assertIsNone(self.notice())
+    def test_critico_el_recorte_conserva_fallos_y_encargo_completos(self):
+        fallos = {"prio": 1, "ord": 1, "pre": "Problemas de la migración de Neb al iniciar la sesión: ",
+                  "items": ["`8.%d.0:p` (paso) falló: %s" % (i, "x" * 120) for i in range(40)], "post": ".",
+                  "tell": True}
+        encargo = {"prio": 1, "ord": 0, "pre": nm.AL_INICIAR_ASK % (nm.AL_INICIAR_PASO3["corrio"],
+                                                                 "C:/plug/commands/migrate.md", nm._sh_quote("C:/plug")),
+                   "items": ["`8.%d.0:d` (paso dev)" % i for i in range(40)], "post": ".", "tell": False}
+        aplicado = {"prio": 4, "pre": "La migración guiada de Neb aplicó al iniciar la sesión: ",
+                    "items": ["`7.0.0:a` (a)"], "post": ".", "tell": True}
+        text = nm._fit([aplicado, fallos, encargo])
+        self.assertLessEqual(nm._u16(text), nm.AL_INICIAR_MAX)
+        self.assertIn("Problemas de la migración", text)
+        self.assertIn("No ofrezcas abrir otra sesión", text)
+        self.assertIn("NEB_SRC='C:/plug'", text)
+        self.assertNotIn("aplicó al iniciar la sesión", text, "la prioridad 4 sale antes de acortar la 1")
+        self.assertEqual(text.count("Dile al dev"), 1)
+        self.assertLess(text.index("No ofrezcas abrir otra sesión"), text.index("Problemas de la migración"),
+                        "el encargo va antes que los fallos: el corte final cae en los fallos")
+
+    def test_critico_un_fallo_enorme_no_se_lleva_el_encargo(self):
+        fallos = {"prio": 1, "ord": 1, "pre": "Problemas de la migración de Neb al iniciar la sesión: ",
+                  "items": ["`8.0.0:p` (paso) falló: " + "x" * 6000], "post": ".", "tell": True}
+        encargo = {"prio": 1, "ord": 0, "pre": nm.AL_INICIAR_ASK % (nm.AL_INICIAR_PASO3["corrio"],
+                                                                 "C:/plug/commands/migrate.md", nm._sh_quote("C:/plug")),
+                   "items": ["`8.0.0:d` (paso dev)"], "post": ".", "tell": False}
+        text = nm._fit([fallos, encargo])
+        self.assertLessEqual(nm._u16(text), nm.AL_INICIAR_MAX)
+        for frase in ("No ofrezcas abrir otra sesión", "NEB_SRC='C:/plug'", "`8.0.0:d`", "`8.0.0:p` (paso) falló: xxx",
+                      "Dile al dev"):
+            self.assertIn(frase, text)
+        self.assertIn("x….", text, "se acorta la entrada (con su cierre), no el texto por el final")
+
+    def test_critico_en_el_aviso_el_encargo_va_antes_que_los_fallos(self):
+        report = {"guiados": {"fallos": [{"id": "8.0.0:p", "titulo": "paso", "detalle": "x" * 100}],
+                              "aplicados": [], "pendientes": [], "manual": [], "errores_de_carga": [], "error": None}}
+        guided = {"pendientes": [{"id": "8.0.0:d", "titulo": "paso dev", "clase": "dev"}], "error_omitidos": None}
+        text = nm._al_iniciar_text(report, "", guided)
+        self.assertLess(text.index("No ofrezcas abrir otra sesión"), text.index("Problemas de la migración"))
+
+    def test_la_orden_de_decirlo_va_una_sola_vez(self):
+        self.touch("libre.txt")
+        self.write_migration("9.9.7", "def f(:\n")
+        text = self.run_al_iniciar()
+        self.assertIn("aplicó al iniciar la sesión", text)
+        self.assertIn("no carga", text)
+        self.assertEqual(text.count("Dile al dev"), 1, text)
+
+    def test_lo_pendiente_no_se_le_pide_decir_al_dev(self):
+        self.touch("excl.txt")
+        other = sqlite3.connect(self.db)
+        other.execute("SELECT count(*) FROM work").fetchone()
+        try:
+            with mock.patch.object(nm, "AL_INICIAR_WINDOW", 0.0):
+                text = self.run_al_iniciar()
+        finally:
+            other.close()
+        self.assertIn("Quedan para el siguiente inicio de sesión", text)
+        self.assertIn("se reintentan solos", text)
+        self.assertNotIn("Dile al dev", text)
+
+    def test_con_un_fallo_y_lo_pendiente_la_orden_no_queda_junto_a_lo_pendiente(self):
+        self.touch("excl.txt")
+        self.write_migration("9.9.7", "def f(:\n")
+        other = sqlite3.connect(self.db)
+        other.execute("SELECT count(*) FROM work").fetchone()
+        try:
+            with mock.patch.object(nm, "AL_INICIAR_WINDOW", 0.0):
+                text = self.run_al_iniciar()
+        finally:
+            other.close()
+        self.assertEqual(text.count("Dile al dev"), 1, text)
+        self.assertLess(text.index("Dile al dev"), text.index("Quedan para el siguiente inicio"))
+        self.assertIn("lo que se reintenta solo, únicamente si pregunta", text)
+
+    def test_lo_aplicado_lleva_su_detalle(self):
+        self.touch("libre.txt")
+        text = self.run_al_iniciar()
+        self.assertIn("`%s:libre-respaldo` (Libre con respaldo): movido, respaldo `" % V, text)
+
+    def test_neb_src_va_entre_comillas(self):
+        self.assertEqual(nm._sh_quote("C:/Users/Ana María/x"), "'C:/Users/Ana María/x'")
+        self.assertEqual(nm._sh_quote("a'b"), "'a'\"'\"'b'")
+        self.touch("dev.txt")
+        text = self.run_al_iniciar()
+        self.assertIn("NEB_SRC='", text)
+
+    def test_critico_sin_la_carpeta_de_la_base_no_corre_pasos(self):
+        # Sin ~/.claude de verdad (no un sustituto de _take_lock): los settings viven en CLAUDE_CONFIG_DIR.
+        cfg = os.path.join(self.home, "cfg")
+        os.makedirs(cfg)
+        os.environ["CLAUDE_CONFIG_DIR"] = cfg
+        with open(os.path.join(cfg, "settings.json"), "w", encoding="utf-8") as fh:
+            json.dump({"env": {"NEB_PRUEBA_A": "1"}}, fh)
+        shutil.rmtree(self.claude)
+        text = self.run_al_iniciar()
+        with open(os.path.join(cfg, "settings.json"), encoding="utf-8") as fh:
+            self.assertIn("NEB_PRUEBA_A", json.load(fh)["env"], "sin candado no corre nada solo")
+        self.assertFalse(os.path.isdir(self.claude), "no crea la carpeta de la base")
+        self.assertIn("`/neb:migrate` corre estos pasos: `%s:settings-solo`" % V, text)
+        self.assertIn("Dile al dev", text)
+        self.assertNotIn("se reintentan solos", text)
+
+    def test_sin_correr_la_migracion_el_encargo_incluye_el_paso_3(self):
+        self.touch("dev.txt")
+        with mock.patch.object(nm, "_take_lock", lambda home: -1):
+            text = self.run_al_iniciar()
+        self.assertIn("pasos 1 a 5 (este inicio de sesión no corrió la migración", text)
+        self.assertNotIn("el 3 ya lo corrió", text)
+        self.assertIn("no se pudo tomar el candado", text)
+
+    def test_al_iniciar_respeta_la_espera_tras_un_fallo_de_base(self):
+        # Se espía la frontera real (_db_shared._connect), no el envoltorio: retry=False es lo que hace esperar.
+        seen = []
+        real = nm._db_shared._connect
+
+        def spy(db, *a, **k):
+            seen.append(k.get("retry", False))
+            return real(db, *a, **k)
+        with mock.patch.object(nm._db_shared, "_connect", spy):
+            self.run_al_iniciar()
+        self.assertTrue(seen)
+        self.assertEqual(set(seen), {False})
+
+    def test_un_enlace_puesto_al_abrir_el_candado_se_rechaza(self):
+        path = _guided.lock_path(_machine.Ctx(self.home, db_path=self.db))
+        with mock.patch.object(_guided._machine, "is_link", side_effect=[False, True]):
+            with self.assertRaises(OSError):
+                _guided.try_lock(path)
+        self.touch("libre.txt")
+        calls = iter([False, True])
+        with mock.patch.object(_guided._machine, "is_link", side_effect=lambda p: next(calls, False)):
+            text = self.run_al_iniciar()
+        self.assertTrue(self.exists("libre.txt"))
+        self.assertIn("no se pudo tomar el candado", text)
+
+    def test_un_error_del_candado_que_no_es_contencion_no_se_calla(self):
+        import errno as _errno
+        target = "msvcrt" if os.name == "nt" else "fcntl"
+        mod = __import__(target)
+        fn = "locking" if os.name == "nt" else "flock"
+        self.touch("libre.txt")
+        with mock.patch.object(mod, fn, side_effect=OSError(_errno.EINVAL, "sin candados")):
+            text = self.run_al_iniciar()
+        self.assertTrue(self.exists("libre.txt"))
+        self.assertIn("no se pudo tomar el candado", text)
+
+    def test_partes_no_cambian_con_lo_pendiente(self):
+        # Flujo 2: lo que las partes agregan al arranque no cambia con lo guiado pendiente.
+        bc = nm._load_bootstrap()
+        with mock.patch.object(os.path, "expanduser", lambda p: self.home if p == "~" else p):
+            antes = bc._env_notices(os.path.join(self.tree, "bootstrap"))
+            self.touch("libre.txt")
+            self.touch("dev.txt")
+            despues = bc._env_notices(os.path.join(self.tree, "bootstrap"))
+        self.assertEqual(antes, despues)
+        self.assertFalse(any("migración guiada" in n for n in despues), despues)
 
 
 if __name__ == "__main__":

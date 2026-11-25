@@ -14,7 +14,7 @@ Un paso de base es un cambio del esquema escrito en código. Corre dentro de BEG
 su fila de `schema_step` (todo o nada); el paso 1 (esquema inicial) también, y además es idempotente.
 Un paso destructivo lleva respaldo previo verificado en `<carpeta de la base>/neb-backups/` (queda el último de cada paso).
 
-Este módulo NO importa módulos hermanos: el arranque lee `SCHEMA_VERSION` de otro árbol como texto
+Este módulo NO importa módulos hermanos: el aviso de base (`_db_notice`, que corre `al-iniciar`) lee `SCHEMA_VERSION` de otro árbol como texto
 (regex sobre este archivo) sin cargarlo. Mantener la asignación en una sola línea literal.
 
 Documento: tooling/migrations.md.
@@ -490,7 +490,7 @@ _BOOKKEEPING_DDL = (
 def read_version(con):
     """(V, F) de la base: (0, 0) sin tabla de versión. F es la mínima compatible efectiva: la fila del paso 3
     que dejó 7.3.0 (min_code 3) cuenta como 2 aunque relax_axis_step_min_code no la haya bajado todavía, así que
-    la regla de compatibilidad, `neb-migrate.py status` y el aviso del arranque (que leen en solo lectura) no
+    la regla de compatibilidad, `neb-migrate.py status` y el aviso de base de `al-iniciar` (que leen en solo lectura) no
     dependen de que alguna conexión de escritura haya corrido la reparación."""
     if not _table_exists(con, "schema_step"):
         return 0, 0
@@ -564,12 +564,14 @@ def take_backup(db_path, name):
 
 
 def prune_backups(db_path, pattern, keep_path):
-    """Borra los archivos de <pattern> en neb-backups/ salvo keep_path (queda 1 de ese patrón)."""
+    """Borra los archivos de <pattern> en neb-backups/ salvo keep_path (queda 1 de ese patrón), con sus -wal,
+    -shm y -journal (desde 7.5.0 también el -journal: una copia que se cortó a medias, p. ej. porque la
+    plataforma mató la entrada de migración por su timeout, lo deja al lado)."""
     keep = os.path.normcase(os.path.abspath(keep_path)) if keep_path else None
     for p in glob.glob(os.path.join(glob.escape(backup_dir(db_path)), pattern)):
         if keep and os.path.normcase(os.path.abspath(p)) == keep:
             continue
-        for f in (p, p + "-wal", p + "-shm"):
+        for f in (p, p + "-wal", p + "-shm", p + "-journal"):
             _remove_quiet(f)
 
 

@@ -11,11 +11,13 @@ y `migrations/<versión>.py`, que define `STEPS`: una lista de GuidedStep. Dos c
 
 Pendiente es lo que la detección dice en el momento (solo lee; no se persiste). Lo único que se guarda es el
 «no» del dev a un paso, en `migration_skip`. Corre solo lo que deja con qué deshacerlo (M5); lo demás, con
-`apply --include`. Lo usan bootstrap/neb-migrate.py y el aviso del arranque.
+`apply --include`. Lo usa bootstrap/neb-migrate.py: `apply`, `status` y `al-iniciar`, la entrada de migración de
+SessionStart (desde 7.5.0), que corre lo que tiene respaldo al iniciar sesión.
 
 Documento: tooling/migrations.md § "Migración guiada".
 """
 
+import errno
 import glob
 import importlib.util
 import os
@@ -40,7 +42,7 @@ SKIP_DDL = ("CREATE TABLE IF NOT EXISTS migration_skip ("
 class GuidedStep:
     """Un paso guiado. De catálogo: op + args. Libre: detectar + aplicar (+ respaldo, deshacer).
     exclusivo: corre solo cuando nadie más tiene la base (o el archivo) en uso; si no, queda pendiente y se
-    reintenta en la siguiente corrida, sin pedirle al dev que cierre sesiones (desde 7.4.0; una versión nueva no
+    reintenta en el siguiente inicio de sesión (o con /neb:migrate), sin pedirle al dev que cierre sesiones (desde 7.4.0; una versión nueva no
     puede pedir cerrar las sesiones abiertas). `condicion(ctx) -> motivo | None` (por omisión, que ninguna
     otra conexión tenga la base abierta en ese momento). El programa la comprueba antes de actuar, y el paso la
     vuelve a comprobar con ctx.exclusivo_ok() justo antes de la acción que no se deshace (las operaciones del
@@ -284,6 +286,94 @@ def base_sin_otras_conexiones(ctx):
         con.close()
 
 
+class ExclusiveWindow:
+    """Ventana de reintento de los pasos exclusivos de una corrida (desde 7.5.0): segundos que la corrida puede
+    esperar en total a que se cumpla la condición de sus exclusivos, compartidos por todos. La usa
+    `neb-migrate.py al-iniciar`, para que un proceso que mantiene la base abierta no alargue cada inicio de
+    sesión más que eso; `apply` no la usa (prueba la condición una vez)."""
+
+    DELAYS = (0.25, 0.5, 1.0)
+
+    def __init__(self, seconds):
+        self.left = float(seconds)
+
+    def wait_for(self, check):
+        """Motivo de `check()` tras reintentar dentro de lo que queda de la ventana, o None si se cumplió."""
+        motivo = check()
+        i = 0
+        while motivo and self.left > 0:
+            pause = min(self.DELAYS[min(i, len(self.DELAYS) - 1)], self.left)
+            time.sleep(pause)
+            self.left -= pause
+            i += 1
+            motivo = check()
+        return motivo
+
+
+# --------------------------------------------------------------------------- candado entre corridas
+
+LOCK_NAME = ".neb-migrate.lock"
+
+
+def lock_path(ctx):
+    """El candado entre corridas (desde 7.5.0): un archivo oculto y vacío en la carpeta de la base de ctx. No vive
+    en neb-backups/ para no crear esa carpeta (ni una base) donde no hay base: con la base sin migrar, junto a
+    neb-logbook.db solo aparece este archivo vacío hasta que la migración guiada le cambie el nombre."""
+    return os.path.join(os.path.dirname(os.path.abspath(ctx.db_path)), LOCK_NAME)
+
+
+_LOCK_BUSY = {getattr(errno, n) for n in ("EACCES", "EAGAIN", "EWOULDBLOCK", "EDEADLK", "EDEADLOCK")
+              if hasattr(errno, n)}
+
+
+def try_lock(path):
+    """Toma sin esperar el candado de sistema operativo sobre `path` (msvcrt.locking en Windows, fcntl.flock en
+    los demás). Devuelve el descriptor, o None si otra corrida lo tiene (errno de contención: EACCES en Windows,
+    EWOULDBLOCK con flock). Cualquier otro error al bloquear (p. ej. un sistema de archivos sin candados) se
+    propaga como OSError: no es «otra corrida». El sistema lo libera si el proceso muere, también cuando la
+    plataforma mata la entrada de hook por su `timeout` (verificado con msvcrt y taskkill; con fcntl.flock
+    [asumido: semántica POSIX de flock, sin prueba en esta máquina]). Sin la carpeta (no hay ~/.claude) no la
+    crea: OSError. Un enlace se rechaza (OSError): antes de abrir y, como en Windows no hay O_NOFOLLOW, otra vez
+    después, comparando lo abierto con la ruta. El archivo queda vacío y no es un respaldo ni una base."""
+    if _machine.is_link(path):
+        raise OSError(f"{path} es un enlace: no se toma el candado ahí")
+    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    fd = os.open(path, flags, 0o600)
+    try:
+        if _machine.is_link(path) or not os.path.samestat(os.fstat(fd), os.lstat(path)):
+            raise OSError(f"{path} cambió al abrirlo (enlace): no se toma el candado ahí")
+        if os.name == "nt":
+            import msvcrt
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+    except OSError as e:
+        os.close(fd)
+        if e.errno in _LOCK_BUSY:
+            return None
+        raise
+    return fd
+
+
+def unlock(fd):
+    if fd is None:
+        return
+    try:
+        if os.name == "nt":
+            import msvcrt
+            os.lseek(fd, 0, os.SEEK_SET)
+            msvcrt.locking(fd, msvcrt.LK_UNLCK, 1)
+        else:
+            import fcntl
+            fcntl.flock(fd, fcntl.LOCK_UN)
+    except OSError:
+        pass
+    finally:
+        os.close(fd)
+
+
 # --------------------------------------------------------------------------- ejecución
 
 def _norm(path):
@@ -359,9 +449,10 @@ def _check_declared_backup(ctx, path, started, before):
     return None
 
 
-def run(ctx, step, allow_dev=False):
+def run(ctx, step, allow_dev=False, window=None):
     """Corre un paso guiado. {estado: aplicado | sin-cambio | manual | pendiente | fallo, respaldo, detalle}.
-    Sin allow_dev, un paso que pide al dev no corre. Un paso exclusivo comprueba su condición antes de actuar."""
+    Sin allow_dev, un paso que pide al dev no corre. Un paso exclusivo comprueba su condición antes de actuar;
+    con `window` (ExclusiveWindow), la reintenta dentro de lo que quede de esa ventana."""
     try:
         if not detect(ctx, step):
             return {"estado": "sin-cambio", "respaldo": None, "detalle": "nada que hacer"}
@@ -372,11 +463,11 @@ def run(ctx, step, allow_dev=False):
         return {"estado": "pendiente", "respaldo": None, "detalle": "pide al dev (apply --include)"}
     if step.exclusivo:
         cond = step.condicion or base_sin_otras_conexiones
-        motivo = cond(ctx)
+        motivo = window.wait_for(lambda: cond(ctx)) if window is not None else cond(ctx)
         if motivo:
             return {"estado": "pendiente", "respaldo": None,
-                    "detalle": f"{motivo}: queda pendiente y se reintenta en la siguiente corrida de "
-                               "apply --guiados"}
+                    "detalle": f"{motivo}: queda pendiente y se reintenta en el siguiente inicio de sesión "
+                               "(o con /neb:migrate)"}
         ctx.exclusivo_ok = lambda: cond(ctx)
     started = time.time()
     before = set() if step.catalog else _snapshot(ctx)

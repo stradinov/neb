@@ -3,8 +3,8 @@
 migrate-neb-db.py — cambia el nombre de la bitácora de ~/.claude/neb-logbook.db (anterior a neb 7.0.0)
 a ~/.claude/neb.db. Desde 7.0.0, neb no captura ni abre la base mientras siga con el nombre anterior.
 
-Lo invoca el paso guiado 7.0.0:renombrar-base (`/neb:migrate`, migrations/7.0.0.py); también se puede
-correr a mano. Usa el módulo sqlite3 de Python porque el binario `sqlite3` no está en el PATH de Windows.
+Lo invoca el paso guiado 7.0.0:renombrar-base (migrations/7.0.0.py), que corre solo al iniciar sesión
+(`neb-migrate.py al-iniciar`, desde 7.5.0) o con `/neb:migrate`; también se puede correr a mano. Usa el módulo sqlite3 de Python porque el binario `sqlite3` no está en el PATH de Windows.
 No migra columnas ni llama a _connect: la primera conexión de neb 7.0.0 sobre neb.db aplica los pasos de
 base (el paso 2 retira el esquema de equipo, con su propio respaldo).
 

@@ -33,7 +33,7 @@ Los casos 5, 6 y 8 piden a propósito verbos que se retiraron en 7.0.0; los caso
    - **Montaje:** el común.
 
 7. `/logbook`, con la base sin migrar.
-   - **Esperado:** la salida es `{"ok": false, "motivo": "base-sin-migrar", ...}`. Claude muestra el `detalle`, la `accion` (`/neb:migrate` en una sesión nueva) y el `comando` como vía a mano, no corre el migrador ni la migración guiada por su cuenta (pide OK explícito) y no corre otros verbos.
+   - **Esperado:** la salida es `{"ok": false, "motivo": "base-sin-migrar", ...}`. Claude muestra el `detalle`, la `accion` (el siguiente inicio de sesión la migra solo, o `/neb:migrate`) y el `comando` como vía a mano, no corre el migrador ni la migración guiada por su cuenta (pide OK explícito) y no corre otros verbos.
    - **Montaje:** en `T/.claude/` solo hay un `neb-logbook.db` no vacío y ningún `neb.db`. El `neb-logbook.db` se crea ejecutando el esquema inicial, que es el de 6.45.0: `py -c "import sqlite3,sys;sqlite3.connect(sys.argv[1]).executescript(open(sys.argv[2],encoding='utf-8').read())" <db> hooks/logbook-schema.sql`. Comprobar al final que no se creó `T/.claude/neb.db` y que `neb-logbook.db` conserva tamaño y fecha.
 
 7b. `/logbook traza <nombre>`, con la base sin migrar.

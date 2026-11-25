@@ -157,8 +157,8 @@ def _aplicar(ctx):
         if _read(path) != raw:                  # otra sesión lo reescribió: no se pisa su versión
             _remove_quiet(tmp)
             _remove_quiet(backup)
-            return {"estado": "pendiente", "detalle": "compas.md cambió mientras se migraba: se reintenta en la "
-                                                      "siguiente corrida"}
+            return {"estado": "pendiente", "detalle": "compas.md cambió mientras se migraba: se reintenta en el "
+                                                      "siguiente inicio de sesión"}
         if read_only:
             orig_mode = stat.S_IMODE(os.stat(path).st_mode)
             os.chmod(path, orig_mode | stat.S_IWRITE)

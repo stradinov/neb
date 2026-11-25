@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
-test_migrations_bootstrap.py — aviso del arranque de base incompatible o paso detenido (6.48.0).
+test_migrations_bootstrap.py — aviso de base incompatible o paso detenido (6.48.0; desde 7.5.0 lo emite `al-iniciar`, no las partes).
 
-Cubre _db_notice / _env_notices de bootstrap/neb-bootstrap-context.py:
+Cubre _db_notice de bootstrap/neb-bootstrap-context.py (desde 7.5.0 lo llama `neb-migrate.py al-iniciar`;
+_env_notices, las partes, ya no lo incluye):
   • sin aviso con la base al día, ni con plugin y clon de versiones distintas si los dos la entienden (M7);
   • aviso por árbol que ya no puede operar la base (el propio y el clon de NEB_HOME, leído como texto;
     un clon sin _migrations.py cuenta como 1);
   • aviso de paso detenido con el motivo del precheck propio;
   • solo lectura: sin base no la crea;
-  • dos corridas con el aviso presente dan el mismo texto; un cambio de estado entre corridas, otro;
+  • las partes (_env_notices) dan el mismo texto sin base, con base incompatible y tras otro cambio (7.5.0);
   • tope DB_NOTICE_MAX.
 
 Homes temporales; nunca ~/.claude.
@@ -133,19 +134,23 @@ class TestAvisoBase(unittest.TestCase):
         with mock.patch.object(nb, "_load_module", patched):
             self.assertIsNone(self.notice())
 
-    def test_mismo_texto_en_dos_corridas_y_otro_si_el_estado_cambia(self):
-        self.make_db([(N + 1, N + 1)])
+    def test_critico_las_partes_no_dependen_de_la_base(self):
+        # Desde 7.5.0 el aviso de base lo emite `neb-migrate.py al-iniciar`, no las partes: su texto no cambia con
+        # el estado de la base, así una migración en curso no puede partir la huella (flujo 2 del REQ
+        # neb-migracion-automatica-al-arrancar). Falla sembrada: devolver _db_notice a _env_notices.
         with mock.patch.object(os.path, "expanduser", lambda p: self.home if p == "~" else p):
-            a = nb._env_notices(BOOTSTRAP_DIR, self.clone)
-            b = nb._env_notices(BOOTSTRAP_DIR, self.clone)
-            self.assertEqual(a, b)
-            self.assertTrue(any("base-incompatible" in x for x in a))
+            sin_base = nb._env_notices(BOOTSTRAP_DIR, self.clone)
+            self.make_db([(N + 1, N + 1)])
+            incompatible = nb._env_notices(BOOTSTRAP_DIR, self.clone)
             con = sqlite3.connect(self.db)
             con.execute("INSERT INTO schema_step VALUES (?, ?, 'otro', 'x', 'x', NULL)", (N + 2, N + 2))
             con.commit()
             con.close()
-            c = nb._env_notices(BOOTSTRAP_DIR, self.clone)
-        self.assertNotEqual(a, c)
+            otro = nb._env_notices(BOOTSTRAP_DIR, self.clone)
+        self.assertEqual(sin_base, incompatible)
+        self.assertEqual(incompatible, otro)
+        self.assertFalse(any("base-incompatible" in x or "no la opera" in x for x in otro), otro)
+        self.assertIsNotNone(self.notice(), "el aviso sigue existiendo: lo emite al-iniciar")
 
     def test_tope_del_aviso(self):
         self.make_db([(N + 1, N + 1)])
