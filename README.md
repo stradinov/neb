@@ -22,28 +22,17 @@ En la práctica, defines un *profile* para cada tipo de proyecto: uno para el de
 
 ## Cómo empezar
 
-En Claude Code, agrega el marketplace e instala el plugin:
+Copia este prompt en Claude Code:
 
 ```
-/plugin marketplace add stradinov/neb
-/plugin install neb@neb
+Instala o actualiza Neb siguiendo https://raw.githubusercontent.com/stradinov/neb/main/INSTALL.md
 ```
 
-Reinicia Claude Code o ejecuta
-```
-/reload-plugins
-```
-para activar el hook de arranque.
+Claude revisa los requisitos, instala el plugin si no lo tienes y, si ya lo tienes, compara tu versión con la última y te ofrece actualizar. Sirve para la primera instalación, para reinstalar y para ponerte al día. Las instrucciones que sigue están en [INSTALL.md](INSTALL.md).
 
-Luego, ejecuta
-```
-/wakeup
-```
-para montar tu *espacio de trabajo* (directorio donde extiendes la metodología, *overlay* + configuración personal).
+Al final te pide abrir una sesión nueva para que el arranque de Neb se cargue y, si todavía no tienes *espacio de trabajo* (directorio donde extiendes la metodología, *overlay* + configuración personal), `/wakeup` para montarlo.
 
-> El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores. En Windows, Neb requiere Git for Windows (Git Bash): Claude Code corre ahí los hooks del plugin. La bitácora y los pendientes piden Python 3 con SQLite 3.35.5 o superior (en Windows, Python 3.12 o superior lo trae).
-
-> El plugin no se actualiza solo hasta que lo decidas: ver [Guía del usuario](docs/user-guide.md) § "Mantener Neb al día".
+> El hook `SessionStart` del plugin inyecta el arranque de Neb en cada sesión; no necesitas clonar el repo ni correr instaladores. ¿Prefieres instalarlo a mano? Ver [Guía del usuario](docs/user-guide.md) § "Instalar".
 
 ---
 

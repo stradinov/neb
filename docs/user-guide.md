@@ -4,7 +4,17 @@ Cómo poner Neb a trabajar en tu equipo: instalarlo, montar tu capa propia y def
 
 ## Instalar
 
-Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni correr instaladores. En Windows requiere **Git for Windows (Git Bash)**: Claude Code corre ahí los hooks del plugin, y sin él fallan en cada evento (ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb"). Desde Claude Code:
+Neb se instala como **plugin de Claude Code** — no requiere clonar el repo ni correr instaladores. En Windows requiere **Git for Windows (Git Bash)**: Claude Code corre ahí los hooks del plugin, y sin él fallan en cada evento (ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb").
+
+**La vía corta** es pedírselo a Claude con este prompt. Sirve para instalar, reinstalar o ponerte al día:
+
+```
+Instala o actualiza Neb siguiendo https://raw.githubusercontent.com/stradinov/neb/main/INSTALL.md
+```
+
+Claude sigue [`INSTALL.md`](../INSTALL.md): revisa los requisitos, detecta si ya tienes el plugin (con cualquier marketplace, `neb@<marketplace>`), compara tu versión con la última publicada y te ofrece instalar o actualizar. Solo clona el repo si vas a contribuir.
+
+**A mano**, desde Claude Code:
 
 ```
 /plugin marketplace add stradinov/neb
@@ -41,6 +51,8 @@ Según la documentación de Claude Code, la actualización automática viene **a
 - Después de tu primer mensaje en una sesión interactiva, Claude Code espera hasta diez minutos y actualiza en disco los plugins de los marketplaces con actualización automática encendida. La sesión abierta sigue con la versión que cargó; la nueva rige desde la **siguiente sesión**, o antes con `/reload-plugins` (según la documentación de Claude Code; en la app de escritorio se observó a los 7 minutos).
 - Recibes **cada versión que se publica**; hoy no hay un canal estable aparte. Si prefieres elegir el momento, déjala apagada y actualiza a mano.
 - **En la app de escritorio** se observó que las sesiones corren con `DISABLE_AUTOUPDATER=1` (versión 2.1.325). Según la documentación de Claude Code, esa variable apaga toda la actualización automática de plugins y oculta el interruptor, salvo que exista `FORCE_AUTOUPDATE_PLUGINS=1`. Esta última la vuelve a encender para **todos** tus marketplaces con actualización automática encendida, no solo para el de Neb. Cuando aceptas la oferta desde la app, el ayudante la agrega al bloque `env` de tu settings. No se ha probado si la actualización corre sin ella. A mano: `"env": { "FORCE_AUTOUPDATE_PLUGINS": "1" }`.
+
+**Pedírselo a Claude**: el mismo prompt de [Instalar](#instalar) revisa tu versión contra la última publicada, te resume qué cambia y te ofrece actualizar.
 
 **Actualizar a mano**, con la actualización automática apagada o para no esperar:
 
