@@ -2,7 +2,7 @@
 
 > Lineamiento del hook `notify-on-permission.{ps1,sh}`. **Opcional personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
 >
-> Artefactos del hook: [`hooks/notify-on-permission.ps1`](../hooks/notify-on-permission.ps1), [`hooks/notify-on-permission.sh`](../hooks/notify-on-permission.sh), [`hooks/neb-hook.py`](../hooks/neb-hook.py) (dispatcher del plugin), [`hooks/hooks.json`](../hooks/hooks.json).
+> Artefactos del hook: [`hooks/notify-on-permission.ps1`](../hooks/notify-on-permission.ps1), [`hooks/notify-on-permission.sh`](../hooks/notify-on-permission.sh), [`hooks/neb-hook.py`](../hooks/neb-hook.py) (dispatcher del plugin), [`hooks/lib/notify_sound.py`](../hooks/lib/notify_sound.py) (qué sonido suena), [`hooks/sounds/`](../hooks/sounds/README.md) (sonido por defecto y su licencia), [`hooks/hooks.json`](../hooks/hooks.json).
 >
 > Hermano de [`tooling/notify-on-stop.md`](notify-on-stop.md). Detalles compartidos (guard de subsesión interna, filosofía hooks, cross-OS Windows, restricciones técnicas) viven allí — este documento referencia sin duplicar.
 
@@ -23,7 +23,7 @@ Claude pide permiso o idle > 60s → Notification hook
                                   ├─ Guard de subsesión interna (NEB_INTERNAL_SUBSESSION=1 → exit 0)
                                   ├─ Cargar ~/.claude/notify-on-permission.json (defaults si ausente)
                                   ├─ Si enabled=false → exit 0
-                                  ├─ Resolver WAV (cfg.wav || ${NEB_WORKSPACE:-$NEB_HOME}/personal/chimes-loud.wav)
+                                  ├─ Resolver WAV (NEB_NOTIFY_WAV || CLI de hooks/lib/notify_sound.py || hooks/sounds/neb-chime.wav)
                                   └─ Reproducir 1 chime async (sin scaling, sin walk-back)
 ```
 
@@ -43,7 +43,7 @@ Sin walk-back de transcript: el evento `Notification` no corresponde a "cierre d
 | Campo | Tipo | Default | Notas |
 |---|---|---|---|
 | `enabled` | bool | `true` | `false` → `exit 0` inmediato sin reproducir. |
-| `wav` | string \| null | `null` (= `personal/chimes-loud.wav` de `$NEB_WORKSPACE`, o de `$NEB_HOME` sin workspace) | Path absoluto. Si no existe → fallback al default + warning a stderr. |
+| `wav` | string \| null | `null` (= `hooks/sounds/neb-chime.wav`) | Preset (`"neb"`, `"chimes"`, `"chimes-loud"`) o ruta absoluta; los mismos valores y respaldos que `notify-on-stop`: [`notify-on-stop.md`](notify-on-stop.md) § "Configuración personal default". |
 
 Sin campos `min_seconds`, `max_chimes` ni `scaling`: el evento no tiene duración medible ni escala. Si en el futuro aparece necesidad de N chimes, se agrega.
 
@@ -55,7 +55,7 @@ Manual, mismo procedimiento que [`notify-on-stop.md`](notify-on-stop.md) § "Act
 
 1. Agregar `notify-on-permission` a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json` (el plugin ya registra el hook; en una lista ya existente, va separado por comas y sin espacios). En Windows requiere Git Bash.
 
-2. Verificar que el WAV por defecto exista (`personal/chimes-loud.wav` de `$NEB_WORKSPACE`), o fijar `wav` en el config del paso 3.
+2. (Opcional) Elegir otro sonido con `wav` en el config del paso 3. Sin elegir nada suena el que trae el plugin.
 
 3. (Opcional) Crear `~/.claude/notify-on-permission.json` con valores explícitos. Si está ausente, los defaults aplican.
 
@@ -97,7 +97,7 @@ Escenarios a probar tras activar:
 | 2 | Aprobar el permiso → tool corre → turno termina | Después del chime de Notification, suena el chime de Stop (separados). |
 | 3 | Idle > 60 s sin permission prompt previo | 1 chime al cumplirse el idle. |
 | 4 | Config `enabled: false` | Sin chime. |
-| 5 | Config `wav` apuntando a archivo inexistente | Fallback al default + warning stderr; chime suena. |
+| 5 | Config `wav` apuntando a archivo inexistente | Suena `neb-chime.wav`; el arranque de la siguiente sesión avisa del motivo. |
 | 6 | Config JSON malformado | Defaults aplicados; warning stderr. |
 | 7 | Sin config (archivo ausente) | Defaults; chime suena. |
 | 8 | **Prompt no trivial con `preprocess-prompt.py` activo** (escenario clave) | Sin chime fantasma del subproceso `claude -p` (guard de subsesión interna via `NEB_INTERNAL_SUBSESSION`). |

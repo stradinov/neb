@@ -65,9 +65,10 @@ def invalid_tokens(env=None):
     return [(var, t) for var in ENV_VARS for t in _tokens(env, var) if t not in HOOKS]
 
 
-def _child_env():
+def _child_env(extra=None):
     env = os.environ.copy()
     env["PYTHONIOENCODING"] = "utf-8"   # en Windows el stdio por defecto es cp1252
+    env.update(extra or {})
     return env
 
 
@@ -79,10 +80,10 @@ def _log(msg):
         pass
 
 
-def _run(hook, argv, payload, stdout=subprocess.DEVNULL, stderr=None, timeout=None):
+def _run(hook, argv, payload, stdout=subprocess.DEVNULL, stderr=None, timeout=None, extra_env=None):
     try:
         subprocess.run(argv, input=payload, stdout=stdout, stderr=stderr,
-                       env=_child_env(), timeout=timeout)
+                       env=_child_env(extra_env), timeout=timeout)
     except (OSError, subprocess.SubprocessError) as e:
         _log("%s: %r" % (hook, e))
 
@@ -98,6 +99,18 @@ def dispatch(hook, payload, event, home):
         import approved_plan
         approved_plan.save(event, home)
     elif hook in ("notify-on-stop", "notify-on-permission"):
+        # El sonido lo resuelve hooks/lib/notify_sound.py (presets, ruta absoluta, respaldo) y llega al
+        # script en NEB_NOTIFY_WAV. Sin ruta (hook apagado en su JSON, o sin ningún WAV) no se lanza.
+        # Si el resolvedor falla, el script corre sin la variable y resuelve por su cuenta.
+        extra = None
+        try:
+            import notify_sound
+            wav, _ = notify_sound.resolve(hook, home=home)
+            if not wav:
+                return
+            extra = {"NEB_NOTIFY_WAV": wav}
+        except Exception as e:  # noqa: BLE001 — un hook no bloquea la sesión
+            _log("%s: resolver: %r" % (hook, e))
         if IS_WINDOWS:
             argv = ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
                     os.path.join(HERE, hook + ".ps1")]
@@ -105,7 +118,7 @@ def dispatch(hook, payload, event, home):
             argv = ["bash", os.path.join(HERE, hook + ".sh")]
         # Salida a DEVNULL: el .sh deja la reproducción en segundo plano (`& disown`) con los
         # descriptores heredados, y con un pipe el dispatcher la esperaría.
-        _run(hook, argv, payload, stderr=subprocess.DEVNULL, timeout=9)
+        _run(hook, argv, payload, stderr=subprocess.DEVNULL, timeout=9, extra_env=extra)
     elif hook == "preprocess-prompt":
         # El stdout del hijo es el del hook: su JSON es el contexto que inyecta UserPromptSubmit.
         _run(hook, [py, os.path.join(HERE, "preprocess-prompt.py")], payload, stdout=None, timeout=33)

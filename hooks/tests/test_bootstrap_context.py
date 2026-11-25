@@ -477,5 +477,73 @@ class TestAvisoBaseSinMigrar(unittest.TestCase):
         self.assertFalse(any("`7.0.0`" in n for n in notices), notices)
 
 
+class TestAvisoSonido(unittest.TestCase):
+    """Los hooks notify-on-* activados que no suenan como se configuraron se avisan en el arranque (7.2.0).
+    El aviso solo lee: no genera la caché de `chimes-loud`."""
+
+    AVISO = "Hooks de sonido que no suenan como se configuraron"
+
+    def setUp(self):
+        self.home_env = _tmp_home(self)
+        self.claude = os.path.join(self.home_env["HOME"], ".claude")
+        os.makedirs(self.claude)
+        self.falta = os.path.join(self.home_env["HOME"], "falta.wav")
+
+    def _cfg(self, hook, data):
+        with open(os.path.join(self.claude, "%s.json" % hook), "w", encoding="utf-8") as f:
+            json.dump(data, f)
+
+    def _notices(self, hooks="notify-on-stop,notify-on-permission", extra=None):
+        env = dict(self.home_env, NEB_HOOKS=hooks)
+        env.update(extra or {})
+        with mock.patch.dict(os.environ, env):
+            for k in ("NEB_PROJECT_HOOKS",):
+                os.environ.pop(k, None)
+            return [n for n in nb._env_notices(os.path.join(NEB, "bootstrap")) if self.AVISO in n]
+
+    def _player_path(self):
+        """PATH con un reproductor falso, para que en POSIX el aviso no salga por falta de reproductor."""
+        if os.name == "nt":
+            return {}
+        bindir = tempfile.mkdtemp(prefix="neb-test-bin-")
+        self.addCleanup(shutil.rmtree, bindir, True)
+        exe = os.path.join(bindir, "aplay")
+        with open(exe, "w") as f:
+            f.write("#!/bin/sh\n")
+        os.chmod(exe, 0o755)
+        return {"PATH": bindir}
+
+    def test_critico_ruta_inexistente_avisa_y_config_valida_no(self):
+        extra = self._player_path()
+        self._cfg("notify-on-stop", {"wav": self.falta})
+        notices = self._notices(extra=extra)
+        self.assertEqual(len(notices), 1, notices)
+        self.assertIn("`notify-on-stop` usa el sonido por defecto: no existe %s" % self.falta, notices[0])
+        self.assertNotIn("`notify-on-permission`", notices[0])
+        self._cfg("notify-on-stop", {"wav": None})
+        self.assertEqual(self._notices(extra=extra), [])
+
+    def test_critico_enabled_false_o_hook_no_activado_no_avisan(self):
+        extra = self._player_path()
+        self._cfg("notify-on-stop", {"enabled": False, "wav": self.falta})
+        self.assertEqual(self._notices(extra=extra), [])
+        self._cfg("notify-on-stop", {"wav": self.falta})
+        self.assertEqual(self._notices(hooks="logbook-sync", extra=extra), [])
+        self.assertEqual(self._notices(hooks="", extra=extra), [])
+
+    def test_critico_chimes_loud_no_escribe_en_el_arranque(self):
+        self._cfg("notify-on-stop", {"wav": "chimes-loud"})
+        self._notices(extra=self._player_path())
+        self.assertFalse(os.path.exists(os.path.join(self.claude, "neb-sounds")))
+
+    @unittest.skipIf(os.name == "nt", "en Windows el reproductor lo da el sistema")
+    def test_sin_reproductor_avisa(self):
+        empty = tempfile.mkdtemp(prefix="neb-test-bin-")
+        self.addCleanup(shutil.rmtree, empty, True)
+        notices = self._notices(hooks="notify-on-permission", extra={"PATH": empty})
+        self.assertEqual(len(notices), 1, notices)
+        self.assertIn("`notify-on-permission` no suena: no hay reproductor", notices[0])
+
+
 if __name__ == "__main__":
     unittest.main()

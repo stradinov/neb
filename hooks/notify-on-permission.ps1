@@ -17,7 +17,6 @@ if ($env:NEB_INTERNAL_SUBSESSION -eq '1' -or $env:CLAUDE_PREPROCESS_RECURSION -e
 
 $cfg = @{
     enabled = $true
-    wav     = $null
 }
 
 # --- Cargar config personal -------------------------------------------------
@@ -26,7 +25,7 @@ $cfgPath = Join-Path $env:USERPROFILE '.claude\notify-on-permission.json'
 if (Test-Path -LiteralPath $cfgPath) {
     try {
         $user = Get-Content -LiteralPath $cfgPath -Raw -Encoding utf8 | ConvertFrom-Json
-        foreach ($key in @('enabled','wav')) {
+        foreach ($key in @('enabled')) {
             if ($user.PSObject.Properties.Name -contains $key) {
                 $cfg[$key] = $user.$key
             }
@@ -40,21 +39,28 @@ if (-not $cfg.enabled) { exit 0 }
 
 # --- Resolver WAV -----------------------------------------------------------
 
-# personal/ vive en el workspace de gobernanza (NEB_WORKSPACE), no en el checkout de neb
-$nebHome = if ($env:NEB_WORKSPACE) { $env:NEB_WORKSPACE } else { $env:NEB_HOME }
-$wav = $cfg.wav
+# Un solo resolvedor (lib\notify_sound.py): presets, ruta absoluta y respaldo. Bajo el
+# despachador del plugin llega resuelto en NEB_NOTIFY_WAV; invocado directo (entradas de
+# settings.json anteriores a 6.15.0) se le pregunta a su CLI. Sin Python, el sonido de neb.
+$wav = $env:NEB_NOTIFY_WAV
 if (-not $wav) {
-    $wav = Join-Path $nebHome 'personal\chimes-loud.wav'
-}
-if (-not (Test-Path -LiteralPath $wav)) {
-    $fallback = Join-Path $nebHome 'personal\chimes-loud.wav'
-    if ($cfg.wav -and (Test-Path -LiteralPath $fallback)) {
-        [Console]::Error.WriteLine("[notify-on-permission] wav '$($cfg.wav)' no existe; usando default '$fallback'")
-        $wav = $fallback
-    } else {
-        exit 0
+    $resolver = Join-Path $PSScriptRoot 'lib\notify_sound.py'
+    foreach ($py in @('py','python','python3')) {
+        if (Get-Command $py -ErrorAction SilentlyContinue) {
+            $prevEnc = [Console]::OutputEncoding
+            [Console]::OutputEncoding = [Text.Encoding]::UTF8
+            $env:PYTHONIOENCODING = 'utf-8'
+            $wav = & $py $resolver 'notify-on-permission' 2>$null | Select-Object -First 1
+            [Console]::OutputEncoding = $prevEnc
+            # 3 = el dev apagó el hook en su JSON (criterio del resolvedor, también "enabled": "false").
+            if ($LASTEXITCODE -eq 3) { exit 0 }
+            # Un alias que no corre Python (el de la Microsoft Store) no imprime nada: se prueba el siguiente.
+            if ($wav) { break }
+        }
     }
 }
+if (-not $wav) { $wav = Join-Path $PSScriptRoot 'sounds\neb-chime.wav' }
+if (-not (Test-Path -LiteralPath $wav)) { exit 0 }
 
 # --- Player (1 chime async) -------------------------------------------------
 

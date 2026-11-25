@@ -308,10 +308,32 @@ def _env_notices(bootstrap_dir, neb_home=None):
             "Valores que el gate de los hooks opcionales no reconoce, y que por eso no corren: %s. "
             "Van separados por comas y sin espacios; nombres validos: %s. Avisa al dev."
             % (', '.join('`%s` en `%s`' % (t, v) for v, t in invalid), names))
+    sound = _sound_notice(bootstrap_dir)
+    if sound:
+        notices.append(sound)
     offer = _autoupdate_offer(bootstrap_dir)
     if offer:
         notices.append(offer)
     return [ENV_NOTICE % n for n in notices]
+
+
+def _sound_notice(bootstrap_dir):
+    """El aviso de los hooks de sonido activados que no suenan como se configuraron, o None.
+    Solo lee: el diagnóstico de hooks/lib/notify_sound.py no genera la caché de `chimes-loud`."""
+    try:
+        hooks_dir = os.path.join(os.path.dirname(bootstrap_dir), 'hooks')
+        hook = _load_module(os.path.join(hooks_dir, 'neb-hook.py'), 'neb_hook')
+        sound = _load_module(os.path.join(hooks_dir, 'lib', 'notify_sound.py'), 'notify_sound')
+        enabled = hook.enabled_hooks()
+        found = [(name, sound.diagnose(name)) for name in sound.HOOKS if name in enabled]
+    except Exception:  # noqa: BLE001 — el aviso es accesorio; el arranque no se rompe por el
+        return None
+    found = [(name, d) for name, d in found if d]
+    if not found:
+        return None
+    return ("Hooks de sonido que no suenan como se configuraron: %s. Avisa al dev; los valores de `wav` "
+            "están en `tooling/notify-on-stop.md` § \"Configuración personal default\"."
+            % '; '.join('`%s` %s' % (name, d) for name, d in found))
 
 
 def _autoupdate_offer(bootstrap_dir):

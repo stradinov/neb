@@ -2,7 +2,7 @@
 
 > Lineamiento del hook `notify-on-stop.{ps1,sh}`. **Opcional personal**: no es baseline del equipo, cada dev decide si lo activa en su `~/.claude/settings.json`.
 >
-> Artefactos del hook: [`hooks/notify-on-stop.ps1`](../hooks/notify-on-stop.ps1), [`hooks/notify-on-stop.sh`](../hooks/notify-on-stop.sh), [`hooks/neb-hook.py`](../hooks/neb-hook.py) (dispatcher del plugin), [`hooks/hooks.json`](../hooks/hooks.json).
+> Artefactos del hook: [`hooks/notify-on-stop.ps1`](../hooks/notify-on-stop.ps1), [`hooks/notify-on-stop.sh`](../hooks/notify-on-stop.sh), [`hooks/neb-hook.py`](../hooks/neb-hook.py) (dispatcher del plugin), [`hooks/lib/notify_sound.py`](../hooks/lib/notify_sound.py) (qué sonido suena), [`hooks/sounds/`](../hooks/sounds/README.md) (sonido por defecto y su licencia), [`hooks/hooks.json`](../hooks/hooks.json).
 
 ---
 
@@ -21,6 +21,7 @@ Opcional personal porque no todos los devs lo quieren (entorno de oficina compar
 | 1. Detectar fin de turno | Claude Code | Dispara `Stop` hook con `transcript_path` en stdin |
 | 2. Guard de subsesión interna | Hook (script) | Si `NEB_INTERNAL_SUBSESSION=1` (o alias legacy), `exit 0` |
 | 3. Cargar config personal | Hook (script) | Lee `~/.claude/notify-on-stop.json`; campos ausentes caen a los valores por defecto |
+| 3b. Resolver el sonido | `hooks/lib/notify_sound.py` | Aplica el valor de `wav` (§ "Configuración personal default"). El dispatcher pasa la ruta al script en `NEB_NOTIFY_WAV`; invocado directo, el script le pregunta a la CLI del resolvedor |
 | 4. Calcular duración del turno | Hook (script) | Walk-back del transcript al último user message no-`toolUseResult` |
 | 5. Reproducir N chimes | Hook (script) | Player nativo en background process; el hook retorna inmediato |
 
@@ -31,7 +32,7 @@ Claude termina turno → Stop hook
                       ├─ Guard de subsesión interna (NEB_INTERNAL_SUBSESSION=1 → exit 0)
                       ├─ Cargar ~/.claude/notify-on-stop.json (defaults si ausente)
                       ├─ Si enabled=false → exit 0
-                      ├─ Resolver WAV (cfg.wav || ${NEB_WORKSPACE:-$NEB_HOME}/personal/chimes-loud.wav)
+                      ├─ Resolver WAV (NEB_NOTIFY_WAV || CLI de hooks/lib/notify_sound.py || hooks/sounds/neb-chime.wav)
                       ├─ Leer transcript_path del stdin JSON
                       ├─ Walk-back → último user msg no-toolUseResult → timestamp
                       ├─ duración = now - timestamp
@@ -63,12 +64,23 @@ Claude termina turno → Stop hook
 | Campo | Tipo | Por defecto | Notas |
 |---|---|---|---|
 | `enabled` | bool | `true` | `false` → `exit 0` inmediato sin reproducir. |
-| `wav` | string \| null | `null` (= `personal/chimes-loud.wav` de `$NEB_WORKSPACE`, o de `$NEB_HOME` sin workspace) | Path absoluto. Si no existe → fallback al valor por defecto + warning a stderr. |
+| `wav` | string \| null | `null` (= `hooks/sounds/neb-chime.wav`) | Preset o ruta absoluta; tabla de valores abajo. |
 | `min_seconds` | int | `10` | Turnos más cortos → skip silencioso. Útil para que respuestas triviales no suenen. |
 | `max_chimes` | int | `5` | Clamp `[1, 20]`. |
 | `scaling` | `"per-minute"` \| `"fixed"` | `"per-minute"` | Cualquier otro valor cae a `"per-minute"`. |
 
 Cualquier campo ausente cae al valor por defecto hardcoded en el script. Si el archivo no existe, todos los valores por defecto aplican. JSON malformado loguea a stderr y aplica los valores por defecto.
+
+Valores de `wav` (los resuelve [`hooks/lib/notify_sound.py`](../hooks/lib/notify_sound.py); valen igual para `notify-on-permission`):
+
+| Valor | Suena | SO |
+|---|---|---|
+| `null`, ausente o `"neb"` | `hooks/sounds/neb-chime.wav`, que viene con el plugin (CC0; fuente y licencia en [`hooks/sounds/README.md`](../hooks/sounds/README.md)) | todos |
+| `"chimes"` | El `chimes.wav` original de Windows (`%WINDIR%\Media\chimes.wav`) | Windows |
+| `"chimes-loud"` | El mismo `chimes.wav`, amplificado. Se genera en local la primera vez en `~/.claude/neb-sounds/chimes-loud.wav` y se regenera si el original cambia | Windows |
+| Ruta absoluta | Ese archivo WAV | todos |
+
+Si el valor no se puede cumplir (preset de Windows en otro SO, ruta inexistente, valor no reconocido, `chimes.wav` ilegible), suena `neb-chime.wav`. Cuando el hook está activado en `NEB_HOOKS` o `NEB_PROJECT_HOOKS` y no suena como se configuró, o en Linux/Mac no hay reproductor, el arranque de la sesión lo avisa con el motivo; con `enabled: false` no avisa. Los presets de Windows no se distribuyen con Neb: ese audio no se puede redistribuir, así que se lee de la máquina del dev.
 
 ## 6. Activación
 
@@ -76,7 +88,7 @@ Manual. El plugin ya registra el hook (ver [`hooks/README.md`](../hooks/README.m
 
 1. Agregar `notify-on-stop` a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json`, por ejemplo `"NEB_HOOKS": "notify-on-stop"` (en una lista ya existente, va separado por comas y sin espacios). En Windows requiere Git Bash.
 
-2. Verificar que el WAV por defecto exista (`personal/chimes-loud.wav` de `$NEB_WORKSPACE`), o fijar `wav` en el config del paso 3.
+2. (Opcional) Elegir otro sonido con `wav` en el config del paso 3. Sin elegir nada suena el que trae el plugin.
 
 3. (Opcional) Crear `~/.claude/notify-on-stop.json` con valores explícitos. Si está ausente, los valores por defecto aplican.
 
@@ -125,8 +137,8 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 - `$env:NEB_INTERNAL_SUBSESSION = '1'` (o el alias legacy `CLAUDE_PREPROCESS_RECURSION`) — guard de subsesión interna.
 - Duración del turno < `min_seconds` (por defecto 10).
 - `transcript_path` ausente o ilegible — fallback a `play_n 1` (1 chime de cortesía, no skip total).
-- WAV inexistente y valor por defecto inexistente.
-- Linux/Mac sin ningún player en PATH.
+- Ningún WAV resoluble: ni el configurado ni `hooks/sounds/neb-chime.wav` (el arranque lo avisa).
+- Linux/Mac sin ningún player en PATH (el arranque lo avisa).
 
 ## 9. Limitaciones y alcances
 
@@ -134,7 +146,8 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 
 - Aviso sonoro al cierre de turno, con número de chimes proporcional a la duración.
 - Cross-OS Windows + Linux/Mac vía dos scripts hermanos.
-- Configuración personal por dev (path al WAV, umbral, máximo, modo).
+- Configuración personal por dev (sonido por preset o ruta, umbral, máximo, modo).
+- Un sonido por defecto que viene con el plugin y suena en todo SO, sin conseguir archivos aparte.
 
 ### No alcances
 
@@ -148,7 +161,7 @@ El hook **no reproduce** en los siguientes casos (`exit 0` silencioso):
 - **Latencia**: < 100 ms del hook al `exit 0`; el sonido corre async en background process. Cumple la filosofía de hooks.
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0`. Nunca bloquea la sesión.
 - **Cross-OS**: bajo el plugin, el hook corre en Git Bash en Windows y el dispatcher elige el `.ps1`; en macOS y Linux, el `.sh`. Una entrada de settings con clon declara `"shell": "powershell"` con `$env:VAR` en Windows.
-- **Linux/Mac**: `jq` es requisito blando — sin `jq`, el script cae a valores por defecto completos y solo puede emitir 1 chime de cortesía (no calcula duración).
+- **Linux/Mac**: `jq` es requisito blando — sin `jq`, el script cae a valores por defecto completos y solo puede emitir 1 chime de cortesía (no calcula duración). El sonido no depende de `jq`: lo resuelve Python (el del dispatcher o, invocado directo, `python3`/`python`); sin Python suena `neb-chime.wav`.
 - **Múltiples hooks `Stop`**: Claude Code los ejecuta en paralelo; convive con otros hooks `Stop` del repo (p. ej. `logbook-sync`).
 - **Coexistencia con `Notification`** (`notify-on-permission`): eventos semánticamente distintos. Si el dev activa ambos, suenan chimes en secuencia (permission → approve → tool corre → cierre de turno). Ver [`tooling/notify-on-permission.md`](notify-on-permission.md) § "Coexistencia con `notify-on-stop`".
 - **Sin secretos**: no lee ni escribe credenciales.
@@ -175,7 +188,7 @@ Escenarios a probar tras activar:
 | 4 | Turno ~6 min | 5 chimes (clamp por `max_chimes`). |
 | 5 | Config `scaling: "fixed"`, turno largo | 1 chime constante. |
 | 6 | Config `enabled: false` | Sin chime aun en turno largo. |
-| 7 | Config `wav` apuntando a archivo inexistente | Fallback al valor por defecto + warning stderr; chime suena. |
+| 7 | Config `wav` apuntando a archivo inexistente | Suena `neb-chime.wav`; el arranque de la siguiente sesión avisa del motivo. |
 | 8 | Config JSON malformado | Todos los valores por defecto aplicados; warning stderr. |
 | 9 | Sin config (archivo ausente) | Valores por defecto; chime suena igual que escenarios 2-4. |
 | 10 | **Prompt no trivial con `preprocess-prompt.py` activo** (escenario clave) | Solo 1 chime al final del turno real. **Sin chime fantasma** del subproceso `claude -p` (guard de subsesión interna). |
@@ -184,8 +197,10 @@ Escenarios a probar tras activar:
 | 13 | Windows con WAV en path con espacios | Suena correctamente. |
 | 14 | Coexistencia con `logbook-sync` (otro hook `Stop`) | Ambos corren; ninguno bloquea al otro. |
 | 15 | Desactivación permanente (quitar `notify-on-stop` de `NEB_HOOKS` + reiniciar) | Sin chime. |
+| 16 | Config `wav: "chimes"` / `"chimes-loud"` en Windows | Suena el `chimes.wav` original / su versión amplificada (la primera vez se genera en `~/.claude/neb-sounds/`). |
+| 17 | Config `wav: "chimes"` en Linux/Mac | Suena `neb-chime.wav`; el arranque avisa que el preset solo existe en Windows. |
 
-Escenarios 1–4, 6, 9, 10, 13–15 corren en máquina Windows. Escenarios 12 (Linux/Mac sin player) quedan como verificación pendiente cuando otro dev del equipo lo active.
+Escenarios 1–4, 6, 9, 10, 13–16 corren en máquina Windows. Escenarios 12 y 17 (Linux/Mac) quedan como verificación pendiente cuando otro dev del equipo lo active.
 
 ## 12. Referencias
 

@@ -4,6 +4,30 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [7.2.0] - 2026-11-24
+
+> **Minor**: los hooks de sonido (`notify-on-stop`, `notify-on-permission`) suenan en cualquier máquina y SO sin conseguir un WAV aparte. Antes, el sonido por defecto era `personal/chimes-loud.wav` del espacio de trabajo: un archivo que ningún adoptante tenía (está excluido de git y es audio de Windows que no se puede redistribuir), así que el hook callaba sin avisar.
+>
+> - **Adoptantes**: nada que hacer. Con `wav` nulo suena el sonido nuevo del plugin. Para el `chimes.wav` original de Windows, `"wav": "chimes"`; para su versión fuerte, `"wav": "chimes-loud"`.
+> - **Quien tenía `personal/chimes-loud.wav`**: el archivo deja de usarse. `"wav": "chimes-loud"` reproduce el mismo sonido, generado en local.
+
+### Added
+- **`hooks/sounds/neb-chime.wav`**: sonido por defecto en todo SO, el primer binario del repo. Es «Alert/Notification Sound» de frosty ham (OpenGameArt, CC0 1.0), pasado a mono, PCM 16 bit, sin cambiar el volumen.
+- **`hooks/sounds/README.md`**: ficha de origen y licencia, con fuente, fecha de descarga, sha256 del original y del versionado, y la transformación aplicada.
+- **`hooks/lib/notify_sound.py`**: único resolvedor del valor `wav`. Lo usan el dispatcher, el arranque y los scripts invocados directo, por su CLI.
+  - Valores: `null`/`"neb"` (el sonido del plugin), `"chimes"` y `"chimes-loud"` (solo Windows) o una ruta absoluta. Cualquier otro caso suena el del plugin y deja el motivo.
+  - `"chimes-loud"`: amplifica el `chimes.wav` de la máquina por pico (15926, el del archivo histórico; coincide en cada muestra con diferencia ≤ 1). Lo guarda en `~/.claude/neb-sounds/` con escritura atómica y lo regenera si el original cambia. Si la fuente no es PCM 16 bit o está en silencio, suena el sonido del plugin.
+- **Aviso del arranque**: si `notify-on-stop` o `notify-on-permission` están activados (`NEB_HOOKS` o `NEB_PROJECT_HOOKS`) y no suenan como se configuraron, o en Linux/Mac no hay reproductor, el arranque lo avisa con el motivo. No avisa de un hook con `enabled: false`. Solo lee: no genera la caché.
+- **`hooks/tests/test_notify_sound.py`**: cada valor de `wav` en Windows y POSIX, la versión fuerte (pico, formato, caché, escritura atómica, fuentes inválidas), el modo de diagnóstico, la CLI y el WAV versionado.
+
+### Changed
+- **`hooks/neb-hook.py`**: el dispatcher resuelve el sonido y lo pasa en `NEB_NOTIFY_WAV`. Sin ruta (hook apagado en su JSON, o sin ningún WAV) no lanza el script. Si el resolvedor falla, el script corre sin la variable.
+- **`hooks/notify-on-stop.{ps1,sh}`, `hooks/notify-on-permission.{ps1,sh}`**: ya no resuelven `wav` por su cuenta ni conocen `personal/chimes-loud.wav`. Orden: `NEB_NOTIFY_WAV`, luego la CLI del resolvedor (`py`/`python`/`python3`, saltando el alias de la Microsoft Store que no imprime nada) y, sin Python, `sounds/neb-chime.wav`. En Linux/Mac el sonido ya no depende de `jq`. Si la CLI sale con 3 (el hook está apagado en su JSON, también con `"enabled": "false"`), el script sale sin sonar, aun sin `jq`.
+- **`bootstrap/neb-bootstrap-context.py`**: el aviso de los hooks de sonido (`_sound_notice`).
+- **`tooling/notify-on-stop.md`**, **`tooling/notify-on-permission.md`**, **`hooks/README.md`**: tabla de valores de `wav`, el aviso del arranque, la activación sin conseguir un WAV y escenarios de verificación nuevos.
+- **`hooks/tests/test_neb_hook.py`**, **`hooks/tests/test_bootstrap_context.py`**: `NEB_NOTIFY_WAV` en el hijo del dispatcher y el aviso del arranque.
+- **`.gitattributes`**: `*.wav binary`.
+
 ## [7.1.0] - 2026-11-24
 
 > **Minor**: nueva vía de instalación y actualización. El README ya no lista los comandos `/plugin`: da un prompt para copiar que apunta a `INSTALL.md`, y Claude sigue esas instrucciones.

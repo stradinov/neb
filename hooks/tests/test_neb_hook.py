@@ -5,7 +5,8 @@ Cubre hooks/neb-hook.py y hooks/lib/approved_plan.py:
   • gate: unión de NEB_HOOKS y NEB_PROJECT_HOOKS; valores inválidos (desconocidos, con espacios)
   • main(): gate apagado, subsesión interna y stdin inválido no despachan
   • dispatch(): argumentos de cada hook (logbook-sync, notify-*, preprocess-prompt),
-    PYTHONIOENCODING en los hijos
+    PYTHONIOENCODING en los hijos; notify-* recibe el sonido en NEB_NOTIFY_WAV (7.2.0), no se lanza sin
+    ruta y, si el resolvedor falla, corre sin la variable
   • save-approved-plan: slug ASCII completo, ruta y encabezado, proyecto de un cwd de Windows
   • extremo a extremo: neb-hook.py como proceso con un HOME temporal
 
@@ -30,6 +31,7 @@ LIB = os.path.join(HOOKS_DIR, "lib")
 sys.path.insert(0, LIB)
 
 import approved_plan  # noqa: E402
+import notify_sound  # noqa: E402 — el mismo módulo que importa dispatch() (sys.modules)
 
 SCRIPT = os.path.join(HOOKS_DIR, "neb-hook.py")
 _spec = importlib.util.spec_from_file_location("neb_hook", SCRIPT)
@@ -140,17 +142,41 @@ class TestDispatch(unittest.TestCase):
                     run, _, _ = self._dispatch("logbook-sync", event=event)
                     run.assert_not_called()
 
+    def _notify(self, hook, windows, resolved=("C:\\x\\neb-chime.wav", None), error=None):
+        kw = {"side_effect": error} if error else {"return_value": resolved}
+        with mock.patch.object(notify_sound, "resolve", **kw) as resolve:
+            run, popen, payload = self._dispatch(hook, windows=windows)
+        return run, resolve
+
     def test_notify_windows_ps1(self):
-        run, _, _ = self._dispatch("notify-on-stop", windows=True)
+        run, resolve = self._notify("notify-on-stop", windows=True)
+        self.assertEqual(resolve.call_args[0][0], "notify-on-stop")
+        self.assertEqual(resolve.call_args[1]["home"], "HOME")
         argv = run.call_args[0][0]
         self.assertEqual(argv[:5], ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
         self.assertEqual(argv[5], os.path.join(nh.HERE, "notify-on-stop.ps1"))
         self.assertEqual(run.call_args[1]["stdout"], subprocess.DEVNULL)
         self.assertEqual(run.call_args[1]["stderr"], subprocess.DEVNULL)
+        self.assertEqual(run.call_args[1]["env"]["NEB_NOTIFY_WAV"], "C:\\x\\neb-chime.wav")
+        self.assertEqual(run.call_args[1]["env"]["PYTHONIOENCODING"], "utf-8")
 
     def test_notify_posix_sh(self):
-        run, _, _ = self._dispatch("notify-on-permission", windows=False)
+        run, _ = self._notify("notify-on-permission", windows=False, resolved=("/x/neb-chime.wav", "motivo"))
         self.assertEqual(run.call_args[0][0], ["bash", os.path.join(nh.HERE, "notify-on-permission.sh")])
+        self.assertEqual(run.call_args[1]["env"]["NEB_NOTIFY_WAV"], "/x/neb-chime.wav")
+
+    def test_notify_sin_ruta_no_lanza_el_script(self):
+        for resolved in ((None, None), (None, "falta el sonido por defecto")):
+            with self.subTest(resolved=resolved):
+                run, _ = self._notify("notify-on-stop", windows=True, resolved=resolved)
+                run.assert_not_called()
+
+    def test_notify_falla_del_resolvedor_corre_el_script_sin_la_variable(self):
+        with mock.patch.dict(os.environ, {}, clear=False):
+            os.environ.pop("NEB_NOTIFY_WAV", None)
+            run, _ = self._notify("notify-on-stop", windows=True, error=RuntimeError("roto"))
+        run.assert_called_once()
+        self.assertNotIn("NEB_NOTIFY_WAV", run.call_args[1]["env"])
 
     def test_preprocess_hereda_stdout(self):
         run, _, payload = self._dispatch("preprocess-prompt")

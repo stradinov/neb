@@ -65,8 +65,9 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
   - **Linux/Mac**: `bash`, un player en PATH (`afplay`/`paplay`/`aplay`/`play`). `jq` es blando (sin él, defaults completos).
 - **Input**: JSON por stdin (no se usa — sin walk-back).
 - **Output**: ninguno (reproduce audio async en background process).
-- **Defensivo**: ante cualquier falla (config malformado, WAV ausente, player ausente), `exit 0` silencioso.
+- **Defensivo**: ante cualquier falla (config malformado, WAV ausente, player ausente), `exit 0` silencioso. Si el hook está activado y no suena como se configuró, el arranque de la sesión lo avisa.
 - **Configurable** en `~/.claude/notify-on-permission.json`: `enabled`, `wav`. Por defecto: 1 chime fijo. Sin scaling ni `min_seconds` (el evento no tiene duración medible).
+- **Sonido**: el mismo resolvedor y los mismos valores de `wav` que `notify-on-stop` (siguiente sección).
 - **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), igual que `notify-on-stop`.
 - **Coexiste con `Stop`** (`notify-on-stop`): eventos semánticamente distintos; pueden disparar chimes en secuencia. Ver `tooling/notify-on-permission.md` § "Coexistencia con `notify-on-stop`".
 
@@ -80,8 +81,9 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
   - **Linux/Mac**: `bash`, `jq` (requisito blando — sin jq, defaults + 1 chime de cortesía), un player en PATH (`afplay`/`paplay`/`aplay`/`play`).
 - **Input**: JSON por stdin con `transcript_path`.
 - **Output**: ninguno (reproduce audio async en background process).
-- **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0` silencioso.
+- **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0` silencioso. Si el hook está activado y no suena como se configuró, el arranque de la sesión lo avisa.
 - **Configurable** en `~/.claude/notify-on-stop.json`: `enabled`, `wav`, `min_seconds`, `max_chimes`, `scaling` (`per-minute` o `fixed`). Por defecto: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
+- **Sonido**: `wav` nulo suena `sounds/neb-chime.wav`, que viene con el plugin (CC0, ficha en [`sounds/README.md`](sounds/README.md)). En Windows, `"chimes"` usa el `chimes.wav` del sistema y `"chimes-loud"` una versión amplificada que se genera en local; una ruta absoluta usa ese archivo. Lo resuelve `lib/notify_sound.py`: el dispatcher pasa la ruta en `NEB_NOTIFY_WAV` y el script invocado directo le pregunta a su CLI. Valores y respaldos: [`tooling/notify-on-stop.md`](../tooling/notify-on-stop.md) § "Configuración personal default".
 - **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) y abandona — evita el "chime fantasma" del subproceso `claude -p` invocado por [`preprocess-prompt.py`](#preprocess-promptpy). Cross-link en `tooling/notify-on-stop.md` § "Guard de subsesión interna".
 
 ### preprocess-prompt.py

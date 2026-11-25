@@ -5,3 +5,6 @@
 agents/*.md text eol=lf
 commands/*.md text eol=lf
 skills/*/SKILL.md text eol=lf
+
+# Audio de los hooks: binario, sin conversión de fin de línea ni diff de texto.
+*.wav binary

@@ -33,7 +33,6 @@ done
 # --- Defaults ---------------------------------------------------------------
 
 ENABLED=true
-WAV=""
 
 # --- Cargar config personal -------------------------------------------------
 
@@ -43,8 +42,7 @@ command -v jq >/dev/null 2>&1 && HAVE_JQ=1
 
 if [ -f "$CFG" ] && [ "$HAVE_JQ" = "1" ]; then
     if jq empty "$CFG" >/dev/null 2>&1; then
-        ENABLED=$(jq -r 'if has("enabled") then .enabled     else true end' "$CFG")
-        WAV=$(    jq -r 'if has("wav")     then (.wav // "") else ""   end' "$CFG")
+        ENABLED=$(jq -r 'if has("enabled") then .enabled else true end' "$CFG")
     else
         log "config ilegible, usando defaults"
     fi
@@ -54,17 +52,25 @@ fi
 
 # --- Resolver WAV -----------------------------------------------------------
 
-DEFAULT_WAV="${NEB_WORKSPACE:-$NEB_HOME}/personal/chimes-loud.wav"
+# Un solo resolvedor (lib/notify_sound.py): presets, ruta absoluta y respaldo. Bajo el
+# despachador del plugin llega resuelto en NEB_NOTIFY_WAV; invocado directo (entradas de
+# settings.json anteriores a 6.15.0) se le pregunta a su CLI. Sin Python, el sonido de neb.
+HERE="$(cd "$(dirname "$0")" && pwd)"
+WAV="${NEB_NOTIFY_WAV:-}"
 if [ -z "$WAV" ]; then
-    WAV="$DEFAULT_WAV"
-elif [ ! -f "$WAV" ]; then
-    if [ -f "$DEFAULT_WAV" ]; then
-        log "wav '$WAV' no existe; usando default '$DEFAULT_WAV'"
-        WAV="$DEFAULT_WAV"
-    else
-        exit 0
-    fi
+    for py in python3 python; do
+        if command -v "$py" >/dev/null 2>&1; then
+            # Sin `break` incondicional: un alias que no corre Python (el de la Microsoft Store en
+            # Git Bash) no imprime nada y se prueba el siguiente.
+            OUT=$(PYTHONIOENCODING=utf-8 "$py" "$HERE/lib/notify_sound.py" notify-on-permission 2>/dev/null)
+            # 3 = el dev apagó el hook en su JSON (sin jq, este script no lee `enabled`).
+            [ "$?" = "3" ] && exit 0
+            WAV=$(printf '%s\n' "$OUT" | head -n 1)
+            [ -n "$WAV" ] && break
+        fi
+    done
 fi
+[ -z "$WAV" ] && WAV="$HERE/sounds/neb-chime.wav"
 [ ! -f "$WAV" ] && exit 0
 
 # --- 1 chime async ----------------------------------------------------------
