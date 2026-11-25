@@ -4,6 +4,22 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [7.7.0] - 2026-11-25
+
+> **Minor**: cuando al seguir `INSTALL.md` aparece un problema cuya causa es la guía o el plugin, Claude propone el canal en el reporte final. Si el problema se resolvió con una corrección probada en esa instalación, propone un pull request (o, con permiso de escritura en el repo, el arreglo directo). Si no se resolvió, propone un issue. Antes revisa si `main` ya lo corrigió (en la guía o, si la causa es el plugin, en el CHANGELOG) y si ya hay un issue o pull request que lo reporte. Los problemas del entorno del usuario (requisito faltante, red, permisos locales) quedan fuera.
+>
+> - **Adoptantes**: nada que hacer.
+> - **Volver atrás**: 7.6.1 sin cambios en la base ni en la configuración.
+
+### Added
+- **`INSTALL.md`**: sección 7 «Problemas de la guía» (qué cuenta, resuelto o no resuelto, vigencia contra `main`, duplicados con o sin `gh` en el repo del campo `repository`, permiso de escritura, menú del pull request o del issue, arreglo directo del mantenedor) y regla «no se publica durante la instalación». El reporte final pasa a la sección 8 y agrega la línea «Problemas de la guía».
+
+### Changed
+- **`process/upstream-contribution.md`**: el aporte también puede salir de la guía de instalación («Origen en la instalación»: sin REQ ni Change MD de origen; sin arranque en la sesión, sin anuncio de cambio de profile). Paso 1: sin arranque, el `plugin.json` del plugin instalado. Paso 2: sin espacio de trabajo, la ruta del clon no se anota y va al reporte final. Paso 9: si `context-completeness-reviewer` no está disponible, un subagente general con su mandato. Paso 11: sin `neb.db`, Claude entrega la URL al dev al publicar. El campo «Origen» del cuerpo del PR suma el ejemplo de la instalación.
+- **`methodology/vocabulary.md`**: «Aporte al núcleo» incluye el origen en la instalación.
+- **`methodology/platform-assumptions.md`**: R27 lista `INSTALL.md` (`repository`) entre sus dependientes.
+- **`CONTRIBUTING.md`**: la instalación guiada también propone el canal.
+
 ## [7.6.1] - 2026-11-25
 
 > **Patch**: en Windows, la ruta de `wav` de `notify-on-stop` y `notify-on-permission` vale igual con cualquier Python. Lleva unidad (`C:/…`, `C:\…`) o es UNC (`\\servidor\recurso\…`). Desde Python 3.13, `os.path.isabs` da `False` para una ruta con raíz pero sin unidad (`/Windows/Media/chimes.wav`), así que con 3.13 o posterior esa ruta sonaba el sonido por defecto aunque el archivo existiera, y con 3.12 sonaba el archivo. Ahora, en cualquier versión, esa ruta suena el sonido por defecto, y el aviso del arranque dice que lleva la unidad.

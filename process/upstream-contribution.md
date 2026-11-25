@@ -1,10 +1,10 @@
 # Aporte al núcleo por pull request
 
-Cómo un adoptante sin permiso de escritura en el repo del núcleo aporta una mejora que su Fase 9 identificó. Se lee cuando [`improvement.md`](improvement.md) § "Aplicar un ajuste" enruta aquí, y rige en todo clon del núcleo donde el dev no tiene permiso de escritura. El lado del mantenedor vive en [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Incorporar un PR".
+Cómo un adoptante sin permiso de escritura en el repo del núcleo aporta una mejora que su Fase 9 identificó, o la corrección de un problema que encontró al seguir la guía de instalación. Se lee cuando [`improvement.md`](improvement.md) § "Aplicar un ajuste" o [`../INSTALL.md`](../INSTALL.md) § "7. Problemas de la guía" enrutan aquí, y rige en todo clon del núcleo donde el dev no tiene permiso de escritura. El lado del mantenedor vive en [`../profiles/self-applied/deployment.md`](../profiles/self-applied/deployment.md) § "Incorporar un PR".
 
 ## Régimen del aporte
 
-El aporte es parte de la Fase 9 del REQ que lo originó; no abre un REQ nuevo. En el clon de trabajo la detección da el profile `self-applied`, y de ese profile **no aplican**:
+El aporte es parte de la Fase 9 del REQ que lo originó (o de la instalación, ver «Origen en la instalación»); no abre un REQ nuevo. En el clon de trabajo la detección da el profile `self-applied`, y de ese profile **no aplican**:
 
 - El registro propio (Change MD) y el plan-review de roles: el mantenedor revisa el aporte con roles al incorporarlo.
 - El CHANGELOG, el incremento de versión y la sección «Deploy» del profile: los asigna el mantenedor.
@@ -12,6 +12,8 @@ El aporte es parte de la Fase 9 del REQ que lo originó; no abre un REQ nuevo. E
 - El hook `pre-push` del mantenedor: no se instala en el clon de trabajo, porque su gate de fragmento rechaza un push sin CHANGELOG.
 
 **Propuesta y cambio de profile.** La opción «Aportar por PR» del menú de [`improvement.md`](improvement.md) § "Aplicar un ajuste" muestra el delta (archivo del núcleo, sección y texto nuevo) y el nombre de la rama, y anuncia que el trabajo pasa al profile `self-applied`. Elegirla aprueba esa propuesta y confirma el cambio de profile ([`../general/profile-detection.md`](../general/profile-detection.md) § "Política de anuncio"). Si al editar el delta alcanza otro archivo u otra sección, Claude vuelve a pedir OK.
+
+**Origen en la instalación.** Cuando el aporte sale de un problema al seguir `INSTALL.md`, no hay REQ ni Change MD de origen y el régimen se aplica completo. Si el arranque de Neb no está en la sesión (plugin recién instalado o recién activado), no hay profile activo que cambiar y el cambio de profile no se anuncia; si está, se anuncia como siempre.
 
 **Archivos reservados.** El aporte no toca `VERSION`, `CHANGELOG.md`, `changelog.d/`, `.gitattributes`, `.gitmodules` ni el campo `version` de `.claude-plugin/plugin.json`.
 
@@ -21,8 +23,8 @@ El aporte es parte de la Fase 9 del REQ que lo originó; no abre un REQ nuevo. E
 - «Con `gh`» significa que `gh auth status` termina en 0. Si no, Claude ofrece al dev iniciar sesión con `gh auth login` o sigue § "Sin `gh`".
 - Abrir un PR o un issue requiere una cuenta de GitHub del dev.
 
-1. **Repo del núcleo.** Claude toma la URL del campo `repository` del `.claude-plugin/plugin.json` del núcleo en uso (la raíz que nombra el arranque); `<owner>/<repo>` es la ruta de esa URL. No la toma del remoto del marketplace, que puede ser el repo del overlay del adoptante.
-2. **Clon de trabajo.** `git clone <url>` en la ruta que el dev elija; Claude la anota en «Directorio de repos locales» de `personal/<usuario>.md`. Si el clon ya existe, `git fetch origin`. Nunca se edita el caché del plugin: no es un repositorio y cada actualización instala una copia nueva (supuesto R27 de [`../methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)).
+1. **Repo del núcleo.** Claude toma la URL del campo `repository` del `.claude-plugin/plugin.json` del núcleo en uso (la raíz que nombra el arranque; sin arranque en la sesión, el del plugin instalado); `<owner>/<repo>` es la ruta de esa URL. No la toma del remoto del marketplace, que puede ser el repo del overlay del adoptante.
+2. **Clon de trabajo.** `git clone <url>` en la ruta que el dev elija; Claude la anota en «Directorio de repos locales» de `personal/<usuario>.md`; sin espacio de trabajo (instalación antes de `/wakeup`), no se anota y la ruta va en la línea «Clon» del reporte final de `INSTALL.md`. Si el clon ya existe, `git fetch origin`. Nunca se edita el caché del plugin: no es un repositorio y cada actualización instala una copia nueva (supuesto R27 de [`../methodology/platform-assumptions.md`](../methodology/platform-assumptions.md)).
 3. **Vigencia.** Si `origin/main` ya resuelve la mejora, no hay aporte: Claude lo informa y sugiere actualizar el plugin.
 4. **Rama e identidad.** Rama `mejora/<slug>` desde `origin/main` recién traído; el slug no lleva nombres de cliente ni de proyecto. En el clon: `git config --local user.email "<id>+<login>@users.noreply.github.com"` (ambos de `gh api user --jq '.id, .login'`; sin `gh`, el dev lo copia de la configuración de correos de su cuenta de GitHub) y `git config --local user.name "<login>"`.
 5. **Línea base.** Antes de la primera edición: `PY bootstrap/check-references.py --no-overlay --save-baseline <archivo fuera del clon>`.
@@ -47,7 +49,7 @@ El aporte es parte de la Fase 9 del REQ que lo originó; no abre un REQ nuevo. E
    - **Determinista.**
      - Si el overlay trae el guion `scan-forbidden-terms.sh` (`$NEB_WORKSPACE/*/scripts/`), Claude lo corre sobre ese directorio: `bash <guion> <directorio>` (en Windows, con Git Bash). La publicación sigue solo si termina en 0: con 1 se corrige lo que reporta; con otro valor la revisión no se hizo y la publicación queda bloqueada.
      - Claude busca siempre, además, en los cinco textos: el nombre de cada overlay del espacio de trabajo (las carpetas que contienen `overlays/detect-profile.local.sh`) y de cada proyecto del «Directorio de repos locales» —salvo el repo del núcleo—, el correo de `git config --global user.email`, y rutas absolutas (`C:\Users\`, `/home/`, `/Users/`). Una coincidencia bloquea la publicación hasta corregirla.
-   - **Revisor.** Claude invoca al `context-completeness-reviewer` con un briefing que lleva solo esos cinco textos —no el REQ de origen— y, además de su mandato, la consigna de reportar todo dato que identifique a un cliente, una persona, un proyecto o una máquina. Con esta invocación se cumple la de Fase 7 de [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`" para un repo público.
+   - **Revisor.** Claude invoca al `context-completeness-reviewer` con un briefing que lleva solo esos cinco textos —no el REQ de origen— y, además de su mandato, la consigna de reportar todo dato que identifique a un cliente, una persona, un proyecto o una máquina. Si ese subagente no está disponible (el plugin se acaba de instalar y la sesión no se ha reiniciado), Claude lanza un subagente general con el mismo briefing, el mandato de [`../agents/context-completeness-reviewer.md`](../agents/context-completeness-reviewer.md) y la misma consigna. Con esta invocación se cumple la de Fase 7 de [`plan-review.md`](plan-review.md) § "Cuándo aplica el `context-completeness-reviewer`" para un repo público.
 10. **Publicación (gate único).** Claude muestra al dev los cinco textos y el resultado de los pasos 7 y 9. Con su OK explícito, que cubre crear el fork, el push y el PR, desde la raíz del clon:
 
     ```
@@ -57,7 +59,7 @@ El aporte es parte de la Fase 9 del REQ que lo originó; no abre un REQ nuevo. E
     ```
 
     El fork vive en la cuenta personal del dev. Si el remoto `fork` ya existe (`git remote get-url fork` termina en 0), se omite `gh repo fork`. Si `gh repo fork` termina con error, Claude lo reporta y no sigue con el push.
-11. **Seguimiento.** Claude da de alta un pendiente con la URL del PR («revisar la respuesta del mantenedor») y, si el Change MD del REQ de origen sigue abierto, anota ahí la URL. No hace un commit adicional en el proyecto de origen solo para anotarla.
+11. **Seguimiento.** Claude da de alta un pendiente con la URL del PR («revisar la respuesta del mantenedor») y, si el Change MD del REQ de origen sigue abierto, anota ahí la URL. No hace un commit adicional en el proyecto de origen solo para anotarla. Sin `neb.db` (instalación sin espacio de trabajo), Claude entrega la URL al dev al publicar, para que él dé seguimiento a la respuesta del mantenedor ([`../INSTALL.md`](../INSTALL.md) § "8. Reporte final").
 
 ## Cuerpo del PR
 
@@ -67,7 +69,7 @@ El aporte es parte de la Fase 9 del REQ que lo originó; no abre un REQ nuevo. E
 - **Cambio propuesto** y **nivel SemVer sugerido** (según el `CLAUDE.md` del repo).
 - **Entrada de CHANGELOG propuesta**: el mantenedor la usa como insumo.
 - **Versión de Neb** instalada.
-- **Origen**: qué lo detectó y en qué fase se originó (p. ej. «diagnóstico de un defecto, origen Fase 3» o «revisión agregada»), sin el nombre del REQ. Es la cita de origen que [`improvement.md`](improvement.md) pide para el CHANGELOG.
+- **Origen**: qué lo detectó y en qué fase se originó (p. ej. «diagnóstico de un defecto, origen Fase 3», «revisión agregada» o «problema al seguir INSTALL.md, sección 3»), sin el nombre del REQ. Es la cita de origen que [`improvement.md`](improvement.md) pide para el CHANGELOG.
 
 El cuerpo no cita el Change MD de origen ni pega salidas de comandos con rutas locales.
 
