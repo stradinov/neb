@@ -742,8 +742,8 @@ class TestApply(Base):
         self.assertEqual(self.journal_mode(), "wal")
 
 
-class TestAlIniciar(Base):
-    """`neb-migrate.py al-iniciar`, la entrada de migración de SessionStart (7.5.0)."""
+class AlIniciarBase(Base):
+    """El árbol y las ayudas de las pruebas de `al-iniciar`."""
 
     def setUp(self):
         super().setUp()
@@ -757,6 +757,12 @@ class TestAlIniciar(Base):
                         os.path.join(self.tree, "hooks", "logbook-schema.sql"))
         for k in ("CLAUDE_PROJECT_DIR", "NEB_HOME", "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION"):
             os.environ.pop(k, None)
+        # Requisitos del intérprete (7.6.0): cumplidos salvo que la prueba fije otros, para no depender del Python
+        # que corre la suite.
+        self.req = None
+        p = mock.patch.object(nm, "_requisitos", lambda **kw: self.req)
+        p.start()
+        self.addCleanup(p.stop)
 
     def run_al_iniciar(self):
         out = io.StringIO()
@@ -773,6 +779,10 @@ class TestAlIniciar(Base):
 
     def exists(self, name):
         return os.path.exists(os.path.join(self.claude, name))
+
+
+class TestAlIniciar(AlIniciarBase):
+    """`neb-migrate.py al-iniciar`, la entrada de migración de SessionStart (7.5.0)."""
 
     def test_sin_pendientes_no_dice_nada(self):
         self.assertEqual(self.run_al_iniciar(), "")
@@ -1158,6 +1168,173 @@ class TestAlIniciar(Base):
             despues = bc._env_notices(os.path.join(self.tree, "bootstrap"))
         self.assertEqual(antes, despues)
         self.assertFalse(any("migración guiada" in n for n in despues), despues)
+
+
+REQUISITOS = nm._requisitos         # la real: AlIniciarBase la reemplaza en cada prueba
+
+
+def _win(**kw):
+    """Un intérprete que no alcanza ningún requisito, en Windows con winget."""
+    args = dict(py=(3, 7, 9), sqlite=(3, 31, 1), plataforma="win32", which=lambda n: "C:/winget.exe",
+                exe="C:\\Py37\\python.exe")
+    args.update(kw)
+    return REQUISITOS(**args)
+
+
+class TestRequisitos(AlIniciarBase):
+    """La oferta de instalar Python cuando el intérprete de los hooks no alcanza lo que neb pide (7.6.0)."""
+
+    def test_critico_fronteras(self):
+        casos = {((3, 7, 17), (3, 49, 1)): ["Python 3.7.17"],
+                 ((3, 8, 0), (3, 35, 4)): ["SQLite 3.35.4"],
+                 ((3, 8, 0), (3, 35, 5)): None,
+                 ((3, 12, 10), (3, 49, 1)): None}
+        for (py, sq), esperado in casos.items():
+            r = REQUISITOS(py=py, sqlite=sq, plataforma="linux", exe="/usr/bin/python3")
+            if esperado is None:
+                self.assertIsNone(r, (py, sq))
+                continue
+            self.assertEqual(len(r["motivos"]), 1, (py, sq))
+            self.assertIn(esperado[0], r["motivos"][0])
+        r = _win()
+        self.assertEqual(len(r["motivos"]), 2)
+        self.assertIn("CONTRIBUTING.md", r["motivos"][0])           # cada requisito con su motivo
+        self.assertIn("DROP COLUMN", r["motivos"][1])
+        self.assertIn("3.24", r["motivos"][1])
+
+    def test_critico_sqlite_sale_de_la_misma_fuente_que_el_paso_de_700(self):
+        self.assertEqual(nm.SQLITE_MIN, nm._migrations.DROP_COLUMN_SQLITE)
+        with mock.patch.object(nm._migrations, "SQLITE_VERSION", (3, 31, 1)):
+            r = REQUISITOS(py=(3, 12, 10), plataforma="linux", exe="/x")
+        self.assertIn("SQLite 3.31.1", r["motivos"][0])
+
+    def test_critico_orden_recorte_y_sin_orden_de_decirlo(self):
+        req = nm._req_text(self.home, r=_win())
+        guided = {"pendientes": [{"id": "%s:p%d" % (V, i), "titulo": "Paso %d" % i, "clase": "dev"}
+                                 for i in range(60)]}
+        report = {"guiados": {"fallos": [{"id": "%s:f%d" % (V, i), "titulo": "F", "detalle": "x" * 900}
+                                         for i in range(8)]}}
+        text = nm._al_iniciar_text(report, "aviso de base " * 40, guided, requisitos=req)
+        self.assertLessEqual(nm._u16(text), nm.AL_INICIAR_MAX)
+        self.assertIn(req, text, "el texto de la oferta queda entero tras el recorte")
+        self.assertLess(text.index("Hay pasos de la migración guiada"), text.index(req))
+        self.assertLess(text.index(req), text.index("Problemas de la migración"))
+        solo = nm._al_iniciar_text(None, "", {}, requisitos=req)
+        self.assertEqual(solo, nm.AL_INICIAR_HEADER + req + "\n")
+        self.assertNotIn(nm.AL_INICIAR_TELL, solo, "la oferta trae su propia instrucción")
+
+    def test_critico_al_iniciar_trae_la_oferta(self):
+        self.req = _win()
+        text = self.run_al_iniciar()
+        self.assertIn("winget install --id Python.Python.3.14", text)
+        self.req = None
+        self.assertEqual(self.run_al_iniciar(), "")
+
+    def test_critico_la_oferta_sale_tambien_si_la_corrida_falla(self):
+        self.req = _win()
+        with mock.patch.object(nm, "_al_iniciar_run", side_effect=RuntimeError("x")):
+            text = self.run_al_iniciar()
+        self.assertIn("falló al iniciar la sesión (RuntimeError)", text)
+        self.assertIn("winget install --id Python.Python.3.14", text)
+
+    def test_respeta_la_subsesion_interna(self):
+        self.req = _win()
+        os.environ["NEB_INTERNAL_SUBSESSION"] = "1"
+        self.assertEqual(self.run_al_iniciar(), "")
+
+    def test_variantes_por_plataforma(self):
+        con = nm._req_text(self.home, r=_win())
+        self.assertIn("«Instalarlo (Recomendado)»", con)
+        self.assertIn("winget install --id Python.Python.3.14 --exact --source winget --scope user", con)
+        self.assertIn('--custom "InstallLauncherAllUsers=0"', con)
+        self.assertIn("PSF-2.0", con)
+        self.assertIn("unos 33 MB", con)
+        self.assertIn("reiniciar Claude Code", con)
+        self.assertIn("un Python de todo el equipo", con)
+        otras = {"sin winget": _win(which=lambda n: None, alias=lambda: False), "macOS": _win(plataforma="darwin"),
+                 "Linux": _win(plataforma="linux", exe="/usr/bin/python3")}
+        for nombre, r in otras.items():
+            t = nm._req_text(self.home, r=r)
+            self.assertNotIn("winget install", t, nombre)
+            self.assertNotIn("«Instalarlo", t, nombre)
+            self.assertIn("No corras el comando", t, nombre)
+        self.assertIn("https://www.python.org/downloads/", nm._req_text(self.home, r=otras["sin winget"]))
+        self.assertIn("brew install python@3.14", nm._req_text(self.home, r=otras["macOS"]))
+        linux = nm._req_text(self.home, r=otras["Linux"])
+        self.assertIn("sudo apt install python3", linux)
+        self.assertIn("Ubuntu 20.04 trae SQLite 3.31.1", linux)
+        self.assertLess(linux.index("python.org"), linux.index("apt"), "python.org va antes que apt")
+        self.assertIn("o el instalado tampoco alcanza", linux)
+
+    def test_winget_por_su_alias_aunque_which_no_lo_vea(self):
+        # Antes de Python 3.8, shutil.which no ve el alias de ejecución de winget (verificado con 3.7.9).
+        self.assertTrue(_win(which=lambda n: None, alias=lambda: True)["winget"])
+        self.assertFalse(_win(which=lambda n: None, alias=lambda: False)["winget"])
+        base = os.path.join(self.home, "lad")
+        os.makedirs(os.path.join(base, "Microsoft", "WindowsApps"))
+        with mock.patch.dict(os.environ, {"LOCALAPPDATA": base}):
+            self.assertFalse(nm._winget_alias())
+            with open(os.path.join(base, "Microsoft", "WindowsApps", "winget.exe"), "w") as fh:
+                fh.write("")
+            self.assertTrue(nm._winget_alias())
+
+    def test_no_volver_a_ofrecer_es_por_interprete_y_version(self):
+        r = _win()
+        self.assertIn("«No volver a ofrecer»", nm._req_text(self.home, r=r))
+        self.assertIn("'C:/Py37/python.exe' '", nm._req_text(self.home, r=r), "el comando usa el intérprete del hook")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(nm.no_ofrecer(self.home, r), 0)
+            self.assertEqual(nm.no_ofrecer(self.home, r), 0)          # dos veces: un solo registro
+        self.assertEqual(nm._req_text(self.home, r=r), "")
+        self.assertEqual(len(nm._req_read(self.home)), 1)
+        self.assertNotEqual(nm._req_text(self.home, r=_win(sqlite=(3, 31, 2))), "", "otra versión: vuelve")
+        self.assertNotEqual(nm._req_text(self.home, r=_win(exe="D:\\otro\\python.exe")), "", "otro intérprete: vuelve")
+
+    def test_registro_ilegible_cuenta_como_ninguno(self):
+        r = _win()
+        with open(nm._req_path(self.home), "w", encoding="utf-8") as fh:
+            fh.write("{no es json")
+        self.assertNotEqual(nm._req_text(self.home, r=r), "")
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(nm.no_ofrecer(self.home, r), 0)
+        with open(nm._req_path(self.home), encoding="utf-8") as fh:
+            self.assertEqual(json.load(fh), {"no_ofrecer": [nm._req_key(r)]})
+        self.assertEqual(nm._req_text(self.home, r=r), "")
+
+    def test_sin_carpeta_no_hay_no_volver_a_ofrecer(self):
+        shutil.rmtree(self.claude)
+        r = _win()
+        t = nm._req_text(self.home, r=r)
+        self.assertNotEqual(t, "")
+        self.assertNotIn("No volver a ofrecer", t)
+        self.assertNotIn("requisitos --no-ofrecer", t)
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
+            self.assertEqual(nm.no_ofrecer(self.home, r), 1)
+        self.assertIn("seguirá saliendo", err.getvalue())
+
+    @unittest.skipUnless(hasattr(os, "symlink"), "sin enlaces simbólicos")
+    def test_no_escribe_a_traves_de_un_enlace(self):
+        r = _win()
+        destino = os.path.join(self.home, "fuera.json")
+        try:
+            os.symlink(destino, nm._req_path(self.home))
+        except (OSError, NotImplementedError):
+            self.skipTest("crear enlaces simbólicos pide permiso en esta máquina")
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            self.assertEqual(nm.no_ofrecer(self.home, r), 1)
+        self.assertFalse(os.path.exists(destino))
+
+    def test_no_deja_temporales(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(nm.no_ofrecer(self.home, _win()), 0)
+        self.assertEqual([f for f in os.listdir(self.claude) if f.endswith(".tmp")], [])
+
+    def test_no_ofrecer_con_un_interprete_que_cumple(self):
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out):
+            self.assertEqual(nm.no_ofrecer(self.home, None), 0)     # _requisitos reemplazada: cumple
+        self.assertIn("cumple", out.getvalue())
+        self.assertFalse(os.path.exists(nm._req_path(self.home)))
 
 
 if __name__ == "__main__":

@@ -4,6 +4,21 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [7.6.0] - 2026-11-25
+
+> **Minor**: si el Python que corre los hooks no alcanza lo que neb pide (SQLite 3.35.5 o Python 3.8), el aviso de migración del inicio de sesión lo dice con el motivo de cada requisito y encarga a Claude ofrecer instalar uno que sí: en Windows con `winget`, un menú con «Instalarlo» (Python 3.14 de python.org, solo para el usuario); fuera de Windows o sin `winget`, una línea con el comando, que Claude no corre. «No volver a ofrecer» lo calla para ese intérprete y esas versiones. Supuesto nuevo R32. Sin paso de base ni migración guiada nuevos.
+>
+> - **Adoptantes**: nada que hacer. Con un intérprete que cumple, el aviso es idéntico al de 7.5.0.
+> - **Volver atrás**: 7.5.0 opera la base sin cambios; queda en la carpeta de la base, si el dev pidió no volver a ver la oferta, el archivo `.neb-requisitos.json`, que 7.5.0 ignora.
+
+### Added
+- **`bootstrap/neb-migrate.py`**: `_requisitos` (Python contra `PYTHON_MIN` 3.8.0 y SQLite contra `SQLITE_MIN`, que es `_migrations.DROP_COLUMN_SQLITE`, el umbral del `precheck` del paso 2 de 7.0.0), `_req_text` (el encargo de la oferta según la plataforma y si hay `winget`, que se busca también por su alias de ejecución porque antes de Python 3.8 `shutil.which` no lo ve; el comando lleva `--custom "InstallLauncherAllUsers=0"`; paquete `PY_WINGET_ID` = `Python.Python.3.14`, porque `Python.Python.3.12` ya no publica instaladores) y el subcomando `requisitos --no-ofrecer`, que guarda en `.neb-requisitos.json`, junto a `.neb-migrate.lock`, el intérprete y sus versiones (un archivo ilegible cuenta como ningún registro; no escribe a través de un enlace). `al-iniciar` lo calcula después de los chequeos de subsesión y de `neb: skip`, y lo agrega como sección de prioridad 1 entre el encargo del menú y los fallos, sin recorte y sin la orden de decírselo (trae la suya), también en su aviso de falla.
+- **`methodology/platform-assumptions.md`**: supuesto **R32** (la app toma el `PATH` al abrirse: un Python recién instalado rige al reiniciarla), sin verificar.
+- Pruebas: `TestRequisitos` en `test_migrations_guided.py` (14): fronteras de los dos umbrales, misma fuente de SQLite que el paso de 7.0.0, orden y recorte, la oferta en la rama de falla, subsesión interna, variantes por plataforma, winget por su alias de ejecución, «No volver a ofrecer» por intérprete y versión, registro ilegible, sin carpeta, sin escribir a través de un enlace, sin temporales y sin oferta que callar con un intérprete que cumple. Las de `al-iniciar` que corren dentro del proceso de la suite fijan los requisitos como cumplidos (`AlIniciarBase`).
+
+### Changed
+- **`tooling/migrations.md`** (§ "Requisitos del intérprete" nueva; § "Paso 2: retiro de lo de equipo" y § "Dónde corre"), **`INSTALL.md`**, **`docs/user-guide.md`**, **`hooks/README.md`**, **`tooling/logbook.md`**: la oferta, el umbral real de cada requisito y el reinicio.
+
 ## [7.5.0] - 2026-11-25
 
 > **Minor**: la migración ya no pide abrir otra sesión con `/neb:migrate`. Una entrada propia de `SessionStart` (`neb-migrate.py al-iniciar`, al final de `startup` y `clear`) corre al iniciar cada sesión los pasos de base y los pasos guiados que dejan con qué deshacerlos; un paso `exclusivo` con la base en uso se reintenta solo en el siguiente inicio, y lo que no deja respaldo (clase `dev`) Claude lo pide en un menú en la misma sesión. Las partes del arranque ya no abren la base. Supuesto nuevo R31; R30 pierde la parte de la sesión nueva y R1 se aclara. Sin paso de base ni migración guiada nuevos.

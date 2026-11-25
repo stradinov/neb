@@ -592,6 +592,161 @@ def _sh_quote(s):
     return "'" + s.replace("'", "'\"'\"'") + "'"
 
 
+# --------------------------------------------------------------------------- requisitos del intérprete (7.6.0)
+# El Python que corre los hooks (el primero que responde a `python … || python3 …` de hooks.json) se compara con
+# lo que neb pide. Si no alcanza, el aviso de al-iniciar encarga a Claude ofrecer instalar uno que sí alcance:
+# con winget en Windows (un menú; nada se descarga sin «Instalarlo»), una línea con el comando fuera de Windows.
+
+PYTHON_MIN = (3, 8, 0)                       # las cuatro comprobaciones del aporte por PR (CONTRIBUTING.md)
+SQLITE_MIN = _migrations.DROP_COLUMN_SQLITE  # el paso 2 de 7.0.0 sobre una base con el esquema de equipo
+PY_WINGET_ID = "Python.Python.3.14"          # 3.12 ya no publica instaladores (winget se quedó en 3.12.10)
+PY_WINGET_VERSION = "3.14"
+PY_WINGET_SIZE = "unos 33 MB"                # python-3.14.10-amd64.exe: 33,498,520 bytes (python.org, 2026-11-25)
+REQ_FILE = ".neb-requisitos.json"            # «No volver a ofrecer»: junto a .neb-migrate.lock
+
+
+def _ver(t):
+    return ".".join(str(n) for n in t)
+
+
+def _winget_alias():
+    """True si existe el alias de ejecución de winget (`%LOCALAPPDATA%\\Microsoft\\WindowsApps\\winget.exe`). Antes de
+    Python 3.8, os.stat no resuelve ese tipo de enlace y shutil.which no lo encuentra; lexists sí lo ve (3.7.9,
+    2026-11-25). Quien corre winget es el Bash de Claude, no este intérprete."""
+    base = os.environ.get("LOCALAPPDATA")
+    return bool(base) and os.path.lexists(os.path.join(base, "Microsoft", "WindowsApps", "winget.exe"))
+
+
+def _requisitos(py=None, sqlite=None, plataforma=None, which=None, exe=None, alias=None):
+    """Los requisitos que este intérprete no cumple, o None si cumple todos. Los argumentos son para las pruebas:
+    por omisión, sys.version_info, _migrations.SQLITE_VERSION, sys.platform, shutil.which, sys.executable y
+    _winget_alias."""
+    py = tuple((py if py is not None else sys.version_info)[:3])
+    sqlite = tuple((sqlite if sqlite is not None else _migrations.SQLITE_VERSION)[:3])
+    plataforma = plataforma if plataforma is not None else sys.platform
+    exe = exe if exe is not None else (sys.executable or "python")
+    motivos = []
+    if py < PYTHON_MIN:
+        motivos.append("es Python %s, anterior a %s, que piden las cuatro comprobaciones con que se aporta a neb "
+                       "por pull request (`CONTRIBUTING.md`)" % (_ver(py), _ver(PYTHON_MIN)))
+    if sqlite < SQLITE_MIN:
+        motivos.append("trae SQLite %s, anterior a %s, que pide el paso 2 de neb 7.0.0 (`DROP COLUMN`) sobre una "
+                       "base de antes de 7.0.0; el resto de neb funciona desde SQLite 3.24"
+                       % (_ver(sqlite), _ver(SQLITE_MIN)))
+    if not motivos:
+        return None
+    winget = False
+    if plataforma == "win32":
+        winget = bool((which or shutil.which)("winget")) or bool((alias or _winget_alias)())
+    return {"motivos": motivos, "exe": exe, "py": _ver(py), "sqlite": _ver(sqlite), "plataforma": plataforma,
+            "winget": winget}
+
+
+def _req_path(home):
+    return os.path.join(os.path.dirname(_guided.lock_path(_machine.Ctx(home))), REQ_FILE)
+
+
+def _req_key(r):
+    return {"python": r["exe"], "py": r["py"], "sqlite": r["sqlite"]}
+
+
+def _req_read(home):
+    """La lista de «No volver a ofrecer»; [] si no existe o no se puede leer (un archivo ilegible cuenta como
+    ningún registro: la oferta sale, y `requisitos --no-ofrecer` lo reescribe)."""
+    try:
+        with open(_req_path(home), encoding="utf-8") as f:
+            data = json.load(f)
+        rows = data.get("no_ofrecer") if isinstance(data, dict) else None
+        return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
+    except (OSError, ValueError):
+        return []
+
+
+def _req_text(home, r=None, **kw):
+    """El encargo de la oferta para al-iniciar, o '' si el intérprete cumple o el dev pidió no volver a verla
+    para este intérprete y estas versiones."""
+    r = r if r is not None else _requisitos(**kw)
+    if r is None or _req_key(r) in _req_read(home):
+        return ""
+    exe = r["exe"].replace("\\", "/")
+    root = ROOT.replace("\\", "/")
+    folder = os.path.isdir(os.path.dirname(_req_path(home)))
+    no_ofrecer = "%s %s requisitos --no-ofrecer" % (_sh_quote(exe), _sh_quote(root + "/bootstrap/neb-migrate.py"))
+    head = ("El Python que corre los hooks de Neb (`%s`) no alcanza lo que neb pide: %s."
+            % (exe, "; ".join(r["motivos"])))
+    restart = ("Rige al reiniciar Claude Code (cerrar todas sus ventanas); si ya se instaló y este aviso sigue tras "
+               "reiniciar, %s." % ("un Python de todo el equipo va antes en el PATH" if r["plataforma"] == "win32"
+                                   else "otro Python va antes en el PATH, o el instalado tampoco alcanza"))
+    if r["plataforma"] == "win32" and r["winget"]:
+        # InstallLauncherAllUsers=0: el lanzador `py` para todo el equipo pediría elevación en un alcance de usuario.
+        install = ("winget install --id %s --exact --source winget --scope user --custom \"InstallLauncherAllUsers=0\" "
+                   "--accept-package-agreements --accept-source-agreements --disable-interactivity" % PY_WINGET_ID)
+        options = "«Instalarlo (Recomendado)», «Todavía no»" + (" y «No volver a ofrecer»" if folder else "")
+        text = ("%s Si hay una persona presente, al cierre de tu primera respuesta y una sola vez por conversación "
+                "(después del menú de los pasos guiados, si lo hay), ofrécele un menú con %s. «Instalarlo»: Python "
+                "%s de python.org con winget (paquete `%s`), %s, solo para su usuario (alcance de usuario, sin el "
+                "lanzador `py` para todo el equipo); elegirlo acepta la licencia PSF-2.0 de Python y los términos del "
+                "origen `winget`. "
+                "%s Con «Instalarlo», corre en Bash, tal cual, `%s`, dile al dev lo que respondió winget y pídele "
+                "reiniciar Claude Code." % (head, options, PY_WINGET_VERSION, PY_WINGET_ID, PY_WINGET_SIZE,
+                                            restart, install))
+        if folder:
+            text += " Con «No volver a ofrecer», corre en Bash, tal cual, `%s`." % no_ofrecer
+        return text + (" Sin herramienta de preguntas, díselo en una línea con el comando de instalación y no "
+                       "instales.")
+    if r["plataforma"] == "win32":
+        how = ("instalar Python %s (o 3.12 o superior) desde https://www.python.org/downloads/, marcando «Add "
+               "python.exe to PATH»" % PY_WINGET_VERSION)
+    elif r["plataforma"] == "darwin":
+        how = "`brew install python@%s`" % PY_WINGET_VERSION
+    else:
+        how = ("un Python %s de https://www.python.org/downloads/ o de un gestor de versiones; el del gestor de "
+               "paquetes de la distribución (por ejemplo `sudo apt install python3`) sirve solo si su versión alcanza "
+               "(Ubuntu 20.04 trae SQLite 3.31.1)" % PY_WINGET_VERSION)
+    text = ("%s Díselo al dev en una línea al cierre de tu primera respuesta, una sola vez por conversación, con el "
+            "remedio: %s. %s No corras el comando." % (head, how, restart))
+    if folder:
+        text += " Si el dev pide no volver a verlo, corre en Bash, tal cual, `%s`." % no_ofrecer
+    return text
+
+
+def no_ofrecer(home, r=None):
+    """`requisitos --no-ofrecer`: guarda que el dev no quiere volver a ver la oferta para este intérprete y estas
+    versiones (constancia de lo que decidió). Si cambia el intérprete o una versión, la oferta vuelve."""
+    r = r if r is not None else _requisitos()
+    if r is None:
+        print("este Python cumple lo que neb pide: no hay oferta que callar")
+        return 0
+    path = _req_path(home)
+    if not os.path.isdir(os.path.dirname(path)):
+        print("no existe la carpeta de la base (%s): no hay dónde guardarlo y la oferta seguirá saliendo"
+              % os.path.dirname(path), file=sys.stderr)
+        return 1
+    if _machine.is_link(path):
+        print("%s es un enlace: no se escribe a través de él y la oferta seguirá saliendo" % path, file=sys.stderr)
+        return 1
+    rows = _req_read(home)
+    if _req_key(r) not in rows:
+        rows.append(_req_key(r))
+    tmp = None
+    try:
+        # Nombre nuevo y exclusivo en la misma carpeta (mkstemp no sigue un enlace plantado con el nombre fijo).
+        fd, tmp = tempfile.mkstemp(prefix=REQ_FILE + ".", suffix=".tmp", dir=os.path.dirname(path))
+        with os.fdopen(fd, "w", encoding="utf-8", newline="") as f:
+            json.dump({"no_ofrecer": rows}, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, path)
+    except OSError as e:
+        print("no se pudo guardar %s: %s" % (path, e), file=sys.stderr)
+        if tmp:
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+        return 1
+    print("listo: la oferta no vuelve a salir para %s (Python %s, SQLite %s)" % (r["exe"], r["py"], r["sqlite"]))
+    return 0
+
+
 def _load_bootstrap():
     """El módulo del arranque de este mismo árbol: _relax_axis_step, _db_notice, _project_opts_out,
     is_internal_subsession, resolve_neb_root y _emit."""
@@ -608,21 +763,30 @@ def al_iniciar(home):
     Con el candado entre corridas: baja la mínima del paso 3 de 7.3.0, corre los pasos de base y los guiados
     que dejan con qué deshacerlos, en el orden de apply --guiados, con presupuesto y ventana de exclusivos.
     Sin el candado (otra corrida lo tiene) no corre nada. En los dos casos emite, en solo lectura, el aviso de
-    base que un árbol no opera o de paso detenido y el encargo del menú para lo que pide al dev. Devuelve
-    siempre 0: el envoltorio `python … || python3 …` de hooks.json volvería a correrla con otro código."""
+    base que un árbol no opera o de paso detenido y el encargo del menú para lo que pide al dev. Desde 7.6.0,
+    también el encargo de la oferta de instalar Python si el intérprete no alcanza lo que neb pide (se calcula
+    antes de la corrida y va también en el aviso de falla). Devuelve siempre 0: el envoltorio
+    `python … || python3 …` de hooks.json volvería a correrla con otro código."""
     started = time.monotonic()
     try:
         bc = _load_bootstrap()
     except Exception as e:  # noqa: BLE001 — sin el arranque no se sabe si el proyecto optó por no recibir nada
         print(f"[neb-migrate] al-iniciar: no se pudo cargar el arranque ({type(e).__name__})", file=sys.stderr)
         return 0
+    req = ""
     try:
         if bc.is_internal_subsession() or bc._project_opts_out():
             return 0
-        text = _al_iniciar_run(bc, home, started)
+        try:
+            req = _req_text(home)
+        except Exception as e:  # noqa: BLE001 — la oferta nunca impide la migración
+            print(f"[neb-migrate] al-iniciar: no se pudieron comprobar los requisitos ({type(e).__name__})",
+                  file=sys.stderr)
+        text = _al_iniciar_run(bc, home, started, req)
     except Exception as e:  # noqa: BLE001 — nunca sale con otro código
         text = (AL_INICIAR_HEADER + "la migración automática de Neb falló al iniciar la sesión (%s). %s "
-                "`neb-migrate.py status` da el estado.\n" % (type(e).__name__, AL_INICIAR_TELL))
+                "`neb-migrate.py status` da el estado.%s\n" % (type(e).__name__, AL_INICIAR_TELL,
+                                                               (" " + req) if req else ""))
     if text:
         try:
             bc._emit(text)
@@ -631,7 +795,7 @@ def al_iniciar(home):
     return 0
 
 
-def _al_iniciar_run(bc, home, started):
+def _al_iniciar_run(bc, home, started, req=""):
     report, lock_note = None, None
     held = _take_lock(home)
     if not _blocked(held) and held != NO_FOLDER:
@@ -649,16 +813,19 @@ def _al_iniciar_run(bc, home, started):
     st = status(home)
     paso3 = "corrio" if report is not None else ("otra" if held is None else "no")
     return _al_iniciar_text(report, db_text, st.get("guiados") or {}, lock_note, no_folder=held == NO_FOLDER,
-                            paso3=paso3)
+                            paso3=paso3, requisitos=req)
 
 
-def _al_iniciar_text(report, db_text, guided_status, lock_note=None, no_folder=False, paso3="corrio"):
+def _al_iniciar_text(report, db_text, guided_status, lock_note=None, no_folder=False, paso3="corrio",
+                     requisitos=""):
     """El aviso de al-iniciar, o '' si no hay nada que decir. Secciones por prioridad de recorte (_fit): 1 encargo
     del menú y fallos (nunca se quitan; si no caben, se acortan sus listas y luego cada entrada de fallo); 2 aviso
     de base; 3 lo pendiente: lo que se reintenta solo, sin pedir que se le diga al dev, o, sin la carpeta de la
     base, lo que no corre solo y pide `/neb:migrate`; 4 lo aplicado, con el `detalle` y el respaldo de cada paso
     guiado (no los respaldos de los pasos de base: esos los dan `status` y `/neb:migrate`). La orden de decírselo
-    al dev va una sola vez, al principio, si quedó alguna sección que lo pide."""
+    al dev va una sola vez, al principio, si quedó alguna sección que lo pide. `requisitos` (desde 7.6.0) es el
+    encargo de la oferta de instalar Python: prioridad 1 entre el encargo del menú y los fallos, todo en el texto
+    fijo (el recorte no lo toca) y con su propia instrucción (no pide la orden de decírselo)."""
     rows = guided_status.get("pendientes", [])
     dev = [r for r in rows if r.get("clase") == "dev" and not r.get("error")]
     broken = [r for r in rows if r.get("error")]
@@ -692,6 +859,8 @@ def _al_iniciar_text(report, db_text, guided_status, lock_note=None, no_folder=F
         sections.append({"prio": 1, "ord": 0, "pre": AL_INICIAR_ASK % (AL_INICIAR_PASO3[paso3],
                                                                        root + "/commands/migrate.md", _sh_quote(root)),
                          "items": ids, "post": ".", "tell": False})
+    if requisitos:
+        sections.append({"prio": 1, "ord": 0.5, "pre": requisitos, "items": [], "post": "", "tell": False})
     if db_text:
         sections.append({"prio": 2, "pre": db_text.strip(), "items": [], "post": "", "tell": False})
     if no_folder:
@@ -819,10 +988,14 @@ def main(argv):
     rs.add_argument("--remigrar", action="store_true")
     sub.add_parser("schema")
     sub.add_parser("al-iniciar")
+    rq = sub.add_parser("requisitos")
+    rq.add_argument("--no-ofrecer", action="store_true", required=True)
     args = p.parse_args(argv)
     home = _home()
     if args.cmd == "al-iniciar":
         return al_iniciar(home)
+    if args.cmd == "requisitos":
+        return no_ofrecer(home)
     if args.cmd == "status":
         s = status(home)
         if args.json:
