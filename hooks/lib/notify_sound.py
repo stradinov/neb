@@ -28,6 +28,8 @@ import wave
 
 HOOKS = ("notify-on-stop", "notify-on-permission")
 HERE = os.path.dirname(os.path.abspath(__file__))
+# Viaja con el plugin: la copia en caché trae los binarios del repo intactos (supuesto R27 de
+# methodology/platform-assumptions.md).
 DEFAULT_WAV = os.path.join(os.path.dirname(HERE), "sounds", "neb-chime.wav")
 PLAYERS = ("afplay", "paplay", "aplay", "play")      # el mismo orden que los .sh
 LOUD_PEAK = 15926   # pico de la versión fuerte: reproduce el chimes-loud.wav histórico muestra por muestra

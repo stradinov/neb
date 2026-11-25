@@ -22,11 +22,12 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ### Changed
 - **`hooks/neb-hook.py`**: el dispatcher resuelve el sonido y lo pasa en `NEB_NOTIFY_WAV`. Sin ruta (hook apagado en su JSON, o sin ningún WAV) no lanza el script. Si el resolvedor falla, el script corre sin la variable.
-- **`hooks/notify-on-stop.{ps1,sh}`, `hooks/notify-on-permission.{ps1,sh}`**: ya no resuelven `wav` por su cuenta ni conocen `personal/chimes-loud.wav`. Orden: `NEB_NOTIFY_WAV`, luego la CLI del resolvedor (`py`/`python`/`python3`, saltando el alias de la Microsoft Store que no imprime nada) y, sin Python, `sounds/neb-chime.wav`. En Linux/Mac el sonido ya no depende de `jq`. Si la CLI sale con 3 (el hook está apagado en su JSON, también con `"enabled": "false"`), el script sale sin sonar, aun sin `jq`.
+- **`hooks/notify-on-stop.{ps1,sh}`, `hooks/notify-on-permission.{ps1,sh}`**: ya no resuelven `wav` por su cuenta ni conocen `personal/chimes-loud.wav`. Orden: `NEB_NOTIFY_WAV`, luego la CLI del resolvedor (`py`, `python`, `python3` en el `.ps1`; `python3`, `python` en el `.sh`; si uno no imprime nada, como el alias de la Microsoft Store, prueba el siguiente) y, sin Python, `sounds/neb-chime.wav`. En Linux/Mac el sonido ya no depende de `jq`. Si la CLI sale con 3 (el hook está apagado en su JSON, también con `"enabled": "false"`), el script sale sin sonar, aun sin `jq`.
 - **`bootstrap/neb-bootstrap-context.py`**: el aviso de los hooks de sonido (`_sound_notice`).
 - **`tooling/notify-on-stop.md`**, **`tooling/notify-on-permission.md`**, **`hooks/README.md`**: tabla de valores de `wav`, el aviso del arranque, la activación sin conseguir un WAV y escenarios de verificación nuevos.
 - **`hooks/tests/test_neb_hook.py`**, **`hooks/tests/test_bootstrap_context.py`**: `NEB_NOTIFY_WAV` en el hijo del dispatcher y el aviso del arranque.
 - **`.gitattributes`**: `*.wav binary`.
+- **`methodology/platform-assumptions.md`**: R27 suma que la copia en caché trae los binarios del repo intactos, probado antes de publicar con un marketplace local que apunta al clon (mismo sha256 de `neb-chime.wav`). También suma como consumidores a `hooks/lib/notify_sound.py` y los `notify-on-*`.
 
 ## [7.1.0] - 2026-11-24
 

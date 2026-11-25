@@ -9,8 +9,9 @@
 # NEB_INTERNAL_SUBSESSION=1 (o el alias legacy CLAUDE_PREPROCESS_RECURSION=1),
 # abandona sin sonar — evita chime fantasma. Ver hooks/lib/subsession.py.
 #
-# Requisitos: bash, jq, un player (afplay/paplay/aplay/play). Sin alguno
-# de estos, exit 0 silencioso. Defensivo: cualquier falla → exit 0.
+# Requisitos: bash, jq (blando: sin él, 1 chime de cortesía), un player
+# (afplay/paplay/aplay/play). Sin player en PATH → exit 0 silencioso.
+# Defensivo: cualquier falla → exit 0.
 
 set +e
 
