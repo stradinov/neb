@@ -222,6 +222,17 @@ class TestPartesDelArranque(unittest.TestCase):
         rc, _, err = self._nucleo(justo_arriba - 2)
         self.assertEqual(rc, 0, err)
 
+    def test_check_size_la_raiz_larga_solo_pesa_en_la_intro(self):
+        # 50 enlaces: si salieran absolutos, la raíz simulada sumaría 50 * LONG_ROOT caracteres.
+        os.makedirs(os.path.join(self.tmp, "general"))
+        with open(os.path.join(self.tmp, "general", "startup.md"), "w", encoding="utf-8") as f:
+            f.write("# Arranque\n\n" + "".join("[d%d](../process/d%d.md)\n" % (i, i) for i in range(50)))
+        rc, out, err = self._run("--check-size", "--root", self.tmp)
+        self.assertEqual(rc, 0, err)
+        chars = int(re.search(r": (\d+) caracteres", out).group(1))
+        self.assertGreater(chars, 2 * nb.LONG_ROOT)       # la intro lleva la raíz simulada (dos veces)
+        self.assertLess(chars, 50 * nb.LONG_ROOT)
+
     def test_check_size_sin_raiz_falla(self):
         rc, _, err = self._run("--check-size")
         self.assertEqual(rc, 1)

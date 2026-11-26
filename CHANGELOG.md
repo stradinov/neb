@@ -4,6 +4,18 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [8.1.0] - 2026-11-25
+
+> **Minor**: el arranque que inyecta el plugin pesa menos. Los enlaces del núcleo ya no repiten la raíz de la instalación: la intro la anuncia una vez y los enlaces van relativos a ella. Nada que hacer al actualizar.
+
+### Added
+- **`assemble-startup.py`** acepta `--relative-to <raíz>` (y `rel_root` en `assemble`); sin él, reescribe a rutas absolutas como antes. Un destino fuera de la raíz conserva su ruta absoluta. `--check` no cambia.
+- **Supuesto R34** (`methodology/platform-assumptions.md`): Claude abre al primer intento un enlace relativo a la raíz que la intro del arranque anuncia una vez.
+
+### Changed
+- **Enlaces del arranque relativos a la raíz de Neb** (`bootstrap/neb-bootstrap-context.py`, `bootstrap/assemble-startup.py`): el arranque del núcleo sale con enlaces como `process/delivery.md` en lugar de la ruta completa, y la intro anuncia la raíz (`NEB_HOME`) con un ejemplo de cómo abrir un enlace. El overlay del adoptante y la configuración personal conservan sus enlaces con ruta completa, porque viven bajo otra raíz. La intro pide escribir la ruta completa al citarle un enlace al dev o pasárselo a un subagente. Medido en el primer prompt de una sesión: 738 tokens menos con la raíz en un clon y al menos 1,434 menos con la raíz en la caché del plugin.
+- **Gate de tamaño del arranque** (`--check-size`): la raíz simulada de 100 caracteres ya solo pesa en la intro. El núcleo mide 33,338 caracteres (antes 37,975) y ocupa 5 partes (antes 6); los topes no cambian.
+
 ## [8.0.0] - 2026-11-25
 
 > **Major**: Neb deja `~/.claude/` y guarda todo lo suyo en una carpeta propia, la **carpeta de datos** (`NEB_DATA` si es absoluta; si no, `~/.neb`), pensada para poder llevarla a otra herramienta de IA. La configuración queda en un solo `config.json` (`schema: 1`) con las secciones `notify.stop`, `notify.permission`, `preprocess` y `language`, que reemplaza a los tres JSON sueltos; `hooks/lib/neb_paths.py` es el único resolvedor de rutas y de config. La migración guiada 8.0.0 (8 pasos) corre sola al iniciar sesión: muda `neb.db` (con respaldo y una **base testigo** en la ruta vieja), los respaldos, `compas.md`, los planes aprobados, `research/`, el estado de preprocess, la caché de sonidos y `.neb-requisitos.json`, y funde la config. Se cumple el retiro prometido en `changelog.d/7.0.0.md` § Notas: 6.x queda sin soporte. Rompe por la ruta de la base (los CLI con `--db` implícito y las herramientas que la abrían en `~/.claude/neb.db`), por la de la config y por el retiro de los residuos de 7.0.0. Sin paso de base nuevo (la versión de esquema sigue en 3); la base testigo responde `base-incompatible` al código anterior.

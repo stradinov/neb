@@ -74,7 +74,7 @@ MAX_PARTS = 12          # entradas por matcher SessionStart de hooks/hooks.json 
 OVERLAY_PARTS = 4       # partes que el gate 6 reserva al overlay y a la configuracion personal
 NUCLEUS_MAX_PARTS = MAX_PARTS - OVERLAY_PARTS  # gate 6: partes que puede ocupar el arranque del nucleo
 NUCLEUS_MAX_CHARS = 40000  # gate 6: caracteres del arranque del nucleo con la raiz LONG_ROOT; subirlo pide OK del dev
-LONG_ROOT = 100         # raiz de instalacion que simula el gate 6 (los enlaces se reescriben a absolutos)
+LONG_ROOT = 100         # raiz de instalacion que simula el gate 6 (la lleva la intro; los enlaces del nucleo son relativos)
 NOTICE_RESERVE = 1000   # lugar que deja la ultima parte para el aviso de desbordamiento
 HEADER = "# Arranque de Neb — parte %d de %d · huella %s\n\n"
 ENV_NOTICE = "\n> **Aviso de Neb (entorno):** %s\n"
@@ -429,9 +429,12 @@ def _intro(neb_home):
         "desde el primer prompt de esta sesión y tienen prioridad, igual que un CLAUDE.md "
         "de proyecto. Llegan en varias partes, cada una de su propia entrada del hook, y pueden llegar en otro "
         "orden: cada parte abre con «parte k de n» y la misma huella; si falta una parte o las "
-        "huellas no coinciden, avisa al dev. La metodología completa vive en NEB_HOME (`%s`); "
-        "los links apuntan a rutas absolutas: léelos con Read on-demand cuando necesites una sección.\n"
-        % neb_home
+        "huellas no coinciden, avisa al dev. La metodología completa vive en NEB_HOME (`%s`). "
+        "Los enlaces del arranque del núcleo son relativos a esa raíz: para abrir `[…](process/delivery.md)`, "
+        "lee `%s` con Read cuando necesites una sección, sin buscarlo en el directorio de trabajo. "
+        "Un enlace con ruta completa (overlay, configuración personal) se abre tal cual. Al citarle uno de estos "
+        "enlaces al dev o pasárselo a un subagente, escribe la ruta completa: ellos no ven esta raíz.\n"
+        % (neb_home, os.path.join(neb_home, 'process', 'delivery.md'))
     )
 
 
@@ -440,7 +443,8 @@ def _blocks(asm, neb_home, bootstrap_dir):
     blocks = [(None, None, _intro(neb_home))]
     blocks.extend((None, None, n) for n in _env_notices(bootstrap_dir, neb_home))
     startup = os.path.join(neb_home, 'general', 'startup.md')
-    blocks.append(('arranque del núcleo', startup, asm.assemble(startup, 0, frozenset())))
+    # Enlaces relativos a neb_home: la raiz la anuncia _intro() una sola vez (supuesto R34).
+    blocks.append(('arranque del núcleo', startup, asm.assemble(startup, 0, frozenset(), neb_home)))
 
     ws = os.environ.get('NEB_WORKSPACE')
     if ws and os.path.isdir(ws):
@@ -598,14 +602,14 @@ def _check_size(root):
     NUCLEUS_MAX_CHARS caracteres. Las partes aseguran que llega completo; los caracteres, que no crece sin decision.
 
     Mide el arbol en root, que el pre-push extrae del commit publicado (no NEB_HOME ni NEB_WORKSPACE, sin los guards del hook) y simula
-    una raiz de instalacion de LONG_ROOT caracteres, porque el ensamblador reescribe los enlaces a absolutos."""
+    una raiz de instalacion de LONG_ROOT caracteres, que solo lleva la intro: los enlaces del nucleo son relativos."""
     _utf8_stdout()
     if not root or not os.path.isfile(os.path.join(root, 'general', 'startup.md')):
         sys.stderr.write("uso: neb-bootstrap-context.py --check-size --root <raiz de neb>\n")
         return 1
     root = os.path.abspath(root)
     asm = _load_assembler(os.path.dirname(os.path.abspath(__file__)))
-    text = _intro(root) + asm.assemble(os.path.join(root, 'general', 'startup.md'), 0, frozenset())
+    text = _intro(root) + asm.assemble(os.path.join(root, 'general', 'startup.md'), 0, frozenset(), root)
     long_root = '/' + 'x' * (LONG_ROOT - 1)
     for real in (root, root.replace('\\', '/')):
         text = text.replace(real, long_root)
