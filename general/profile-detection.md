@@ -9,7 +9,7 @@ Al entrar a un directorio de proyecto, Claude detecta el profile:
 0. **Detectar overlay por path** — si el cwd cae dentro de un path de overlay, activar ese profile **sin subir** al `.git` padre. Overlays por path (en orden de prioridad, primer match gana). `<neb>` es el nombre del directorio del checkout (convencionalmente `neb`):
    - `*/<neb>/profiles/<algo>/` → `profile-authoring`.
    - `*/<neb>/skills/<algo>/` → `skill-authoring`.
-   - `*/<neb>/research/` (o descendientes) → `research`. Para investigación en `<proyecto>/research/` o `~/.claude/research/`, activación explícita por el dev (sin auto-detección por path para evitar colisión con otros profiles).
+   - `*/<neb>/research/` (o descendientes) → `research`. Para investigación en `<proyecto>/research/` o `<datos>/research/` (carpeta de datos de Neb), activación explícita por el dev (sin auto-detección por path para evitar colisión con otros profiles).
 
    Prioridad canónica y heurísticas estructurales: [`profiles/index.md`](../profiles/index.md).
 1. **Identificar la raíz del proyecto** — subir hasta encontrar `.git` (o equivalente) si el cwd es un subdirectorio.

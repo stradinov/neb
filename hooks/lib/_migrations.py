@@ -12,7 +12,8 @@ La base guarda sus pasos aplicados en `schema_step`; el código trae `SCHEMA_VER
 
 Un paso de base es un cambio del esquema escrito en código. Corre dentro de BEGIN IMMEDIATE junto con
 su fila de `schema_step` (todo o nada); el paso 1 (esquema inicial) también, y además es idempotente.
-Un paso destructivo lleva respaldo previo verificado en `<carpeta de la base>/neb-backups/` (queda el último de cada paso).
+Un paso destructivo lleva respaldo previo verificado en `<carpeta de la base>/backups/` (queda el último de cada
+paso; hasta 7.x, `neb-backups/`, que la migración guiada 8.0.0 muda).
 
 Este módulo NO importa módulos hermanos: el aviso de base (`_db_notice`, que corre `al-iniciar`) lee `SCHEMA_VERSION` de otro árbol como texto
 (regex sobre este archivo) sin cargarlo. Mantener la asignación en una sola línea literal.
@@ -24,6 +25,7 @@ import glob
 import os
 import re
 import sqlite3
+import stat
 import sys
 import time
 from datetime import datetime, timezone
@@ -31,7 +33,10 @@ from datetime import datetime, timezone
 
 SCHEMA_VERSION = 3
 
-BACKUP_DIR_NAME   = "neb-backups"
+BACKUP_DIR_NAME   = "backups"                           # <datos>/backups/ (desde 8.0.0)
+# Nombre de hasta 7.x. Solo para una base que vive en una carpeta `.claude` (abierta con --db, o NEB_DATA=~/.claude):
+# ahí `backups/` es de Claude Code y neb no escribe en ella (backup_dir).
+LEGACY_BACKUP_DIR_NAME = "neb-backups"
 STEP_BACKUP_GLOB  = "neb.pre-paso-*.db"                 # todos los pasos: lo que listan status y restore
 RESTORE_BACKUP_GLOB = "neb.pre-restore.*.db"
 
@@ -513,10 +518,30 @@ def read_errors(con):
 # --------------------------------------------------------------------------- respaldo
 
 def backup_dir(db_path):
-    return os.path.join(os.path.dirname(os.path.abspath(db_path)), BACKUP_DIR_NAME)
+    """Carpeta de los respaldos de la base: <carpeta de la base>/backups/. Si la base vive en una carpeta `.claude`
+    (una base abierta con --db, o NEB_DATA=~/.claude), neb-backups/: `~/.claude/backups/` es de Claude Code."""
+    folder = os.path.dirname(os.path.abspath(db_path))
+    name = LEGACY_BACKUP_DIR_NAME if os.path.basename(folder).lower() == ".claude" else BACKUP_DIR_NAME
+    return os.path.join(folder, name)
+
+
+def _is_link(path):
+    """Symlink o junction (Windows). Copia local de neb_paths._is_link: este módulo se carga también por ruta
+    (bootstrap/neb-bootstrap-context.py), sin hooks/lib en sys.path, y no puede importar a sus hermanos."""
+    try:
+        if os.path.islink(path):
+            return True
+        st = os.lstat(path)
+    except OSError:
+        return False
+    return bool(getattr(st, "st_file_attributes", 0) & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0))
 
 
 def _private_dir(path):
+    """Crea la carpeta de respaldos (0700 donde el sistema lo respeta). OSError si es un enlace (symlink o
+    junction): un respaldo es una copia completa de la base y Neb no escribe a través de enlaces (8.0.0)."""
+    if _is_link(path):
+        raise OSError(f"{path} es un enlace: Neb no escribe un respaldo a través de un enlace")
     os.makedirs(path, exist_ok=True)
     try:
         os.chmod(path, 0o700)
@@ -564,7 +589,8 @@ def take_backup(db_path, name):
 
 
 def prune_backups(db_path, pattern, keep_path):
-    """Borra los archivos de <pattern> en neb-backups/ salvo keep_path (queda 1 de ese patrón), con sus -wal,
+    """Borra los archivos de <pattern> en la carpeta de respaldos (backup_dir) salvo keep_path (queda 1 de ese
+    patrón), con sus -wal,
     -shm y -journal (desde 7.5.0 también el -journal: una copia que se cortó a medias, p. ej. porque la
     plataforma mató la entrada de migración por su timeout, lo deja al lado)."""
     keep = os.path.normcase(os.path.abspath(keep_path)) if keep_path else None

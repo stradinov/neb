@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 """
-test_logbook_migracion_team.py — base única y retiro del esquema de equipo (neb 7.0.0).
+test_logbook_migracion_team.py — base única y retiro del esquema de equipo (neb 7.0.0); desde 8.0.0, la base
+vive en la carpeta de datos.
 
 Cubre:
-  • Resolvedor único: resolve_db_path devuelve siempre <home>/.claude/neb.db.
-  • Guarda del nombre anterior (open_default_db / unmigrated_legacy): con neb-logbook.db poblado y sin un
-    neb.db usable no se crea nada y se responde base-sin-migrar con la migración guiada (`accion`) y el
-    migrador (`comando`); una base bloqueada no cuenta como sin migrar. También por subproceso
-    (`logbook.py list`, `logbook.py trace <x>`) y de punta a punta por el hook (`neb-hook.py logbook-sync`
-    y, en Windows, `logbook-sync.ps1`).
+  • Resolvedor único: resolve_db_path devuelve siempre <datos>/neb.db (<home>/.neb, o NEB_DATA absoluta).
+  • Guarda de la base sin mudar (open_default_db / unmoved_legacy, desde 8.0.0; reemplaza la del nombre anterior
+    a 7.0.0, retirada): con ~/.claude/neb.db poblado (o en uso por otra conexión) y sin una base usable en la
+    carpeta de datos no se crea nada (ni la carpeta) y se responde base-sin-mudar con la migración guiada
+    (`accion`); una base nueva bloqueada no cuenta, ni la base testigo, ni NEB_DATA en ~/.claude. También por
+    subproceso (`logbook.py list`, `logbook.py trace <x>`) y de punta a punta por el hook
+    (`neb-hook.py logbook-sync` y, en Windows, `logbook-sync.ps1`).
   • Las entradas del hook (neb-hook.py, logbook-sync.ps1 y logbook-sync.sh) quedan en silencio (stdout
     vacío, rc 0, sin base) con un payload sin transcript_path o sin hook_event_name.
   • Paso de base 2 (hooks/lib/_migrations.py) sobre una base 6.45.0 (su DDL es el esquema inicial): salen
@@ -27,7 +29,8 @@ Cubre:
     y el paso 3 pendiente (TestPaso2DetenidoNoBloqueaEn740).
   • _add_missing_columns: tolera la carrera «duplicate column name» y propaga cualquier otro error.
 
-Invariantes: DBs y homes temporales (tempfile); nunca ~/.claude; ningún test hace red.
+Invariantes: DBs y homes temporales (tempfile), sin NEB_DATA (_entorno); nunca ~/.claude ni ~/.neb reales;
+ningún test hace red.
 Framework: unittest (stdlib).
   py -m unittest tests.test_logbook_migracion_team
 """
@@ -50,8 +53,10 @@ LIB = os.path.join(HERE, "..", "lib")
 NEB_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, LIB)
 
+import _entorno  # quita NEB_DATA: la carpeta de datos es la del home temporal
 import _db_shared
 import _migrations
+import _relocate
 import logbook
 
 sys.path.insert(0, HERE)
@@ -91,6 +96,13 @@ def _home():
     h = tempfile.mkdtemp(prefix="neb-test-team-")
     os.makedirs(os.path.join(h, ".claude"))
     return h
+
+
+def _data_db(home):
+    """<home>/.neb/neb.db, con la carpeta de datos creada."""
+    path = _db_shared.resolve_db_path(home)
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    return path
 
 
 def _base_645(path, journal=None):
@@ -143,14 +155,14 @@ def _base_645(path, journal=None):
 
 
 def _legacy_home(populated=True):
-    """Home con ~/.claude/neb-logbook.db (base 6.45.0 poblada) y sin neb.db."""
+    """Home con la base de 7.x todavía en ~/.claude/neb.db (base 6.45.0 poblada) y sin carpeta de datos."""
     home = _home()
-    legacy = os.path.join(home, ".claude", "neb-logbook.db")
+    legacy = os.path.join(home, ".claude", "neb.db")
     if populated:
         _base_645(legacy)
     else:
         open(legacy, "wb").close()
-    return home, legacy, os.path.join(home, ".claude", "neb.db")
+    return home, legacy, _db_shared.resolve_db_path(home)
 
 
 def _connect_quiet(path):
@@ -253,96 +265,138 @@ def _jsonl(path, text="hola"):
 
 class TestResolvedorUnico(unittest.TestCase):
 
-    def test_siempre_neb_db_con_o_sin_la_base_anterior(self):
+    def test_siempre_la_carpeta_de_datos_con_o_sin_la_base_anterior(self):
         home, legacy, newp = _legacy_home()
+        self.assertEqual(newp, os.path.join(home, ".neb", "neb.db"))
         self.assertEqual(_db_shared.resolve_db_path(home), newp)
+        os.makedirs(os.path.dirname(newp))
         open(newp, "wb").close()
         self.assertEqual(_db_shared.resolve_db_path(home), newp)
-        self.assertEqual(_db_shared.resolve_db_path(_home()).rsplit(os.sep, 2)[-2:], [".claude", "neb.db"])
+        self.assertEqual(_db_shared.legacy_db_path(home), legacy)
+        datos = os.path.join(home, "otra", "datos")
+        with mock.patch.dict(os.environ, {"NEB_DATA": datos}):
+            self.assertEqual(_db_shared.resolve_db_path(home), os.path.join(datos, "neb.db"))
 
 
 class TestGuarda(unittest.TestCase):
 
-    def _assert_unmigrated(self, home, legacy, newp, newp_bytes):
+    def _assert_unmoved(self, home, legacy, newp, newp_bytes):
         size = os.path.getsize(legacy)
-        with self.assertRaises(_db_shared.UnmigratedDb) as cm:
+        with self.assertRaises(_db_shared.UnmovedDb) as cm:
             _db_shared.open_default_db(home)
         e = cm.exception
         self.assertIsInstance(e, _db_shared.DbUnavailable)
-        self.assertEqual(e.motivo, "base-sin-migrar")
+        self.assertEqual(e.motivo, "base-sin-mudar")
         self.assertIn(legacy, e.detalle)
+        self.assertIn(newp, e.detalle)
         self.assertIn("/neb:migrate", e.accion)
-        self.assertIn("7.0.0:renombrar-base", e.accion)
-        self.assertIn("migrate-neb-db.py", e.comando)
+        self.assertIn("8.0.0:mover-base", e.accion)
+        self.assertEqual(e.to_dict(), {"ok": False, "motivo": "base-sin-mudar", "detalle": e.detalle,
+                                       "accion": e.accion})
         self.assertEqual(os.path.getsize(legacy), size)
         if newp_bytes is None:
-            self.assertFalse(os.path.exists(newp))
+            self.assertFalse(os.path.exists(os.path.dirname(newp)), "no crea la carpeta de datos")
         else:
             with open(newp, "rb") as fh:
                 self.assertEqual(fh.read(), newp_bytes)
-        self.assertEqual(sorted(os.listdir(os.path.dirname(legacy))),
-                         sorted(["neb-logbook.db"] + ([] if newp_bytes is None else ["neb.db"])))
+        self.assertEqual(os.listdir(os.path.dirname(legacy)), ["neb.db"])
         return e
 
-    def test_critico_solo_la_base_anterior_no_crea_neb_db(self):
+    def test_critico_solo_la_base_vieja_no_crea_la_nueva(self):
         home, legacy, newp = _legacy_home()
-        e = self._assert_unmigrated(home, legacy, newp, None)
+        e = self._assert_unmoved(home, legacy, newp, None)
         self.assertNotIn("mueve fuera", e.detalle)
-        self.assertIsInstance(_db_shared.unmigrated_legacy(home), _db_shared.UnmigratedDb)
+        self.assertIsInstance(_db_shared.unmoved_legacy(home), _db_shared.UnmovedDb)
+        with self.assertRaises(_db_shared.UnmovedDb):
+            _db_shared.prepare_default_db(home)
 
-    def test_neb_db_de_0_bytes_al_lado_tampoco(self):
+    def test_neb_db_de_0_bytes_en_la_carpeta_de_datos_tampoco(self):
         home, legacy, newp = _legacy_home()
+        _data_db(home)
         open(newp, "wb").close()
-        e = self._assert_unmigrated(home, legacy, newp, b"")
+        e = self._assert_unmoved(home, legacy, newp, b"")
         self.assertNotIn("mueve fuera", e.detalle)
 
     def test_neb_db_no_vacio_sin_tabla_work_pide_moverlo(self):
         home, legacy, newp = _legacy_home()
+        _data_db(home)
         c = sqlite3.connect(newp)
         c.execute("CREATE TABLE foo (x)")
         c.commit()
         c.close()
         with open(newp, "rb") as fh:
             before = fh.read()
-        e = self._assert_unmigrated(home, legacy, newp, before)
+        e = self._assert_unmoved(home, legacy, newp, before)
         self.assertIn("mueve fuera", e.detalle)
         self.assertIn(f"({len(before)} bytes)", e.detalle)
         self.assertIn(os.path.dirname(newp), e.detalle)
 
     def test_neb_db_que_no_es_una_base_pide_moverlo(self):
         home, legacy, newp = _legacy_home()
+        _data_db(home)
         data = b"esto no es una base SQLite" * 40
         with open(newp, "wb") as fh:
             fh.write(data)
-        e = self._assert_unmigrated(home, legacy, newp, data)
+        e = self._assert_unmoved(home, legacy, newp, data)
         self.assertIn("mueve fuera", e.detalle)
         self.assertIn(f"({len(data)} bytes)", e.detalle)
 
-    def test_ninguna_de_las_dos_crea_neb_db(self):
+    def test_base_vieja_en_uso_por_otra_conexion_tambien_cuenta(self):
+        """Una base vieja bloqueada (una sesión 7.x capturando en ese instante) es una base de verdad: abrir la
+        nueva la escondería igual."""
+        home, legacy, newp = _legacy_home()
+        locker = sqlite3.connect(legacy, isolation_level=None)
+        self.addCleanup(locker.close)
+        locker.execute("PRAGMA journal_mode=DELETE")         # en WAL un BEGIN EXCLUSIVE no frena a los lectores
+        locker.execute("BEGIN EXCLUSIVE")
+        self.assertEqual(_db_shared._probe_db(legacy), "bloqueada")
+        self.assertIsInstance(_db_shared.unmoved_legacy(home), _db_shared.UnmovedDb)
+        self.assertFalse(os.path.exists(newp))
+
+    def test_ninguna_de_las_dos_crea_la_base_y_la_carpeta(self):
         home = _home()
         con = _db_shared.open_default_db(home)
         self.assertIsNotNone(con)
         con.close()
-        self.assertTrue(_db_shared._is_usable_db(os.path.join(home, ".claude", "neb.db")))
-        self.assertIsNone(_db_shared.unmigrated_legacy(home))
+        self.assertTrue(_db_shared._is_usable_db(os.path.join(home, ".neb", "neb.db")))
+        self.assertIsNone(_db_shared.unmoved_legacy(home))
+        self.assertEqual(os.listdir(os.path.join(home, ".claude")), [])
 
-    def test_base_anterior_vacia_no_bloquea(self):
+    def test_base_vieja_vacia_no_bloquea(self):
         home, _legacy, newp = _legacy_home(populated=False)
-        self.assertIsNone(_db_shared.unmigrated_legacy(home))
+        self.assertIsNone(_db_shared.unmoved_legacy(home))
         _db_shared.open_default_db(home).close()
         self.assertTrue(_db_shared._is_usable_db(newp))
 
-    def test_neb_db_usable_se_abre_aunque_quede_la_base_anterior(self):
+    def test_critico_la_base_testigo_no_cuenta(self):
+        home = _home()
+        legacy = _db_shared.legacy_db_path(home)
+        _relocate.write_witness(legacy, "8.0.0")
+        self.assertEqual(_db_shared._probe_db(legacy), "sin-work")
+        self.assertIsNone(_db_shared.unmoved_legacy(home))
+        _db_shared.open_default_db(home).close()
+        self.assertTrue(_db_shared._is_usable_db(_db_shared.resolve_db_path(home)))
+        self.assertTrue(_relocate.is_witness(legacy))
+
+    def test_neb_data_en_claude_no_es_mudanza(self):
+        home, legacy, _newp = _legacy_home()
+        with mock.patch.dict(os.environ, {"NEB_DATA": os.path.join(home, ".claude")}):
+            self.assertIsNone(_db_shared.unmoved_legacy(home))
+            con = _db_shared.open_default_db(home)
+            self.assertEqual(con.execute("SELECT count(*) FROM work").fetchone()[0], 2)
+            con.close()
+
+    def test_base_nueva_usable_se_abre_aunque_quede_la_vieja(self):
         home, _legacy, newp = _legacy_home()
-        _db_shared._connect(newp, SCHEMA).close()
-        self.assertIsNone(_db_shared.unmigrated_legacy(home))
+        _db_shared._connect(_data_db(home), SCHEMA).close()
+        self.assertIsNone(_db_shared.unmoved_legacy(home))
         con = _db_shared.open_default_db(home)
         self.assertEqual(con.execute("SELECT count(*) FROM work").fetchone()[0], 0)
         con.close()
 
-    def test_base_bloqueada_no_cuenta_como_sin_migrar(self):
+    def test_base_nueva_bloqueada_no_cuenta_como_sin_mudar(self):
         home, _legacy, newp = _legacy_home()
-        c = sqlite3.connect(newp)
+        c = sqlite3.connect(_data_db(home))
         c.execute("CREATE TABLE work (id INTEGER PRIMARY KEY)")      # journal_mode=DELETE por omisión
         c.commit()
         c.close()
@@ -350,16 +404,34 @@ class TestGuarda(unittest.TestCase):
         self.addCleanup(locker.close)
         locker.execute("BEGIN EXCLUSIVE")
         self.assertEqual(_db_shared._probe_db(newp), "bloqueada")
-        self.assertIsNone(_db_shared.unmigrated_legacy(home))
+        self.assertIsNone(_db_shared.unmoved_legacy(home))
+
+    def test_carpeta_de_datos_que_es_enlace_no_se_usa(self):
+        home = _home()
+        target = os.path.join(home, "destino")
+        os.makedirs(target)
+        link = os.path.join(home, ".neb")
+        try:
+            os.symlink(target, link, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            try:
+                import _winapi
+                _winapi.CreateJunction(target, link)
+            except (ImportError, AttributeError, OSError):
+                self.skipTest("sin permiso para crear enlaces")
+        with self.assertRaises(_db_shared.DbUnavailable) as cm:
+            _db_shared.open_default_db(home)
+        self.assertEqual(cm.exception.motivo, "carpeta-de-datos")
+        self.assertEqual(os.listdir(target), [])
 
 
 class TestGuardaCli(unittest.TestCase):
-    """JSON de base sin migrar por subproceso: motivo base-sin-migrar (no «error»), las claves `accion` y
-    `comando`, y sin crear neb.db."""
+    """JSON de base sin mudar por subproceso: motivo base-sin-mudar (no «error»), con `accion`, y sin crear la
+    base nueva ni tocar la vieja."""
 
     def _run(self, home, *args):
         r = subprocess.run([sys.executable, os.path.join(LIB, "logbook.py")] + list(args), capture_output=True,
-                           env=_child_env(home, NEB_HOME=NEB_ROOT), timeout=60)
+                           env=_child_env(home, NEB_HOME=NEB_ROOT), timeout=60, cwd=home)
         self.assertEqual(r.returncode, 0)
         return r
 
@@ -367,11 +439,10 @@ class TestGuardaCli(unittest.TestCase):
         size = os.path.getsize(legacy)
         out = json.loads(self._run(home, *args).stdout.decode("utf-8"))
         self.assertEqual(out["ok"], False)
-        self.assertEqual(out["motivo"], "base-sin-migrar")
+        self.assertEqual(out["motivo"], "base-sin-mudar")
         self.assertIn(legacy, out["detalle"])
-        self.assertIn("migrate-neb-db.py", out["comando"])
         self.assertIn("/neb:migrate", out["accion"])
-        self.assertEqual(list(out), ["ok", "motivo", "detalle", "accion", "comando"])
+        self.assertEqual(list(out), ["ok", "motivo", "detalle", "accion"])
         self.assertFalse(os.path.exists(newp))
         self.assertEqual(os.path.getsize(legacy), size)
 
@@ -387,16 +458,17 @@ class TestGuardaCli(unittest.TestCase):
             with self.subTest(args=args):
                 self._check(home, legacy, newp, *args)
 
-    def test_un_verbo_retirado_se_atiende_antes_que_la_guarda(self):
+    def test_un_verbo_retirado_es_un_subcomando_desconocido_sin_base(self):
         home, _legacy, newp = _legacy_home()
-        out = json.loads(self._run(home, "claim", "1").stdout.decode("utf-8"))
-        self.assertEqual(out["motivo"], "verbo-retirado")
+        out = self._run(home, "claim", "1").stdout.decode("utf-8")
+        self.assertEqual(out.strip(), "subcomando desconocido: claim")
         self.assertFalse(os.path.exists(newp))
 
 
 class TestGuardaPuntaAPunta(unittest.TestCase):
-    """Entrada real del hook con HOME y USERPROFILE temporales: la captura no crea neb.db ni toca la base
-    anterior. El control positivo (sin base anterior) comprueba que el mismo camino sí captura."""
+    """Entrada real del hook con HOME y USERPROFILE temporales: la captura no crea la base nueva ni toca la
+    vieja. El control positivo (sin base vieja) comprueba que el mismo camino sí captura, en la carpeta de
+    datos."""
 
     def _payload(self, home):
         cwd = os.path.join(home, "repo")
@@ -431,10 +503,11 @@ class TestGuardaPuntaAPunta(unittest.TestCase):
 
     def _check_control(self, runner):
         home = _home()
-        newp = os.path.join(home, ".claude", "neb.db")
+        newp = _db_shared.resolve_db_path(home)
         runner(home)
         self.assertTrue(os.path.exists(newp))
         self.assertEqual(self._works(newp), [("exploratory", "S-e2e")])
+        self.assertFalse(os.path.exists(_db_shared.legacy_db_path(home)))
 
     def test_critico_neb_hook_dispatch(self):
         self._check_guard(self._neb_hook)
@@ -491,6 +564,7 @@ class TestHookSinDatoEnSilencio(unittest.TestCase):
                 r = runner(home, self._payload(home, campo, valor))
                 self.assertEqual(r.stdout, b"")
                 self.assertEqual(r.returncode, 0)
+                self.assertFalse(os.path.exists(_db_shared.resolve_db_path(home)))
                 self.assertFalse(os.path.exists(os.path.join(home, ".claude", "neb.db")))
 
     def _check_control(self, runner):
@@ -498,7 +572,7 @@ class TestHookSinDatoEnSilencio(unittest.TestCase):
         r = runner(home, self._payload(home))
         self.assertEqual(r.stdout, b"")
         self.assertEqual(r.returncode, 0)
-        c = sqlite3.connect(os.path.join(home, ".claude", "neb.db"))
+        c = sqlite3.connect(_db_shared.resolve_db_path(home))
         try:
             self.assertEqual(c.execute("SELECT claude_session_id FROM work").fetchall(), [("S-e2e",)])
         finally:
@@ -531,7 +605,7 @@ class TestHookSinDatoEnSilencio(unittest.TestCase):
         r = runner(home, self._payload(home, "hook_event_name", "SubagentStop"))
         self.assertEqual(r.stdout, b"")
         self.assertEqual(r.returncode, 0)
-        self.assertFalse(os.path.exists(os.path.join(home, ".claude", "neb.db")))
+        self.assertFalse(os.path.exists(_db_shared.resolve_db_path(home)))
 
     @unittest.skipUnless(sys.platform == "win32" and shutil.which("powershell"), "logbook-sync.ps1: solo Windows")
     def test_logbook_sync_ps1_registrado_en_otro_evento_calla(self):
@@ -542,7 +616,7 @@ class TestHookSinDatoEnSilencio(unittest.TestCase):
         self._check_otro_evento(self._sh)
 
 
-class TestCapturaSinMigrar(unittest.TestCase):
+class TestCapturaSinMudar(unittest.TestCase):
 
     def test_captura_en_proceso_avisa_y_no_crea_nada(self):
         home, legacy, newp = _legacy_home()
@@ -554,8 +628,7 @@ class TestCapturaSinMigrar(unittest.TestCase):
         with mock.patch.object(sys, "argv", argv), mock.patch.object(sys, "stderr", err):
             logbook.main()
         self.assertFalse(os.path.exists(newp))
-        self.assertIn("[logbook] captura omitida (base-sin-migrar): La bitácora sigue con el nombre anterior",
-                      err.getvalue())
+        self.assertIn("[logbook] captura omitida (base-sin-mudar): La base de Neb sigue en", err.getvalue())
 
 
 # =========================================================================== paso de base 2: retiro del esquema de equipo
@@ -566,7 +639,7 @@ class _Paso2(unittest.TestCase):
 
     def setUp(self):
         self.home = _home()
-        self.path = _base_645(os.path.join(self.home, ".claude", "neb.db"))
+        self.path = _base_645(_data_db(self.home))
 
     def _raw(self, *sqls):
         c = sqlite3.connect(self.path)

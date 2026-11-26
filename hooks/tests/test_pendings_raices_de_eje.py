@@ -29,6 +29,7 @@ from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(HERE, "..", "lib"))
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 
 import _db_shared   # noqa: E402
 import _migrations  # noqa: E402
@@ -40,6 +41,7 @@ SCHEMA = os.path.join(HERE, "..", "logbook-schema.sql")
 def _home():
     d = tempfile.mkdtemp(prefix="neb-test-raices-")
     os.makedirs(os.path.join(d, ".claude"))
+    os.makedirs(os.path.join(d, ".neb"))   # carpeta de datos (8.0.0): ahí vive la base
     return d
 
 
@@ -77,6 +79,7 @@ class TestBaseSinPaso3(unittest.TestCase):
         self.home = _home()
         self.addCleanup(shutil.rmtree, self.home, True)
         self.db = _db_shared.resolve_db_path(self.home)
+        os.makedirs(os.path.dirname(self.db), exist_ok=True)   # carpeta de datos (8.0.0): la base ya no cuelga de .claude
         with contextlib.redirect_stderr(io.StringIO()):
             con = _db_shared._connect(self.db, SCHEMA)
         self.assertIsNotNone(con)

@@ -14,8 +14,14 @@ type: personal
 
 ## Preferencias de comunicación
 
-<!-- Idioma/variedad/registro: SUSTITUYEN el default del equipo (ver tooling/redaccion-es.md).
-     ej: variedad: rioplatense, permitir_voseo: true, registro: informal
+<!-- Idioma, variedad, registro, tratamiento, permitir_voseo y extranjerismos NO van aquí: se declaran en la
+     sección `language` de config.json, en la carpeta de datos de Neb (convencionalmente ~/.neb; ver
+     tooling/config.md § "Sección language"). Si una de esas seis también estuviera aquí, gana config.json (un <proyecto>/.claude/personal.md, en cambio,
+     la sustituye en su proyecto).
+     ej: py "$NEB_SRC/hooks/lib/neb_paths.py" set language.variedad '"rioplatense"'
+         py "$NEB_SRC/hooks/lib/neb_paths.py" set language.permitir_voseo true
+     Aquí, en prosa, las demás perillas de tooling/redaccion-es.md (SUSTITUYEN el default del equipo):
+     ej: "estrictez: flexible", "comillas: inglesas"
      Formato de salida: "respuestas <100 palabras", "tablas cuando hay 5+ ítems"
      Correos (general/correspondence.md): idioma y registro por defecto, vía de copia (adjunto renderizado, portapapeles o navegador), tipografía del contenedor -->
 

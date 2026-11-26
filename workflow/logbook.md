@@ -1,15 +1,15 @@
 # Bitácora de relevo (logbook)
 
-Base local de trabajos a medias, para retomarlos. Vive en tu máquina (`~/.claude/neb.db`) y guarda dos cosas: el estado de cada REQ en curso y las sesiones sin REQ, para que `/logbook` las localice y te entregue el comando para continuar. Cubre la sesión interrumpida (tokens agotados, corte de energía o de internet) que retomas en la misma máquina.
+Base local de trabajos a medias, para retomarlos. Vive en tu máquina (`neb.db`, en la carpeta de datos de Neb: `~/.neb` o la que fije `NEB_DATA`) y guarda dos cosas: el estado de cada REQ en curso y las sesiones sin REQ, para que `/logbook` las localice y te entregue el comando para continuar. Cubre la sesión interrumpida (tokens agotados, corte de energía o de internet) que retomas en la misma máquina.
 
 Continuar en otra máquina, o que otro dev continúe tu trabajo, no pasa por la bitácora sino por git: el Change MD con su `## Relevo`, el plan aprobado y la rama, que lee cualquiera que clone el repo; quien continúa corre `/logbook retomar <ruta-del-Change-MD>` ([`changes.md`](changes.md) § "Relevo").
 
-La **mecánica** (hook de captura, base sin migrar, modos de fallo) vive en [`../tooling/logbook.md`](../tooling/logbook.md); el **protocolo operativo** (pasos para retomar y relevar) en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)". Este archivo cubre el **artefacto**: su modelo, ciclo de vida y relación con el resto.
+La **mecánica** (hook de captura, modos de fallo) vive en [`../tooling/logbook.md`](../tooling/logbook.md); el **protocolo operativo** (pasos para retomar y relevar) en [`../process/execution.md`](../process/execution.md) § "Gestión de sesiones (handoff)". Este archivo cubre el **artefacto**: su modelo, ciclo de vida y relación con el resto.
 
 ## Unidad y backend
 
 - **Unidad = `work`** (un trabajo a medias). Un `work` de REQ se identifica por `project + req_slug`, el mismo `<nombre>` del Change MD; no por la sesión de Claude, que cambia en cada retomada. Un `work` exploratorio se identifica por su sesión.
-- **Backend**: SQLite local en `~/.claude/neb.db`, sin infraestructura; es la misma base de los pendientes ([`pendings.md`](pendings.md)). El esquema es el esquema inicial más los pasos de base ([`../tooling/migrations.md`](../tooling/migrations.md)). Si la base todavía no se migró a 7.0.0, la captura se detiene hasta migrarla: [`../tooling/logbook.md`](../tooling/logbook.md) § "Base sin migrar".
+- **Backend**: SQLite local en `<datos>/neb.db` (la carpeta de datos de Neb), sin infraestructura; es la misma base de los pendientes ([`pendings.md`](pendings.md)). El esquema es el esquema inicial más los pasos de base ([`../tooling/migrations.md`](../tooling/migrations.md)). Si la base sigue en `~/.claude`, donde vivía hasta 7.x, la captura se detiene hasta mudarla: [`../tooling/logbook.md`](../tooling/logbook.md) § "Base sin mudar".
 - **Máquina de origen** (`origin_machine`): la máquina donde se capturó el `work`. Dice dónde vale su `claude_session_id`, por si la base se copia a otra máquina.
 
 ## Dos modos

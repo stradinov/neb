@@ -32,7 +32,16 @@ La "Regla central" (estrechar/agregar/nunca relajar) gobierna las **reglas de pr
 | **Regla de proceso** (tiene eje de severidad) | Estrecha o agrega, **nunca relaja** | gates, plan de pruebas, firma de commits, revisión |
 | **Punto de customización** (sin eje de severidad) | **Sustituye** el default | idioma/variedad/registro, formato de salida, alias |
 
-Por eso `permitir_voseo: true` en un `personal.md` es legítimo aunque el default del equipo sea no-voseo — sustituye una preferencia, no relaja un control.
+Por eso `permitir_voseo: true` del individuo es legítimo aunque el default del equipo sea no-voseo — sustituye una preferencia, no relaja un control.
+
+## Idioma del individuo
+
+Las seis perillas de idioma —`base`, `variedad`, `registro`, `tratamiento`, `permitir_voseo` y `extranjerismos`— se declaran de forma estructurada en la sección `language` de `config.json`, en la carpeta de datos de Neb (convencionalmente `~/.neb`; ver [`../tooling/config.md`](../tooling/config.md) § "Sección language"). Las demás perillas de [`../tooling/redaccion-es.md`](../tooling/redaccion-es.md) (estrictez, dominio, tipografía, estilo…) siguen en prosa en `personal/<usuario>.md` § "Preferencias de comunicación" o en `<proyecto>/.claude/personal.md`.
+
+- **Precedencia**: núcleo → overlay del adoptante → individuo (`language` de `config.json`) → proyecto (`<proyecto>/.claude/personal.md`, solo en ese proyecto). Cada nivel sustituye lo que declara; lo que no declara lo hereda del anterior.
+- **Perilla en `null`**: no se declara; rige el overlay o, sin él, el núcleo.
+- **La misma perilla en `personal/<usuario>.md` y en `config.json`**: gana `config.json`. Claude recomienda al dev borrarla del `personal/<usuario>.md`, para que no quede una declaración que no rige. En `<proyecto>/.claude/personal.md` es un override de ese proyecto: gana sobre `config.json` y se conserva.
+- **Alcance**: la conversación con el dev. La prosa de los `.md` sigue la convención del repo, y la correspondencia a terceros, [`../general/correspondence.md`](../general/correspondence.md) § "Idioma y registro".
 
 ## Detección de contradicciones
 
@@ -59,7 +68,7 @@ Override solo para un proyecto: `<proyecto>/.claude/personal.md` (ignorada por G
 ## Qué va en el personal
 
 - Atajos personales (alias mentales, formatos de salida).
-- Preferencias de comunicación (idioma, variedad, registro, formato): sustituyen el default del equipo.
+- Preferencias de comunicación (formato de salida y las perillas de redacción que no van en `config.json`, § "Idioma del individuo"): sustituyen el default del equipo.
 - Convenciones individuales (firma de commits, herramientas).
 - Notas privadas.
 

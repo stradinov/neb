@@ -8,6 +8,7 @@ test_logbook_cli_local.py — verbos locales de `/logbook`: list, show, rename y
     base sigue operando con los pasos vigentes: desde 7.4.0 el paso 3 tiene espera (7.3.0 la bloqueaba).
   • rename: solo works `req`.
   • archive: archiva el work y, por pendings.on_work_archived, deja obsoletos sus pendientes abiertos.
+  • base sin mudar (8.0.0): cada verbo responde el JSON de base-sin-mudar.
 
 Invariantes: DBs temporales (tempfile); nunca ~/.claude. _db_for_cli se reemplaza por una conexión nueva a
 la base de la prueba en cada llamada (los verbos la cierran).
@@ -187,10 +188,10 @@ class TestArchive(_Cli):
         self.assertEqual(self._cli("archive").strip(), "uso: archivar <id>")
 
 
-class TestBaseSinMigrar(unittest.TestCase):
+class TestBaseSinMudar(unittest.TestCase):
 
-    def test_cada_verbo_local_responde_base_sin_migrar(self):
-        err = _db_shared.UnmigratedDb("detalle de prueba", 'py "migrate-neb-db.py"')
+    def test_cada_verbo_local_responde_base_sin_mudar(self):
+        err = _db_shared.UnmovedDb("detalle de prueba")
 
         def _raise():
             raise err
@@ -200,8 +201,8 @@ class TestBaseSinMigrar(unittest.TestCase):
                 with mock.patch.object(logbook, "_db_for_cli", _raise), mock.patch.object(sys, "stdout", buf):
                     logbook.cli_main(args)
                 self.assertEqual(json.loads(buf.getvalue()),
-                                 {"ok": False, "motivo": "base-sin-migrar", "detalle": "detalle de prueba",
-                                  "accion": err.accion, "comando": 'py "migrate-neb-db.py"'})
+                                 {"ok": False, "motivo": "base-sin-mudar", "detalle": "detalle de prueba",
+                                  "accion": err.accion})
 
 
 if __name__ == "__main__":

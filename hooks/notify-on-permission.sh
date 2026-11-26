@@ -4,13 +4,14 @@
 #
 # Opt-in personal. Lineamiento: tooling/notify-on-permission.md.
 # Defaults: 1 chime fijo. Sin scaling, sin walk-back de transcript.
-# Configurable en ~/.claude/notify-on-permission.json (enabled, wav).
+# Configurable en la sección notify.permission del config.json de la carpeta de datos de Neb
+# (enabled, wav).
 #
 # Guard de subsesión interna del corrector (preprocess-prompt.py): si
 # NEB_INTERNAL_SUBSESSION=1 (o el alias legacy CLAUDE_PREPROCESS_RECURSION=1),
 # abandona sin sonar — evita chime fantasma. Ver hooks/lib/subsession.py.
 #
-# Requisitos: bash, jq (blando), un player (afplay/paplay/aplay/play). Sin
+# Requisitos: bash, un player (afplay/paplay/aplay/play). Sin
 # player en PATH → exit 0 silencioso. Defensivo: cualquier falla → exit 0.
 
 set +e
@@ -30,46 +31,43 @@ for cand in afplay paplay aplay play; do
 done
 [ -z "$PLAYER" ] && exit 0
 
-# --- Defaults ---------------------------------------------------------------
+# --- Config efectiva --------------------------------------------------------
 
+# Un solo resolvedor (lib/notify_sound.py) lee la sección notify.permission de config.json en la carpeta
+# de datos de Neb y resuelve el WAV (presets, ruta absoluta, respaldo). Bajo el despachador del plugin
+# llegan ya resueltos en NEB_NOTIFY_ENABLED y NEB_NOTIFY_WAV (esta marca que vienen de él); invocado
+# directo (entradas de settings.json anteriores a 6.15.0) se le piden a su CLI `config`, en líneas
+# llave=valor. Sin Python: encendido y el sonido de neb.
+HERE="$(cd "$(dirname "$0")" && pwd)"
 ENABLED=true
+WAV=""
 
-# --- Cargar config personal -------------------------------------------------
-
-CFG="$HOME/.claude/notify-on-permission.json"
-HAVE_JQ=0
-command -v jq >/dev/null 2>&1 && HAVE_JQ=1
-
-if [ -f "$CFG" ] && [ "$HAVE_JQ" = "1" ]; then
-    if jq empty "$CFG" >/dev/null 2>&1; then
-        ENABLED=$(jq -r 'if has("enabled") then .enabled else true end' "$CFG")
-    else
-        log "config ilegible, usando defaults"
-    fi
+if [ -n "${NEB_NOTIFY_WAV:-}" ]; then
+    ENABLED="${NEB_NOTIFY_ENABLED:-true}"
+    WAV="$NEB_NOTIFY_WAV"
+else
+    for py in python3 python; do
+        if command -v "$py" >/dev/null 2>&1; then
+            OUT=$(PYTHONIOENCODING=utf-8 "$py" "$HERE/lib/notify_sound.py" config notify-on-permission 2>/dev/null)
+            # Sin `break` incondicional: un alias que no corre Python (el de la Microsoft Store en
+            # Git Bash) no imprime nada y se prueba el siguiente.
+            [ -z "$OUT" ] && continue
+            while IFS='=' read -r key value; do
+                value="${value%$'\r'}"
+                case "$key" in
+                    enabled) ENABLED="$value" ;;
+                    wav)     WAV="$value" ;;
+                esac
+            done <<EOF
+$OUT
+EOF
+            break
+        fi
+    done
 fi
 
 [ "$ENABLED" != "true" ] && exit 0
 
-# --- Resolver WAV -----------------------------------------------------------
-
-# Un solo resolvedor (lib/notify_sound.py): presets, ruta absoluta y respaldo. Bajo el
-# despachador del plugin llega resuelto en NEB_NOTIFY_WAV; invocado directo (entradas de
-# settings.json anteriores a 6.15.0) se le pregunta a su CLI. Sin Python, el sonido de neb.
-HERE="$(cd "$(dirname "$0")" && pwd)"
-WAV="${NEB_NOTIFY_WAV:-}"
-if [ -z "$WAV" ]; then
-    for py in python3 python; do
-        if command -v "$py" >/dev/null 2>&1; then
-            # Sin `break` incondicional: un alias que no corre Python (el de la Microsoft Store en
-            # Git Bash) no imprime nada y se prueba el siguiente.
-            OUT=$(PYTHONIOENCODING=utf-8 "$py" "$HERE/lib/notify_sound.py" notify-on-permission 2>/dev/null)
-            # 3 = el dev apagó el hook en su JSON (sin jq, este script no lee `enabled`).
-            [ "$?" = "3" ] && exit 0
-            WAV=$(printf '%s\n' "$OUT" | head -n 1)
-            [ -n "$WAV" ] && break
-        fi
-    done
-fi
 [ -z "$WAV" ] && WAV="$HERE/sounds/neb-chime.wav"
 [ ! -f "$WAV" ] && exit 0
 

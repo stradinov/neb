@@ -14,9 +14,10 @@ En complejidad media/alta, el plan aprobado se guarda como archivo versionado en
 **Lugar de caída.** El hook `save-approved-plan` corre antes de que exista el Change MD y no conoce el repo; deja el plan en una carpeta global, no versionada, que sirve solo de tránsito:
 
 ```
-~/.claude/approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md
+<datos>/approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md
 ```
 
+- `<datos>` es la carpeta de datos de Neb: `NEB_DATA` si es una ruta absoluta; si no, `~/.neb`. Ruta exacta: `neb_paths.py path approved-plans` (`hooks/lib/`). Hasta 7.x el lugar de caída era `~/.claude/approved-plans/`; lo que quede ahí lo muda la migración 8.0.0.
 - `<proyecto>` = último segmento del cwd; cada `<>:"|?*` → `-`, sin `-` en los extremos; `unknown` si queda vacío.
 - `<slug>` = primera línea del plan, normalizada: sin `#` ni espacios al inicio, minúsculas, sin acentos (`ñ` → `n`), cada tramo que no sea `a-z0-9` → `-`, máx 50 chars, `plan` si queda vacío (criterio de `slugify` en `hooks/lib/approved_plan.py`).
 
@@ -54,7 +55,7 @@ Cuando un plan de complejidad **media/alta** se aprueba en conversación (sin pa
 
 Casos borde:
 
-- **No-duplicación**: antes de escribir el plan (tras `ExitPlanMode`, o ante duda tras una compactación), Claude busca primero `changes/plans/<YYYY-MM-DD>-<nombre>.md` en el repo y después, en el lugar de caída, un archivo creado después de la aprobación. Si está en el repo, no se duplica. Si está en el lugar de caída, el hook ya guardó (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md): el hook termina de escribir antes de que Claude siga) y Claude lo mueve. Si no está en ninguno, Claude lo escribe en el repo.
+- **No-duplicación**: antes de escribir el plan (tras `ExitPlanMode`, o ante duda tras una compactación), Claude busca primero `changes/plans/<YYYY-MM-DD>-<nombre>.md` en el repo y después, en el lugar de caída, un archivo creado después de la aprobación. Mientras dure la transición a 8.0.0 (hasta 9.0.0) busca también en `~/.claude/approved-plans/`: una sesión abierta con la versión anterior sigue escribiendo ahí hasta reiniciarse. Si está en el repo, no se duplica. Si está en el lugar de caída (en cualquiera de las dos rutas), el hook ya guardó (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md): el hook termina de escribir antes de que Claude siga) y Claude lo mueve. Si no está en ninguno, Claude lo escribe en el repo.
 - **Sin repo** (el proyecto no usa control de versiones): el plan queda en `changes/plans/` del proyecto, sin commit.
 
 Niveles **baja / trivial / no-formal** no persisten artefacto (ver [`process/planning.md`](../process/planning.md) § "Cuándo aplica cada aprobación").

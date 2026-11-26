@@ -21,10 +21,10 @@ Lineamientos concretos: qué archivos genera la metodología, dónde viven, cóm
 | Memoria del proyecto (duradero) | `~/.claude/projects/.../memory/project_<nombre>.md` | No | Contexto duradero del proyecto |
 | REQ activo | `~/.claude/projects/.../memory/active_<proyecto>_<slug>.md` | No | Estado vivo de un REQ (incluye "Pendiente de entrega"); uno por REQ |
 | MEMORY.md (índice) | `~/.claude/projects/.../memory/MEMORY.md` | No | Index de memorias |
-| Pendientes del dev | `~/.claude/neb.db` | No | Seguimiento cross-sesión |
-| Sesiones pausadas | `~/.claude/neb.db` (pendiente tipo `session`) | No | Reanudar por nombre la propia sesión |
+| Pendientes del dev | `<datos>/neb.db` (carpeta de datos de Neb, convencionalmente `~/.neb`; ver [`tooling/config.md`](../tooling/config.md)) | No | Seguimiento cross-sesión |
+| Sesiones pausadas | `<datos>/neb.db` (pendiente tipo `session`) | No | Reanudar por nombre la propia sesión |
 | Incidente en prod | `<proyecto>/changes/<YYYY-MM-DD>-incident-<slug>.md` | Sí | Trazabilidad del incidente (ver [`general/incidents.md`](../general/incidents.md)) |
-| Bitácora de relevo | `~/.claude/neb.db` (local) | No | Retomar trabajos a medias en esta máquina (ver [logbook.md](logbook.md)) |
+| Bitácora de relevo | `<datos>/neb.db` (local) | No | Retomar trabajos a medias en esta máquina (ver [logbook.md](logbook.md)) |
 
 ## Estados del requerimiento
 

@@ -15,7 +15,8 @@ veces con su -journal. Cubre:
   • `restore` sobre una copia cortada de verdad (VACUUM matado sobre la copia, con su -journal) responde sin
     lanzar: restaura una copia íntegra o responde respaldo-ilegible.
 
-Homes temporales; nunca ~/.claude.
+Homes temporales, con la base y sus respaldos en la carpeta de datos (<home>/.neb, 8.0.0; sin NEB_DATA:
+_entorno); nunca ~/.claude ni ~/.neb reales.
   py -m unittest discover -s hooks/tests -p test_respaldos_a_medias.py
 """
 
@@ -36,6 +37,7 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -71,10 +73,12 @@ class Base(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.home, True)
         self.claude = os.path.join(self.home, ".claude")
         os.makedirs(self.claude)
-        self.db = os.path.join(self.claude, "neb.db")
+        self.data = os.path.join(self.home, ".neb")      # carpeta de datos (8.0.0)
+        os.makedirs(self.data)
+        self.db = os.path.join(self.data, "neb.db")
         with contextlib.redirect_stderr(io.StringIO()):
             _db_shared._connect(self.db).close()
-        self.backups = os.path.join(self.claude, "neb-backups")
+        self.backups = os.path.join(self.data, "backups")
         os.makedirs(self.backups, exist_ok=True)
 
     def write(self, name, data=b"x"):
@@ -229,8 +233,10 @@ class TestVacuumMatado(Base):
         with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
             rc = nm.al_iniciar(self.home)
         self.assertEqual(rc, 0)
-        # Corrió de verdad (no salió por subsesión ni por `neb: skip`): llegó a tomar el candado, junto a la base.
-        self.assertTrue(os.path.exists(os.path.join(self.claude, ".neb-migrate.lock")))
+        # Corrió de verdad (no salió por subsesión ni por `neb: skip`): llegó a tomar el candado, junto a la base;
+        # el viejo de ~/.claude no existía y no se crea (8.0.0).
+        self.assertTrue(os.path.exists(os.path.join(self.data, ".neb-migrate.lock")))
+        self.assertFalse(os.path.exists(os.path.join(self.claude, ".neb-migrate.lock")))
         # Un diario caliente ya no está (lo revirtió su conexión de escritura); uno sin cabecera válida puede quedar
         # hasta la siguiente escritura de páginas (Change MD, Incidencias), pero no estorba: mode=ro lee abajo.
         ro = sqlite3.connect(Path(self.db).as_uri() + "?mode=ro", uri=True)
@@ -241,7 +247,7 @@ class TestVacuumMatado(Base):
             ro.close()
 
     def test_restore_de_una_copia_cortada_de_verdad_no_lanza(self):
-        # Flujo 5(e): una copia en neb-backups/ con el -journal de un VACUUM matado sobre ella.
+        # Flujo 5(e): una copia en la carpeta de respaldos con el -journal de un VACUUM matado sobre ella.
         copia = os.path.join(self.backups, "neb.pre-paso-2.20260101T000000Z.db")
 
         def rebuild():

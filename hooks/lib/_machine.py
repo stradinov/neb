@@ -26,6 +26,9 @@ import sys
 import time
 from datetime import datetime, timezone
 
+import _migrations
+import neb_paths
+
 _HERE = os.path.dirname(os.path.abspath(__file__))
 
 USER_ENV_NAME_RE = re.compile(r"NEB_[A-Z0-9_]+")
@@ -34,7 +37,8 @@ CRED_URL_RE = re.compile(r"://\S*[@?#]")      # usuario:clave@, token@, ?token=,
 SECRET_KEY_RE = re.compile(r"TOKEN|SECRET|PASS|KEY|AUTH|CRED|WEBHOOK", re.I)   # nombre que suena a secreto
 SETTINGS_FILES = ("settings.json", "settings.local.json")
 SETTINGS_BACKUP_PREFIX = "settings-env."
-BACKUP_DIR_NAME = "neb-backups"
+# <carpeta de la base>/backups/ (desde 8.0.0; la regla completa, en _migrations.backup_dir).
+BACKUP_DIR_NAME = "backups"
 
 
 def _stamp():
@@ -73,16 +77,26 @@ def is_link(path):
 # --------------------------------------------------------------------------- contexto
 
 class Ctx:
-    """Lo que una operación o un paso guiado necesita de la máquina. Las pruebas inyectan home, config_dir y
-    user_env. La base vive en <home>/.claude; los settings, en el dir de configuración de Claude Code
-    (CLAUDE_CONFIG_DIR o <home>/.claude, supuesto R26)."""
+    """Lo que una operación o un paso guiado necesita de la máquina. Las pruebas inyectan home, db_path, config_dir,
+    data_dir y user_env.
 
-    def __init__(self, home=None, db_path=None, user_env=None, config_dir=None):
+    claude_dir   <home>/.claude: lo de Claude Code y lo que los pasos guiados de 7.x miran ahí
+    legacy_dir   la carpeta donde Neb guardaba sus datos hasta 7.x (neb_paths.legacy_dir: <home>/.claude, nunca
+                 CLAUDE_CONFIG_DIR); el origen de la mudanza de 8.0.0
+    data_dir     la carpeta de datos de Neb (neb_paths.data_dir: NEB_DATA absoluta o <home>/.neb; desde 8.0.0)
+    config_dir   el dir de configuración de Claude Code, donde viven los settings (CLAUDE_CONFIG_DIR o
+                 <home>/.claude, supuesto R26)
+    db_path      la base (por omisión <data_dir>/neb.db, la de _db_shared.resolve_db_path)
+    backups_dir  <carpeta de la base>/backups/ (_migrations.backup_dir)"""
+
+    def __init__(self, home=None, db_path=None, user_env=None, config_dir=None, data_dir=None):
         self.home = home or os.path.expanduser("~")
         self.claude_dir = os.path.join(self.home, ".claude")
+        self.legacy_dir = neb_paths.legacy_dir(self.home)
+        self.data_dir = data_dir or neb_paths.data_dir(self.home)
         self.config_dir = config_dir or os.environ.get("CLAUDE_CONFIG_DIR") or self.claude_dir
-        self.db_path = db_path or os.path.join(self.claude_dir, "neb.db")
-        self.backups_dir = os.path.join(os.path.dirname(os.path.abspath(self.db_path)), BACKUP_DIR_NAME)
+        self.db_path = db_path or os.path.join(self.data_dir, neb_paths.DB_NAME)
+        self.backups_dir = _migrations.backup_dir(self.db_path)
         self.user_env = user_env if user_env is not None else default_user_env()
         self.started = time.time()            # inicio de la corrida: la poda no toca respaldos de esta corrida
         self.exclusivo_ok = lambda: None      # el programa la fija para un paso exclusivo (segunda comprobación)
@@ -119,7 +133,7 @@ def _present(env, claves):
 
 def _needs_dev(env, present, secretas):
     """Sin respaldo (pide al dev) si la clave es secreta o lo parece, o si el valor parece llevar una
-    credencial en la URL: un olvido en `secretas` no deja un secreto copiado en neb-backups/."""
+    credencial en la URL: un olvido en `secretas` no deja un secreto copiado en la carpeta de respaldos."""
     return any(k in secretas or SECRET_KEY_RE.search(k) for k in present) or \
         any(isinstance(env[k], str) and CRED_URL_RE.search(env[k]) for k in present)
 

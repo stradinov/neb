@@ -76,16 +76,16 @@ python <ruta>/hooks/lib/autoupdate.py disable    # la apaga
 - `disable` no quita `FORCE_AUTOUPDATE_PLUGINS`. Bórrala a mano si ningún otro marketplace la necesita.
 - Si tu settings no trae la entrada del marketplace, el ayudante no escribe nada y te muestra el bloque para agregarla a mano.
 
-**Qué pasa con tu base al actualizar** (desde 6.48.0). Tus pendientes y tu bitácora viven en `~/.claude/neb.db`. Cuando una versión cambia el esquema de esa base, el cambio corre solo en la primera conexión de la versión nueva, sin que tengas que hacer nada:
+**Qué pasa con tu base al actualizar** (desde 6.48.0). Tus pendientes y tu bitácora viven en `neb.db`, en la carpeta de datos de Neb: `~/.neb`, o la que fijes con `NEB_DATA` ([`tooling/config.md`](../tooling/config.md)). Hasta 7.x vivían en `~/.claude`; al actualizar a 8.0.0, la migración guiada del inicio de sesión los muda sola, con respaldo. Cuando una versión cambia el esquema de esa base, el cambio corre solo en la primera conexión de la versión nueva, sin que tengas que hacer nada:
 
-- Si el cambio borra o reescribe datos, Neb copia antes la base, verificada, a `~/.claude/neb-backups/` y conserva la última copia de cada paso.
+- Si el cambio borra o reescribe datos, Neb copia antes la base, verificada, a `backups/` de la carpeta de datos y conserva la última copia de cada paso.
 - Plugin y clon (si tienes `NEB_HOME`) pueden tener versiones distintas: los dos operan la base mientras la entiendan. Si uno ya no la entiende, no la toca, sus comandos responden `base-incompatible` y el aviso de migración al iniciar la sesión te dice cuál actualizar.
 - `py <ruta>/bootstrap/neb-migrate.py status` muestra la versión de esquema de tu base y del código, si algo detiene un cambio y qué respaldos hay.
 - Para volver a una versión anterior: regresa primero plugin y clon, y después `neb-migrate.py restore <respaldo>`. Detalle en `tooling/migrations.md`.
 
 **Cuando una versión pide configurar tu máquina** (desde 6.49.0). Algunas versiones piden algo más que cambiar la base: quitar una clave de tu `settings.json` o una variable de entorno que ya no se usa. Eso es una **migración guiada**:
 
-- Al abrir sesión (desde 7.5.0), Neb corre solo lo que deja con qué deshacerlo (p. ej. quitar una clave no secreta de `settings.json`, guardando el par quitado en `~/.claude/neb-backups/`) y Claude te dice en una línea qué aplicó. Lo que necesita que nadie más tenga la base abierta se reintenta solo en las siguientes sesiones, sin pedirte que cierres nada.
+- Al abrir sesión (desde 7.5.0), Neb corre solo lo que deja con qué deshacerlo (p. ej. quitar una clave no secreta de `settings.json`, guardando el par quitado en `backups/` de la carpeta de datos) y Claude te dice en una línea qué aplicó. Lo que necesita que nadie más tenga la base abierta se reintenta solo en las siguientes sesiones, sin pedirte que cierres nada.
 - Lo que no deja respaldo, como quitar un token o una variable de entorno, Claude te lo pregunta en esa misma sesión, en un solo menú: aplicarlo, no aplicarlo (deja de ofrecerse) o después. Ya no hace falta abrir otra sesión; `/neb:migrate` sirve para reintentar en el momento.
 - Las sesiones y terminales que ya estaban abiertas conservan en su entorno las variables quitadas hasta que las reinicies.
 - A mano: `neb-migrate.py status` lista lo pendiente, `apply --guiados` corre lo que corre solo (`apply` a secas, solo los pasos de base), `apply --include <id>` un paso que pide tu OK y `skip <id>` guarda tu «no».
@@ -127,6 +127,7 @@ El recorrido `/wakeup` ejecuta el script de configuración por ti (idempotente �
 | `NEB_HOME` | el clon de neb (solo si el núcleo viene de un clon) | arranque, templates y bootstrap del núcleo desde el clon. Se ignora si apunta al caché del plugin |
 | `NEB_WORKSPACE` | la raíz de tu espacio de trabajo de gobernanza | tu overlay, `personal/`, `changes/` |
 | `NEB_HOOKS` / `NEB_PROJECT_HOOKS` | listas de hooks opcionales (las agregas tú; `/wakeup` no las toca) | activar los hooks que registra el plugin (ver [Retomar y relevar trabajo](#retomar-y-relevar-trabajo-bitácora-de-relevo)) |
+| `NEB_DATA` | (opcional; la declaras tú, `/wakeup` no la toca) una ruta absoluta para la carpeta de datos de Neb; sin ella, `~/.neb` | tus pendientes, tu bitácora, `compas.md` y `config.json`. Decláralo como variable de entorno de tu sistema, no solo en `settings.json`, para que una terminal fuera de Claude Code vea la misma carpeta ([`tooling/config.md`](../tooling/config.md) § "Carpeta de datos") |
 
 Abre una **sesión nueva** de Claude Code para que surtan efecto (settings.json se lee por sesión). El script detecta un overlay preexistente y no lo pisa; el flag `--overlay <nombre>` solo nombra uno nuevo si no hay ninguno (por defecto `overlay`).
 
@@ -167,6 +168,12 @@ Los agents se auto-descubren del plugin: basta con crear el `agents/<nombre>.md`
 
 Si quieres versionarla (respaldo, portabilidad entre máquinas), quita la regla `personal/` de **tu** `.gitignore` (no del de `neb/`) y haz commit de ella en tu repo privado. Excluye binarios (`*.wav` y similares). Sus cambios se trazan con el commit normal; no llevan Change MD.
 
+## Tu configuración de Neb (`config.json`)
+
+Los sonidos de aviso, el corrector de prompts y el idioma de la conversación (variedad, registro, tuteo o usted, voseo, extranjerismos) se configuran en un solo archivo, `config.json`, en la carpeta de datos de Neb (`~/.neb`, o la que fijes con `NEB_DATA`). No vive en tu espacio de trabajo ni se versiona. Lo más simple es pedírselo a Claude («háblame de usted», «apaga el sonido de fin de turno»); a mano, edita el archivo o usa `neb_paths.py set`. Esquema, valores y comandos: [`tooling/config.md`](../tooling/config.md).
+
+Lo que antes declarabas en tu `personal.md` sobre variedad, registro o voseo pasa a la sección `language` de `config.json`: si los dos dicen algo distinto, gana `config.json`. Para un solo proyecto, la perilla en `<proyecto>/.claude/personal.md` sigue ganando en ese proyecto.
+
 ## Retomar y relevar trabajo (bitácora de relevo)
 
 Cuando una sesión queda a medias —tokens agotados o un corte de luz o de red— la **bitácora de relevo** te deja retomarla. Es **opcional**: el plugin registra el hook `logbook-sync`, y tú lo activas agregándolo a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json`:
@@ -177,7 +184,7 @@ Cuando una sesión queda a medias —tokens agotados o un corte de luz o de red�
 
 Con eso aplica a todos tus proyectos, desde la siguiente sesión. Para activarlo solo en un proyecto para todo el equipo, usa `NEB_PROJECT_HOOKS` en su `.claude/settings.json` versionado. Corre con el código del plugin instalado, sin `NEB_HOME`. En Windows requiere Git Bash (Git for Windows). Los demás hooks opcionales (`save-approved-plan`, `notify-on-stop`, `notify-on-permission`, `preprocess-prompt`) se activan igual: ver [`hooks/README.md`](../hooks/README.md) § "Bajo el plugin de Neb". Si tu `settings.json` todavía invoca hooks desde `$NEB_HOME` (templates anteriores a 6.15.0), quita esas entradas al activarlos, o correrán dos veces.
 
-El hook registra tu trabajo en una bitácora local (SQLite, `~/.claude/neb.db`) en cada cierre de turno, sin que tengas que anunciar la pausa. Pide Python 3 con SQLite 3.35.5 o superior (en Windows, Python 3.12 o superior lo trae). Si el tuyo no alcanza, al iniciar sesión Claude te lo dice y, en Windows, te ofrece instalar Python 3.14 con `winget`; rige al reiniciar Claude Code.
+El hook registra tu trabajo en una bitácora local (SQLite, `neb.db` en la carpeta de datos de Neb) en cada cierre de turno, sin que tengas que anunciar la pausa. Pide Python 3 con SQLite 3.35.5 o superior (en Windows, Python 3.12 o superior lo trae). Si el tuyo no alcanza, al iniciar sesión Claude te lo dice y, en Windows, te ofrece instalar Python 3.14 con `winget`; rige al reiniciar Claude Code.
 
 Con el comando `/logbook`:
 
@@ -209,7 +216,7 @@ git clone https://github.com/stradinov/neb ~/neb   # o donde prefieras
 cp ~/neb/hooks/pre-push-wrapper ~/neb/.git/hooks/pre-push
 ```
 
-Flujo del mantenedor: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo. Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`. Los hooks opcionales activados con `NEB_HOOKS` corren siempre el plugin cargado: para probarlos desde el clon, usa `--plugin-dir`. Ojo: si el clon trae un paso de base nuevo, la primera conexión lo aplica a tu `~/.claude/neb.db`; y desde 7.5.0, con `--plugin-dir`, cada inicio de sesión corre solos los pasos guiados del clon que dejan con qué deshacerlos (también los de una migración en desarrollo, sin publicar) sobre tu `~/.claude` y tu configuración. Para probar un paso de base o una migración guiada sin tocarlos, usa un home temporal (`HOME` y `USERPROFILE`) con una copia de la base.
+Flujo del mantenedor: editas en el clon, fragmento de CHANGELOG (`changelog.d/<version>.md` + `bootstrap/assemble-changelog.py`) y `git push` directo. Para **dogfoodear** tus cambios antes de publicarlos, apunta `NEB_HOME` al clon (el hook `SessionStart` prefiere `NEB_HOME` sobre el caché del plugin) o corre `claude --plugin-dir <clon>`. Los hooks opcionales activados con `NEB_HOOKS` corren siempre el plugin cargado: para probarlos desde el clon, usa `--plugin-dir`. Ojo: si el clon trae un paso de base nuevo, la primera conexión lo aplica a tu `neb.db`; y desde 7.5.0, con `--plugin-dir`, cada inicio de sesión corre solos los pasos guiados del clon que dejan con qué deshacerlos (también los de una migración en desarrollo, sin publicar) sobre tu carpeta de datos, tu `~/.claude` y tu configuración. Para probar un paso de base o una migración guiada sin tocarlos, usa un home temporal (`HOME` y `USERPROFILE`) con una copia de la base y `NEB_DATA` vacía: si la tienes declarada, la carpeta de datos seguiría siendo la tuya aunque cambies el home.
 
 El clon del núcleo y tu espacio de trabajo son repos **independientes**: el núcleo se actualiza con `git pull` sin tocar lo tuyo. La envoltura instalada ejecuta `hooks/pre-push-changelog` del clon, así que el hook `pre-push` se actualiza con `git pull` sin reinstalarlo. (El layout histórico de `neb/` como `git subtree` dentro de un repo de gobernanza sigue siendo posible, pero ya no es el camino recomendado — un clon separado es más simple y el push no requiere `subtree split`.)
 

@@ -1,5 +1,5 @@
 <!-- Plantilla de una entrada de la bitácora de relevo: representación legible de un `work`.
-     El almacenamiento real es la base local ~/.claude/neb.db (esquema inicial en hooks/logbook-schema.sql más los pasos de base de tooling/migrations.md);
+     El almacenamiento real es la base local <datos>/neb.db, en la carpeta de datos de Neb (esquema inicial en hooks/logbook-schema.sql más los pasos de base de tooling/migrations.md);
      esto documenta la forma y lo que /logbook muestra al retomar. NO es un archivo que el dev edite a mano. -->
 
 # Relevo: <project> / <req_slug>   (<mode: req | exploratory>)

@@ -21,6 +21,7 @@ LIB = os.path.join(HERE, "..", "lib")
 NEB_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, LIB)
 
+import _entorno  # quita NEB_DATA: la base de prueba es la del home temporal (<home>/.neb/neb.db)
 import _db_shared
 import logbook
 
@@ -45,6 +46,7 @@ class TestCliUtf8(unittest.TestCase):
     def test_list_survives_cp1252_stdout(self):
         home = tempfile.mkdtemp(prefix="neb-test-cli-")
         os.makedirs(os.path.join(home, ".claude"))
+        os.makedirs(os.path.join(home, ".neb"))
         con = _db_shared._connect(_db_shared.resolve_db_path(home), SCHEMA)
         _add_req(con, "proj→uno", "", "s1")
         con.commit()
@@ -70,6 +72,7 @@ class _Base(unittest.TestCase):
         os.makedirs(self.otro)
         self.home = os.path.join(self.base, "home")
         os.makedirs(os.path.join(self.home, ".claude"))
+        os.makedirs(os.path.join(self.home, ".neb"))
         self.con = _db_shared._connect(_db_shared.resolve_db_path(self.home), SCHEMA)
         self.addCleanup(self.con.close)
 

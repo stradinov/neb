@@ -23,8 +23,8 @@ vencido, base bloqueada) solo avisan en stderr, que el hook descarta: el aviso q
 `logbook.py` a mano.
 
 CLI (`link`, `trace`, `unlink`): los despacha `logbook.cli_main`, que atrapa `DbUnavailable` (base
-sin migrar, o que este código no puede operar); salida JSON en stdout y exit 0 siempre (el skill
-decide por `ok`).
+sin mudar a la carpeta de datos, o que este código no puede operar); salida JSON en stdout y exit 0 siempre
+(el skill decide por `ok`).
 """
 
 import json
@@ -359,8 +359,8 @@ def after_capture(con, session_id, chunk):
 
 def _default_connect():
     """Misma base y esquema que `logbook._db_for_cli` (para llamadas directas sin conector): el esquema
-    inicial del árbol de este módulo (6.48.0). Lanza UnmigratedDb si la base sigue sin migrar; puede lanzar
-    DbUnavailable."""
+    inicial del árbol de este módulo (6.48.0). Lanza UnmovedDb si la base sigue en ~/.claude sin mudar; puede
+    lanzar DbUnavailable."""
     from _db_shared import open_default_db
     return open_default_db(os.path.expanduser("~"))
 

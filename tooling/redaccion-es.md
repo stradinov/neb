@@ -164,6 +164,21 @@ Errores en la representación de elementos no textuales.
 
 Estas son las perillas que el usuario puede mover para que el corrector se comporte de la manera deseada. Las agrupo por tipo de decisión.
 
+**En Neb**, el idioma, el tratamiento y cuatro de estas perillas son la sección `language` de `config.json`, la declaración estructurada del individuo ([`config.md`](config.md) § "Sección language"):
+
+| Llave de `language` | Perilla de este documento |
+|---|---|
+| `base` | El idioma (ISO 639-1); estas perillas son de `es`, hoy el único con lineamientos |
+| `variedad` | § "A. Variedad regional del español" |
+| `registro` | § "C. Registro" |
+| `tratamiento` | `tuteo` o `usted`: cómo se dirige Claude al dev (no es `permitir_ustedeo_general`, que convierte un texto) |
+| `permitir_voseo` | § "E. Zonas grises (toggles individuales)" |
+| `extranjerismos` | § "F. Tratamiento de extranjerismos" (la `politica` de la plantilla) |
+
+- **Precedencia**: núcleo → overlay del adoptante → individuo → proyecto (`<proyecto>/.claude/personal.md`); cada nivel sustituye lo que declara, y una llave en `null` no se declara ([`../methodology/personal-vs-team.md`](../methodology/personal-vs-team.md) § "Idioma del individuo").
+- **Las demás perillas** (estrictez, dominio, zonas grises salvo el voseo, tipografía, estilo, intervención, salida) se declaran en prosa en `personal/<usuario>.md` § "Preferencias de comunicación" o en `<proyecto>/.claude/personal.md`.
+- **Una de las seis en `personal/<usuario>.md` y en `config.json`**: gana `config.json`; se recomienda quitarla del `personal/<usuario>.md`. En `<proyecto>/.claude/personal.md` sustituye a `config.json` en ese proyecto.
+
 ### A. Variedad regional del español
 
 Determina qué se considera estándar.

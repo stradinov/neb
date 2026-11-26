@@ -12,11 +12,13 @@ LIMIT unidades UTF-16 o menos, una por entrada de hooks/hooks.json:
   • la oferta de actualización automática (hooks/lib/autoupdate.py): desde un caché simulado, sin decidir
     avisa en la parte 1 y no escribe; decidido sale igual que fuera del caché; el tope del aviso; con los
     cuatro avisos el arranque cabe
-  • la base sin migrar (solo neb-logbook.db, no vacío) sale en el aviso de migración guiada pendiente como
-    el paso de 7.0.0, sin crear neb.db; ausente con neb.db o con la base vieja vacía; el arranque no abre
-    la base vieja (sqlite3.connect)
+  • la base sin mudar (8.0.0: la de 7.x sigue en ~/.claude/neb.db y la carpeta de datos no tiene una usable):
+    las partes no la miran ni abren ninguna base; `neb-migrate.py al-iniciar` la muda (8.0.0:mover-base) y deja
+    la base testigo; el aviso de base de al-iniciar (_db_notice) la nombra sin crear nada, y calla con la
+    testigo o con la base ya mudada; _readonly_db mira la carpeta de datos
 
-Framework: unittest (stdlib). Árboles, workspaces y HOME/USERPROFILE temporales; nunca toca ~/.claude.
+Framework: unittest (stdlib). Árboles, workspaces y HOME/USERPROFILE temporales, sin NEB_DATA (_entorno); nunca
+toca ~/.claude ni ~/.neb reales.
   py -m unittest discover -s hooks/tests -p test_bootstrap_context.py
 """
 import importlib.util
@@ -33,6 +35,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -50,7 +53,7 @@ CLEAN = ("NEB_HOME", "CLAUDE_PLUGIN_ROOT", "NEB_WORKSPACE", "NEB_HOOKS", "NEB_PR
 
 
 def _tmp_home(test):
-    """HOME y USERPROFILE temporales (en Windows expanduser lee USERPROFILE): el aviso de base sin migrar
+    """HOME y USERPROFILE temporales (en Windows expanduser lee USERPROFILE): el aviso de base sin mudar
     no depende de la máquina."""
     home = tempfile.mkdtemp(prefix="neb-test-home-")
     test.addCleanup(shutil.rmtree, home, True)
@@ -408,31 +411,37 @@ class TestAvisoActualizacion(unittest.TestCase):
         self.assertIsNone(nb._autoupdate_offer(os.path.join(NEB, "bootstrap")))
 
 
-class TestAvisoBaseSinMigrar(unittest.TestCase):
-    """La base con el nombre anterior a 7.0.0: las partes del arranque no la miran ni la avisan (desde 7.5.0), no
-    crean neb.db ni abren la base vieja, ni en solo lectura; la entrada de migración de SessionStart
-    (`neb-migrate.py al-iniciar`) corre el paso 7.0.0:renombrar-base, que deja respaldo, y lo reporta."""
+class TestAvisoBaseSinMudar(unittest.TestCase):
+    """La base de 7.x que sigue en ~/.claude/neb.db (8.0.0): las partes del arranque no la miran ni la avisan (desde
+    7.5.0 no abren ninguna base), no crean la nueva; la entrada de migración de SessionStart (`neb-migrate.py
+    al-iniciar`) corre 8.0.0:mover-base, que deja respaldo y la base testigo, y lo reporta. Mientras no se mude,
+    su aviso de base (_db_notice) la nombra."""
 
     AVISO = "migración guiada de Neb"
 
     def setUp(self):
         self.home_env = _tmp_home(self)
-        self.base = os.path.join(self.home_env["HOME"], ".claude")
+        self.home = self.home_env["HOME"]
+        self.base = os.path.join(self.home, ".claude")
         os.makedirs(self.base)
-        self.legacy = os.path.join(self.base, "neb-logbook.db")
-        self.target = os.path.join(self.base, "neb.db")
+        self.legacy = os.path.join(self.base, "neb.db")
+        self.target = os.path.join(self.home, ".neb", "neb.db")
 
     def _base(self, path):
+        os.makedirs(os.path.dirname(path), exist_ok=True)
         con = sqlite3.connect(path)
         con.execute("CREATE TABLE work (id INTEGER PRIMARY KEY)")
         con.commit()
         con.close()
 
-    def _out(self):
+    def _env(self):
         e = {k: v for k, v in os.environ.items() if k not in CLEAN}
         e["NEB_HOME"] = NEB
         e.update(self.home_env)
-        r = subprocess.run([sys.executable, SCRIPT], env=e, capture_output=True, timeout=60)
+        return e
+
+    def _out(self):
+        r = subprocess.run([sys.executable, SCRIPT], env=self._env(), capture_output=True, timeout=60)
         self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8"))
         return r.stdout.decode("utf-8")
 
@@ -445,36 +454,42 @@ class TestAvisoBaseSinMigrar(unittest.TestCase):
         out = self._out()
         self.assertNotIn(self.AVISO, out)
         self.assertNotIn("/neb:migrate", out)
-        self.assertNotIn("La bitácora sigue con el nombre anterior", out)
-        self.assertEqual(self._carpeta(), ["neb-logbook.db"])
+        self.assertNotIn("La base de Neb sigue en", out)
+        self.assertEqual(self._carpeta(), ["neb.db"])
+        self.assertFalse(os.path.exists(self.target))
         st2 = os.stat(self.legacy)
         self.assertEqual((st.st_size, st.st_mtime_ns), (st2.st_size, st2.st_mtime_ns))
 
-    def test_critico_al_iniciar_renombra_la_base_vieja(self):
+    def test_critico_al_iniciar_muda_la_base_vieja_y_deja_la_testigo(self):
         self._base(self.legacy)
-        e = {k: v for k, v in os.environ.items() if k not in CLEAN}
-        e["NEB_HOME"] = NEB
-        e.update(self.home_env)
         r = subprocess.run([sys.executable, os.path.join(NEB, "bootstrap", "neb-migrate.py"), "al-iniciar"],
-                           env=e, capture_output=True, timeout=120)
+                           env=self._env(), capture_output=True, timeout=120)
         self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8"))
         out = r.stdout.decode("utf-8")
-        self.assertIn("`7.0.0:renombrar-base`", out)
+        self.assertIn("`8.0.0:mover-base`", out)
         self.assertIn("aplicó al iniciar la sesión", out)
         self.assertNotIn("sesión nueva", out)
+        self.assertNotIn("La base de Neb sigue en", out)
         self.assertTrue(os.path.isfile(self.target))
-        self.assertFalse(os.path.exists(self.legacy))
+        sys.path.insert(0, os.path.join(NEB, "hooks", "lib"))
+        import _relocate
+        self.assertTrue(_relocate.is_witness(self.legacy))
+        con = sqlite3.connect(self.target)
+        try:
+            self.assertIsNotNone(con.execute("SELECT 1 FROM sqlite_master WHERE name = 'work'").fetchone())
+        finally:
+            con.close()
 
     def test_sin_la_base_vieja_no_avisa(self):
         self._base(self.target)
-        self.assertNotIn("`7.0.0`", self._out())
+        self.assertNotIn("8.0.0:mover-base", self._out())
 
-    def test_critico_env_notices_no_abre_la_base_vieja(self):
+    def test_critico_env_notices_no_abre_ninguna_base(self):
         real = sqlite3.connect
         self._base(self.legacy)
-        for neb_db in (False, True):
-            with self.subTest(neb_db=neb_db):
-                if neb_db:
+        for nueva in (False, True):
+            with self.subTest(nueva=nueva):
+                if nueva:
                     self._base(self.target)
                 abiertos = []
 
@@ -483,7 +498,6 @@ class TestAvisoBaseSinMigrar(unittest.TestCase):
                     return real(path, *a, **k)
                 with mock.patch.dict(os.environ, self.home_env), mock.patch("sqlite3.connect", espia):
                     notices = nb._env_notices(os.path.join(NEB, "bootstrap"))
-                self.assertFalse([p for p in abiertos if "neb-logbook" in p], abiertos)
                 self.assertFalse(abiertos, "las partes no abren ninguna base (7.5.0)")
                 self.assertFalse(any(self.AVISO in n for n in notices), notices)
 
@@ -491,7 +505,42 @@ class TestAvisoBaseSinMigrar(unittest.TestCase):
         open(self.legacy, "wb").close()
         with mock.patch.dict(os.environ, self.home_env):
             notices = nb._env_notices(os.path.join(NEB, "bootstrap"))
-        self.assertFalse(any("`7.0.0`" in n for n in notices), notices)
+        self.assertFalse(any("8.0.0" in n for n in notices), notices)
+        self.assertIsNone(nb._db_notice(os.path.join(NEB, "bootstrap"), NEB, home=self.home))
+
+    def test_critico_db_notice_nombra_la_base_sin_mudar_sin_crear_nada(self):
+        self._base(self.legacy)
+        st = os.stat(self.legacy)
+        with mock.patch.dict(os.environ, self.home_env):
+            text = nb._db_notice(os.path.join(NEB, "bootstrap"), NEB, home=self.home)
+        self.assertIsNotNone(text)
+        self.assertTrue(text.startswith("La base de Neb sigue en " + self.legacy), text)
+        self.assertIn("Avísale al dev", text)
+        self.assertIn("/neb:migrate", text)
+        self.assertIn("8.0.0:mover-base", text)
+        self.assertTrue(text.endswith("."), text)
+        self.assertLessEqual(u16(nb.ENV_NOTICE % text), nb.DB_NOTICE_MAX)
+        self.assertFalse(os.path.exists(os.path.dirname(self.target)), "no crea la carpeta de datos")
+        self.assertEqual(self._carpeta(), ["neb.db"])
+        st2 = os.stat(self.legacy)
+        self.assertEqual((st.st_size, st.st_mtime_ns), (st2.st_size, st2.st_mtime_ns))
+
+    def test_db_notice_calla_con_la_testigo_y_con_la_base_mudada(self):
+        sys.path.insert(0, os.path.join(NEB, "hooks", "lib"))
+        import _relocate
+        _relocate.write_witness(self.legacy, "8.0.0")
+        bootstrap = os.path.join(NEB, "bootstrap")
+        with mock.patch.dict(os.environ, self.home_env):
+            self.assertIsNone(nb._db_notice(bootstrap, NEB, home=self.home))
+            self._base(self.target)
+            self.assertIsNone(nb._db_notice(bootstrap, NEB, home=self.home))
+
+    def test_readonly_db_mira_la_carpeta_de_datos(self):
+        mig = nb._load_module(os.path.join(NEB, "hooks", "lib", "_migrations.py"), "neb_migrations_prueba")
+        self._base(self.legacy)
+        self.assertIsNone(nb._readonly_db(mig, self.home))
+        self._base(self.target)
+        self.assertEqual(nb._readonly_db(mig, self.home), self.target)
 
 
 class TestAvisoSonido(unittest.TestCase):
@@ -507,6 +556,20 @@ class TestAvisoSonido(unittest.TestCase):
         self.falta = os.path.join(self.home_env["HOME"], "falta.wav")
 
     def _cfg(self, hook, data):
+        """Sección notify.<stop|permission> de <home>/.neb/config.json (8.0.0); la del otro hook se conserva."""
+        data_dir = os.path.join(self.home_env["HOME"], ".neb")
+        os.makedirs(data_dir, exist_ok=True)
+        path = os.path.join(data_dir, "config.json")
+        cfg = {"schema": 1, "notify": {}}
+        if os.path.exists(path):
+            with open(path, encoding="utf-8") as f:
+                cfg = json.load(f)
+        cfg["notify"][hook.replace("notify-on-", "")] = data
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(cfg, f)
+
+    def _cfg_suelto(self, hook, data):
+        """JSON suelto de 7.x en <home>/.claude: solo cuenta sin config.json (residuo que sale en 9.0.0)."""
         with open(os.path.join(self.claude, "%s.json" % hook), "w", encoding="utf-8") as f:
             json.dump(data, f)
 
@@ -552,6 +615,14 @@ class TestAvisoSonido(unittest.TestCase):
         self._cfg("notify-on-stop", {"wav": "chimes-loud"})
         self._notices(extra=self._player_path())
         self.assertFalse(os.path.exists(os.path.join(self.claude, "neb-sounds")))
+        self.assertFalse(os.path.exists(os.path.join(self.home_env["HOME"], ".neb", "cache")))
+
+    def test_sin_config_json_avisa_desde_el_suelto_de_7x(self):
+        extra = self._player_path()
+        self._cfg_suelto("notify-on-stop", {"wav": self.falta})
+        notices = self._notices(extra=extra)
+        self.assertEqual(len(notices), 1, notices)
+        self.assertIn("no existe %s" % self.falta, notices[0])
 
     @unittest.skipIf(os.name == "nt", "en Windows el reproductor lo da el sistema")
     def test_sin_reproductor_avisa(self):
@@ -560,6 +631,76 @@ class TestAvisoSonido(unittest.TestCase):
         notices = self._notices(hooks="notify-on-permission", extra={"PATH": empty})
         self.assertEqual(len(notices), 1, notices)
         self.assertIn("`notify-on-permission` no suena: no hay reproductor", notices[0])
+
+
+class TestBloqueIdioma(unittest.TestCase):
+    """La sección `language` de <datos>/config.json llega como bloque de idioma del individuo, después de la
+    configuración personal (8.0.0). Solo las perillas declaradas; `base` solo si no es `es`."""
+
+    TITULO = "# Idioma del individuo (config.json, inyectado por el plugin)"
+    PERSONAL = "# Configuracion personal (inyectada por el plugin)"
+
+    def setUp(self):
+        self.home_env = _tmp_home(self)
+        self.home = self.home_env["HOME"]
+        self.ws = tempfile.mkdtemp(prefix="neb-test-ws-")
+        self.addCleanup(shutil.rmtree, self.ws, True)
+        os.makedirs(os.path.join(self.ws, "personal"))
+        with open(os.path.join(self.ws, "personal", "dev.md"), "w", encoding="utf-8") as f:
+            f.write("# Personal de prueba\n\nvariedad: espana (en prosa)\n")
+
+    def _config(self, language, raw=None):
+        data_dir = os.path.join(self.home, ".neb")
+        os.makedirs(data_dir, exist_ok=True)
+        with open(os.path.join(data_dir, "config.json"), "w", encoding="utf-8") as f:
+            f.write(raw if raw is not None else json.dumps({"schema": 1, "language": language}))
+
+    def _full(self):
+        e = {k: v for k, v in os.environ.items() if k not in CLEAN}
+        e.update(self.home_env, NEB_HOME=NEB, NEB_WORKSPACE=self.ws, CLAUDE_PLUGIN_OPTION_USERNAME="dev")
+        e.pop("NEB_DATA", None)
+        r = subprocess.run([sys.executable, SCRIPT], env=e, capture_output=True, timeout=60)
+        self.assertEqual(r.returncode, 0, r.stderr.decode("utf-8", "replace"))
+        return r.stdout.decode("utf-8")
+
+    def test_critico_perillas_declaradas_despues_de_la_configuracion_personal(self):
+        self._config({"variedad": "mexico", "tratamiento": "usted", "registro": None, "base": "es"})
+        out = self._full()
+        self.assertIn(self.TITULO, out)
+        self.assertGreater(out.index(self.TITULO), out.index(self.PERSONAL))
+        bloque = out[out.index(self.TITULO):]
+        self.assertIn('- `variedad`: `"mexico"`', bloque)
+        self.assertIn('- `tratamiento`: `"usted"`', bloque)
+        self.assertNotIn("`registro`", bloque)
+        self.assertNotIn("`base`", bloque)
+        self.assertNotIn("Hoy solo `es`", bloque)
+
+    def test_critico_sin_perillas_declaradas_no_hay_bloque(self):
+        for caso in ("sin config", {"base": "es"}, {"variedad": None}):
+            with self.subTest(caso=caso):
+                if caso != "sin config":
+                    self._config(caso)
+                self.assertNotIn(self.TITULO, self._full())
+
+    def test_config_ilegible_no_rompe_el_arranque_ni_emite_el_bloque(self):
+        self._config(None, raw="{roto")
+        out = self._full()
+        self.assertIn(self.PERSONAL, out)
+        self.assertNotIn(self.TITULO, out)
+
+    def test_base_distinta_de_es_avisa_sin_lineamientos(self):
+        self._config({"base": "en"})
+        bloque = self._full().split(self.TITULO, 1)[1]
+        self.assertIn('- `base`: `"en"`', bloque)
+        self.assertIn("Hoy solo `es` tiene lineamientos", bloque)
+
+    def test_valor_con_comillas_invertidas_y_salto_no_rompe_el_formato(self):
+        self._config({"variedad": "mx`\n# Inyectado" + "x" * 80})
+        bloque = self._full().split(self.TITULO, 1)[1]
+        linea = [l for l in bloque.splitlines() if l.startswith("- `variedad`")][0]
+        self.assertNotIn("\n# Inyectado", bloque)
+        self.assertTrue(linea.endswith("…`"), linea)
+        self.assertEqual(linea.count("`"), 4)
 
 
 if __name__ == "__main__":

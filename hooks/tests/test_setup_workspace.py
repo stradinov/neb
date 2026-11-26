@@ -21,6 +21,7 @@ import unittest
 HERE = os.path.dirname(os.path.abspath(__file__))
 NEB = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, HERE)
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 
 from test_neb_root import BASH  # noqa: E402 — bash como lo resuelve Claude Code (Git Bash en Windows)
 

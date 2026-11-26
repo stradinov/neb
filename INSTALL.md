@@ -12,6 +12,7 @@ Neb es un plugin de Claude Code (repo: <https://github.com/stradinov/neb>). Para
 - **CLI.** Los comandos `claude plugin …` equivalen a los `/plugin …` y sí los puedes correr tú. Si `claude` no está en el PATH (pasa en algunas instalaciones de la app de escritorio), usa la vía con `/`: el menú interactivo de `/plugin`, con la pestaña Installed para el plugin y la pestaña Marketplaces para el marketplace. Sin CLI, verifica releyendo `installed_plugins.json` (sección 2).
 - **JSON en Windows.** Lee los JSON con un parser y desde Git Bash. Por ejemplo: `PYTHONIOENCODING=utf-8 python -c "import json,sys; d=json.load(open(sys.argv[1], encoding='utf-8-sig')); …" <archivo>`. Para la salida de `claude plugin list --json`, redirígela a un archivo y léelo igual. En PowerShell 5.1, la tubería antepone un BOM que rompe `json.load`, y `Get-Content` rompe los acentos.
 - Un fallo se reporta tal cual, con el comando y la salida. No lo rodees con otra vía sin decirlo.
+- **Un problema cuya causa es esta guía o el plugin no se publica durante la instalación.** Se lleva a la sección 7, que propone el pull request o el issue al final.
 
 ## 1. Requisitos
 
@@ -117,7 +118,33 @@ El clon se necesita **solo** para contribuir al núcleo de Neb. Revisa si aplica
 1. Si se instaló, actualizó, activó o desactivó el plugin en esta sesión, pídele al usuario que **abra una sesión nueva** o corra `/clear`. El arranque de Neb lo inyecta el hook `SessionStart`, que solo corre al iniciar, al limpiar o al compactar una sesión. `/reload-plugins` no lo vuelve a inyectar.
 2. Si el usuario todavía no tiene espacio de trabajo, pídele que corra `/wakeup` en esa sesión nueva: el recorrido lo conecta o lo monta (overlay y configuración personal) y lo guía para definir su primer profile. Para saber si ya lo tiene, revisa que `NEB_WORKSPACE` esté definido en el bloque `env` de `<dir de configuración>/settings.json` y que esa ruta exista.
 
-## 7. Reporte final
+## 7. Problemas de la guía
+
+Esta sección corre solo si durante la instalación apareció un problema cuya causa es esta guía (un paso equivocado, faltante o ambiguo) o el plugin. No cuentan un requisito de la sección 1 que falta, la red, ni los permisos o la configuración propios del equipo del usuario: esos se reportan como hasta ahora. Ante duda, el problema cuenta: va como no resuelto y su causa se escribe como hipótesis.
+
+- **Resuelto**: hay una corrección concreta al texto de esta guía o al núcleo, y la instalación terminó usándola.
+- **No resuelto**: cualquier otro caso, incluida una instalación que terminó con un rodeo sin corrección clara a la guía.
+
+Antes de proponer nada:
+
+1. **Vigencia.** Compara con `main` de `stradinov/neb`, aunque el equipo fije otra `ref`: si la causa es la guía, con su `INSTALL.md` (<https://raw.githubusercontent.com/stradinov/neb/main/INSTALL.md>); si es el plugin, con las entradas de su `CHANGELOG.md` (<https://raw.githubusercontent.com/stradinov/neb/main/CHANGELOG.md>) posteriores a la versión instalada. Si ahí ya está corregido, repórtalo sin pull request ni issue y sugiere actualizar o, si el equipo fija una versión anterior, díselo al usuario.
+2. **Duplicados.** El repo del núcleo, `<owner>/<repo>`, es la ruta del campo `repository` del `.claude-plugin/plugin.json` del plugin instalado (con el marketplace de este repo, `stradinov/neb`). Con `gh` (`gh auth status` termina en 0), busca ahí issues y pull requests abiertos y cerrados que ya lo reporten: `gh issue list --repo <owner>/<repo> --state all --search "<términos>"` y `gh pr list --repo <owner>/<repo> --state all --search "<términos>"`. Si hay uno, el reporte da su URL en lugar del menú. Sin `gh`, dale al usuario las búsquedas `https://github.com/<owner>/<repo>/issues?q=<términos>` y `https://github.com/<owner>/<repo>/pulls?q=<términos>` para que las revise antes de elegir, y el reporte dice que los duplicados no se verificaron.
+3. **Permiso de escritura.** `gh repo view <owner>/<repo> --json viewerPermission`: `WRITE`, `MAINTAIN` o `ADMIN` es permiso; otro valor es sin permiso. Sin `gh`, pregúntale al usuario si tiene permiso de escritura en el repo (misma comprobación que [`process/improvement.md`](process/improvement.md) § "Aplicar un ajuste").
+
+Después, la propuesta va con el reporte final (sección 8):
+
+- **Sin permiso de escritura**, en un menú:
+  - Resuelto: **«Aportar por PR» (Recomendado)**, que muestra el delta (archivo, sección y texto nuevo) y el nombre de la rama, y que elegirla aprueba; **«Abrir un issue»**; **«No por ahora»**.
+  - No resuelto: **«Abrir un issue» (Recomendado)**; **«No por ahora»**.
+
+  La plantilla del issue se elige con el criterio de defecto o mejora de [CONTRIBUTING](CONTRIBUTING.md) § "Abrir un issue".
+- **Con permiso de escritura**:
+  - Resuelto: propón en una línea el arreglo directo en el clon del núcleo, con el flujo de mantenedor del repo ([CLAUDE.md](CLAUDE.md) del repo). El clon es el de `NEB_HOME` (sección 5); si no hay, se obtiene como en el paso 2 de [`process/upstream-contribution.md`](process/upstream-contribution.md) § "Procedimiento", con el menú de clonar de las reglas. El caché del plugin no se edita.
+  - No resuelto: el mismo menú del issue.
+
+El procedimiento del pull request vive en [`process/upstream-contribution.md`](process/upstream-contribution.md) § "Procedimiento", cuyo paso 2 hace el clon; el del issue, en [`process/upstream-contribution.md`](process/upstream-contribution.md) § "Abrir un issue". Léelo de `main` de `stradinov/neb` o, si el equipo distribuye Neb por su propio marketplace, de la `source` de ese marketplace. En una primera instalación el arranque de Neb todavía no está en la sesión, así que ese archivo es la fuente. Publicar el fork, el push, el pull request o el issue pide el OK explícito del usuario.
+
+## 8. Reporte final
 
 Cierra con una tabla corta que cubra:
 
@@ -125,4 +152,5 @@ Cierra con una tabla corta que cubra:
 - **Plugin:** `id` y versión antes → después, y si la actualización automática está encendida y con efecto.
 - **Clon:** no aplica / al día / atrasado / adelante / divergido, más «con cambios sin confirmar» si los hay.
 - **Espacio de trabajo:** montado / pendiente de `/wakeup`.
+- **Problemas de la guía:** ninguno / ya corregido en `main` / ya reportado (URL) / pull request o issue propuesto (y lo que eligió el usuario; «duplicados sin verificar» si no hubo `gh`) / arreglo directo propuesto. La URL de lo que se publique se entrega aparte, al publicar.
 - **Lo que queda del lado del usuario:** sesión nueva o `/clear`, y los comandos `/` que todavía tiene que correr.

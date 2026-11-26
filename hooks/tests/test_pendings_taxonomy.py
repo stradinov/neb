@@ -14,6 +14,9 @@ Cubre contra DBs TEMPORALES (tempfile; NUNCA ~/.claude/*.db) y ejemplos GENÉRIC
   • triage_pass: grupos SOLO por pending_link entre open; suggested/unclassified disjuntos.
   • compas v3: `Proyectos:` (bonus por proyecto), sin la línea, write_compas round-trip; peso por eje;
     las líneas viejas `Clientes:`/`Roadmap:` se ignoran; write-compas con 5 elementos es error JSON.
+  • compas en la carpeta de datos (8.0.0): write_compas escribe en <datos>/compas.md (NEB_DATA o ~/.neb),
+    nunca en ~/.claude; parse_compas lee ~/.claude/compas.md solo si el nuevo falta (residuo hasta 9.0.0) y,
+    con los dos, manda el nuevo; una carpeta de datos que es enlace no se escribe (error JSON en el CLI).
   • recommend_priority: banda curada > compas; curado sin banda -> compas.
   • curate: reemplazo por eje, is_primary solo en tópico, banda EN, slug único, raíz rechazada,
     related -> link; cli_curate emite JSON ok/error por stdout.
@@ -27,7 +30,7 @@ Cubre contra DBs TEMPORALES (tempfile; NUNCA ~/.claude/*.db) y ejemplos GENÉRIC
     --apply aborta sin respaldo ni escritura y dice cómo resolverlo, también si el paso se
     detiene recién al abrir con _connect (el respaldo recién tomado se borra); el dry-run avisa que abortará.
 
-Framework: unittest (stdlib), NO pytest.
+Framework: unittest (stdlib), NO pytest. HOME temporal (_entorno quita NEB_DATA del entorno).
 """
 
 import contextlib
@@ -45,7 +48,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(HERE, "..", "lib")
 sys.path.insert(0, LIB)
 
+import _entorno    # noqa: E402,F401 — quita NEB_DATA: ningún compas.md de prueba cae en la carpeta real
 import _db_shared  # noqa: E402
+import neb_paths   # noqa: E402
 import pendings    # noqa: E402
 
 SCHEMA = os.path.join(HERE, "..", "logbook-schema.sql")
@@ -97,6 +102,7 @@ def _fresh_home():
 
 def _connect_fresh(home):
     path = _db_shared.resolve_db_path(home)
+    os.makedirs(os.path.dirname(path), exist_ok=True)   # carpeta de datos (8.0.0): la base ya no cuelga de .claude
     con = _db_shared._connect(path, SCHEMA)
     con.execute("PRAGMA foreign_keys=ON")
     return con, path
@@ -515,7 +521,68 @@ class TestCompasV3(unittest.TestCase):
         self.con.close()
 
     def _compas_path(self):
+        return neb_paths.compas_path(self.home)
+
+    def _hand_compas_path(self):
+        """Ruta para un compas.md escrito a mano, con su carpeta de datos creada (write_compas la crea solo)."""
+        return os.path.join(neb_paths.ensure_data_dir(self.home), pendings.COMPAS_NAME)
+
+    def _legacy_compas_path(self):
         return os.path.join(self.home, ".claude", pendings.COMPAS_NAME)
+
+    def test_write_compas_goes_to_data_dir_not_legacy(self):
+        """8.0.0: write_compas escribe en <datos>/compas.md (~/.neb sin NEB_DATA), crea la carpeta y no toca
+        ~/.claude; con NEB_DATA absoluta, escribe ahí."""
+        path = pendings.write_compas(self.home, [("Seg", 60, ["seguridad"])])
+        self.assertEqual(path, os.path.join(self.home, ".neb", "compas.md"))
+        self.assertTrue(os.path.isfile(path))
+        self.assertFalse(os.path.exists(self._legacy_compas_path()))
+        datos = os.path.join(self.home, "otra", "datos")
+        with mock.patch.dict(os.environ, {"NEB_DATA": datos}):
+            self.assertEqual(pendings.write_compas(self.home, [("Seg", 60, ["seguridad"])]),
+                             os.path.join(datos, "compas.md"))
+            self.assertEqual(pendings.parse_compas(self.home)["topic_weight"], {"seguridad": 60})
+
+    def test_parse_compas_falls_back_to_legacy_only_when_new_is_missing(self):
+        """Residuo de transición (sale en 9.0.0): sin <datos>/compas.md se lee ~/.claude/compas.md; con los
+        dos manda el nuevo; escribir tras leer el viejo va al nuevo y el viejo queda intacto."""
+        legacy_txt = "---\nversion: 3\n---\n\n## Objetivo: Viejo\n- **Peso:** 40\n- **Temas:** seguridad\n"
+        with open(self._legacy_compas_path(), "w", encoding="utf-8") as fh:
+            fh.write(legacy_txt)
+        self.assertFalse(os.path.exists(self._compas_path()))
+        self.assertEqual(pendings.compas_read_path(self.home), self._legacy_compas_path())
+        c = pendings.parse_compas(self.home)
+        self.assertTrue(c["exists"]); self.assertEqual(c["topic_weight"], {"seguridad": 40})
+        path = pendings.write_compas(self.home, [("Nuevo", 80, ["tooling"])])
+        self.assertEqual(path, self._compas_path())
+        self.assertEqual(pendings.compas_read_path(self.home), self._compas_path())
+        self.assertEqual(pendings.parse_compas(self.home)["topic_weight"], {"tooling": 80})   # manda el nuevo
+        with open(self._legacy_compas_path(), encoding="utf-8") as fh:
+            self.assertEqual(fh.read(), legacy_txt)                                         # viejo intacto
+
+    def test_write_compas_refuses_linked_data_dir(self):
+        """La carpeta de datos es un enlace: ensure_dir la rechaza (ValueError) y el CLI lo da como error
+        JSON sin escribir nada. Home propio: el de setUp ya tiene la carpeta de datos (ahí vive la base)."""
+        home = _fresh_home()
+        target = os.path.join(home, "destino")
+        os.makedirs(target)
+        link = os.path.join(home, ".neb")
+        try:
+            os.symlink(target, link, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            # Windows sin privilegio de symlink: una junction (no lo pide) también es enlace para ensure_dir.
+            try:
+                import _winapi
+                _winapi.CreateJunction(target, link)
+            except (ImportError, AttributeError, OSError):
+                self.skipTest("sin permiso para crear enlaces")
+        with self.assertRaises(ValueError):
+            pendings.write_compas(home, [("Seg", 60, ["seguridad"])])
+        buf = io.StringIO()
+        with _entorno.home_en_proceso(home), contextlib.redirect_stdout(buf):
+            pendings.cli_write_compas(['[["Seg", 60, ["seguridad"]]]'])
+        self.assertFalse(json.loads(buf.getvalue())["ok"])
+        self.assertEqual(os.listdir(target), [])
 
     def test_write_and_parse_v3_with_and_without_projects(self):
         path = pendings.write_compas(self.home, [("Seg", 60, ["seguridad"], {"alpha": 15})])
@@ -535,7 +602,7 @@ class TestCompasV3(unittest.TestCase):
     def test_parse_ignores_old_clientes_and_roadmap_lines(self):
         """Corte limpio (7.3.0): un compas v2 sin migrar no aporta bonos ni roadmap; las líneas viejas
         no se leen como Proyectos ni se confunden con Temas (la migración guiada 7.3.0 las reescribe)."""
-        with open(self._compas_path(), "w", encoding="utf-8") as fh:
+        with open(self._hand_compas_path(), "w", encoding="utf-8") as fh:
             fh.write("---\nversion: 2\n---\n\n## Objetivo: Viejo\n- **Peso:** 40\n- **Temas:** seguridad\n"
                      "- **Roadmap:** alpha\n- **Clientes:** alpha=+15, beta=+10\n")
         c = pendings.parse_compas(self.home)
@@ -599,7 +666,7 @@ class TestCompasV3(unittest.TestCase):
         (write_compas siempre deja uno, por eso el test de 6.7.0 pasaba) devolvía '*' como tema:
         con `(.+?)` el `\\**` retrocedía un asterisco. Ahora: sin temas, y la línea siguiente
         (`Proyectos:`) no se captura como valor."""
-        with open(self._compas_path(), "w", encoding="utf-8") as fh:
+        with open(self._hand_compas_path(), "w", encoding="utf-8") as fh:
             fh.write("---\nversion: 3\n---\n\n## Objetivo: Solo proyectos\n- **Peso:** 40\n"
                      "- **Temas:**\n- **Proyectos:** beta=+10\n")
         c = pendings.parse_compas(self.home)
@@ -1103,6 +1170,7 @@ class TestSeedDryRunPasoTresPendiente(unittest.TestCase):
         import _migrations
         self.home = _fresh_home()
         self.db = _db_shared.resolve_db_path(self.home)
+        os.makedirs(os.path.dirname(self.db), exist_ok=True)   # carpeta de datos (8.0.0)
         con = _db_shared._connect(self.db, SCHEMA, steps=_migrations.STEPS[:2])
         root = con.execute("INSERT INTO topic (slug, name, description, keywords, status) VALUES "
                            "('cliente', 'Cliente', 'Raíz del eje cliente (contenedor; no es un tema)', '', "
@@ -1243,6 +1311,7 @@ class TestSeedPaso2DetenidoAborta(unittest.TestCase):
         self.addCleanup(p.stop)
         self.home = _fresh_home()
         self.db = _db_shared.resolve_db_path(self.home)
+        os.makedirs(os.path.dirname(self.db), exist_ok=True)   # carpeta de datos (8.0.0)
         with contextlib.redirect_stderr(io.StringIO()):
             con = _db_shared._connect(self.db, SCHEMA)
         root = _topic(con, "cliente", "Cliente")
@@ -1327,27 +1396,6 @@ class TestSeedPaso2DetenidoAborta(unittest.TestCase):
                                          "('cliente','proyecto')").fetchall(), [("proyecto",)])
         finally:
             raw.close()
-
-
-class TestSeedBaseSinMigrar(unittest.TestCase):
-    """Con solo la base del nombre anterior a 7.0.0, no vacía, en <home>/.claude, la siembra (dry-run, --apply y --rollback)
-    reenvía el detalle, la migración guiada y el comando que arma _db_shared y no crea neb.db."""
-
-    def test_run_y_rollback_reenvian_motivo_y_comando_sin_crear_neb_db(self):
-        home = _fresh_home()
-        with open(os.path.join(home, ".claude", _db_shared.LEGACY_DB_NAME), "wb") as fh:
-            fh.write(b"x" * 64)
-        db = _db_shared.resolve_db_path(home)
-        err = _db_shared.unmigrated_legacy(home)
-        self.assertIsNotNone(err)
-        expected = f"{err.detalle} Cómo: {err.accion}. A mano: {err.comando}"
-        for call in (lambda: seed.run(db, "catalogo.json", "dataset.json", apply=False),
-                     lambda: seed.run(db, "catalogo.json", "dataset.json", apply=True, backup_dir=home),
-                     lambda: seed.rollback(db, "respaldo.db")):
-            with self.assertRaises(RuntimeError) as cm:
-                call()
-            self.assertEqual(str(cm.exception), expected)
-            self.assertFalse(os.path.exists(db))
 
 
 if __name__ == "__main__":

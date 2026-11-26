@@ -7,9 +7,11 @@ Cubre lo que el retiro deja en su lugar:
     transacción, siembra session_sync.read_byte y nunca hace que _connect devuelva None (módulo FTS5
     ausente, candado de escritura tomado por otra conexión, base que ya no tiene las tablas).
   • El lector solo-cursor de la captura (_read_new_chunk) entrega el tramo nuevo del .jsonl sin guardar texto.
-  • `search` sigue en el diccionario de verbos retirados: responde su JSON sin tocar ni crear la base.
+  • `search` (retirado en 6.41.0) ya no tiene JSON fijo desde 8.0.0 (salió con el diccionario de verbos
+    retirados): responde «subcomando desconocido» sin tocar ni crear la base.
 
-Invariantes: DBs y homes temporales (tempfile); nunca ~/.claude; ningún test hace red.
+Invariantes: DBs y homes temporales (tempfile), sin NEB_DATA (_entorno); nunca ~/.claude ni ~/.neb reales;
+ningún test hace red.
 Framework: unittest (stdlib).
   py -m unittest hooks.tests.test_logbook_migracion_retiro
 """
@@ -30,6 +32,7 @@ LIB = os.path.join(HERE, "..", "lib")
 NEB_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, LIB)
 
+import _entorno  # quita NEB_DATA: la base de prueba es la del home temporal
 import _db_shared
 import logbook
 
@@ -256,41 +259,38 @@ class TestMigracion(unittest.TestCase):
 
 
 class TestSearchRetirado(unittest.TestCase):
-
-    DETALLE = ("se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones. Para retomar un REQ usa su "
-               "Change MD, su ## Relevo, el plan aprobado y la rama.")
+    """`search` es un subcomando desconocido más (8.0.0). Con la aridad exacta del hook (6 posicionales y un
+    evento de captura en el cuarto) entraría a captura como cualquier primer argumento que no es verbo: ningún
+    skill vigente llama así a `search`, y aquí no se prueba (capturaría en el home de esos argumentos)."""
 
     def _run(self, home, args):
         env = {k: v for k, v in os.environ.items()
                if not k.startswith("NEB_") and k not in ("PYTHONUTF8", "CLAUDE_PLUGIN_ROOT")}
         env.update(HOME=home, USERPROFILE=home, NEB_HOME=NEB_ROOT, PYTHONIOENCODING="cp1252")
         return subprocess.run([sys.executable, os.path.join(LIB, "logbook.py"), "search"] + args,
-                              capture_output=True, env=env, timeout=60)
+                              capture_output=True, env=env, timeout=60, cwd=home)
 
-    def test_critico_search_con_1_y_con_6_o_mas_argumentos_responde_el_retiro_sin_tocar_la_base(self):
-        home = tempfile.mkdtemp(prefix="neb-test-search-")
-        os.makedirs(os.path.join(home, ".claude"))
+    def test_critico_search_responde_subcomando_desconocido_sin_tocar_la_base(self):
+        home = _entorno.home_temporal(self, claude=True)
         db = _db_shared.resolve_db_path(home)
+        os.makedirs(os.path.dirname(db))
         _db_shared._connect(db, SCHEMA).close()
         antes = {t: _count(db, t) for t in ("work", "session_sync")}
-        for args in (["algo"], ["a", "b", "c", "d", "e"], ["a", "b", "Stop", "d", "e"],
-                     ["a", "b", "c", "d", "e", "f"], []):
+        for args in (["algo"], ["a", "b", "c", "d"], ["a", "b", "c", "d", "e", "f"], []):
             r = self._run(home, args)
             self.assertEqual(r.returncode, 0, args)
-            self.assertEqual(json.loads(r.stdout.decode("utf-8")),
-                             {"ok": False, "motivo": "verbo-retirado", "verbo": "search", "detalle": self.DETALLE},
-                             args)
+            self.assertEqual(r.stdout.decode("utf-8").strip(), "subcomando desconocido: search", args)
             self.assertEqual({t: _count(db, t) for t in ("work", "session_sync")}, antes, args)
 
     def test_search_no_crea_la_base(self):
-        home = tempfile.mkdtemp(prefix="neb-test-search-")
-        os.makedirs(os.path.join(home, ".claude"))
-        r = self._run(home, ["a", "b", "Stop", "d", "e"])
+        home = _entorno.home_temporal(self, claude=True)
+        r = self._run(home, ["a", "b", "c", "d"])
         self.assertEqual(r.returncode, 0)
         self.assertEqual(os.listdir(os.path.join(home, ".claude")), [])
+        self.assertFalse(os.path.exists(os.path.join(home, ".neb")))
 
-    def test_search_vive_en_el_diccionario_de_retirados(self):
-        self.assertEqual(logbook._RETIRED_VERBS["search"], {"detalle": self.DETALLE})
+    def test_search_no_es_verbo_ni_tiene_diccionario(self):
+        self.assertFalse(hasattr(logbook, "_RETIRED_VERBS"))
         self.assertNotIn("search", logbook.CLI_CMDS)
 
 

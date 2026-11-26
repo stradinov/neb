@@ -24,8 +24,34 @@ fi
 
 [ -z "$SLUG" ] && SLUG="plan"
 
-DEST="${HOME}/.claude/approved-plans"
-mkdir -p "$DEST"
+# Carpeta de datos de Neb (8.0.0): la resuelve hooks/lib/neb_paths.py, el resolvedor único (NEB_DATA
+# absoluta o ~/.neb). Hasta 7.x era ~/.claude/approved-plans; lo que quede ahí lo muda la migración 8.0.0.
+HERE=$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)
+NEB_PATHS="$HERE/lib/neb_paths.py"
+DEST=""
+for PY in python3 python; do
+  if command -v "$PY" >/dev/null 2>&1 && [ -f "$NEB_PATHS" ]; then
+    # tr: el print de Python en Windows termina en \r\n y $( ) solo quita el \n.
+    DEST=$("$PY" "$NEB_PATHS" path approved-plans 2>/dev/null | tr -d '\r') || DEST=""
+    [ -n "$DEST" ] && break
+  fi
+done
+if [ -z "$DEST" ]; then
+  # Sin Python: misma regla que neb_paths (NEB_DATA solo si es absoluta; si no, ~/.neb).
+  case "${NEB_DATA:-}" in
+    /*|[A-Za-z]:[\\/]*) DEST="$NEB_DATA/approved-plans" ;;
+    *) DEST="$HOME/.neb/approved-plans" ;;
+  esac
+fi
+if command -v cygpath >/dev/null 2>&1; then
+  DEST=$(cygpath -u "$DEST")
+fi
+# Neb no escribe a través de enlaces (como neb_paths.ensure_dir); un hook no rompe la sesión: sale 0.
+if [ -L "$DEST" ] || [ -L "$(dirname "$DEST")" ]; then
+  echo "save-approved-plan: $DEST es un enlace: no se guarda el plan" >&2
+  exit 0
+fi
+(umask 077 && mkdir -p "$DEST")
 FILE="${DEST}/${TS}-${PROJECT}-${SLUG}.md"
 
 {

@@ -8,7 +8,7 @@ Hooks de Neb. El plugin registra en `hooks/hooks.json` el `SessionStart` y los h
 
 `PostToolUse` con matcher `ExitPlanMode`. Solo guarda planes **aprobados** (`PostToolUse` solo dispara al éxito; `ExitPlanMode` solo "tiene éxito" cuando el usuario aprueba). Cubre la vía **plan mode**; los planes aprobados conversacionalmente (media/alta) se persisten vía `Write` — ver [`workflow/approved-plans.md`](../workflow/approved-plans.md) § "Persistencia conversacional".
 
-- **Output**: `~/.claude/approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md`.
+- **Output**: `<datos>/approved-plans/<YYYYMMDD-HHMMSS>-<proyecto>-<slug>.md`, en la carpeta de datos de Neb (convencionalmente `~/.neb`; ver [`tooling/config.md`](../tooling/config.md)).
 - **Carpeta**: única global, fuera de cualquier repo, no versionada. Es solo el lugar de caída: al crear el Change MD, Claude mueve el plan a `changes/plans/` del repo (ver [`workflow/approved-plans.md`](../workflow/approved-plans.md) § "Vías de persistencia").
 - **Bajo el plugin**: lo corre `hooks/lib/approved_plan.py` (Python, sin `jq`). El slug es ASCII completo (`ñ` → `n`, símbolos → `-`).
 - **Entrada de settings con clon** (`save-approved-plan.sh`): requiere `bash`, `jq`, `iconv` y `NEB_HOME` apuntando al clon. En Git Bash, `iconv //TRANSLIT` trunca el slug en el primer carácter no ASCII.
@@ -41,7 +41,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 
 ### logbook-sync
 
-`Stop` + `SessionEnd` + `PreCompact` — registra o actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo**, la base local `~/.claude/neb.db`. De la conversación solo guarda el resumen del exploratorio (los primeros 120 caracteres del primer mensaje); el resto no se guarda. Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
+`Stop` + `SessionEnd` + `PreCompact` — registra o actualiza la entrada del REQ activo (o de la sesión exploratoria) en la **bitácora de relevo**, la base local `<datos>/neb.db`. De la conversación solo guarda el resumen del exploratorio (los primeros 120 caracteres del primer mensaje); el resto no se guarda. Lineamiento en [`tooling/logbook.md`](../tooling/logbook.md); artefacto en [`workflow/logbook.md`](../workflow/logbook.md).
 
 - **Tipo**: `command`. Bajo el plugin, `hooks/neb-hook.py` llama directo a `hooks/lib/logbook.py`. Para una entrada de settings con clon hay dos wrappers hermanos: `logbook-sync.sh` (Linux/Mac, requiere `jq`) y `logbook-sync.ps1` (Windows).
 - **Requiere**: Python 3 (`py` / `python` / `python3`) con `sqlite3` (stdlib) 3.35.5 o superior. Los wrappers requieren además `NEB_HOME`, que ubica el módulo; el esquema sale siempre del árbol del módulo, no del 5.º argumento ([`tooling/migrations.md`](../tooling/migrations.md) § "Esquema con el módulo").
@@ -49,7 +49,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **REQ vinculado**: en `Stop` y `PreCompact`, después del commit de la captura, liga la sesión a los REQ vinculados cuyo Change MD escribió, o sobre los que corrió `vincular` (`link <ruta>`), y registra los nuevos ([`workflow/logbook.md`](../workflow/logbook.md) § "REQ vinculado"). Tiene un límite de 4 s, nunca corre `git log` y no corre en `SessionEnd`. Nunca bloquea la captura: corre cuando la captura ya está confirmada, y un fallo suyo se descarta.
 - **Input**: JSON por stdin (`session_id`, `cwd`, `transcript_path`, `hook_event_name`). Si falta cualquiera de los cuatro o viene vacío, la entrada sale con `exit 0` sin capturar ni escribir en stdout.
 - **Windows, entrada de settings con clon**: declarar `"shell": "powershell"` con `logbook-sync.ps1` (ver § "Filosofía").
-- **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea. Con la base sin migrar a 7.0.0 no captura hasta migrarla; el inicio de sesión corre la migración guiada que le cambia el nombre ([`tooling/logbook.md`](../tooling/logbook.md) § "Base sin migrar").
+- **Defensivo**: ante cualquier falla (sin Python, DB inaccesible, sin REQ activo) `exit 0`; nunca bloquea. Con la base sin mudar (todavía en `~/.claude`) no captura hasta mudarla; el inicio de sesión corre la migración guiada que la muda ([`tooling/logbook.md`](../tooling/logbook.md) § "Base sin mudar").
 - **Base que no se puede operar, o paso de base detenido**: el wrapper también descarta ese `stderr`. La captura no escribe, salvo si el paso detenido y todos los posteriores tienen `espera`: entonces la base sigue operando en su versión. Un respaldo fallido o un error al aplicar el paso dejan su motivo en la base (`schema_step_error`); el de un `precheck` se recalcula. Los muestran el aviso de migración del inicio de sesión y `bootstrap/neb-migrate.py status` ([`tooling/migrations.md`](../tooling/migrations.md)).
 - **Activación voluntaria**: `logbook-sync` en `NEB_HOOKS` (personal) o en `NEB_PROJECT_HOOKS` (proyecto); ver § "Bajo el plugin de Neb".
 - **Subsesión interna del corrector**: si `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), `exit 0` — no escribe la subsesión Haiku a la bitácora. Ver `hooks/lib/subsession.py`.
@@ -66,7 +66,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **Input**: JSON por stdin (no se usa — sin walk-back).
 - **Output**: ninguno (reproduce audio async en background process).
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, player ausente), `exit 0` silencioso. Si el hook está activado y no suena como se configuró, el arranque de la sesión lo avisa.
-- **Configurable** en `~/.claude/notify-on-permission.json`: `enabled`, `wav`. Por defecto: 1 chime fijo. Sin scaling ni `min_seconds` (el evento no tiene duración medible).
+- **Configurable** en la sección `notify.permission` de `<datos>/config.json` ([`tooling/config.md`](../tooling/config.md)): `enabled`, `wav`. Por defecto: 1 chime fijo. Sin scaling ni `min_seconds` (el evento no tiene duración medible).
 - **Sonido**: el mismo resolvedor y los mismos valores de `wav` que `notify-on-stop` (siguiente sección).
 - **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`), igual que `notify-on-stop`.
 - **Coexiste con `Stop`** (`notify-on-stop`): eventos semánticamente distintos; pueden disparar chimes en secuencia. Ver `tooling/notify-on-permission.md` § "Coexistencia con `notify-on-stop`".
@@ -82,8 +82,8 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **Input**: JSON por stdin con `transcript_path`.
 - **Output**: ninguno (reproduce audio async en background process).
 - **Defensivo**: ante cualquier falla (config malformado, WAV ausente, transcript ilegible, player ausente), `exit 0` silencioso. Si el hook está activado y no suena como se configuró, el arranque de la sesión lo avisa.
-- **Configurable** en `~/.claude/notify-on-stop.json`: `enabled`, `wav`, `min_seconds`, `max_chimes`, `scaling` (`per-minute` o `fixed`). Por defecto: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
-- **Sonido**: `wav` nulo suena `sounds/neb-chime.wav`, que viene con el plugin (CC0, ficha en [`sounds/README.md`](sounds/README.md)). En Windows, `"chimes"` usa el `chimes.wav` del sistema y `"chimes-loud"` una versión amplificada que se genera en local; una ruta absoluta usa ese archivo. Lo resuelve `lib/notify_sound.py`: el dispatcher pasa la ruta en `NEB_NOTIFY_WAV` y el script invocado directo le pregunta a su CLI. Valores y respaldos: [`tooling/notify-on-stop.md`](../tooling/notify-on-stop.md) § "Configuración personal default".
+- **Configurable** en la sección `notify.stop` de `<datos>/config.json` ([`tooling/config.md`](../tooling/config.md)): `enabled`, `wav`, `min_seconds`, `max_chimes`, `scaling` (`per-minute` o `fixed`). Por defecto: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
+- **Sonido**: `wav` nulo suena `sounds/neb-chime.wav`, que viene con el plugin (CC0, ficha en [`sounds/README.md`](sounds/README.md)). En Windows, `"chimes"` usa el `chimes.wav` del sistema y `"chimes-loud"` una versión amplificada que se genera en local; una ruta absoluta usa ese archivo. Lo resuelve `lib/notify_sound.py`: el dispatcher pasa la config efectiva en `NEB_NOTIFY_ENABLED`, `NEB_NOTIFY_WAV` (la ruta ya resuelta), `NEB_NOTIFY_MIN_SECONDS`, `NEB_NOTIFY_MAX_CHIMES` y `NEB_NOTIFY_SCALING` (a `notify-on-permission`, solo las dos primeras), y el script invocado directo se la pide a su CLI (`notify_sound.py config <hook>`). Valores y respaldos: [`tooling/notify-on-stop.md`](../tooling/notify-on-stop.md) § "Configuración personal default".
 - **Guard de subsesión interna**: chequea `NEB_INTERNAL_SUBSESSION=1` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) y abandona — evita el "chime fantasma" del subproceso `claude -p` invocado por [`preprocess-prompt.py`](#preprocess-promptpy). Cross-link en `tooling/notify-on-stop.md` § "Guard de subsesión interna".
 
 ### preprocess-prompt.py
@@ -95,7 +95,7 @@ No es un hook: es el CLI `hooks/lib/usage-tracker.py` (`report`, `plugins` y `ap
 - **Input**: JSON por stdin con `prompt`, `session_id`, `cwd`, `permission_mode`.
 - **Output**: JSON con `hookSpecificOutput.additionalContext` (preámbulo para Claude principal). Sin output si el hook decide skipear (slash command, trivial, payload puro, error). Bajo el plugin, el dispatcher lo corre con `PYTHONIOENCODING=utf-8` y un timeout de 35 s (el de su `claude -p` es de 30 s), y le pasa su stdout.
 - **Defensivo**: ante cualquier falla (red, API, timeout, CLI ausente), `exit 0` silencioso y el prompt pasa raw — nunca bloquea la sesión.
-- **Configurable** en sesión vía `/preprocess full|fast|off`, prefijo `$$` por prompt o env var `CLAUDE_PREPROCESS_MODE`.
+- **Configurable** en la sección `preprocess` de `<datos>/config.json` ([`tooling/config.md`](../tooling/config.md)) y, en sesión, vía `/preprocess full|fast|off` (estado en `<datos>/state/preprocess/`), prefijo `$$` por prompt o env var `CLAUDE_PREPROCESS_MODE`.
 - **Excepción a la filosofía "< 100ms"**: documentada explícitamente — la llamada inevitable a `claude -p` con Haiku justifica 13–25 s (medido localmente; el plan estimaba 2–4 s, la realidad fue mayor). Mitigaciones: timeout 30 s, filtros agresivos de skip, modo `off`, activación voluntaria y personal, guard de subsesión interna via env var `NEB_INTERNAL_SUBSESSION` (alias legacy `CLAUDE_PREPROCESS_RECURSION`) que establece en el subproceso — consumida por todos los hooks de sesión vía `hooks/lib/subsession.py`.
 
 ### pre-push-changelog (git hook del repo, no Claude Code)

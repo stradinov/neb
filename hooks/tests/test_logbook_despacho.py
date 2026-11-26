@@ -1,13 +1,15 @@
 #!/usr/bin/env python3
 """
-test_logbook_despacho.py — despacho de `logbook.py` y verbos retirados (neb 7.0.0).
+test_logbook_despacho.py — despacho de `logbook.py` (desde 8.0.0, sin el diccionario de verbos retirados).
 
 La captura entra solo con exactamente 6 posicionales, un primer argumento que no es verbo y un cuarto que es
-uno de los eventos del hook (Stop, SessionEnd, PreCompact). Un verbo retirado responde su JSON fijo aunque
-traiga la aridad del hook; cualquier otro primer argumento responde «subcomando desconocido». Ninguno de
-los dos crea works ni la base. Se prueba por subproceso porque el despacho vive en `__main__`.
+uno de los eventos del hook (Stop, SessionEnd, PreCompact). Cualquier otro primer argumento responde
+«subcomando desconocido», también los verbos que se retiraron en 7.0.0 (y `search`, en 6.41.0): su JSON fijo
+salió en 8.0.0. No crea works ni la base (ni la carpeta de datos). Se prueba por subproceso porque el despacho
+vive en `__main__`.
 
-Invariantes: homes temporales (HOME y USERPROFILE) solo en el entorno del subproceso; nunca ~/.claude.
+Invariantes: homes temporales (HOME y USERPROFILE) solo en el entorno del subproceso, sin NEB_DATA; nunca
+~/.claude ni ~/.neb reales.
 Framework: unittest (stdlib).
   py -m unittest tests.test_logbook_despacho
 """
@@ -27,9 +29,12 @@ LOGBOOK = os.path.join(LIB, "logbook.py")
 SCHEMA = os.path.join(HERE, "..", "logbook-schema.sql")
 sys.path.insert(0, LIB)
 
+import _entorno  # quita NEB_DATA: self.db es la base del home temporal
 import _db_shared
 import logbook
 
+# Los verbos que respondían un JSON fijo hasta 7.6.x (diccionario retirado en 8.0.0) y ese JSON, para comprobar
+# que ya no sale.
 _LOCK = "se retiró en neb 7.0.0 junto con el candado entre devs; "
 RETIRED = {
     "sync": {"ok": False, "motivo": "verbo-retirado", "verbo": "sync",
@@ -67,7 +72,7 @@ class _Base(unittest.TestCase):
     def setUp(self):
         self.base = tempfile.mkdtemp(prefix="neb-test-despacho-")
         self.home = os.path.join(self.base, "home")
-        os.makedirs(os.path.join(self.home, ".claude"))
+        os.makedirs(os.path.join(self.home, ".claude"))      # la carpeta de datos (~/.neb) no se crea aquí
         self.cwd = os.path.join(self.base, "repo")
         os.makedirs(self.cwd)
         self.t = os.path.join(self.base, "S.jsonl")
@@ -85,6 +90,10 @@ class _Base(unittest.TestCase):
         self.assertEqual(r.returncode, 0, r.stderr)
         return r.stdout.decode("utf-8")
 
+    def _make_db(self):
+        os.makedirs(os.path.dirname(self.db), exist_ok=True)
+        _db_shared._connect(self.db, SCHEMA).close()
+
     def _works(self):
         c = sqlite3.connect(self.db)
         try:
@@ -94,31 +103,36 @@ class _Base(unittest.TestCase):
 
     def _no_new_files(self):
         self.assertEqual(os.listdir(os.path.join(self.home, ".claude")), [])
+        self.assertEqual(os.listdir(self.home), [".claude"], "no crea la carpeta de datos")
         self.assertEqual(sorted(os.listdir(self.base)), ["S.jsonl", "home", "repo"])
         self.assertEqual(os.listdir(self.cwd), [])
 
 
 class TestVerbosRetirados(_Base):
+    """Desde 8.0.0 (changelog.d/7.0.0.md § Notas), un verbo retirado es un subcomando desconocido más."""
 
-    def test_critico_cada_verbo_retirado_con_la_aridad_del_hook_responde_su_json_y_no_crea_works(self):
-        _db_shared._connect(self.db, SCHEMA).close()
-        for verb, expected in RETIRED.items():
-            for args in ([verb], [verb, "12"], self._hook_args(verb), self._hook_args(verb) + ["x"]):
+    def test_critico_cada_verbo_retirado_responde_subcomando_desconocido_y_no_crea_works(self):
+        self._make_db()
+        for verb, old in RETIRED.items():
+            for args in ([verb], [verb, "12"], self._hook_args(verb) + ["x"]):
                 with self.subTest(args=args):
                     out = self._run(args)
-                    self.assertEqual(out.splitlines(), [json.dumps(expected, ensure_ascii=False)])
+                    self.assertEqual(out.strip(), f"subcomando desconocido: {verb}")
+                    self.assertNotIn(json.dumps(old, ensure_ascii=False), out)
                     self.assertEqual(self._works(), 0)
 
     def test_verbo_retirado_no_crea_la_base(self):
         for verb in RETIRED:
-            with self.subTest(verb=verb):
-                self._run(self._hook_args(verb))
-                self._no_new_files()
+            for args in ([verb], [verb, "12"]):
+                with self.subTest(args=args):
+                    self._run(args)
+                    self._no_new_files()
 
-    def test_el_diccionario_es_el_de_7_0_0_y_no_se_cruza_con_los_verbos_vivos(self):
-        self.assertEqual(set(logbook._RETIRED_VERBS), set(RETIRED))
-        self.assertFalse(set(logbook._RETIRED_VERBS) & logbook.CLI_CMDS)
+    def test_sin_diccionario_de_retirados_y_los_verbos_vivos(self):
+        self.assertFalse(hasattr(logbook, "_RETIRED_VERBS"))
+        self.assertFalse(hasattr(logbook, "_retired_verb"))
         self.assertEqual(logbook.CLI_CMDS, {"list", "show", "rename", "archive", "link", "trace", "unlink"})
+        self.assertFalse(set(RETIRED) & logbook.CLI_CMDS)
         self.assertEqual(logbook.CAPTURE_EVENTS, {"Stop", "SessionEnd", "PreCompact"})
 
 
@@ -130,7 +144,7 @@ class TestDesconocido(_Base):
         self._no_new_files()
 
     def test_desconocido_con_6_posicionales_y_base_existente_no_crea_works(self):
-        _db_shared._connect(self.db, SCHEMA).close()
+        self._make_db()
         for args in (self._hook_args("liberar", event="algo"), self._hook_args("solicitar", event="")):
             with self.subTest(args=args):
                 self.assertEqual(self._run(args).strip(), f"subcomando desconocido: {args[0]}")

@@ -33,6 +33,8 @@ import _machine
 
 SEMVER_RE = re.compile(r"^(\d+)\.(\d+)\.(\d+)$")
 STEP_ID_RE = re.compile(r"^[a-z0-9][a-z0-9-]*$")
+# neb-logbook.db: el nombre de la base hasta 6.x. Una que nunca pasó por 7.0.0 sigue siendo datos del dev (8.0.0
+# no la opera ni la muda), así que tampoco cuenta como respaldo.
 LIVE_DB_NAMES = ("neb.db", "neb-logbook.db")
 
 SKIP_DDL = ("CREATE TABLE IF NOT EXISTS migration_skip ("
@@ -316,28 +318,34 @@ LOCK_NAME = ".neb-migrate.lock"
 
 
 def lock_path(ctx):
-    """El candado entre corridas (desde 7.5.0): un archivo oculto y vacío en la carpeta de la base de ctx. No vive
-    en neb-backups/ para no crear esa carpeta (ni una base) donde no hay base: con la base sin migrar, junto a
-    neb-logbook.db solo aparece este archivo vacío hasta que la migración guiada le cambie el nombre."""
+    """El candado entre corridas (desde 7.5.0): un archivo oculto y vacío en la carpeta de la base de ctx (desde
+    8.0.0, la carpeta de datos). No vive en la carpeta de respaldos para no crearla donde no hay base."""
     return os.path.join(os.path.dirname(os.path.abspath(ctx.db_path)), LOCK_NAME)
+
+
+def legacy_lock_path(ctx):
+    """El candado de 7.5.0–7.6.x, en ~/.claude: lo toman las sesiones abiertas con esas versiones al iniciar o al
+    limpiar la sesión. 8.0.0 lo toma también (antes que el suyo) mientras muda los archivos (neb-migrate.py)."""
+    return os.path.join(ctx.legacy_dir, LOCK_NAME)
 
 
 _LOCK_BUSY = {getattr(errno, n) for n in ("EACCES", "EAGAIN", "EWOULDBLOCK", "EDEADLK", "EDEADLOCK")
               if hasattr(errno, n)}
 
 
-def try_lock(path):
+def try_lock(path, create=True):
     """Toma sin esperar el candado de sistema operativo sobre `path` (msvcrt.locking en Windows, fcntl.flock en
     los demás). Devuelve el descriptor, o None si otra corrida lo tiene (errno de contención: EACCES en Windows,
     EWOULDBLOCK con flock). Cualquier otro error al bloquear (p. ej. un sistema de archivos sin candados) se
     propaga como OSError: no es «otra corrida». El sistema lo libera si el proceso muere, también cuando la
     plataforma mata la entrada de hook por su `timeout` (verificado con msvcrt y taskkill; con fcntl.flock
-    [asumido: semántica POSIX de flock, sin prueba en esta máquina]). Sin la carpeta (no hay ~/.claude) no la
-    crea: OSError. Un enlace se rechaza (OSError): antes de abrir y, como en Windows no hay O_NOFOLLOW, otra vez
-    después, comparando lo abierto con la ruta. El archivo queda vacío y no es un respaldo ni una base."""
+    [asumido: semántica POSIX de flock, sin prueba en esta máquina]). Sin la carpeta no la crea: OSError. Con
+    create=False tampoco crea el archivo (FileNotFoundError si falta). Un enlace se rechaza (OSError): antes de
+    abrir y, como en Windows no hay O_NOFOLLOW, otra vez después, comparando lo abierto con la ruta. El archivo
+    queda vacío y no es un respaldo ni una base."""
     if _machine.is_link(path):
         raise OSError(f"{path} es un enlace: no se toma el candado ahí")
-    flags = os.O_RDWR | os.O_CREAT | getattr(os, "O_NOFOLLOW", 0)
+    flags = os.O_RDWR | (os.O_CREAT if create else 0) | getattr(os, "O_NOFOLLOW", 0)
     fd = os.open(path, flags, 0o600)
     try:
         if _machine.is_link(path) or not os.path.samestat(os.fstat(fd), os.lstat(path)):
@@ -394,8 +402,11 @@ def _snapshot(ctx):
 
 
 def _live_files(ctx):
+    """La base y sus -wal/-shm/-journal (en ~/.claude, en la carpeta de la base de ctx y en la carpeta de datos) y
+    los settings*.json: nunca cuentan como respaldo."""
     live = set()
-    for base in {ctx.claude_dir, os.path.dirname(os.path.abspath(ctx.db_path))}:
+    data_dir = getattr(ctx, "data_dir", ctx.claude_dir)
+    for base in {ctx.claude_dir, os.path.dirname(os.path.abspath(ctx.db_path)), data_dir}:
         for name in LIVE_DB_NAMES:
             for suffix in ("", "-wal", "-shm", "-journal"):
                 live.add(_norm(os.path.join(base, name + suffix)))
@@ -408,15 +419,18 @@ def _live_files(ctx):
 
 def _check_declared_backup(ctx, path, started, before):
     """Motivo si el respaldo que declaró un paso libre no sirve; None si sirve. Debe ser un archivo nuevo de
-    esta corrida, directamente en ~/.claude o en neb-backups/, que no sea un archivo vivo (la base, sus
-    -wal/-shm, un settings) ni un enlace; si es una base SQLite, en un solo archivo (no WAL) e íntegra."""
+    esta corrida, directamente en ~/.claude o en la carpeta de respaldos de la base (ctx.backups_dir: desde 8.0.0,
+    <datos>/backups/), que no sea un archivo vivo (la base, sus -wal/-shm, un settings) ni un enlace; si es una
+    base SQLite, en un solo archivo (no WAL) e íntegra. Un manifiesto o un JSON de respaldo pasa por las mismas
+    reglas generales (nuevo, no vacío, de esta corrida)."""
     if not path or not isinstance(path, str):
         return "el paso declaró respaldo y no devolvió su ruta"
     real = _norm(path)
     if _machine.is_link(path):
         return f"el respaldo {path} es un enlace"
     if os.path.dirname(real) not in (_norm(ctx.claude_dir), _norm(ctx.backups_dir)):
-        return f"el respaldo {path} no está directamente en ~/.claude ni en neb-backups/"
+        return (f"el respaldo {path} no está directamente en ~/.claude ni en la carpeta de respaldos "
+                f"({ctx.backups_dir})")
     if real in _live_files(ctx):
         return f"el respaldo {path} es un archivo vivo, no un respaldo"
     if real in before:

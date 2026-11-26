@@ -16,7 +16,8 @@ Con una migración de prueba en un árbol temporal (fixture):
     vez: una sola aplica; un proceso muerto lo libera); ventana de exclusivos; presupuesto; sale con 0 ante una
     excepción; `neb: skip`; tope de la salida; apply/skip/restore con el candado tomado: migracion-en-curso.
 
-Homes temporales; nunca ~/.claude ni el registro real.
+Homes temporales, con la base en la carpeta de datos (<home>/.neb, 8.0.0; sin NEB_DATA: _entorno) y los archivos
+de la migración de prueba en ~/.claude; nunca ~/.claude ni ~/.neb reales ni el registro real.
   py -m unittest discover -s hooks/tests -p test_migrations_guided.py
 """
 
@@ -35,6 +36,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -141,7 +143,9 @@ class Base(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.home, True)
         self.claude = os.path.join(self.home, ".claude")
         os.makedirs(self.claude)
-        self.db = os.path.join(self.claude, "neb.db")
+        self.data = os.path.join(self.home, ".neb")      # carpeta de datos (8.0.0): la base y sus respaldos
+        os.makedirs(self.data)
+        self.db = os.path.join(self.data, "neb.db")
         self.tree = tempfile.mkdtemp(prefix="neb-test-arbol-")
         self.addCleanup(shutil.rmtree, self.tree, True)
         os.makedirs(os.path.join(self.tree, "migrations"))
@@ -831,7 +835,7 @@ class TestAlIniciar(AlIniciarBase):
         self.assertEqual((rc, out["motivo"]), (1, "migracion-en-curso"))
         buf = io.StringIO()
         with contextlib.redirect_stdout(buf), contextlib.redirect_stderr(io.StringIO()):
-            rc = nm.restore(self.home, os.path.join(self.claude, "neb-backups", "neb.pre-paso-1.20260101T000000Z.db"))
+            rc = nm.restore(self.home, os.path.join(self.data, "backups", "neb.pre-paso-1.20260101T000000Z.db"))
         self.assertEqual((rc, json.loads(buf.getvalue())["motivo"]), (1, "migracion-en-curso"))
 
     def test_critico_un_proceso_muerto_libera_el_candado(self):
@@ -1098,21 +1102,47 @@ class TestAlIniciar(AlIniciarBase):
         text = self.run_al_iniciar()
         self.assertIn("NEB_SRC='", text)
 
-    def test_critico_sin_la_carpeta_de_la_base_no_corre_pasos(self):
-        # Sin ~/.claude de verdad (no un sustituto de _take_lock): los settings viven en CLAUDE_CONFIG_DIR.
+    def _cfg(self):
+        """Settings en CLAUDE_CONFIG_DIR con NEB_PRUEBA_A (un paso que corre solo); devuelve su ruta."""
         cfg = os.path.join(self.home, "cfg")
         os.makedirs(cfg)
         os.environ["CLAUDE_CONFIG_DIR"] = cfg
-        with open(os.path.join(cfg, "settings.json"), "w", encoding="utf-8") as fh:
+        path = os.path.join(cfg, "settings.json")
+        with open(path, "w", encoding="utf-8") as fh:
             json.dump({"env": {"NEB_PRUEBA_A": "1"}}, fh)
-        shutil.rmtree(self.claude)
+        return path
+
+    def test_critico_sin_poder_crear_la_carpeta_de_datos_no_corre_pasos(self):
+        # Sin un sustituto de _take_lock: NEB_DATA debajo de un archivo, donde no se puede crear la carpeta de datos
+        # (ni, por tanto, el candado).
+        settings = self._cfg()
+        archivo = os.path.join(self.home, "archivo")
+        with open(archivo, "w", encoding="utf-8") as fh:
+            fh.write("x")
+        os.environ[_entorno.DATA_ENV] = os.path.join(archivo, "datos")   # el patcher de Base restaura el entorno
         text = self.run_al_iniciar()
-        with open(os.path.join(cfg, "settings.json"), encoding="utf-8") as fh:
+        with open(settings, encoding="utf-8") as fh:
             self.assertIn("NEB_PRUEBA_A", json.load(fh)["env"], "sin candado no corre nada solo")
-        self.assertFalse(os.path.isdir(self.claude), "no crea la carpeta de la base")
-        self.assertIn("`/neb:migrate` corre estos pasos: `%s:settings-solo`" % V, text)
+        self.assertTrue(os.path.isfile(archivo))
+        # /neb:migrate tampoco correría (candado-no-disponible): el aviso da el remedio, la carpeta de datos.
+        self.assertIn("no se pudo tomar el candado de la migración", text)
+        self.assertIn(os.path.join(archivo, "datos"), text)
+        self.assertIn("NEB_DATA", text)
         self.assertIn("Dile al dev", text)
         self.assertNotIn("se reintentan solos", text)
+
+    def test_sin_claude_ni_carpeta_de_datos_la_crea_y_corre(self):
+        # Desde 8.0.0 el candado vive en la carpeta de datos, que al-iniciar crea: sin ~/.claude (los settings en
+        # CLAUDE_CONFIG_DIR) corre igual, y no crea ~/.claude.
+        settings = self._cfg()
+        shutil.rmtree(self.claude)
+        shutil.rmtree(self.data)
+        text = self.run_al_iniciar()
+        with open(settings, encoding="utf-8") as fh:
+            self.assertNotIn("NEB_PRUEBA_A", json.load(fh)["env"], "con candado corre lo que deja respaldo")
+        self.assertTrue(os.path.isfile(os.path.join(self.data, ".neb-migrate.lock")))
+        self.assertFalse(os.path.isdir(self.claude), "no crea ~/.claude")
+        self.assertIn("`%s:settings-solo`" % V, text)
 
     def test_sin_correr_la_migracion_el_encargo_incluye_el_paso_3(self):
         self.touch("dev.txt")
@@ -1301,8 +1331,22 @@ class TestRequisitos(AlIniciarBase):
             self.assertEqual(json.load(fh), {"no_ofrecer": [nm._req_key(r)]})
         self.assertEqual(nm._req_text(self.home, r=r), "")
 
-    def test_sin_carpeta_no_hay_no_volver_a_ofrecer(self):
-        shutil.rmtree(self.claude)
+    def test_sin_la_carpeta_de_datos_la_oferta_trae_no_volver_a_ofrecer_y_la_crea(self):
+        # La primera sesión con 8.0.0 calcula la oferta antes de que el candado cree la carpeta de datos.
+        shutil.rmtree(self.data)
+        r = _win()
+        t = nm._req_text(self.home, r=r)
+        self.assertIn("No volver a ofrecer", t)
+        self.assertIn("requisitos --no-ofrecer", t)
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(nm.no_ofrecer(self.home, r), 0)
+        self.assertTrue(os.path.isfile(os.path.join(self.data, nm.REQ_FILE)))
+        self.assertEqual(nm._req_text(self.home, r=r), "")
+
+    def test_carpeta_de_datos_inservible_no_hay_no_volver_a_ofrecer(self):
+        shutil.rmtree(self.data)
+        with open(self.data, "w", encoding="utf-8") as fh:      # un archivo donde iría la carpeta de datos
+            fh.write("x")
         r = _win()
         t = nm._req_text(self.home, r=r)
         self.assertNotEqual(t, "")
@@ -1311,6 +1355,16 @@ class TestRequisitos(AlIniciarBase):
         with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()) as err:
             self.assertEqual(nm.no_ofrecer(self.home, r), 1)
         self.assertIn("seguirá saliendo", err.getvalue())
+
+    def test_lee_el_registro_de_7_6_en_claude_hasta_mudarlo(self):
+        # Hasta que 8.0.0:mover-requisitos lo mude, el «No volver a ofrecer» de 7.6.x sigue en ~/.claude.
+        r = _win()
+        with open(os.path.join(self.claude, nm.REQ_FILE), "w", encoding="utf-8") as fh:
+            json.dump({"no_ofrecer": [nm._req_key(r)]}, fh)
+        self.assertEqual(nm._req_text(self.home, r=r), "")
+        with open(nm._req_path(self.home), "w", encoding="utf-8") as fh:   # el de la carpeta de datos manda
+            json.dump({"no_ofrecer": []}, fh)
+        self.assertNotEqual(nm._req_text(self.home, r=r), "")
 
     @unittest.skipUnless(hasattr(os, "symlink"), "sin enlaces simbólicos")
     def test_no_escribe_a_traves_de_un_enlace(self):
@@ -1327,7 +1381,7 @@ class TestRequisitos(AlIniciarBase):
     def test_no_deja_temporales(self):
         with contextlib.redirect_stdout(io.StringIO()):
             self.assertEqual(nm.no_ofrecer(self.home, _win()), 0)
-        self.assertEqual([f for f in os.listdir(self.claude) if f.endswith(".tmp")], [])
+        self.assertEqual([f for f in os.listdir(self.data) if f.endswith(".tmp")], [])
 
     def test_no_ofrecer_con_un_interprete_que_cumple(self):
         out = io.StringIO()

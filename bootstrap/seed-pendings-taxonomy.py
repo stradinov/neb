@@ -15,7 +15,8 @@ Contrato CLI:
   py bootstrap/seed-pendings-taxonomy.py --from T.json --catalog C.json [--db P] --apply   # escribe
   py bootstrap/seed-pendings-taxonomy.py [--db P] --rollback <respaldo.bak-...>            # restauración lógica
     --force        re-cura pendientes que ya tenían curaduría y re-activa temas del catálogo archivados
-    --backup-dir   dónde dejar el respaldo (default: junto a la DB)
+    --backup-dir   dónde dejar el respaldo (default: la carpeta de respaldos de la base, `backups/` junto a
+                   ella; se crea si falta)
 
 Qué hace --apply (UNA transacción with_write_tx, después de un respaldo verificado; el plan se
 calcula DENTRO de la transacción, así una curaduría hecha por otra sesión un instante antes no se pisa):
@@ -80,6 +81,7 @@ sys.path.insert(0, _LIB)
 
 import _db_shared          # noqa: E402
 import _migrations         # noqa: E402
+import neb_paths           # noqa: E402
 import pendings            # noqa: E402
 
 _SCHEMA = _db_shared.INITIAL_SCHEMA_PATH          # esquema inicial del árbol de este script (6.48.0)
@@ -108,17 +110,21 @@ def _stamp():
     return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S-%fZ")
 
 
+def _same_path(a, b):
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
 def _require_db(db_path):
     """Exige una base usable: un --db con typo no debe crear una DB vacía (sqlite3.connect la crearía en
-    silencio). Si es el neb.db de un ~/.claude con la base sin migrar, reenvía el motivo y el comando que
-    arma _db_shared."""
+    silencio). Si es la base por omisión (neb_paths.db_path del home) y la base sigue sin mudar en ~/.claude,
+    reenvía el motivo y la acción que arma _db_shared (UnmovedDb)."""
     if _db_shared._is_usable_db(db_path):
         return
-    full = os.path.abspath(db_path)
-    if os.path.basename(full) == _db_shared.NEB_DB_NAME and os.path.basename(os.path.dirname(full)) == ".claude":
-        err = _db_shared.unmigrated_legacy(os.path.dirname(os.path.dirname(full)))
+    home = os.path.expanduser("~")
+    if _same_path(db_path, _db_shared.resolve_db_path(home)):
+        err = _db_shared.unmoved_legacy(home)
         if err is not None:
-            raise RuntimeError(f"{err.detalle} Cómo: {err.accion}. A mano: {err.comando}")
+            raise RuntimeError(f"{err.detalle} Cómo: {err.accion}.")
     if not os.path.isfile(db_path):
         raise RuntimeError(f"no existe la DB {db_path}")
     raise RuntimeError(f"{db_path} no es una base usable (falta la tabla work o no es una base SQLite)")
@@ -689,7 +695,10 @@ def run(db_path, catalog_path, dataset_path, apply=False, force=False, backup_di
         _check_axis_step(pre, definitive=False)
     finally:
         pre.close()
-    bak_dir = backup_dir or os.path.dirname(os.path.abspath(db_path))
+    bak_dir = backup_dir
+    if not bak_dir:                                       # la carpeta de respaldos de la base (8.0.0)
+        bak_dir = _migrations.backup_dir(db_path)
+        neb_paths.ensure_dir(bak_dir)
     bak = backup_db(db_path, os.path.join(bak_dir, f"{os.path.basename(db_path)}.bak-pre-taxonomy-{_stamp()}"))
     con = _open(db_path)
     if con is None:
@@ -728,7 +737,8 @@ def main(argv):
     p.add_argument("--db", dest="db", default=None, help="neb.db destino (default: resolve_db_path(~)); debe existir")
     p.add_argument("--apply", action="store_true", help="ejecuta (sin él = DRY-RUN)")
     p.add_argument("--force", action="store_true", help="re-cura pendientes ya curados y re-activa temas archivados del catálogo")
-    p.add_argument("--backup-dir", dest="backup_dir", default=None, help="carpeta del respaldo (default: junto a la DB)")
+    p.add_argument("--backup-dir", dest="backup_dir", default=None,
+                   help="carpeta del respaldo (default: la carpeta de respaldos de la base, backups/ junto a ella)")
     p.add_argument("--rollback", dest="rollback", default=None, help="respaldo .bak-pre-taxonomy-* a restaurar")
     args = p.parse_args(argv)
     db_path = args.db or _db_shared.resolve_db_path(os.path.expanduser("~"))

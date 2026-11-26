@@ -14,7 +14,8 @@ Cubre contra DBs TEMPORALES (tempfile):
   • triage_pass agrupa por topic compartido, NO O(N²) (sentinel no forma grupo gigante)
   • enums en INGLES de forma consistente (topic 'archived' nunca matchea)
 
-Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db.
+Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db ni la carpeta de datos real
+(_entorno quita NEB_DATA del entorno).
 """
 
 import contextlib
@@ -31,6 +32,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LIB  = os.path.join(HERE, "..", "lib")
 sys.path.insert(0, LIB)
 
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: triage con HOME temporal no lee el compas.md real
 import _db_shared  # noqa: E402
 import pendings  # noqa: E402
 
@@ -343,6 +345,7 @@ class TestTriageEndToEnd(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="neb-triage-")
         os.makedirs(os.path.join(self.tmp, ".claude"), exist_ok=True)
         self.db = _db_shared.resolve_db_path(self.tmp)
+        os.makedirs(os.path.dirname(self.db), exist_ok=True)   # carpeta de datos (8.0.0): la base ya no cuelga de .claude
         # siembra: 2 pendings vinculados (grupo) que comparten tema + 1 sin clasificar
         con = _db_shared._connect(self.db, SCHEMA)
         _new_topic(con, "catalogo", "Catálogo", "catalogo, pedidos")
@@ -397,6 +400,7 @@ class TestWriteTxLockedRetryRollback(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="neb-lock-")
         os.makedirs(os.path.join(self.tmp, ".claude"), exist_ok=True)
         self.db = _db_shared.resolve_db_path(self.tmp)
+        os.makedirs(os.path.dirname(self.db), exist_ok=True)   # carpeta de datos (8.0.0): la base ya no cuelga de .claude
         _db_shared._connect(self.db, SCHEMA).close()
 
     def tearDown(self):
@@ -452,6 +456,7 @@ class TestNoFtsTriggers(unittest.TestCase):
         self.tmp = tempfile.mkdtemp(prefix="neb-noftstrig-")
         os.makedirs(os.path.join(self.tmp, ".claude"), exist_ok=True)
         self.db = _db_shared.resolve_db_path(self.tmp)
+        os.makedirs(os.path.dirname(self.db), exist_ok=True)   # carpeta de datos (8.0.0): la base ya no cuelga de .claude
 
     def tearDown(self):
         for ext in ("", "-wal", "-shm"):

@@ -1,6 +1,6 @@
 # Pendientes
 
-Ítems de seguimiento del dev que no bloquean el cierre de un REQ pero piden acción futura. Viven en `neb.db` (`~/.claude/neb.db`), junto con las sesiones pausadas (§ "Sesiones pausadas").
+Ítems de seguimiento del dev que no bloquean el cierre de un REQ pero piden acción futura. Viven en `neb.db` (`<datos>/neb.db`, en la carpeta de datos de Neb, convencionalmente `~/.neb`; ver [`../tooling/config.md`](../tooling/config.md)), junto con las sesiones pausadas (§ "Sesiones pausadas").
 
 ## Dónde viven y cómo se citan
 

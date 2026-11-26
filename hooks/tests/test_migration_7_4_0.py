@@ -13,7 +13,9 @@ Cubre, con el árbol real y homes temporales:
   • compas.md de solo lectura: se reescribe y conserva la protección; falla sembrada al reemplazar: el original
     queda intacto, con su protección y sin respaldo ni temporal.
 
-Nunca toca ~/.claude, neb.db ni compas.md reales.
+Disposición de 8.0.0: la base, compas.md y los respaldos en la carpeta de datos del home temporal (<home>/.neb,
+sin NEB_DATA: _entorno); con la de 7.x (en ~/.claude), la cubre test_migration_8_0_0.py. Nunca toca ~/.claude,
+~/.neb, neb.db ni compas.md reales.
   py -m unittest hooks.tests.test_migration_7_4_0
 """
 
@@ -34,6 +36,7 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
 import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 
 NEB = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, os.path.join(NEB, "hooks", "lib"))
@@ -101,9 +104,11 @@ class Base(unittest.TestCase):
         os.environ.update(HOME=self.home, USERPROFILE=self.home)
         self.claude = os.path.join(self.home, ".claude")
         os.makedirs(self.claude)
-        self.db = os.path.join(self.claude, "neb.db")
-        self.compas = os.path.join(self.claude, "compas.md")
-        self.backups = os.path.join(self.claude, "neb-backups")
+        self.data = os.path.join(self.home, ".neb")      # carpeta de datos (8.0.0)
+        os.makedirs(self.data)
+        self.db = os.path.join(self.data, "neb.db")
+        self.compas = os.path.join(self.data, "compas.md")
+        self.backups = os.path.join(self.data, "backups")
         self.env = FakeUserEnv()
         p = mock.patch.object(_machine, "default_user_env", lambda: self.env)
         p.start()
@@ -223,7 +228,7 @@ class TestCompasTemaProyecto(Base):
         self.assertNotIn(r.get("estado"), ("fallo", "pendiente", "manual"), r)
         self.assertIn("proyecto-51", self.read_bytes(self.compas).decode("utf-8"))
         self.assertFalse(os.access(self.compas, os.W_OK))
-        self.assertEqual([f for f in os.listdir(self.claude) if ".tmp-" in f], [])
+        self.assertEqual([f for f in os.listdir(self.data) if ".tmp-" in f], [])
 
     def test_falla_sembrada_al_reemplazar_deja_el_original(self):
         self.v2_db_con_choque()
@@ -238,7 +243,7 @@ class TestCompasTemaProyecto(Base):
         self.assertEqual(self.read_bytes(self.compas), original)
         self.assertFalse(os.access(self.compas, os.W_OK))
         self.assertEqual(self.compas_backups(), [])
-        self.assertEqual([f for f in os.listdir(self.claude) if ".tmp-" in f], [])
+        self.assertEqual([f for f in os.listdir(self.data) if ".tmp-" in f], [])
         self.assertTrue(_step().detectar(self.ctx()), "sigue pendiente")
 
 

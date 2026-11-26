@@ -8,12 +8,14 @@ Cubre hooks/lib/req_link.py y su enganche en hooks/lib/logbook.py (filas 2 a 12 
   • CLI link / unlink / trace, siempre locales; idempotencia y sentencias
   • commits en `trace` leídos de git al consultar (solo lo alcanzable desde origin, trailer exacto)
   • costo del hook (llamadas a git), presupuesto de 4 s y aislamiento de las fallas de E2
-  • base sin migrar (solo la bitácora con el nombre anterior a 7.0.0): link, trace y unlink por subproceso
-    responden el JSON de base-sin-migrar con la migración guiada y el comando del migrador, y no crean neb.db
+  • base sin mudar (8.0.0: la base de 7.x sigue en ~/.claude y la carpeta de datos no tiene una usable): link,
+    trace y unlink por subproceso responden el JSON de base-sin-mudar con la migración guiada y no crean
+    <datos>/neb.db
 
 Infraestructura: repos git temporales con remoto bare (url https://example.invalid/o/<repo>.git para fijar el
-`project` y pushurl al bare para publicar), homes y bases temporales, transcripts sintéticos. Nunca toca
-~/.claude ni la copia de neb. Las pruebas con git llevan skipUnless(shutil.which("git")).
+`project` y pushurl al bare para publicar), homes y bases temporales (sin NEB_DATA: _entorno), transcripts
+sintéticos. Nunca toca ~/.claude, ~/.neb ni la copia de neb. Las pruebas con git llevan
+skipUnless(shutil.which("git")).
 
 Framework: unittest (stdlib).
   py -m unittest discover -s hooks/tests -p test_logbook_req_link.py
@@ -41,6 +43,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.abspath(os.path.join(HERE, "..", "lib"))
 sys.path.insert(0, LIB)
 
+import _entorno  # noqa: E402 — quita NEB_DATA: la base de prueba es la del home temporal
 import _db_shared  # noqa: E402
 import logbook  # noqa: E402
 import req_link  # noqa: E402
@@ -187,8 +190,10 @@ def _append(transcript, tools):
 # --------------------------------------------------------------------------- base y captura
 
 def _home(tmp):
+    """Home temporal con ~/.claude/projects y la carpeta de datos (<home>/.neb, donde vive la base desde 8.0.0)."""
     h = os.path.join(tmp, "home")
     os.makedirs(os.path.join(h, ".claude", "projects"), exist_ok=True)
+    os.makedirs(os.path.dirname(_db_shared.resolve_db_path(h)), exist_ok=True)
     return h
 
 
@@ -1370,20 +1375,19 @@ class TestTraza(_Base):
         self.assertEqual(_snapshot_req(self.home), antes)
 
 
-# =========================================================================== base sin migrar (7.0.0)
+# =========================================================================== base sin mudar (8.0.0)
 
 @unittest.skipUnless(HAS_GIT, "requiere git")
-class TestBaseSinMigrar(unittest.TestCase):
-    """HOME y USERPROFILE temporales con solo la bitácora de nombre anterior (poblada): link, trace y unlink
-    entran por logbook.py en subproceso y responden el JSON de base-sin-migrar (con `accion` y `comando`),
-    no «error: …»."""
+class TestBaseSinMudar(unittest.TestCase):
+    """HOME y USERPROFILE temporales con la base de 7.x todavía en ~/.claude (poblada): link, trace y unlink
+    entran por logbook.py en subproceso y responden el JSON de base-sin-mudar (con `accion`), no «error: …»."""
 
     def setUp(self):
         self.tmp = tempfile.mkdtemp(prefix="neb-test-reqlink-")
         self.addCleanup(_rmtree, self.tmp)
         self.home = _home(self.tmp)
         self.base = os.path.join(self.home, ".claude")
-        self.legacy = os.path.join(self.base, _db_shared.LEGACY_DB_NAME)
+        self.legacy = _db_shared.legacy_db_path(self.home)
         _db_shared._connect(self.legacy, SCHEMA).close()
         self.nuevo = _db_shared.resolve_db_path(self.home)
         self.repo = _gitrepo(self.tmp)
@@ -1399,11 +1403,10 @@ class TestBaseSinMigrar(unittest.TestCase):
         return json.loads(p.stdout.decode("utf-8"))
 
     def _esperado(self):
-        # Con el mismo HOME que ve el CLI: así el comando no lleva --home (ese home es el de ~).
-        with mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home}):
-            err = _db_shared.unmigrated_legacy(self.home)
+        with _entorno.home_en_proceso(self.home):
+            err = _db_shared.unmoved_legacy(self.home)
         self.assertIsNotNone(err)
-        self.assertIn("migrate-neb-db.py", err.comando)
+        self.assertEqual(err.motivo, "base-sin-mudar")
         self.assertIn(self.legacy, err.detalle)
         return err.to_dict()
 
@@ -1414,7 +1417,7 @@ class TestBaseSinMigrar(unittest.TestCase):
         with open(path, "rb") as fh:
             return fh.read(), os.path.getmtime(path)
 
-    def test_link_trace_unlink_responden_base_sin_migrar_sin_crear_neb_db(self):
+    def test_link_trace_unlink_responden_base_sin_mudar_sin_crear_neb_db(self):
         esperado = self._esperado()
         self.assertNotIn("mueve fuera", esperado["detalle"])
         antes = self._huella(self.legacy)
@@ -1431,8 +1434,8 @@ class TestBaseSinMigrar(unittest.TestCase):
         c.close()
         antes = self._huella(self.nuevo)
         esperado = self._esperado()
-        self.assertIn(f"mueve fuera de {self.base} el neb.db que hay ahí ({os.path.getsize(self.nuevo)} bytes)",
-                      esperado["detalle"])
+        self.assertIn(f"mueve fuera de {os.path.dirname(self.nuevo)} el neb.db que hay ahí "
+                      f"({os.path.getsize(self.nuevo)} bytes)", esperado["detalle"])
         for argv in self._verbos():
             with self.subTest(argv=argv[0]):
                 self.assertEqual(self._run(argv), esperado)

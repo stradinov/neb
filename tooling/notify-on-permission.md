@@ -21,9 +21,10 @@ Opcional personal por las mismas razones que `notify-on-stop` (oficina compartid
 ```
 Claude pide permiso o idle > 60s → Notification hook
                                   ├─ Guard de subsesión interna (NEB_INTERNAL_SUBSESSION=1 → exit 0)
-                                  ├─ Cargar ~/.claude/notify-on-permission.json (defaults si ausente)
+                                  ├─ Config efectiva y WAV, de la sección notify.permission de <datos>/config.json
+                                  │    (NEB_NOTIFY_ENABLED/NEB_NOTIFY_WAV del dispatcher
+                                  │     || CLI `config` de hooks/lib/notify_sound.py || defaults y hooks/sounds/neb-chime.wav)
                                   ├─ Si enabled=false → exit 0
-                                  ├─ Resolver WAV (NEB_NOTIFY_WAV || CLI de hooks/lib/notify_sound.py || hooks/sounds/neb-chime.wav)
                                   └─ Reproducir 1 chime async (sin scaling, sin walk-back)
 ```
 
@@ -31,12 +32,17 @@ Sin walk-back de transcript: el evento `Notification` no corresponde a "cierre d
 
 ## 3. Configuración personal default
 
-`~/.claude/notify-on-permission.json`:
+Sección `notify.permission` de `<datos>/config.json`, el mismo archivo y las mismas reglas de lectura que `notify.stop` ([`notify-on-stop.md`](notify-on-stop.md) § "Configuración personal default"; la carpeta de datos y `NEB_DATA`: [`config.md`](config.md)):
 
 ```json
 {
-  "enabled": true,
-  "wav": null
+  "schema": 1,
+  "notify": {
+    "permission": {
+      "enabled": true,
+      "wav": null
+    }
+  }
 }
 ```
 
@@ -47,7 +53,7 @@ Sin walk-back de transcript: el evento `Notification` no corresponde a "cierre d
 
 Sin campos `min_seconds`, `max_chimes` ni `scaling`: el evento no tiene duración medible ni escala. Si en el futuro aparece necesidad de N chimes, se agrega.
 
-Cualquier campo ausente cae al default hardcoded en el script. Si el archivo no existe, todos los defaults aplican. JSON malformado loguea a stderr y aplica defaults.
+Cualquier campo ausente o de otro tipo cae al default; un `config.json` ilegible aplica todos los defaults. Si `config.json` todavía no existe (máquina que no ha corrido la migración de 8.0.0), se lee el `~/.claude/notify-on-permission.json` de antes.
 
 ## 4. Activación
 
@@ -55,24 +61,16 @@ Manual, mismo procedimiento que [`notify-on-stop.md`](notify-on-stop.md) § "Act
 
 1. Agregar `notify-on-permission` a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json` (el plugin ya registra el hook; en una lista ya existente, va separado por comas y sin espacios). En Windows requiere Git Bash.
 
-2. (Opcional) Elegir otro sonido con `wav` en el config del paso 3. Sin elegir nada suena el que trae el plugin.
+2. (Opcional) Elegir otro sonido o apagarlo con el snippet de abajo. Sin cambiar nada suena el que trae el plugin.
 
-3. (Opcional) Crear `~/.claude/notify-on-permission.json` con valores explícitos. Si está ausente, los defaults aplican.
+3. Reiniciar la sesión `claude` para que cargue el hook.
 
-4. Reiniciar la sesión `claude` para que cargue el hook.
-
-Snippet PowerShell para Windows (copy/paste):
-
-```powershell
-@'
-{"enabled": true, "wav": null}
-'@ | Out-File -Encoding utf8 "$env:USERPROFILE\.claude\notify-on-permission.json"
-```
-
-Snippet bash (Linux/Mac):
+Snippet (Git Bash, Linux o Mac; `NEB_SRC`, el formato del valor y la nota de PowerShell 5.1: [`notify-on-stop.md`](notify-on-stop.md) § "Activación"). Escribe solo esa llave en `config.json`, sin tocar las demás secciones:
 
 ```bash
-echo '{"enabled": true, "wav": null}' > ~/.claude/notify-on-permission.json
+py "$NEB_SRC/hooks/lib/neb_paths.py" set notify.permission.wav '"chimes-loud"'   # o python / python3
+py "$NEB_SRC/hooks/lib/neb_paths.py" set notify.permission.enabled false
+py "$NEB_SRC/hooks/lib/notify_sound.py" config notify-on-permission             # verifica la config efectiva
 ```
 
 ## 5. Coexistencia con `notify-on-stop`
@@ -85,7 +83,7 @@ Ambos hooks pueden estar activos simultáneamente. Caso típico: dev pide permis
 | Claude queda idle > 60 s | `Notification` | 1 |
 | Cierre de turno | `Stop` (`notify-on-stop`) | 1 + 1/minuto, max 5 |
 
-**Comportamiento aceptado**: si el flujo arriba ocurre en pocos segundos, suenan dos eventos sonoros consecutivos. No se evita — son señales semánticamente distintas. Si molesta, el dev desactiva uno en su config personal (`enabled: false` en el archivo correspondiente).
+**Comportamiento aceptado**: si el flujo arriba ocurre en pocos segundos, suenan dos eventos sonoros consecutivos. No se evita — son señales semánticamente distintas. Si molesta, el dev desactiva uno en su config personal (`enabled: false` en la sección correspondiente de `config.json`).
 
 ## 6. Verificación
 
@@ -98,8 +96,8 @@ Escenarios a probar tras activar:
 | 3 | Idle > 60 s sin permission prompt previo | 1 chime al cumplirse el idle. |
 | 4 | Config `enabled: false` | Sin chime. |
 | 5 | Config `wav` apuntando a archivo inexistente | Suena `neb-chime.wav`; el arranque de la siguiente sesión avisa del motivo. |
-| 6 | Config JSON malformado | Defaults aplicados; warning stderr. |
-| 7 | Sin config (archivo ausente) | Defaults; chime suena. |
+| 6 | `config.json` malformado | Defaults aplicados. |
+| 7 | Sin `config.json` ni el JSON suelto anterior | Defaults; chime suena. |
 | 8 | **Prompt no trivial con `preprocess-prompt.py` activo** (escenario clave) | Sin chime fantasma del subproceso `claude -p` (guard de subsesión interna via `NEB_INTERNAL_SUBSESSION`). |
 | 9 | Windows con WAV en path con espacios | Suena correctamente. |
 | 10 | Coexistencia con otros hooks `Notification` futuros | Todos ejecutan en paralelo; ninguno bloquea al otro (filosofía de `hooks/README.md`). |

@@ -13,7 +13,7 @@ Neb se gobierna con sus propias reglas (profile `self-applied`): cada cambio a l
 | Un defecto sin corrección clara, una fricción o una idea | **Issue** |
 | Un cambio concreto y acotado al núcleo (una regla, un documento, un arreglo) | **Pull request** |
 
-Si usas Neb con Claude Code, la retroalimentación al cerrar un requerimiento (Fase 9) te propone el canal y prepara el pull request por ti: [`process/upstream-contribution.md`](process/upstream-contribution.md).
+Si usas Neb con Claude Code, la retroalimentación al cerrar un requerimiento (Fase 9), o la instalación guiada de [`INSTALL.md`](INSTALL.md) cuando la guía falla, te propone el canal y prepara el pull request por ti: [`process/upstream-contribution.md`](process/upstream-contribution.md).
 
 ## Abrir un issue
 

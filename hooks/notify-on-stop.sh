@@ -3,13 +3,14 @@
 #
 # Opt-in personal. Lineamiento: tooling/notify-on-stop.md.
 # Defaults: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
-# Configurable en ~/.claude/notify-on-stop.json (enabled, wav, min_seconds, max_chimes, scaling).
+# Configurable en la sección notify.stop del config.json de la carpeta de datos de Neb
+# (enabled, wav, min_seconds, max_chimes, scaling).
 #
 # Guard de subsesión interna del corrector (preprocess-prompt.py): si
 # NEB_INTERNAL_SUBSESSION=1 (o el alias legacy CLAUDE_PREPROCESS_RECURSION=1),
 # abandona sin sonar — evita chime fantasma. Ver hooks/lib/subsession.py.
 #
-# Requisitos: bash, jq (blando: sin él, 1 chime de cortesía), un player
+# Requisitos: bash, jq (blando: sin él, 1 chime de cortesía; la config no lo usa), un player
 # (afplay/paplay/aplay/play). Sin player en PATH → exit 0 silencioso.
 # Defensivo: cualquier falla → exit 0.
 
@@ -30,33 +31,56 @@ for cand in afplay paplay aplay play; do
 done
 [ -z "$PLAYER" ] && exit 0
 
-# --- Defaults ---------------------------------------------------------------
+# --- Config efectiva --------------------------------------------------------
 
+# Un solo resolvedor (lib/notify_sound.py) lee la sección notify.stop de config.json en la carpeta de
+# datos de Neb, normaliza los valores y resuelve el WAV (presets, ruta absoluta, respaldo). Bajo el
+# despachador del plugin llegan ya resueltos en variables NEB_NOTIFY_* (NEB_NOTIFY_WAV marca que vienen
+# de él); invocado directo (entradas de settings.json anteriores a 6.15.0) se le piden a su CLI
+# `config`, en líneas llave=valor. Sin Python: valores por defecto y el sonido de neb.
+HERE="$(cd "$(dirname "$0")" && pwd)"
 ENABLED=true
 MIN_SEC=10
 MAX_CHIMES=5
 SCALING="per-minute"
+WAV=""
 
-# --- Cargar config personal -------------------------------------------------
+set_value() {
+    case "$1" in
+        enabled)     ENABLED="$2" ;;
+        wav)         WAV="$2" ;;
+        min_seconds) MIN_SEC="$2" ;;
+        max_chimes)  MAX_CHIMES="$2" ;;
+        scaling)     SCALING="$2" ;;
+    esac
+}
 
-CFG="$HOME/.claude/notify-on-stop.json"
-HAVE_JQ=0
-command -v jq >/dev/null 2>&1 && HAVE_JQ=1
-
-if [ -f "$CFG" ] && [ "$HAVE_JQ" = "1" ]; then
-    if jq empty "$CFG" >/dev/null 2>&1; then
-        ENABLED=$(jq -r 'if has("enabled")     then .enabled     else true          end' "$CFG")
-        MIN_SEC=$(jq -r 'if has("min_seconds") then .min_seconds else 10            end' "$CFG")
-        MAX_CHIMES=$(jq -r 'if has("max_chimes") then .max_chimes else 5            end' "$CFG")
-        SCALING=$( jq -r 'if has("scaling")    then .scaling    else "per-minute" end' "$CFG")
-    else
-        log "config ilegible, usando defaults"
-    fi
+if [ -n "${NEB_NOTIFY_WAV:-}" ]; then
+    set_value enabled     "${NEB_NOTIFY_ENABLED:-true}"
+    set_value wav         "$NEB_NOTIFY_WAV"
+    set_value min_seconds "${NEB_NOTIFY_MIN_SECONDS:-10}"
+    set_value max_chimes  "${NEB_NOTIFY_MAX_CHIMES:-5}"
+    set_value scaling     "${NEB_NOTIFY_SCALING:-per-minute}"
+else
+    for py in python3 python; do
+        if command -v "$py" >/dev/null 2>&1; then
+            OUT=$(PYTHONIOENCODING=utf-8 "$py" "$HERE/lib/notify_sound.py" config notify-on-stop 2>/dev/null)
+            # Sin `break` incondicional: un alias que no corre Python (el de la Microsoft Store en
+            # Git Bash) no imprime nada y se prueba el siguiente.
+            [ -z "$OUT" ] && continue
+            while IFS='=' read -r key value; do
+                set_value "$key" "${value%$'\r'}"
+            done <<EOF
+$OUT
+EOF
+            break
+        fi
+    done
 fi
 
 [ "$ENABLED" != "true" ] && exit 0
 
-# Normalización
+# Normalización (red de seguridad: notify_sound.py ya entrega los valores normalizados)
 case "$MIN_SEC" in ''|*[!0-9-]*) MIN_SEC=10 ;; esac
 [ "$MIN_SEC" -lt 0 ] 2>/dev/null && MIN_SEC=0
 case "$MAX_CHIMES" in ''|*[!0-9]*) MAX_CHIMES=5 ;; esac
@@ -64,28 +88,11 @@ case "$MAX_CHIMES" in ''|*[!0-9]*) MAX_CHIMES=5 ;; esac
 [ "$MAX_CHIMES" -gt 20 ] 2>/dev/null && MAX_CHIMES=20
 [ "$SCALING" != "fixed" ] && [ "$SCALING" != "per-minute" ] && SCALING="per-minute"
 
-# --- Resolver WAV -----------------------------------------------------------
-
-# Un solo resolvedor (lib/notify_sound.py): presets, ruta absoluta y respaldo. Bajo el
-# despachador del plugin llega resuelto en NEB_NOTIFY_WAV; invocado directo (entradas de
-# settings.json anteriores a 6.15.0) se le pregunta a su CLI. Sin Python, el sonido de neb.
-HERE="$(cd "$(dirname "$0")" && pwd)"
-WAV="${NEB_NOTIFY_WAV:-}"
-if [ -z "$WAV" ]; then
-    for py in python3 python; do
-        if command -v "$py" >/dev/null 2>&1; then
-            # Sin `break` incondicional: un alias que no corre Python (el de la Microsoft Store en
-            # Git Bash) no imprime nada y se prueba el siguiente.
-            OUT=$(PYTHONIOENCODING=utf-8 "$py" "$HERE/lib/notify_sound.py" notify-on-stop 2>/dev/null)
-            # 3 = el dev apagó el hook en su JSON (sin jq, este script no lee `enabled`).
-            [ "$?" = "3" ] && exit 0
-            WAV=$(printf '%s\n' "$OUT" | head -n 1)
-            [ -n "$WAV" ] && break
-        fi
-    done
-fi
 [ -z "$WAV" ] && WAV="$HERE/sounds/neb-chime.wav"
 [ ! -f "$WAV" ] && exit 0
+
+HAVE_JQ=0
+command -v jq >/dev/null 2>&1 && HAVE_JQ=1
 
 # --- Player N veces (background) -------------------------------------------
 

@@ -2,7 +2,8 @@
 #
 # Opt-in personal. Lineamiento: tooling/notify-on-stop.md.
 # Defaults: 1 chime + 1 por cada minuto del turno (max 5), skip si < 10s.
-# Configurable en ~/.claude/notify-on-stop.json (enabled, wav, min_seconds, max_chimes, scaling).
+# Configurable en la sección notify.stop del config.json de la carpeta de datos de Neb
+# (enabled, wav, min_seconds, max_chimes, scaling).
 #
 # Guard de subsesión interna del corrector (preprocess-prompt.py): si
 # NEB_INTERNAL_SUBSESSION=1 (o el alias legacy CLAUDE_PREPROCESS_RECURSION=1),
@@ -12,63 +13,61 @@ $ErrorActionPreference = 'SilentlyContinue'
 
 if ($env:NEB_INTERNAL_SUBSESSION -eq '1' -or $env:CLAUDE_PREPROCESS_RECURSION -eq '1') { exit 0 }
 
-# --- Defaults ---------------------------------------------------------------
+# --- Config efectiva --------------------------------------------------------
 
+# Un solo resolvedor (lib\notify_sound.py) lee la sección notify.stop de config.json en la carpeta de
+# datos de Neb, normaliza los valores y resuelve el WAV (presets, ruta absoluta, respaldo). Bajo el
+# despachador del plugin llegan ya resueltos en variables NEB_NOTIFY_* (NEB_NOTIFY_WAV marca que vienen
+# de él); invocado directo (entradas de settings.json anteriores a 6.15.0) se le piden a su CLI
+# `config`, en líneas llave=valor. Sin Python: valores por defecto y el sonido de neb.
 $cfg = @{
-    enabled     = $true
-    min_seconds = 10
-    max_chimes  = 5
+    enabled     = 'true'
+    wav         = ''
+    min_seconds = '10'
+    max_chimes  = '5'
     scaling     = 'per-minute'
 }
 
-# --- Cargar config personal -------------------------------------------------
-
-$cfgPath = Join-Path $env:USERPROFILE '.claude\notify-on-stop.json'
-if (Test-Path -LiteralPath $cfgPath) {
-    try {
-        $user = Get-Content -LiteralPath $cfgPath -Raw -Encoding utf8 | ConvertFrom-Json
-        foreach ($key in @('enabled','min_seconds','max_chimes','scaling')) {
-            if ($user.PSObject.Properties.Name -contains $key) {
-                $cfg[$key] = $user.$key
-            }
-        }
-    } catch {
-        [Console]::Error.WriteLine("[notify-on-stop] config ilegible, usando defaults: $_")
-    }
-}
-
-if (-not $cfg.enabled) { exit 0 }
-
-# Normalización
-if ($cfg.min_seconds -lt 0) { $cfg.min_seconds = 0 }
-if ($cfg.max_chimes -lt 1)  { $cfg.max_chimes  = 1 }
-if ($cfg.max_chimes -gt 20) { $cfg.max_chimes  = 20 }
-if ($cfg.scaling -ne 'fixed' -and $cfg.scaling -ne 'per-minute') {
-    $cfg.scaling = 'per-minute'
-}
-
-# --- Resolver WAV -----------------------------------------------------------
-
-# Un solo resolvedor (lib\notify_sound.py): presets, ruta absoluta y respaldo. Bajo el
-# despachador del plugin llega resuelto en NEB_NOTIFY_WAV; invocado directo (entradas de
-# settings.json anteriores a 6.15.0) se le pregunta a su CLI. Sin Python, el sonido de neb.
-$wav = $env:NEB_NOTIFY_WAV
-if (-not $wav) {
+if ($env:NEB_NOTIFY_WAV) {
+    $cfg.wav = $env:NEB_NOTIFY_WAV
+    if ($env:NEB_NOTIFY_ENABLED)     { $cfg.enabled     = $env:NEB_NOTIFY_ENABLED }
+    if ($env:NEB_NOTIFY_MIN_SECONDS) { $cfg.min_seconds = $env:NEB_NOTIFY_MIN_SECONDS }
+    if ($env:NEB_NOTIFY_MAX_CHIMES)  { $cfg.max_chimes  = $env:NEB_NOTIFY_MAX_CHIMES }
+    if ($env:NEB_NOTIFY_SCALING)     { $cfg.scaling     = $env:NEB_NOTIFY_SCALING }
+} else {
     $resolver = Join-Path $PSScriptRoot 'lib\notify_sound.py'
     foreach ($py in @('py','python','python3')) {
         if (Get-Command $py -ErrorAction SilentlyContinue) {
             $prevEnc = [Console]::OutputEncoding
             [Console]::OutputEncoding = [Text.Encoding]::UTF8
             $env:PYTHONIOENCODING = 'utf-8'
-            $wav = & $py $resolver 'notify-on-stop' 2>$null | Select-Object -First 1
+            $out = @(& $py $resolver 'config' 'notify-on-stop' 2>$null)
             [Console]::OutputEncoding = $prevEnc
-            # 3 = el dev apagó el hook en su JSON (criterio del resolvedor, también "enabled": "false").
-            if ($LASTEXITCODE -eq 3) { exit 0 }
             # Un alias que no corre Python (el de la Microsoft Store) no imprime nada: se prueba el siguiente.
-            if ($wav) { break }
+            if ($out.Count -eq 0) { continue }
+            foreach ($line in $out) {
+                $kv = "$line" -split '=', 2
+                if ($kv.Count -eq 2 -and $cfg.ContainsKey($kv[0])) { $cfg[$kv[0]] = $kv[1].TrimEnd("`r") }
+            }
+            break
         }
     }
 }
+
+if ($cfg.enabled -ne 'true') { exit 0 }
+
+# Normalización (red de seguridad: notify_sound.py ya entrega los valores normalizados)
+$minSeconds = 10
+$maxChimes = 5
+try { $minSeconds = [int]$cfg.min_seconds } catch {}
+try { $maxChimes = [int]$cfg.max_chimes } catch {}
+if ($minSeconds -lt 0) { $minSeconds = 0 }
+if ($maxChimes -lt 1)  { $maxChimes  = 1 }
+if ($maxChimes -gt 20) { $maxChimes  = 20 }
+$scaling = $cfg.scaling
+if ($scaling -ne 'fixed' -and $scaling -ne 'per-minute') { $scaling = 'per-minute' }
+
+$wav = $cfg.wav
 if (-not $wav) { $wav = Join-Path $PSScriptRoot 'sounds\neb-chime.wav' }
 if (-not (Test-Path -LiteralPath $wav)) { exit 0 }
 
@@ -77,9 +76,11 @@ if (-not (Test-Path -LiteralPath $wav)) { exit 0 }
 function Play-Chimes([int]$times, [int]$maxTimes) {
     if ($times -lt 1) { $times = 1 }
     if ($times -gt $maxTimes) { $times = $maxTimes }
+    # Literal de comillas simples: un apostrofo en la ruta (C:\Users\O'Neil, NEB_DATA) se duplica.
+    $wavLit = $wav -replace "'", "''"
     $cmd = @"
 `$ErrorActionPreference = 'SilentlyContinue'
-`$p = New-Object Media.SoundPlayer '$wav'
+`$p = New-Object Media.SoundPlayer '$wavLit'
 for (`$i = 0; `$i -lt $times; `$i++) {
     `$p.PlaySync()
     Start-Sleep -Milliseconds 200
@@ -93,11 +94,11 @@ for (`$i = 0; `$i -lt $times; `$i++) {
 
 $raw = [Console]::In.ReadToEnd()
 $hook = $null
-try { $hook = $raw | ConvertFrom-Json } catch { Play-Chimes 1 $cfg.max_chimes; exit 0 }
+try { $hook = $raw | ConvertFrom-Json } catch { Play-Chimes 1 $maxChimes; exit 0 }
 
 $transcript = $hook.transcript_path
 if (-not $transcript -or -not (Test-Path -LiteralPath $transcript)) {
-    Play-Chimes 1 $cfg.max_chimes; exit 0
+    Play-Chimes 1 $maxChimes; exit 0
 }
 
 # --- Walk-back al último user message no-toolUseResult ----------------------
@@ -113,18 +114,18 @@ for ($i = $lines.Count - 1; $i -ge 0; $i--) {
     }
 }
 
-if (-not $boundaryTime) { Play-Chimes 1 $cfg.max_chimes; exit 0 }
+if (-not $boundaryTime) { Play-Chimes 1 $maxChimes; exit 0 }
 
 # --- Duración + scaling -----------------------------------------------------
 
 $durationSec = [math]::Floor(((Get-Date).ToUniversalTime() - $boundaryTime.ToUniversalTime()).TotalSeconds)
-if ($durationSec -lt $cfg.min_seconds) { exit 0 }
+if ($durationSec -lt $minSeconds) { exit 0 }
 
-if ($cfg.scaling -eq 'fixed') {
+if ($scaling -eq 'fixed') {
     $n = 1
 } else {
     $n = 1 + [math]::Floor($durationSec / 60)
 }
 
-Play-Chimes $n $cfg.max_chimes
+Play-Chimes $n $maxChimes
 exit 0

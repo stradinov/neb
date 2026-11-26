@@ -40,7 +40,7 @@ import os
 import re
 import sys
 
-# Reusa la infra de hooks/lib (misma técnica que bootstrap/migrate-neb-db.py).
+# Reusa la infra de hooks/lib (misma técnica que bootstrap/neb-migrate.py).
 _LIB = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "hooks", "lib")
 sys.path.insert(0, _LIB)
 
@@ -493,13 +493,17 @@ def _utf8_stdout():
             pass
 
 
-def _unmigrated(db_path):
-    """UnmigratedDb de _db_shared si db_path es el neb.db de un ~/.claude con la base sin migrar; si no,
-    None. Una base nueva sí se crea: el migrador también corre en una máquina sin neb.db."""
-    full = os.path.abspath(db_path)
-    if os.path.basename(full) != _db_shared.NEB_DB_NAME or os.path.basename(os.path.dirname(full)) != ".claude":
-        return None
-    return _db_shared.unmigrated_legacy(os.path.dirname(os.path.dirname(full)))
+def _same_path(a, b):
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
+
+
+def _prepare(db_path):
+    """Si db_path es la base por omisión (neb_paths.db_path del home): la guarda de la base sin mudar y la carpeta
+    de datos (_db_shared.prepare_default_db; lanza UnmovedDb o DbUnavailable). Una base nueva sí se crea: el
+    migrador también corre en una máquina sin neb.db. Otra ruta (--db) se abre tal cual."""
+    home = os.path.expanduser("~")
+    if _same_path(db_path, _db_shared.resolve_db_path(home)):
+        _db_shared.prepare_default_db(home)
 
 
 def run(src_path, db_path, do_apply):
@@ -517,9 +521,10 @@ def run(src_path, db_path, do_apply):
         print(render_report(plan, src_path))
         return plan, None
 
-    err = _unmigrated(db_path)
-    if err is not None:
-        print(f"[migrate-pendings] ERROR: {err.detalle} Cómo: {err.accion}. A mano: {err.comando}", file=sys.stderr)
+    try:
+        _prepare(db_path)
+    except _db_shared.DbUnavailable as err:
+        print(f"[migrate-pendings] ERROR: {err.detalle} Cómo: {err.accion}.", file=sys.stderr)
         return plan, None
 
     # --apply: escritura idempotente dentro de una transacción.

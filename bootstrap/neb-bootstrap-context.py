@@ -29,6 +29,7 @@ Variables de entorno (provistas por Claude Code / el usuario):
 Defensivo: si algo falta, emite lo que pueda + una guia a /wakeup; nunca aborta.
 """
 import hashlib
+import json
 import os
 import re
 import sqlite3
@@ -124,14 +125,26 @@ def _load_assembler(bootstrap_dir):
     return _load_module(os.path.join(bootstrap_dir, 'assemble-startup.py'), 'neb_assemble_startup')
 
 
-DB_NOTICE_MAX = 900  # unidades UTF-16 del aviso de base incompatible o paso detenido, con su envoltura
+DB_NOTICE_MAX = 900  # unidades UTF-16 del aviso de base incompatible, sin mudar o paso detenido, con su envoltura
+
+
+def _db_path(home):
+    """<datos>/neb.db (neb_paths.db_path: NEB_DATA absoluta o ~/.neb), la de _db_shared.resolve_db_path; None si
+    el árbol no trae neb_paths (anterior a 8.0.0)."""
+    try:
+        import neb_paths
+        return neb_paths.db_path(home)
+    except Exception:  # noqa: BLE001 — el aviso es accesorio
+        return None
 
 
 def _readonly_db(mig, home):
-    """Ruta de la base (~/.claude/neb.db, la de resolve_db_path) si trae `work`, comprobado sin abrirla para
-    escribir; None si no. La base con el nombre anterior a 7.0.0 no se abre ni en solo lectura: dejaría
-    -wal/-shm al lado, y su cambio de nombre lo hace la migración guiada."""
-    p = os.path.join(home, '.claude', 'neb.db')
+    """Ruta de la base (<datos>/neb.db, la de resolve_db_path) si trae `work`, comprobado sin abrirla para
+    escribir; None si no. La base que sigue en ~/.claude (sin mudar, hasta 7.x) no se abre aquí: la muda la
+    migración guiada 8.0.0 y su aviso lo da _unmoved_notice."""
+    p = _db_path(home)
+    if p is None:
+        return None
     con = mig.open_readonly(p)
     if con is None:
         return None
@@ -187,9 +200,23 @@ def _relax_axis_step(bootstrap_dir, home=None):
         con.close()
 
 
+def _unmoved_notice(own_root, home):
+    """Parte del aviso si la base sigue sin mudar en ~/.claude (_db_shared.unmoved_legacy: es una base de verdad y
+    la carpeta de datos no tiene una usable): mientras tanto neb no captura. None si no; nunca levanta."""
+    try:
+        dbs = _load_module(os.path.join(own_root, 'hooks', 'lib', '_db_shared.py'), 'neb_db_shared_own')
+        err = dbs.unmoved_legacy(home)
+    except Exception:  # noqa: BLE001 — el aviso es accesorio
+        return None
+    if err is None:
+        return None
+    return "%s Avísale al dev: %s" % (err.detalle.rstrip('.') + '.', err.accion)
+
+
 def _db_notice(bootstrap_dir, neb_home=None, home=None):
-    """Aviso de base que un árbol de Neb ya no puede operar, o de un paso de base detenido; None si no hay
-    nada que decir. Solo lee (mode=ro; nunca crea la base). Usa las migraciones del árbol propio; del clon
+    """Aviso de base que un árbol de Neb ya no puede operar, de base sin mudar (sigue en ~/.claude, desde 8.0.0)
+    o de un paso de base detenido; None si no hay nada que decir. Solo lee (mode=ro; nunca crea la base; la base
+    sin mudar la prueba _db_shared._probe_db, que no la crea). Usa las migraciones del árbol propio; del clon
     (NEB_HOME) solo lee SCHEMA_VERSION como texto (un árbol sin _migrations.py cuenta como 1). Que la base
     esté atrás no es aviso por sí solo (lo normal en la primera sesión tras actualizar), ni que plugin y
     clon difieran de versión si los dos la entienden (M7 del REQ neb-migraciones-de-version)."""
@@ -199,6 +226,9 @@ def _db_notice(bootstrap_dir, neb_home=None, home=None):
     except Exception:  # noqa: BLE001 — un árbol anterior a 6.48.0 no lo trae
         return None
     home = home or os.path.expanduser('~')
+    unmoved = _unmoved_notice(own_root, home)
+    if unmoved is not None:
+        return _fit_db_notice([unmoved])
     db = _readonly_db(mig, home)
     if db is None:
         return None
@@ -233,7 +263,13 @@ def _db_notice(bootstrap_dir, neb_home=None, home=None):
         con.close()
     if not parts:
         return None
-    text = '; '.join(parts) + '.'
+    return _fit_db_notice(parts)
+
+
+def _fit_db_notice(parts):
+    """Une las partes del aviso de base y lo recorta a DB_NOTICE_MAX (con su envoltura)."""
+    text = '; '.join(parts)
+    text = (text if text.endswith('.') else text + '.')
     text = text[0].upper() + text[1:]
     tail = '… (`neb-migrate.py status` da el detalle).'
 
@@ -330,6 +366,45 @@ def _autoupdate_offer(bootstrap_dir):
     return None
 
 
+LANGUAGE_VALUE_MAX = 64   # tope por valor de `language` en el bloque: Neb no valida los valores (tooling/config.md)
+
+
+def _language_block(bootstrap_dir):
+    """El bloque de idioma del individuo: las perillas de la sección `language` de config.json que no son null
+    (`base` solo si no es `es`, el valor por omisión), o None si no declara ninguna. Va después de la
+    configuración personal: gana sobre la misma perilla escrita en prosa (methodology/personal-vs-team.md
+    § "Idioma del individuo"). Solo lee; un árbol sin neb_paths (anterior a 8.0.0) o una config ilegible no lo
+    emiten."""
+    try:
+        paths = _load_module(os.path.join(os.path.dirname(bootstrap_dir), 'hooks', 'lib', 'neb_paths.py'),
+                             'neb_paths')
+        lang = paths.section('language')
+        where = paths.config_path()
+    except Exception:  # noqa: BLE001 — el bloque es accesorio; el arranque no se rompe por el
+        return None
+    if not isinstance(lang, dict):
+        return None
+    declared = []
+    for key, value in lang.items():
+        if value is None or (key == 'base' and value == 'es'):
+            continue
+        text = json.dumps(value, ensure_ascii=False)
+        if len(text) > LANGUAGE_VALUE_MAX:
+            text = text[:LANGUAGE_VALUE_MAX] + '…'
+        declared.append('- `%s`: `%s`' % (key, text.replace('`', "'")))
+    if not declared:
+        return None
+    other = ''
+    if lang.get('base') not in (None, 'es'):
+        other = ("\nHoy solo `es` tiene lineamientos de redacción (`tooling/redaccion-es.md`); con otro `base`, "
+                 "las demás perillas no tienen lista de valores que las respalde.\n")
+    return ("\n\n---\n\n# Idioma del individuo (config.json, inyectado por el plugin)\n\n"
+            "Perillas declaradas en la sección `language` de `%s`, para la conversación con el dev. Ganan sobre "
+            "el núcleo, el overlay y la misma perilla en `personal/<usuario>.md` (si está ahí, recomienda al dev "
+            "borrarla); un `<proyecto>/.claude/personal.md` la sigue sustituyendo en su proyecto "
+            "(`methodology/personal-vs-team.md` § \"Idioma del individuo\").\n\n%s\n%s" % (where.replace('\\', '/'), '\n'.join(declared), other))
+
+
 def _project_opts_out():
     """True si el CLAUDE.md del proyecto activo declara el marcador <!-- neb: skip -->.
 
@@ -398,6 +473,9 @@ def _blocks(asm, neb_home, bootstrap_dir):
         blocks.append((None, None,
                        "\n\n---\n\n> No hay `NEB_WORKSPACE` configurado todavia. Corre `/wakeup` para crear "
                        "tu workspace (overlay + personal + changes) y conectarlo.\n"))
+    language = _language_block(bootstrap_dir)
+    if language:
+        blocks.append(('idioma del individuo', None, language))
     return blocks
 
 

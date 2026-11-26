@@ -5,7 +5,7 @@ Con solo el plugin, NEB_HOME no existe: `_db_for_cli` toma el esquema del árbol
 que es el de su misma versión. Antes caía a ~/.claude/neb, que bajo el plugin no existe, y con una
 base nueva el CLI fallaba con «no such table».
 
-Framework: unittest (stdlib). Home temporal; nunca toca ~/.claude.
+Framework: unittest (stdlib). Home temporal, sin NEB_DATA (_entorno); nunca toca ~/.claude ni ~/.neb.
   py -m unittest discover -s hooks/tests -p test_cli_schema_fallback.py
 """
 import os
@@ -20,6 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(HERE, "..", "lib")
 sys.path.insert(0, LIB)
 
+import _entorno  # noqa: F401 — quita NEB_DATA: la base de prueba es <home>/.neb/neb.db
 import logbook
 import pendings
 
@@ -112,7 +113,7 @@ class TestEsquemaConElModulo(unittest.TestCase):
     def test_scripts_de_bootstrap_salen_con_1_y_el_motivo(self):
         import subprocess
         self._mark_incompatible()
-        db = os.path.join(self.home, ".claude", "neb.db")
+        db = os.path.join(self.home, ".neb", "neb.db")
         md = os.path.join(self.home, "pendings.md")
         with open(md, "w", encoding="utf-8") as fh:
             fh.write("## alpha\n\n- **alpha-uno** — algo pendiente.\n")
@@ -135,7 +136,7 @@ class TestEsquemaConElModulo(unittest.TestCase):
 
     def test_captura_no_escribe_en_base_incompatible(self):
         self._mark_incompatible()
-        db = os.path.join(self.home, ".claude", "neb.db")
+        db = os.path.join(self.home, ".neb", "neb.db")
 
         def content():
             # Lee a través de SQLite: lo que esté en el -wal también cuenta.

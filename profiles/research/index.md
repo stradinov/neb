@@ -8,7 +8,7 @@ Overlay sobre `self-applied`. Se activa cuando:
 
 - El cwd está dentro de `methodology/research/` (investigación sobre la metodología misma).
 - El REQ pide explícitamente investigar, buscar fuentes, o comparar opciones en un tema especializado.
-- Para investigación en un proyecto (`<proyecto>/research/...`) o cross-proyecto (`~/.claude/research/...`): activación **explícita** por el dev al abrir el REQ — sin auto-detección por path para evitar colisión con el profile del proyecto.
+- Para investigación en un proyecto (`<proyecto>/research/...`) o cross-proyecto (`<datos>/research/...`, en la carpeta de datos de Neb; ver [deployment.md](deployment.md) § "Ubicación del documento según scope"): activación **explícita** por el dev al abrir el REQ — sin auto-detección por path para evitar colisión con el profile del proyecto.
 
 Si el REQ también toca la metodología general (`general/`, `methodology/`, `process/`, `tooling/`, etc.), el profile activo es `research` para el documento de investigación y `self-applied` para el resto. Si hay ambigüedad, anunciar y preguntar.
 

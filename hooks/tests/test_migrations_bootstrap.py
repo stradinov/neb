@@ -12,7 +12,8 @@ _env_notices, las partes, ya no lo incluye):
   • las partes (_env_notices) dan el mismo texto sin base, con base incompatible y tras otro cambio (7.5.0);
   • tope DB_NOTICE_MAX.
 
-Homes temporales; nunca ~/.claude.
+Homes temporales, con la base en su carpeta de datos (<home>/.neb, 8.0.0; sin NEB_DATA: _entorno); nunca
+~/.claude ni ~/.neb reales. El aviso de la base que sigue en ~/.claude (sin mudar) lo cubre test_bootstrap_context.py.
   py -m unittest discover -s hooks/tests -p test_migrations_bootstrap.py
 """
 
@@ -28,6 +29,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -55,7 +57,8 @@ class TestAvisoBase(unittest.TestCase):
         self.home = tempfile.mkdtemp(prefix="neb-test-boot-")
         self.addCleanup(shutil.rmtree, self.home, True)
         os.makedirs(os.path.join(self.home, ".claude"))
-        self.db = os.path.join(self.home, ".claude", "neb.db")
+        self.db = _db_shared.resolve_db_path(self.home)          # <home>/.neb/neb.db (8.0.0)
+        os.makedirs(os.path.dirname(self.db))
         self.clone = tempfile.mkdtemp(prefix="neb-test-clon-")
         self.addCleanup(shutil.rmtree, self.clone, True)
         os.makedirs(os.path.join(self.clone, "hooks", "lib"))

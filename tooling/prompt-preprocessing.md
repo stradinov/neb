@@ -41,7 +41,7 @@ dev tipea prompt → UserPromptSubmit hook
 
 ## 4. Modos
 
-**El modo por defecto es `off`**: el hook se instala pero arranca **inerte** (no llama a Haiku ni inyecta contexto). El dev lo enciende cuando quiere con `/preprocess full|fast` o fijándolo en su `preprocess.json` (§ "Configuración personal default").
+**El modo por defecto es `off`**: el hook se instala pero arranca **inerte** (no llama a Haiku ni inyecta contexto). El dev lo enciende cuando quiere con `/preprocess full|fast` o fijándolo en la sección `preprocess` de su `config.json` (§ "Configuración personal default").
 
 | Modo | Corrección | Eco | Confirmación | Cuándo usar |
 |---|---|---|---|---|
@@ -51,13 +51,16 @@ dev tipea prompt → UserPromptSubmit hook
 
 ## 5. Configuración personal default
 
-`~/.claude/preprocess.json`:
+Sección `preprocess` de `<datos>/config.json`, el único archivo de configuración de Neb desde 8.0.0 (`<datos>` es la carpeta de datos: `NEB_DATA` si es una ruta absoluta; si no, `~/.neb`). Solo hace falta lo que cambia; el resto del archivo es de otras secciones:
 
 ```json
 {
-  "mode": "off",
-  "model": "claude-haiku-4-5-20251001",
-  "prefix": "$$"
+  "schema": 1,
+  "preprocess": {
+    "mode": "off",
+    "model": "claude-haiku-4-5-20251001",
+    "prefix": "$$"
+  }
 }
 ```
 
@@ -67,16 +70,16 @@ dev tipea prompt → UserPromptSubmit hook
 | `model` | `"claude-haiku-4-5-20251001"` | Modelo Anthropic para corregir. Subir a Sonnet si Haiku falla; cuesta más tokens y latencia |
 | `prefix` | `"$$"` | Prefijo opt-out por prompt. `$$` comparte tecla física en distribuciones US y Español LATAM/España |
 
-Cualquier campo ausente cae al valor por defecto hardcoded en el script. Si el archivo no existe, todos los valores por defecto aplican.
+Cualquier campo ausente, vacío o de otro tipo cae al valor por defecto, y un `mode` fuera de los tres también (no enciende el hook). El archivo se lee en UTF-8 con o sin BOM. Si `config.json` todavía no existe (máquina que no ha corrido la migración de 8.0.0), el hook lee el `~/.claude/preprocess.json` de antes; sin ninguno de los dos, todos los valores por defecto aplican.
 
 ## 6. Cambio de modo en sesión
 
 Precedencia (primero que aplica gana):
 
 1. **Prefijo por prompt** `$$` (bypass una sola vez para ese turno). Ej: `$$explora rapido el repo` → Claude actúa directo, sin eco/confirmación.
-2. **Slash command** `/preprocess full|fast|off` — persiste durante la sesión, escribe `~/.claude/preprocess-state/<session_id>.json`.
-3. **Env var** `CLAUDE_PREPROCESS_MODE=fast` antes de lanzar `claude` — fija el modo de toda la sesión, ignora `preprocess.json`. En PowerShell: `$env:CLAUDE_PREPROCESS_MODE = "fast"`.
-4. **Archivo personal** `~/.claude/preprocess.json` — valor por defecto personal.
+2. **Slash command** `/preprocess full|fast|off` — persiste durante la sesión, escribe `<datos>/state/preprocess/<session_id>.json` con `preprocess-prompt.py --set-session-mode` (de paso borra los estados de sesiones de más de 7 días). Un `session_id` con caracteres fuera de letras, dígitos, `_` y `-` no tiene estado. Mientras dure la transición a 8.0.0, si ese archivo no existe el hook lee el de la ruta anterior, `~/.claude/preprocess-state/<session_id>.json`.
+3. **Env var** `CLAUDE_PREPROCESS_MODE=fast` antes de lanzar `claude` — fija el modo de toda la sesión, ignora `config.json`. En PowerShell: `$env:CLAUDE_PREPROCESS_MODE = "fast"`.
+4. **Configuración personal** — sección `preprocess` de `<datos>/config.json` (§ "Configuración personal default").
 5. **Por defecto hardcoded**: `off`.
 
 > Con el valor por defecto en `off`, el prefijo `$$` solo tiene efecto observable si activaste el hook en la sesión (`/preprocess full|fast`): por su precedencia máxima fuerza `off` en ese turno pese al modo de sesión. En el estado por defecto (off) es redundante e inocuo (solo se elimina el `$$` del prompt).
@@ -87,29 +90,24 @@ Manual. El plugin ya registra el hook (ver [`hooks/README.md`](../hooks/README.m
 
 1. Agregar `preprocess-prompt` a `NEB_HOOKS` en el bloque `env` de `~/.claude/settings.json` (en una lista ya existente, va separado por comas y sin espacios). En Windows requiere Git Bash.
 
-2. El comando viene con el plugin como `/neb:preprocess`. Para tenerlo también como `/preprocess`, copia [`commands/preprocess.md`](../commands/preprocess.md) a `~/.claude/commands/`.
-3. Crear `~/.claude/preprocess.json` con el esquema completo (ver § "Configuración personal default").
+2. El comando viene con el plugin como `/neb:preprocess`; no hace falta copiarlo. Una copia personal anterior a 8.0.0 en `~/.claude/commands/preprocess.md` sigue escribiendo el estado en `~/.claude/preprocess-state/`, que el hook deja de leer en 9.0.0: bórrala y usa `/neb:preprocess`, o reemplázala por la versión actual de [`commands/preprocess.md`](../commands/preprocess.md).
+3. Opcional: fijar un modo persistente en `config.json` (ver § "Configuración personal default" y el snippet de abajo). Sin él, el hook arranca en `off`.
 4. Verificar Python 3 en PATH:
    - **Windows**: `py --version` o `python --version`.
    - **Linux/Mac**: `python3 --version`.
 5. Verificar `claude` CLI en PATH: `claude --version`.
 6. Reiniciar la sesión `claude` para que cargue el hook.
 
-> Tras instalar, el hook arranca en modo **`off`** (inerte): no actúa hasta que lo enciendas con `/preprocess full` (o `fast`), o cambies `"mode"` en `preprocess.json`. Deliberado — copiar la instalación no altera el comportamiento de tus prompts hasta que tú lo decidas.
+> Tras instalar, el hook arranca en modo **`off`** (inerte): no actúa hasta que lo enciendas con `/preprocess full` (o `fast`), o cambies `preprocess.mode` en `config.json`. Deliberado — copiar la instalación no altera el comportamiento de tus prompts hasta que tú lo decidas.
 
-Snippet PowerShell para Windows (copy/paste; crea `preprocess.json`):
-
-```powershell
-@'
-{"mode": "off", "model": "claude-haiku-4-5-20251001", "prefix": "$$"}
-'@ | Out-File -Encoding utf8 "$env:USERPROFILE\.claude\preprocess.json"
-```
-
-Snippet bash (Linux/Mac):
+Snippet para fijar el modo persistente (Git Bash, Linux o Mac; `NEB_SRC` es la raíz del plugin o tu clon de `NEB_HOME`). Escribe solo `preprocess.mode` en `config.json`, de forma atómica, sin tocar las demás llaves; si el archivo no existe, lo crea con lo que dijeran los JSON sueltos de antes de 8.0.0. El valor va como JSON, con sus comillas:
 
 ```bash
-echo '{"mode": "off", "model": "claude-haiku-4-5-20251001", "prefix": "$$"}' > ~/.claude/preprocess.json
+py "$NEB_SRC/hooks/lib/neb_paths.py" set preprocess.mode '"fast"'   # o python / python3
+py "$NEB_SRC/hooks/lib/neb_paths.py" config preprocess              # verifica la sección efectiva
 ```
+
+En Windows PowerShell 5.1 las comillas internas se pierden al pasar el argumento: escríbelas como `'\"fast\"'`.
 
 ## 8. Heurística de skip
 

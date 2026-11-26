@@ -14,8 +14,10 @@ Cubre contra DBs TEMPORALES (tempfile) + compas.md temporal (home= bajo el tmp):
   • señal intrínseca: un pending que BLOQUEA a otro sube de prioridad (T9)
   • parse_compas defensivo + traducción band_to_db (extra)
   • lote: triage parsea compas.md UNA vez por llamada y sus consultas no crecen con los pendientes (extra)
+  • 8.0.0: compas.md en la carpeta de datos; sin él, el residuo ~/.claude/compas.md pondera (extra)
 
-Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db ni ~/.claude/compas.md.
+Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db, ~/.claude/compas.md ni la carpeta de
+datos real (_entorno quita NEB_DATA del entorno).
 """
 
 import os
@@ -29,6 +31,8 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LIB  = os.path.join(HERE, "..", "lib")
 sys.path.insert(0, LIB)
 
+import _entorno  # noqa: E402,F401 — quita NEB_DATA del entorno antes de cualquier ruta de datos
+import neb_paths  # noqa: E402
 import pendings as P  # noqa: E402
 
 SCHEMA = os.path.join(HERE, "..", "logbook-schema.sql")
@@ -141,7 +145,8 @@ class RecommendTests(unittest.TestCase):
         out = P.infer_objectives(self.con, home=self.home)
         self.assertTrue(out["proposed"])                      # propone algo
         self.assertIn("alpha", [t for o in out["proposed"] for t in o["topics"]])
-        # y NO escribió compas.md por su cuenta:
+        # y NO escribió compas.md por su cuenta (ni en la carpeta de datos ni en la ruta vieja):
+        self.assertFalse(os.path.isfile(neb_paths.compas_path(self.home)))
         self.assertFalse(os.path.isfile(os.path.join(self.home, ".claude", "compas.md")))
 
     # T7 — sentinel sin-clasificar -> source unclassified, banda baja, score 0
@@ -169,6 +174,15 @@ class RecommendTests(unittest.TestCase):
         base = P.recommend_priority(self.con, 9, home=self.home)["score"]
         blk  = P.recommend_priority(self.con, 8, home=self.home)["score"]
         self.assertGreater(blk, base)
+
+    # extra — 8.0.0: sin <datos>/compas.md, el residuo ~/.claude/compas.md sigue ponderando
+    def test_legacy_compas_still_weights_until_migrated(self):
+        _seed_pending(self.con, pid=10, status="open", topic="alpha")
+        with open(os.path.join(self.home, ".claude", "compas.md"), "w", encoding="utf-8") as fh:
+            fh.write("---\nversion: 3\n---\n\n## Objetivo: Tienda\n- **Peso:** 90\n- **Temas:** alpha\n")
+        r = P.recommend_priority(self.con, 10, home=self.home)
+        self.assertEqual(r["source"], "compas")
+        self.assertEqual(r["band"], "alta")
 
     # extra — parse_compas defensivo: ausente -> exists False
     def test_parse_compas_absent(self):

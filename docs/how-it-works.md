@@ -68,6 +68,11 @@ Preferencias de comunicación, atajos y reglas individuales del desarrollador.
 Contrato: un override puede *estrechar o agregar* sobre el baseline, pero
 **nunca relajarlo**.
 
+El idioma de la conversación y sus perillas principales (variedad, registro,
+tratamiento, voseo, extranjerismos) se declaran aparte, en la sección `language`
+de tu `config.json` ([`tooling/config.md`](../tooling/config.md) § "Sección language"):
+sustituyen el valor por omisión del equipo y ganan sobre lo que diga tu `personal.md`.
+
 ### Overrides de equipo (dentro del profile)
 
 Convenciones de commit, estándares de código, definición de done y reglas
@@ -102,6 +107,12 @@ Dos variables fijan los paths del entorno: `NEB_HOME` (el checkout de neb; con s
 el plugin no se establece, porque el plugin resuelve su propio directorio) y `NEB_WORKSPACE` (la raíz del espacio de trabajo, donde
 viven el overlay y `personal/`). Cómo establecerlas: [user-guide](user-guide.md) § "Configurar el entorno".
 
+Lo que Neb guarda en tu máquina —pendientes, bitácora, la brújula `compas.md`, planes
+aprobados en caída y su configuración (`config.json`)— vive en su **carpeta de datos**,
+`~/.neb` (o la que fijes con `NEB_DATA`), aparte del dir de configuración de Claude Code:
+así no depende de Claude Code y se puede llevar a otra herramienta. Detalle en
+[`tooling/config.md`](../tooling/config.md).
+
 ---
 
 ## Artefactos del flujo
@@ -110,8 +121,8 @@ viven el overlay y `personal/`). Cómo establecerlas: [user-guide](user-guide.md
 |---|---|---|
 | Change MD (registro del requerimiento) | `<proyecto>/changes/<fecha>-<nombre>.md` | Sí, en el repo del proyecto |
 | Plan aprobado (media/alta) | `<proyecto>/changes/plans/<fecha>-<nombre>.md` | Sí, en el repo del proyecto, junto a su Change MD |
-| Pendientes | `~/.claude/neb.db` | No (seguimiento cross-sesión) |
-| Bitácora de relevo | `~/.claude/neb.db` (local) | No (trabajos a medias, para retomarlos en esta máquina) |
+| Pendientes | `neb.db`, en la carpeta de datos de Neb (`~/.neb`) | No (seguimiento cross-sesión) |
+| Bitácora de relevo | `neb.db`, en la carpeta de datos (local) | No (trabajos a medias, para retomarlos en esta máquina) |
 
 Cada registro del requerimiento documenta: contexto y objetivo, decisiones tomadas,
 plan de pruebas (en media/alta, solo su resultado: lo define el plan aprobado),

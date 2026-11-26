@@ -6,7 +6,9 @@
 |---|---|---|
 | Investigación sobre la metodología | `methodology/research/<YYYY-MM-DD>-<slug>.md` | Sí — repo `methodology` |
 | Investigación sobre un proyecto específico | `<proyecto>/research/<YYYY-MM-DD>-<slug>.md` | Sí — repo del proyecto |
-| Investigación cross-proyecto sin dueño claro | `~/.claude/research/<timestamp>-<slug>.md` | No — local del dev |
+| Investigación cross-proyecto sin dueño claro | `<datos>/research/<timestamp>-<slug>.md` | No — local del dev |
+
+`<datos>` es la carpeta de datos de Neb: `NEB_DATA` si es una ruta absoluta; si no, `~/.neb`. Ruta exacta: `neb_paths.py path research` (`hooks/lib/`). Hasta 7.x era `~/.claude/research/`; la migración 8.0.0 lo muda.
 
 Naming: `<YYYY-MM-DD>-<slug>.md` donde slug es kebab-case del tema central (ej. `2026-05-17-multi-llm-gratuito`).
 
@@ -32,4 +34,4 @@ Criterio de cierre: research `vigente` una vez verificada la calidad (gate de Fa
 
 ## Distribución al equipo
 
-`git push` al remote del repo correspondiente. Otros devs reciben el research vía `git pull` normal. Si el research es cross-proyecto (`~/.claude/research/`), compartir manualmente el archivo si el equipo lo necesita.
+`git push` al remote del repo correspondiente. Otros devs reciben el research vía `git pull` normal. Si el research es cross-proyecto (`<datos>/research/`), compartir manualmente el archivo si el equipo lo necesita.

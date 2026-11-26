@@ -10,18 +10,18 @@ TEMPORALES:
   • plan (dry-run): conteos de pendings/topics/links sin tocar DB.
   • --apply: crea pending/topic/pending_link; idempotente (re-correr no duplica).
   • relación 'depends' cuando el sub-ítem es prerequisito/bloqueante; 'related' si no.
-  • --apply con la base sin migrar: reenvía el detalle, la migración guiada y el comando de _db_shared y no
-    crea neb.db.
+  • --apply con la base sin mudar (8.0.0: la de 7.x sigue en ~/.claude/neb.db y la carpeta de datos no tiene
+    una usable): reenvía el detalle y la acción de _db_shared (UnmovedDb) y no crea <datos>/neb.db ni la carpeta
+    de datos; con --db a otra ruta, la guarda no aplica.
 
 Ejemplos GENÉRICOS (alpha/beta), NUNCA clientes reales. Framework: unittest (stdlib).
-NUNCA toca ~/.claude/*.db ni ~/.claude/pendings.md.
+NUNCA toca ~/.claude, ~/.neb ni ~/.claude/pendings.md reales: homes temporales, sin NEB_DATA (_entorno).
 """
 
 import io
 import os
 import sys
 import importlib.util
-import shutil
 import tempfile
 import unittest
 from unittest import mock
@@ -30,6 +30,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LIB = os.path.join(HERE, "..", "lib")
 sys.path.insert(0, LIB)
 
+import _entorno            # noqa: E402,F401 — quita NEB_DATA: la base de prueba es la del home temporal
 import _db_shared          # noqa: E402
 import pendings            # noqa: E402
 
@@ -66,9 +67,12 @@ SAMPLE_MD = """\
 
 
 def _fresh_db():
+    """neb.db por omisión de un home temporal (<home>/.neb/neb.db), con su carpeta de datos ya creada."""
     d = tempfile.mkdtemp(prefix="neb-migtest-")
     os.makedirs(os.path.join(d, ".claude"), exist_ok=True)
-    return _db_shared.resolve_db_path(d)
+    db = _db_shared.resolve_db_path(d)
+    os.makedirs(os.path.dirname(db), exist_ok=True)
+    return db
 
 
 def _write_sample(text=SAMPLE_MD):
@@ -223,47 +227,65 @@ class TestDryRunNoWrite(unittest.TestCase):
         os.remove(src)
 
 
-class TestBaseSinMigrar(unittest.TestCase):
+class TestBaseSinMudar(unittest.TestCase):
+    """La guarda de la base sin mudar (8.0.0) aplica cuando --db es la base por omisión del home en curso
+    (HOME/USERPROFILE del proceso, que es lo que lee el script)."""
 
-    def test_apply_reenvia_motivo_y_comando_sin_crear_neb_db(self):
-        home = tempfile.mkdtemp(prefix="neb-migtest-")
-        self.addCleanup(shutil.rmtree, home, True)
-        base = os.path.join(home, ".claude")
-        os.makedirs(base)
-        with open(os.path.join(base, "neb-logbook.db"), "wb") as fh:
-            fh.write(b"x" * 64)
-        db = _db_shared.resolve_db_path(home)
-        src = _write_sample()
-        self.addCleanup(os.remove, src)
-        expected = _db_shared.unmigrated_legacy(home)
-        self.assertIsNotNone(expected)
-        with mock.patch("sys.stderr", new_callable=io.StringIO) as err, \
+    def setUp(self):
+        self.home = _entorno.home_temporal(self, claude=True)
+        self.legacy = _db_shared.legacy_db_path(self.home)
+        _db_shared._connect(self.legacy, SCHEMA).close()
+        self.db = _db_shared.resolve_db_path(self.home)
+        self.src = _write_sample()
+        self.addCleanup(os.remove, self.src)
+
+    def test_critico_apply_reenvia_detalle_y_accion_sin_crear_la_base_nueva(self):
+        with _entorno.home_en_proceso(self.home):
+            expected = _db_shared.unmoved_legacy(self.home)
+            self.assertIsNotNone(expected)
+            self.assertEqual(expected.motivo, "base-sin-mudar")
+            with mock.patch("sys.stderr", new_callable=io.StringIO) as err, \
+                    mock.patch("sys.stdout", new_callable=io.StringIO):
+                plan, counts = mig.run(self.src, self.db, do_apply=True)
+            self.assertIsNotNone(plan)
+            self.assertIsNone(counts)
+            self.assertIn(f"{expected.detalle} Cómo: {expected.accion}.", err.getvalue())
+            self.assertFalse(os.path.exists(os.path.dirname(self.db)), "no crea la carpeta de datos")
+            # Por main (con y sin --db explícito), el aborto sale con rc 1: quien encadena con && no lo lee
+            # como aplicado.
+            for extra in (["--db", self.db], []):
+                with mock.patch("sys.stderr", new_callable=io.StringIO), \
+                        mock.patch("sys.stdout", new_callable=io.StringIO):
+                    rc = mig.main(["--from", self.src, "--apply"] + extra)
+                self.assertEqual(rc, 1, extra)
+        self.assertFalse(os.path.exists(self.db))
+        con = _db_shared._connect(self.legacy, SCHEMA)
+        try:
+            self.assertEqual(con.execute("SELECT count(*) FROM pending").fetchone()[0], 0, "la vieja no se toca")
+        finally:
+            con.close()
+
+    def test_db_explicito_en_otra_ruta_no_pasa_por_la_guarda(self):
+        otra = os.path.join(self.home, "otra", "neb.db")
+        os.makedirs(os.path.dirname(otra))
+        with _entorno.home_en_proceso(self.home), \
+                mock.patch("sys.stderr", new_callable=io.StringIO), \
                 mock.patch("sys.stdout", new_callable=io.StringIO):
-            plan, counts = mig.run(src, db, do_apply=True)
-        self.assertIsNotNone(plan)
-        self.assertIsNone(counts)
-        self.assertIn(f"{expected.detalle} Cómo: {expected.accion}. A mano: {expected.comando}", err.getvalue())
-        self.assertFalse(os.path.exists(db))
-        # Por main, el aborto sale con rc 1 (quien encadena con && no lo lee como aplicado).
-        with mock.patch("sys.stderr", new_callable=io.StringIO), \
-                mock.patch("sys.stdout", new_callable=io.StringIO):
-            rc = mig.main(["--from", src, "--db", db, "--apply"])
-        self.assertEqual(rc, 1)
-        self.assertFalse(os.path.exists(db))
+            plan, counts = mig.run(self.src, otra, do_apply=True)
+        self.assertIsNotNone(counts)
+        self.assertEqual(counts["pendings_created"], 4)
+        self.assertFalse(os.path.exists(self.db))
 
     def test_main_sale_con_0_en_dry_run_y_en_apply_exitoso(self):
-        home = tempfile.mkdtemp(prefix="neb-migtest-")
-        self.addCleanup(shutil.rmtree, home, True)
-        os.makedirs(os.path.join(home, ".claude"))
+        home = _entorno.home_temporal(self, claude=True)
         db = _db_shared.resolve_db_path(home)
-        src = _write_sample()
-        self.addCleanup(os.remove, src)
-        with mock.patch("sys.stderr", new_callable=io.StringIO), \
+        with _entorno.home_en_proceso(home), \
+                mock.patch("sys.stderr", new_callable=io.StringIO), \
                 mock.patch("sys.stdout", new_callable=io.StringIO):
-            self.assertEqual(mig.main(["--from", src, "--db", db]), 0)
+            self.assertEqual(mig.main(["--from", self.src]), 0)
             self.assertFalse(os.path.exists(db))
-            self.assertEqual(mig.main(["--from", src, "--db", db, "--apply"]), 0)
-        self.assertTrue(os.path.exists(db))
+            self.assertEqual(mig.main(["--from", self.src, "--apply"]), 0)
+        self.assertTrue(os.path.exists(db), "una máquina sin base: la crea en la carpeta de datos")
 
 
 if __name__ == "__main__":

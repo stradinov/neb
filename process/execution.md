@@ -17,7 +17,7 @@ Los estándares de código (baseline: sin comentarios salvo WHY no obvio, saniti
 
 - Solo acciones read-only y edición del archivo de plan.
 - Cierra con `ExitPlanMode` (aprobación del usuario).
-- Un plan aprobado en plan mode lo deja el hook `save-approved-plan`, si está activado, en `~/.claude/approved-plans/` (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)); al crear el Change MD, Claude lo mueve a `changes/plans/` del repo. Si tras `ExitPlanMode` no hay un archivo nuevo ahí, Claude lo escribe directo en el repo con `Write`, igual que los aprobados conversacionalmente (media/alta) (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
+- Un plan aprobado en plan mode lo deja el hook `save-approved-plan`, si está activado, en `<datos>/approved-plans/`, el lugar de caída de [workflow/approved-plans.md](../workflow/approved-plans.md) § "Path" (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)); al crear el Change MD, Claude lo mueve a `changes/plans/` del repo. Si tras `ExitPlanMode` no hay un archivo nuevo ahí, Claude lo escribe directo en el repo con `Write`, igual que los aprobados conversacionalmente (media/alta) (ver [workflow/approved-plans.md](../workflow/approved-plans.md)).
 
 Usar plan mode cuando: el cambio toca múltiples archivos, hay decisiones arquitectónicas, o conviene ver el plan antes de gastar tiempo en código.
 

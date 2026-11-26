@@ -21,6 +21,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -79,7 +80,7 @@ class TestCliConNebHomeEnCache(unittest.TestCase):
         self.home = tempfile.mkdtemp(prefix="neb-test-")
         self.addCleanup(shutil.rmtree, self.home, True)
         os.makedirs(os.path.join(self.home, ".claude"))
-        env = {k: v for k, v in os.environ.items() if k not in ("NEB_HOME", "CLAUDE_PLUGIN_ROOT")}
+        env = {k: v for k, v in os.environ.items() if k not in ("NEB_HOME", "CLAUDE_PLUGIN_ROOT", "NEB_DATA")}
         env.update(HOME=self.home, USERPROFILE=self.home,
                    NEB_HOME=os.path.join(self.home, ".claude", "plugins", "cache", "acme", "neb", "6.0.0"))
         patcher = mock.patch.dict(os.environ, env, clear=True)
@@ -109,7 +110,7 @@ class TestArranque(unittest.TestCase):
         self.addCleanup(shutil.rmtree, home, True)
         e = {k: v for k, v in os.environ.items()
              if k not in ("NEB_HOME", "CLAUDE_PLUGIN_ROOT", "NEB_HOOKS", "NEB_PROJECT_HOOKS", "NEB_WORKSPACE",
-                          "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION", "CLAUDE_PROJECT_DIR")}
+                          "NEB_INTERNAL_SUBSESSION", "CLAUDE_PREPROCESS_RECURSION", "CLAUDE_PROJECT_DIR", "NEB_DATA")}
         e.update(HOME=home, USERPROFILE=home)
         e.update(env)
         r = subprocess.run([sys.executable, os.path.join(NEB, "bootstrap", "neb-bootstrap-context.py")],
@@ -175,7 +176,7 @@ class TestSetupWorkspace(unittest.TestCase):
     def test_dry_run_no_toma_el_neb_home_del_cache(self):
         home = tempfile.mkdtemp(prefix="neb-test-")
         self.addCleanup(shutil.rmtree, home, True)
-        env = {k: v for k, v in os.environ.items() if k not in ("NEB_HOME", "CLAUDE_PLUGIN_ROOT", "NEB_WORKSPACE")}
+        env = {k: v for k, v in os.environ.items() if k not in ("NEB_HOME", "CLAUDE_PLUGIN_ROOT", "NEB_WORKSPACE", "NEB_DATA")}
         env.update(HOME=home, USERPROFILE=home, NEB_HOME=CACHE_FWD)
         r = subprocess.run([BASH, os.path.join(NEB, "bootstrap", "setup-workspace.sh"), "--dry-run",
                             "--base", os.path.join(home, "ws")],

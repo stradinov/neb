@@ -9,9 +9,10 @@ Cubre el CRUD + ciclo de vida de pendings.py contra DBs TEMPORALES (tempfile):
   resolve_session_context para pending type='session'
   on_work_archived (auto-obsolescencia reversible vía SAVEPOINT)
   archive / on_work_archived borran las sugerencias (curated=0) del pendiente que vuelve obsoleto
-  base sin migrar: cada verbo del CLI que abre la base responde el JSON de base-sin-migrar
+  base sin mudar (8.0.0): con la base todavía en ~/.claude, cada verbo del CLI que abre la base responde el
+    JSON de base-sin-mudar y no crea <datos>/neb.db
 
-Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db.
+Framework: unittest (stdlib), NO pytest. NUNCA toca ~/.claude/*.db ni ~/.neb reales (_entorno quita NEB_DATA).
 """
 
 import io
@@ -27,6 +28,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 LIB  = os.path.join(HERE, "..", "lib")
 sys.path.insert(0, LIB)
 
+import _entorno  # quita NEB_DATA: ninguna base de prueba cae en la carpeta de datos real
 import _db_shared
 import pendings
 
@@ -35,8 +37,9 @@ SCHEMA = os.path.join(HERE, "..", "logbook-schema.sql")
 
 def _fresh_con():
     d = tempfile.mkdtemp(prefix="neb-test-")
-    os.makedirs(os.path.join(d, ".claude"), exist_ok=True)
-    return _db_shared._connect(_db_shared.resolve_db_path(d), SCHEMA)
+    db = _db_shared.resolve_db_path(d)                   # <d>/.neb/neb.db (8.0.0)
+    os.makedirs(os.path.dirname(db), exist_ok=True)
+    return _db_shared._connect(db, SCHEMA)
 
 
 class TestPendingsCrud(unittest.TestCase):
@@ -205,8 +208,8 @@ class TestPendingsCrud(unittest.TestCase):
         con = _fresh_con()
         con.close()  # cerrar el de schema; abrir uno limpio para el wrapper
         d = tempfile.mkdtemp(prefix="neb-test-")
-        os.makedirs(os.path.join(d, ".claude"), exist_ok=True)
         db = _db_shared.resolve_db_path(d)
+        os.makedirs(os.path.dirname(db), exist_ok=True)
         c = _db_shared._connect(db, SCHEMA)
         pid = pendings._with_write_tx(c, lambda x: pendings.create(x, "task", "via wrapper"))
         c.close()
@@ -272,10 +275,10 @@ class TestResolvePendingRef(unittest.TestCase):
         con.close()
 
 
-class TestBaseSinMigrar(unittest.TestCase):
-    """HOME y USERPROFILE temporales con solo la bitácora de nombre anterior (poblada): cada verbo del CLI
-    que abre la base responde el JSON de base-sin-migrar con la migración guiada y el comando del migrador,
-    y no crea neb.db.
+class TestBaseSinMudar(unittest.TestCase):
+    """HOME y USERPROFILE temporales con la base de 7.x todavía en ~/.claude (poblada) y nada en la carpeta de
+    datos: cada verbo del CLI que abre la base responde el JSON de base-sin-mudar (la migración guiada que la
+    muda) y no crea <datos>/neb.db ni toca la vieja.
     write-compas no abre la base (escribe compas.md), así que no entra."""
 
     # Argumentos válidos para que cada verbo llegue a abrir la base.
@@ -286,35 +289,34 @@ class TestBaseSinMigrar(unittest.TestCase):
     )
 
     def setUp(self):
-        self.home = tempfile.mkdtemp(prefix="neb-test-sinmigrar-")
+        self.home = _entorno.home_temporal(self, claude=True)
         self.base = os.path.join(self.home, ".claude")
-        os.makedirs(self.base)
-        self.legacy = os.path.join(self.base, _db_shared.LEGACY_DB_NAME)
+        self.legacy = _db_shared.legacy_db_path(self.home)
         _db_shared._connect(self.legacy, SCHEMA).close()
         self.nuevo = _db_shared.resolve_db_path(self.home)
 
     def _cli(self, argv):
         out = io.StringIO()
-        with mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home}), \
+        with _entorno.home_en_proceso(self.home), \
                 mock.patch.object(sys, "stdout", out), mock.patch.object(sys, "stderr", io.StringIO()):
             pendings.cli_main(list(argv))
         return json.loads(out.getvalue())
 
     def _esperado(self):
-        # Con el mismo HOME que ve el CLI: así el comando no lleva --home (ese home es el de ~).
-        with mock.patch.dict(os.environ, {"HOME": self.home, "USERPROFILE": self.home}):
-            err = _db_shared.unmigrated_legacy(self.home)
+        with _entorno.home_en_proceso(self.home):
+            err = _db_shared.unmoved_legacy(self.home)
         self.assertIsNotNone(err)
-        self.assertIn("migrate-neb-db.py", err.comando)
         self.assertIn(self.legacy, err.detalle)
-        self.assertEqual(list(err.to_dict()), ["ok", "motivo", "detalle", "accion", "comando"])
+        self.assertIn("/neb:migrate", err.accion)
+        self.assertEqual(err.to_dict()["motivo"], "base-sin-mudar")
+        self.assertEqual(list(err.to_dict()), ["ok", "motivo", "detalle", "accion"])
         return err.to_dict()
 
     def _huella(self, path):
         with open(path, "rb") as fh:
             return fh.read(), os.path.getmtime(path)
 
-    def test_cada_verbo_responde_base_sin_migrar_sin_crear_neb_db(self):
+    def test_cada_verbo_responde_base_sin_mudar_sin_crear_neb_db(self):
         esperado = self._esperado()
         antes = self._huella(self.legacy)
         for argv in self.VERBOS:
@@ -324,14 +326,15 @@ class TestBaseSinMigrar(unittest.TestCase):
         self.assertEqual(self._huella(self.legacy), antes)
 
     def test_neb_db_no_vacio_sin_work_pide_moverlo_y_no_se_toca(self):
+        os.makedirs(os.path.dirname(self.nuevo))
         c = sqlite3.connect(self.nuevo)
         c.execute("CREATE TABLE otra (x)")
         c.commit()
         c.close()
         antes = self._huella(self.nuevo)
         esperado = self._esperado()
-        self.assertIn(f"mueve fuera de {self.base} el neb.db que hay ahí ({os.path.getsize(self.nuevo)} bytes)",
-                      esperado["detalle"])
+        self.assertIn(f"mueve fuera de {os.path.dirname(self.nuevo)} el neb.db que hay ahí "
+                      f"({os.path.getsize(self.nuevo)} bytes)", esperado["detalle"])
         for argv in self.VERBOS:
             with self.subTest(verbo=argv[0]):
                 self.assertEqual(self._cli(argv), esperado)

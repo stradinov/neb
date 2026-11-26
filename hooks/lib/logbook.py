@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-logbook.py — bitácora de relevo de neb: base local de trabajos a medias (~/.claude/neb.db), para retomarlos.
+logbook.py — bitácora de relevo de neb: base local de trabajos a medias (<datos>/neb.db: la carpeta de datos de
+neb_paths, ~/.neb o NEB_DATA), para retomarlos.
 
 Dos modos (dispatch en __main__):
   • captura — lo dispara el hook `logbook-sync` en Stop/SessionEnd/PreCompact: registra estado +
@@ -10,12 +11,12 @@ Dos modos (dispatch en __main__):
       guardarlo. Entra SOLO con exactamente 6 posicionales, un primer argumento que no es verbo y un
       cuarto argumento que es uno de CAPTURE_EVENTS.
   • CLI (list/show/rename/archive/link/trace/unlink) — lo invoca el comando/skill `/logbook`. `link`,
-      `trace` y `unlink` (REQ vinculado, E2) viven en req_link.py. Los verbos retirados responden un JSON
-      fijo (_RETIRED_VERBS); cualquier otro primer argumento, «subcomando desconocido».
+      `trace` y `unlink` (REQ vinculado, E2) viven en req_link.py. Cualquier otro primer argumento,
+      «subcomando desconocido».
 
-Si la base sigue con el nombre anterior a 7.0.0, la captura no crea nada y el CLI responde
-{ok: false, motivo: "base-sin-migrar", ...} con la migración guiada que la renombra (ver
-_db_shared.raise_if_unmigrated).
+Si la base sigue en ~/.claude (donde vivía hasta 7.x) y la carpeta de datos no tiene una usable, la captura no
+crea nada y el CLI responde {ok: false, motivo: "base-sin-mudar", ...} con la migración guiada que la muda
+(8.0.0:mover-base; ver _db_shared.prepare_default_db).
 Filosofía: defensivo — exit 0 siempre; errores a stderr, nunca bloquean al dev.
 
 Args posicionales del modo captura (los arma el wrapper desde el stdin JSON del hook):
@@ -28,7 +29,7 @@ import sqlite3
 import sys
 
 from _db_shared import (
-    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable, raise_if_unmigrated,
+    _connect, INITIAL_SCHEMA_PATH, DbUnavailable, prepare_default_db,
     with_write_tx, _safe_rollback,
     now_iso, posix_to_win, encode_cwd, find_active_reqs, resolve_memory_dir,
     _hostname, _git_info, _project_id,
@@ -250,45 +251,19 @@ def _first_user_prompt(jsonl_path, limit=120):
 
 
 # =========================================================================== CLI (/logbook)
-# Siempre contra la base local (~/.claude/neb.db). Salida por stdout: el wrapper del skill descarta stderr.
+# Siempre contra la base local (<datos>/neb.db). Salida por stdout: el wrapper del skill descarta stderr.
 
 CLI_CMDS = {"list", "show", "rename", "archive", "link", "trace", "unlink"}
 
 # Eventos en que hooks/hooks.json registra el hook logbook-sync: solo con uno de ellos se entra a captura.
 CAPTURE_EVENTS = {"Stop", "SessionEnd", "PreCompact"}
 
-# Verbos retirados: responden un JSON fijo y nunca caen al modo captura. Residuo de transición (sale en 8.0.0).
-_RETIRED_VERBS = {
-    "sync": {"detalle": "se retiró en neb 7.0.0 junto con el backend central: la bitácora es solo local y no hay "
-                        "nada que sincronizar."},
-    # attention: 0 evita que un SKILL.md anterior en caché muestre un diagnóstico falso.
-    "sync-status": {"detalle": "se retiró en neb 7.0.0 junto con el backend central: la bitácora es solo local y "
-                               "no hay estado de sincronización que revisar.",
-                    "attention": 0},
-    "claim": {"detalle": "se retiró en neb 7.0.0 junto con el candado entre devs; para continuar un REQ usa "
-                         "`retomar <ruta-del-Change-MD>` (## Relevo, plan aprobado y rama)."},
-    "release": {"detalle": "se retiró en neb 7.0.0 junto con el candado entre devs; para dejar un REQ a otro, deja "
-                           "su ## Relevo en el Change MD y entrega el registro por git."},
-    "forced-release": {"detalle": "se retiró en neb 7.0.0 junto con el candado entre devs; para continuar un REQ "
-                                  "usa `retomar <ruta-del-Change-MD>`."},
-    "request": {"detalle": "se retiró en neb 7.0.0 junto con el candado entre devs; para continuar un REQ usa "
-                           "`retomar <ruta-del-Change-MD>`."},
-    "search": {"detalle": "se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones. Para retomar un REQ "
-                          "usa su Change MD, su ## Relevo, el plan aprobado y la rama."},
-}
-
-
-def _retired_verb(verb):
-    out = {"ok": False, "motivo": "verbo-retirado", "verbo": verb, **_RETIRED_VERBS[verb]}
-    print(json.dumps(out, ensure_ascii=False))
-
-
 def _open_db(home_dir):
-    """Base por omisión con el esquema inicial del árbol de este módulo, con o sin NEB_HOME (6.48.0).
-    Pasa por el `_connect` de este módulo para que las pruebas que lo parchean sigan vigilando la captura.
-    Lanza UnmigratedDb, antes de crear nada, si la base sigue sin migrar; puede lanzar DbUnavailable."""
-    raise_if_unmigrated(home_dir)
-    return _connect(resolve_db_path(home_dir), INITIAL_SCHEMA_PATH)
+    """Base por omisión (<datos>/neb.db) con el esquema inicial del árbol de este módulo, con o sin NEB_HOME
+    (6.48.0). Pasa por el `_connect` de este módulo para que las pruebas que lo parchean sigan vigilando la
+    captura. Lanza UnmovedDb, antes de crear nada, si la base sigue en ~/.claude sin mudar; puede lanzar
+    DbUnavailable (también si la carpeta de datos es un enlace)."""
+    return _connect(prepare_default_db(home_dir), INITIAL_SCHEMA_PATH)
 
 
 def _db_for_cli():
@@ -383,9 +358,7 @@ def cli_main(argv):
             pass
     cmd, rest = argv[0], argv[1:]
     try:
-        if cmd in _RETIRED_VERBS:
-            _retired_verb(cmd)
-        elif cmd == "list":
+        if cmd == "list":
             cli_list(rest)
         elif cmd == "show":
             cli_show(rest)
@@ -413,7 +386,7 @@ def cli_main(argv):
 if __name__ == "__main__":
     try:
         args = sys.argv[1:]
-        if args and (args[0] in CLI_CMDS or args[0] in _RETIRED_VERBS):
+        if args and args[0] in CLI_CMDS:
             cli_main(args)
         elif len(args) == 6 and args[3] in CAPTURE_EVENTS:
             main()

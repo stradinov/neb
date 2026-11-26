@@ -2,17 +2,15 @@
 name: logbook
 description: >
   Cargar cuando el usuario invoca `/logbook` o pide listar o retomar trabajos a medias de la bitácora
-  de relevo, la base local `~/.claude/neb.db`: una sesión interrumpida en esta máquina, o un REQ desde
-  su Change MD (en otra máquina, o el que dejó otro dev), por git. También para vincular, trazar o
-  desvincular un REQ (repos, sesiones y commits). Si piden tomar, liberar o solicitar un trabajo, o el
-  estado de la sincronización, cargar para explicar que eso se retiró en neb 7.0.0 y ofrecer
-  `retomar <ruta-del-Change-MD>`. NO cargar para consultar o curar pendientes (eso es `pendings-review`)
-  ni para implementar el REQ activo.
+  de relevo, la base local `neb.db` de la carpeta de datos de Neb: una sesión interrumpida en esta
+  máquina, o un REQ desde su Change MD (en otra máquina, o el que dejó otro dev), por git. También para
+  vincular, trazar o desvincular un REQ (repos, sesiones y commits). NO cargar para consultar o curar
+  pendientes (eso es `pendings-review`) ni para implementar el REQ activo.
 ---
 
 # Skill: logbook (bitácora de relevo)
 
-Opera la bitácora de relevo: la base local de trabajos a medias, para retomarlos. Qué guarda y cómo se relaciona con el Change MD vive en [`../../workflow/logbook.md`](../../workflow/logbook.md); la captura, la base sin migrar y el significado de los campos de `trace`, en [`../../tooling/logbook.md`](../../tooling/logbook.md). Este skill **ejecuta** las operaciones; no repite esos lineamientos.
+Opera la bitácora de relevo: la base local de trabajos a medias, para retomarlos. Qué guarda y cómo se relaciona con el Change MD vive en [`../../workflow/logbook.md`](../../workflow/logbook.md); la captura, sus modos de fallo y el significado de los campos de `trace`, en [`../../tooling/logbook.md`](../../tooling/logbook.md). Este skill **ejecuta** las operaciones; no repite esos lineamientos.
 
 ## Resolver el módulo
 
@@ -27,8 +25,7 @@ LB() { py "$NEB_SRC/hooks/lib/logbook.py" "$@" 2>/dev/null || python "$NEB_SRC/h
 
 Antes de presentar una salida, revisa si es un objeto JSON con `"ok": false` y uno de estos `motivo`:
 
-- **`base-sin-migrar`**: la base conserva el nombre anterior a neb 7.0.0 y ningún verbo la abre hasta migrarla. Muestra al dev el `detalle` y la `accion` tal cual (la migración guiada: corre sola al iniciar la siguiente sesión, o ya con `/neb:migrate`; no pide cerrar las demás sesiones: si alguna tiene la base abierta, el cambio de nombre queda para el siguiente inicio de sesión), y el `comando` como la vía a mano (qué hacer si el migrador se niega: [`../../tooling/logbook.md`](../../tooling/logbook.md) § "Base sin migrar"). No corras el migrador ni la migración guiada sin un OK explícito del dev, y no reintentes con otro verbo: ninguno abre la base hasta migrarla. Detente ahí.
-- **`verbo-retirado`** (llega si una versión anterior del skill llamó al verbo): el verbo ya no existe. Dile al dev que se retiró, con el `detalle`, y sigue con la operación que sí aplica (por lo general, `retomar <ruta-del-Change-MD>`).
+- **`base-sin-mudar`**: la base sigue en `~/.claude`, donde la guardaba neb hasta 7.x, y ningún verbo la abre hasta mudarla a la carpeta de datos. Muestra al dev el `detalle` y la `accion` tal cual (la migración guiada: corre sola al iniciar la siguiente sesión, o ya con `/neb:migrate`; no pide cerrar las demás sesiones: si alguna tiene la base abierta, la mudanza queda para el siguiente inicio de sesión). No corras la migración guiada sin un OK explícito del dev, y no reintentes con otro verbo: ninguno abre la base hasta mudarla. Detente ahí.
 
 ## Operaciones
 
@@ -41,7 +38,6 @@ Las palabras del skill no son comandos del CLI. Usa solo los comandos de esta ta
 | `retomar <ruta-del-Change-MD>` | Ninguno: se resuelve leyendo el Change MD |
 | `vincular`, `traza`, `desvincular` | `LB link`, `LB trace`, `LB unlink` |
 | `renombrar`, `archivar` | `LB rename`, `LB archive` |
-| Tomar, liberar, solicitar, estado de la sincronización | Ninguno: se retiraron (§ "Lo que se retiró") |
 
 ### Listar (default, sin args)
 
@@ -84,7 +80,7 @@ Un argumento que es un número (con o sin `#`; quita el `#` antes de pasarlo a `
 
 ### Lo que se retiró
 
-Si el dev pide tomar, liberar o solicitar un trabajo, o el estado de la sincronización, no llames al CLI. Cuenta como tomar todo pedido de quedarse con un trabajo o apropiárselo («toma el mando del REQ 12», «quédate con ese REQ»), aunque nombre un id o un REQ: no lo trates como `retomar`. En esos casos, explícale que eso se retiró en neb 7.0.0, porque la bitácora es solo local, y ofrece `retomar <ruta-del-Change-MD>`. Un pedido de continuar, seguir o retomar un trabajo («retoma el 12», «sigue con el 12 donde lo dejé») sí es `retomar`, aunque también diga «toma». Para dejarle un REQ a otra persona, basta su `## Relevo` en el Change MD y el registro entregado por git. `search` se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones.
+`search` se retiró en neb 6.41.0: la bitácora no guarda texto de sesiones.
 
 ## Notas
 

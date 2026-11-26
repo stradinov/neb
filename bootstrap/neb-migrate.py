@@ -12,14 +12,16 @@ neb-migrate.py — estado y operación de la versión de esquema de neb.db y de 
                              (lo pasa /neb:migrate) corre además los pasos guiados que dejan con qué deshacerlos;
                              los que piden al dev corren solo con --include <versión>:<paso>; --sin-exclusivos
                              deja pendientes los exclusivos. --include y --sin-exclusivos implican --guiados.
-                             Con la base sin migrar (nombre anterior a 7.0.0) no la abre: corren antes los pasos
-                             guiados (el que le cambia el nombre) y después los de base.
+                             Con la base sin mudar (sigue en ~/.claude, donde vivía hasta 7.x) no la abre: corren
+                             antes los pasos guiados (8.0.0:mover-base la muda a la carpeta de datos) y después
+                             los de base.
   skip <id>                  guarda el «no» del dev a un paso guiado: sale de lo pendiente hasta que se pida
-                             con apply --include. Sin base, con la base sin migrar, o con una base más nueva que
+                             con apply --include. Sin base, con la base sin mudar, o con una base más nueva que
                              no tiene la tabla, se niega.
   restore <archivo> [--remigrar]
-                             vuelve la base al contenido de un respaldo de neb-backups/ (neb.pre-paso-*.db
-                             o neb.pre-restore.*.db). Antes respalda la base actual. Se niega si el código
+                             vuelve la base al contenido de un respaldo de la carpeta de respaldos (`backups/`
+                             junto a la base: neb.pre-paso-*.db o neb.pre-restore.*.db). Antes respalda la base
+                             actual. Con la base sin mudar se niega. Se niega si el código
                              que lo corre no podría operar la base restaurada, o si la siguiente conexión
                              volvería a aplicar los pasos que el respaldo no tiene (--remigrar lo permite).
                              Volver atrás: primero regresar plugin y clon a la versión anterior.
@@ -30,7 +32,9 @@ neb-migrate.py — estado y operación de la versión de esquema de neb.db y de 
                              lo aplicado, lo pendiente, el aviso de base y el encargo del menú para lo que pide al
                              dev. Sale siempre con 0.
 
-apply, skip y restore toman el mismo candado: si otra corrida lo tiene, responden migracion-en-curso.
+apply, skip, restore y al-iniciar toman el mismo candado (desde 8.0.0, doble: el de ~/.claude, que toman las
+sesiones abiertas con 7.5–7.6, y el de la carpeta de datos): si otra corrida lo tiene, responden
+migracion-en-curso. Lo toman después de crear la carpeta de datos (~/.neb o NEB_DATA).
 
 Salida 0 si la operación terminó; 1 si se negó o falló (el motivo va en la salida). Documento:
 tooling/migrations.md.
@@ -55,6 +59,7 @@ import _db_shared    # noqa: E402
 import _guided       # noqa: E402
 import _machine      # noqa: E402
 import _migrations   # noqa: E402
+import neb_paths     # noqa: E402
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 
@@ -76,9 +81,23 @@ def _existing_db(home):
         return None
 
 
-def _unmigrated(home):
-    """UnmigratedDb si la base sigue con el nombre anterior a 7.0.0, o None. No abre esa base."""
-    return _db_shared.unmigrated_legacy(home)
+def _unmoved(home):
+    """UnmovedDb si la base sigue sin mudar en ~/.claude (_db_shared.unmoved_legacy), o None. No crea nada."""
+    return _db_shared.unmoved_legacy(home)
+
+
+def _legacy_skips(home):
+    """(omitidos, error) de migration_skip en la base vieja (~/.claude/neb.db), en solo lectura: mientras la base
+    no se mude, el «no» del dev a un paso vive ahí y no se vuelve a ofrecer lo ya rechazado."""
+    con = _migrations.open_readonly(_db_shared.legacy_db_path(home))
+    if con is None:
+        return set(), None
+    try:
+        return _guided.read_skips(con), None
+    except sqlite3.Error as e:
+        return set(), str(e)
+    finally:
+        con.close()
 
 
 # --------------------------------------------------------------------------- status
@@ -88,11 +107,12 @@ def status(home):
     out = {"neb_version": _migrations.neb_version(), "schema_version_code": c, "db": None,
            "schema_version_db": None, "min_compatible_db": None, "estado": "sin-base",
            "pasos_detenidos": [], "respaldos": [], "guiados": None}
-    unmigrated = _unmigrated(home)
-    if unmigrated is not None:
-        out["estado"] = "sin-migrar"
-        out["detalle"], out["accion"] = unmigrated.detalle, unmigrated.accion
-        out["guiados"] = _guided_status(home, None, set())
+    unmoved = _unmoved(home)
+    if unmoved is not None:
+        out["estado"] = "sin-mudar"
+        out["detalle"], out["accion"] = unmoved.detalle, unmoved.accion
+        skips, skips_error = _legacy_skips(home)
+        out["guiados"] = _guided_status(home, None, skips, skips_error)
         return out
     db = _existing_db(home)
     if db is None:
@@ -143,8 +163,8 @@ def _guided_status(home, db, skips, skips_error=None):
 
 _ESTADOS = {
     "sin-base": "no hay base todavía (la crea la primera captura)",
-    "sin-migrar": "con el nombre anterior a neb 7.0.0: neb no la abre hasta que la migración guiada le cambie el "
-                  "nombre",
+    "sin-mudar": "en ~/.claude, donde la guardaba neb hasta 7.x: neb no la abre hasta que la migración guiada la "
+                 "mude a la carpeta de datos",
     "ilegible": "la base no se pudo leer",
     "al-dia": "al día",
     "atras": "atrás: la siguiente conexión aplica los pasos pendientes",
@@ -172,7 +192,7 @@ def _print_guided(g):
 def _print_status(s):
     print(f"neb {s['neb_version']} · versión de esquema del código: {s['schema_version_code']}")
     if s["db"] is None:
-        print("base: " + _ESTADOS[s["estado"] if s["estado"] == "sin-migrar" else "sin-base"])
+        print("base: " + _ESTADOS[s["estado"] if s["estado"] == "sin-mudar" else "sin-base"])
         if s.get("detalle"):
             print(f"detalle: {s['detalle']}")
             print(f"acción: {s['accion']}")
@@ -216,15 +236,15 @@ def apply(home, include=(), sin_exclusivos=False, guiados=False):
     captura, y un paso guiado puede necesitar ver la máquina sin ella). Luego, solo con guiados (lo pide
     /neb:migrate), los pasos guiados: reintentar un paso de base no corre la migración guiada.
 
-    Con la base sin migrar no la abre (abrir neb.db lo crearía vacío y escondería la base vieja): sin
-    guiados responde base-sin-migrar; con guiados corren antes los pasos guiados y, si alguno le cambió el
-    nombre, después los de base.
+    Con la base sin mudar no la abre (abrir <datos>/neb.db lo crearía vacío y escondería la base vieja): sin
+    guiados responde base-sin-mudar; con guiados corren antes los pasos guiados (con los omitidos que guarda la
+    base vieja) y, si 8.0.0:mover-base la llevó a la carpeta de datos, después los de base.
 
-    Toma el candado entre corridas (desde 7.5.0): si otra corrida lo tiene (`al-iniciar` de una sesión que
-    está iniciando, otro apply, skip o restore), responde migracion-en-curso sin tocar nada."""
+    Toma el candado entre corridas (desde 7.5.0; doble desde 8.0.0): si otra corrida lo tiene (`al-iniciar` de
+    una sesión que está iniciando, otro apply, skip o restore), responde migracion-en-curso sin tocar nada."""
     held = _take_lock(home)
     if _blocked(held):
-        return _lock_refusal(held)
+        return _lock_refusal(held, home)
     try:
         rc, out = _apply_core(home, include, sin_exclusivos, guiados)
     finally:
@@ -236,15 +256,22 @@ def apply(home, include=(), sin_exclusivos=False, guiados=False):
 def _apply_core(home, include=(), sin_exclusivos=False, guiados=False, deadline=None, window=None, retry=True):
     """Lo que hace apply, sin candado ni impresión: (código, salida). `deadline` (time.monotonic), `window`
     (ExclusiveWindow) y retry=False los usa al-iniciar: pasado `deadline` no empieza otro paso guiado ni el
-    bloque de pasos de base que va después de ellos (base sin migrar), los exclusivos reintentan dentro de
-    `window`, y un paso de base con fallo reciente guardado espera (_open_for_apply)."""
+    bloque de pasos de base que va después de ellos (base sin mudar), los exclusivos reintentan dentro de
+    `window`, y un paso de base con fallo reciente guardado espera (_open_for_apply).
+
+    Con la base sin mudar (8.0.0), el orden cambia: primero los pasos guiados (8.0.0:mover-base la muda), luego
+    los pasos de base sobre la base ya mudada y, si la mudanza ocurrió en esta corrida, una segunda pasada de los
+    guiados: los de versiones anteriores que miran la base en la carpeta de datos (7.3.0:vacuum-neb-db) o que
+    esperan un paso de base (7.4.0:compas-tema-proyecto, tras el paso 3) no se detectaban en la primera."""
     guiados = bool(guiados or include or sin_exclusivos)
     db = _db_shared.resolve_db_path(home)
     v, skips, skips_error = None, set(), None
-    unmigrated = _unmigrated(home)
-    if unmigrated is not None and not guiados:
-        return 1, unmigrated.to_dict()
-    if unmigrated is None and _existing_db(home) is not None:
+    unmoved = _unmoved(home)
+    if unmoved is not None and not guiados:
+        return 1, unmoved.to_dict()
+    if unmoved is not None:
+        skips, skips_error = _legacy_skips(home)
+    elif _existing_db(home) is not None:
         con, err = _open_for_apply(db, retry)
         if con is None:
             return 1, err
@@ -263,20 +290,29 @@ def _apply_core(home, include=(), sin_exclusivos=False, guiados=False, deadline=
         guided["error"] = f"no se pudo leer migration_skip ({skips_error}): no corrió ningún paso guiado"
     else:
         guided = _apply_guided(home, db, skips, include, sin_exclusivos, deadline, window)
-    if (unmigrated is not None and _unmigrated(home) is None and _existing_db(home) is not None
+    if (unmoved is not None and _unmoved(home) is None and _existing_db(home) is not None
             and not _past(deadline)):
-        con, err = _open_for_apply(db, retry)    # la base ya tiene su nombre: sus pasos de base, con su respaldo
+        con, err = _open_for_apply(db, retry)    # la base ya está en su lugar: sus pasos de base, con su respaldo
         if con is None:
-            return 1, {**err, "guiados": guided}   # sin perder el reporte del cambio de nombre
+            return 1, {**err, "guiados": guided}   # sin perder el reporte de la mudanza
         try:
             v, _f = _migrations.read_version(con)
+            try:
+                skips, skips_error = _guided.read_skips(con), None
+            except sqlite3.Error as e:
+                skips_error = str(e)
         finally:
             con.close()
+        if skips_error:
+            guided["error"] = (f"no se pudo leer migration_skip de la base ya mudada ({skips_error}): la segunda "
+                               "pasada de los pasos guiados no corrió")
+        elif not _past(deadline):
+            guided = _merge_guided(guided, _apply_guided(home, db, skips, include, sin_exclusivos, deadline, window))
     s = status(home)
     c = _migrations.code_version()
     # Un paso con `espera` que no corrió (candado ocupado) no deja fila de error: ok exige también V >= C.
     # Una migración guiada que no carga tampoco es ok: sus pasos nunca correrían, en silencio.
-    ok = not s["pasos_detenidos"] and (v is None or v >= c) and s["estado"] != "sin-migrar"
+    ok = not s["pasos_detenidos"] and (v is None or v >= c) and s["estado"] != "sin-mudar"
     if guided is not None:
         ok = ok and not (guided["error"] or guided["fallos"] or guided["no_encontrados"]
                          or guided["errores_de_carga"])
@@ -288,30 +324,69 @@ def _past(deadline):
     return deadline is not None and time.monotonic() >= deadline
 
 
+def _merge_guided(first, second):
+    """El reporte de las dos pasadas de los pasos guiados (base mudada en esta corrida): lo aplicado en las dos;
+    lo pendiente, manual o con fallo, como lo ve la segunda, que detecta todo otra vez sobre la base ya mudada.
+    Un fallo de la primera que la segunda ya no reporta de ninguna forma se conserva: no se esconde."""
+    out = dict(second)
+    out["aplicados"] = first["aplicados"] + second["aplicados"]
+    seen = {r["id"] for key in ("aplicados", "pendientes", "manual", "fallos") for r in second[key]}
+    out["fallos"] = [r for r in first["fallos"] if r["id"] not in seen] + second["fallos"]
+    out["omision_sin_borrar"] = first["omision_sin_borrar"] + [k for k in second["omision_sin_borrar"]
+                                                                if k not in first["omision_sin_borrar"]]
+    out["error"] = first["error"] or second["error"]
+    return out
+
+
 # --------------------------------------------------------------------------- candado entre corridas
 
-NO_FOLDER = -2      # no existe la carpeta de la base: no hay dónde poner el candado (no se crea)
-
-
 def _take_lock(home):
-    """El descriptor del candado entre corridas; None si otra corrida lo tiene; -1 si no se pudo crear (el
-    archivo es un enlace, no se puede escribir o el sistema de archivos no admite el candado): entonces no se
-    corre nada; NO_FOLDER si no existe la carpeta de la base (no se crea). Con NO_FOLDER, al-iniciar no corre
-    pasos (los guiados de catálogo escriben fuera de esa carpeta, p. ej. settings.json en CLAUDE_CONFIG_DIR, y
-    sin candado dos sesiones que inician a la vez se pisarían); apply, skip y restore, que corre el dev a mano,
-    siguen sin candado."""
-    path = _guided.lock_path(_machine.Ctx(home))
-    if not os.path.isdir(os.path.dirname(path)):
-        return NO_FOLDER
+    """El candado entre corridas (desde 7.5.0; doble desde 8.0.0). Primero crea la carpeta de datos
+    (neb_paths.ensure_dir: sin ella la mudanza de 8.0.0 no correría sola) y toma, sin esperar, el candado viejo de
+    ~/.claude, que toman las sesiones abiertas con 7.5–7.6 al iniciar o limpiar la sesión (sin él, una de ellas
+    podría correr la compactación de 7.3.0 o reescribir compas.md mientras 8.0.0 muda los archivos), y luego el
+    de la carpeta de datos. El viejo se toma solo si el archivo ya existe: lo crea la primera corrida de 7.5 o
+    7.6, así que sin archivo no hay sesión de esas versiones que lo tome, y crearlo dejaría un residuo nuevo en
+    ~/.claude; si existe pero no se puede abrir (enlace, permiso), una sesión 7.x tampoco lo toma y se sigue sin
+    él. Devuelve (fd viejo o None, fd nuevo); None si otra corrida tiene cualquiera de los dos; -1 si no se pudo
+    crear la carpeta de datos ni el candado nuevo (es un enlace, no se puede escribir o el sistema de archivos
+    no admite el candado): entonces no se corre nada."""
+    ctx = _machine.Ctx(home)
+    path = _guided.lock_path(ctx)
     try:
-        return _guided.try_lock(path)
-    except OSError:
+        neb_paths.ensure_dir(os.path.dirname(path))
+    except (OSError, ValueError):
         return -1
+    old = None
+    legacy = _guided.legacy_lock_path(ctx)
+    if not _same_file(legacy, path) and os.path.isfile(legacy):
+        try:
+            old = _guided.try_lock(legacy, create=False)
+            if old is None:
+                return None
+        except OSError:
+            old = None                             # no se pudo abrir: tampoco lo toma una sesión 7.x
+    try:
+        new = _guided.try_lock(path)
+    except OSError:
+        new = -1
+    if new is None or new == -1:
+        if old is not None:
+            _guided.unlock(old)
+        return new
+    return (old, new)
+
+
+def _same_file(a, b):
+    return os.path.normcase(os.path.abspath(a)) == os.path.normcase(os.path.abspath(b))
 
 
 def _release(held):
-    if held is not None and held >= 0:
-        _guided.unlock(held)
+    if isinstance(held, tuple):
+        old, new = held
+        _guided.unlock(new)
+        if old is not None:
+            _guided.unlock(old)
 
 
 def _blocked(held):
@@ -319,16 +394,18 @@ def _blocked(held):
     return held is None or held == -1
 
 
-def _lock_refusal(held):
+def _lock_refusal(held, home=None):
     if held is None:
         return _refuse("migracion-en-curso",
                        "otra corrida de la migración de neb tiene el candado (una sesión que está iniciando, "
-                       "o apply, skip o restore)",
+                       "o apply, skip o restore; también una sesión abierta con neb 7.5 o 7.6)",
                        "reintenta en unos segundos; si sigue, el siguiente inicio de sesión lo corre")
+    folder = os.path.dirname(_guided.lock_path(_machine.Ctx(home or _home())))
     return _refuse("candado-no-disponible",
-                   "no se pudo tomar el candado entre corridas (.neb-migrate.lock junto a la base: es un "
-                   "enlace, no hay permiso de escritura o el sistema de archivos no admite el candado)",
-                   "revisa la carpeta de la base (~/.claude)")
+                   f"no se pudo tomar el candado entre corridas (.neb-migrate.lock en la carpeta de datos {folder}: "
+                   "la carpeta o el candado es un enlace, no se pudo crear, no hay permiso de escritura o el "
+                   "sistema de archivos no admite el candado)",
+                   "revisa la carpeta de datos de neb (NEB_DATA, si la declaraste, o ~/.neb)")
 
 
 def _guided_out():
@@ -374,7 +451,7 @@ def _apply_guided(home, db, skips, include, sin_exclusivos=False, deadline=None,
                 unskip.append(key)
     if unskip:
         con = None
-        if _unmigrated(home) is None:      # sin migrar: abrir neb.db lo crearía vacío
+        if _unmoved(home) is None and _existing_db(home) is not None:   # sin mudar: abrirla la crearía vacía
             try:
                 con = _db_shared._connect(db)
             except _db_shared.DbUnavailable:
@@ -395,7 +472,7 @@ def skip(home, key):
     """Guarda el «no» del dev a un paso guiado, con el candado entre corridas (desde 7.5.0)."""
     held = _take_lock(home)
     if _blocked(held):
-        return _lock_refusal(held)
+        return _lock_refusal(held, home)
     try:
         return _skip(home, key)
     finally:
@@ -407,11 +484,11 @@ def _skip(home, key):
     if _guided.find(migrations, key)[1] is None:
         return _refuse("paso-desconocido", f"no hay un paso guiado {key}",
                        "usa un id <versión>:<paso> de `neb-migrate.py status`")
-    unmigrated = _unmigrated(home)
-    if unmigrated is not None:                     # abrir neb.db lo crearía vacío y escondería la base vieja
-        return _refuse("base-sin-migrar", unmigrated.detalle,
-                       "el paso sigue pendiente; el «no» se podrá guardar cuando la migración guiada le cambie "
-                       "el nombre a la base")
+    unmoved = _unmoved(home)
+    if unmoved is not None:                        # abrir <datos>/neb.db lo crearía vacío y escondería la vieja
+        return _refuse("base-sin-mudar", unmoved.detalle,
+                       "el paso sigue pendiente; el «no» se podrá guardar cuando la migración guiada mude la base "
+                       "a la carpeta de datos (el siguiente inicio de sesión o /neb:migrate)")
     if _existing_db(home) is None:                 # como apply: sin base no la crea
         return _refuse("sin-base", "no hay base donde guardar el «no»",
                        "el paso sigue pendiente; se podrá omitir cuando la primera captura cree la base")
@@ -465,7 +542,7 @@ def restore(home, archivo, remigrar=False):
     """Vuelve la base al contenido de un respaldo, con el candado entre corridas (desde 7.5.0)."""
     held = _take_lock(home)
     if _blocked(held):
-        return _lock_refusal(held)
+        return _lock_refusal(held, home)
     try:
         return _restore(home, archivo, remigrar)
     finally:
@@ -473,18 +550,24 @@ def restore(home, archivo, remigrar=False):
 
 
 def _restore(home, archivo, remigrar=False):
+    unmoved = _unmoved(home)
+    if unmoved is not None:                        # restaurar crearía <datos>/neb.db y escondería la base vieja
+        return _refuse("base-sin-mudar", unmoved.detalle,
+                       "no se restauró nada: muda primero la base con /neb:migrate (o el siguiente inicio de "
+                       "sesión) y vuelve a correr restore")
     db = _db_shared.resolve_db_path(home)
     folder = _migrations.backup_dir(db)
     name = os.path.basename(archivo)
     m = _BACKUP_NAME_RE.match(name)
     if not m:
-        return _refuse("respaldo-no-valido", f"{name} no es un respaldo de neb-backups/",
+        return _refuse("respaldo-no-valido", f"{name} no es un respaldo de {folder}",
                        "usa un neb.pre-paso-*.db o neb.pre-restore.*.db de `neb-migrate.py status`")
     if not os.path.isfile(archivo) or _is_link(archivo) or _is_link(folder):
         return _refuse("respaldo-no-valido", "el archivo no existe o hay un enlace en la ruta",
                        "usa la ruta que muestra `neb-migrate.py status`")
-    # neb-backups/ y el archivo no pueden ser enlace (arriba); un enlace en una carpeta superior (.claude
-    # movido con junction, unidad subst) es del dev y no impide restaurar: se comparan rutas reales.
+    # La carpeta de respaldos y el archivo no pueden ser enlace (arriba); un enlace en una carpeta superior (la
+    # carpeta de datos movida con junction, unidad subst) es del dev y no impide restaurar: se comparan rutas
+    # reales.
     real_parent = os.path.normcase(os.path.realpath(os.path.dirname(os.path.abspath(archivo))))
     if real_parent != os.path.normcase(os.path.realpath(folder)):
         return _refuse("respaldo-no-valido", f"el respaldo no está directamente en {folder}",
@@ -579,8 +662,6 @@ AL_INICIAR_PASO3 = {
 }
 AL_INICIAR_PEND = ("Quedan para el siguiente inicio de sesión (o `/neb:migrate`), sin nada que el dev deba hacer "
                    "(se reintentan solos): ")
-AL_INICIAR_NO_FOLDER = ("Sin la carpeta de la base no hay dónde poner el candado y la migración no corre sola al "
-                        "iniciar sesión; `/neb:migrate` corre estos pasos: ")
 
 
 def _u16(s):
@@ -602,7 +683,7 @@ SQLITE_MIN = _migrations.DROP_COLUMN_SQLITE  # el paso 2 de 7.0.0 sobre una base
 PY_WINGET_ID = "Python.Python.3.14"          # 3.12 ya no publica instaladores (winget se quedó en 3.12.10)
 PY_WINGET_VERSION = "3.14"
 PY_WINGET_SIZE = "unos 33 MB"                # python-3.14.10-amd64.exe: 33,498,520 bytes (python.org, 2026-11-25)
-REQ_FILE = ".neb-requisitos.json"            # «No volver a ofrecer»: junto a .neb-migrate.lock
+REQ_FILE = ".neb-requisitos.json"            # «No volver a ofrecer»: junto a .neb-migrate.lock (carpeta de datos)
 
 
 def _ver(t):
@@ -643,7 +724,23 @@ def _requisitos(py=None, sqlite=None, plataforma=None, which=None, exe=None, ali
 
 
 def _req_path(home):
+    """En la carpeta de datos, junto al candado (desde 8.0.0; hasta 7.6.x, en ~/.claude: lo muda
+    8.0.0:mover-requisitos)."""
     return os.path.join(os.path.dirname(_guided.lock_path(_machine.Ctx(home))), REQ_FILE)
+
+
+def _legacy_req_path(home):
+    return os.path.join(neb_paths.legacy_dir(home), REQ_FILE)
+
+
+def _req_folder_ok(home):
+    """True si `requisitos --no-ofrecer` puede guardar ahí su registro: la carpeta de datos existe y no es un
+    enlace, o todavía no existe (no_ofrecer la crea; al-iniciar calcula la oferta antes de crearla con el
+    candado, y la primera sesión con 8.0.0 puede no tenerla aún)."""
+    folder = os.path.dirname(_req_path(home))
+    if _machine.is_link(folder):
+        return False
+    return os.path.isdir(folder) or not os.path.lexists(folder)
 
 
 def _req_key(r):
@@ -652,9 +749,14 @@ def _req_key(r):
 
 def _req_read(home):
     """La lista de «No volver a ofrecer»; [] si no existe o no se puede leer (un archivo ilegible cuenta como
-    ningún registro: la oferta sale, y `requisitos --no-ofrecer` lo reescribe)."""
+    ningún registro: la oferta sale, y `requisitos --no-ofrecer` lo reescribe). Sin el archivo de la carpeta de
+    datos lee el de ~/.claude (7.6.x), que muda 8.0.0:mover-requisitos: al-iniciar calcula la oferta antes de la
+    mudanza."""
+    path = _req_path(home)
+    if not os.path.isfile(path) and os.path.isfile(_legacy_req_path(home)):
+        path = _legacy_req_path(home)
     try:
-        with open(_req_path(home), encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             data = json.load(f)
         rows = data.get("no_ofrecer") if isinstance(data, dict) else None
         return [r for r in rows if isinstance(r, dict)] if isinstance(rows, list) else []
@@ -670,7 +772,7 @@ def _req_text(home, r=None, **kw):
         return ""
     exe = r["exe"].replace("\\", "/")
     root = ROOT.replace("\\", "/")
-    folder = os.path.isdir(os.path.dirname(_req_path(home)))
+    folder = _req_folder_ok(home)
     no_ofrecer = "%s %s requisitos --no-ofrecer" % (_sh_quote(exe), _sh_quote(root + "/bootstrap/neb-migrate.py"))
     head = ("El Python que corre los hooks de Neb (`%s`) no alcanza lo que neb pide: %s."
             % (exe, "; ".join(r["motivos"])))
@@ -718,9 +820,11 @@ def no_ofrecer(home, r=None):
         print("este Python cumple lo que neb pide: no hay oferta que callar")
         return 0
     path = _req_path(home)
-    if not os.path.isdir(os.path.dirname(path)):
-        print("no existe la carpeta de la base (%s): no hay dónde guardarlo y la oferta seguirá saliendo"
-              % os.path.dirname(path), file=sys.stderr)
+    try:
+        neb_paths.ensure_dir(os.path.dirname(path))
+    except (OSError, ValueError) as e:
+        print("no se pudo usar la carpeta de datos (%s): %s; la oferta seguirá saliendo"
+              % (os.path.dirname(path), e), file=sys.stderr)
         return 1
     if _machine.is_link(path):
         print("%s es un enlace: no se escribe a través de él y la oferta seguirá saliendo" % path, file=sys.stderr)
@@ -798,7 +902,7 @@ def al_iniciar(home):
 def _al_iniciar_run(bc, home, started, req=""):
     report, lock_note = None, None
     held = _take_lock(home)
-    if not _blocked(held) and held != NO_FOLDER:
+    if not _blocked(held):
         try:
             bc._relax_axis_step(os.path.join(ROOT, "bootstrap"), home=home)
             _rc, report = _apply_core(home, guiados=True, deadline=started + AL_INICIAR_BUDGET,
@@ -806,22 +910,23 @@ def _al_iniciar_run(bc, home, started, req=""):
         finally:
             _release(held)
     elif held == -1:
-        lock_note = ("no se pudo tomar el candado de la migración (.neb-migrate.lock junto a la base): no corrió "
-                     "ningún paso")
+        # Sin carpeta de datos usable tampoco corre /neb:migrate (candado-no-disponible): el remedio es la carpeta.
+        folder = os.path.dirname(_guided.lock_path(_machine.Ctx(home)))
+        lock_note = ("no se pudo tomar el candado de la migración (.neb-migrate.lock en la carpeta de datos %s: la "
+                     "carpeta o el candado es un enlace, o no se pudo crear): no corrió ningún paso; revisa la "
+                     "carpeta de datos (NEB_DATA, si la declaraste, o ~/.neb)" % folder)
     neb_home = os.path.abspath(bc.resolve_neb_root(ROOT))
     db_text = bc._db_notice(os.path.join(ROOT, "bootstrap"), neb_home, home=home)
     st = status(home)
     paso3 = "corrio" if report is not None else ("otra" if held is None else "no")
-    return _al_iniciar_text(report, db_text, st.get("guiados") or {}, lock_note, no_folder=held == NO_FOLDER,
-                            paso3=paso3, requisitos=req)
+    return _al_iniciar_text(report, db_text, st.get("guiados") or {}, lock_note, paso3=paso3, requisitos=req)
 
 
-def _al_iniciar_text(report, db_text, guided_status, lock_note=None, no_folder=False, paso3="corrio",
-                     requisitos=""):
+def _al_iniciar_text(report, db_text, guided_status, lock_note=None, paso3="corrio", requisitos=""):
     """El aviso de al-iniciar, o '' si no hay nada que decir. Secciones por prioridad de recorte (_fit): 1 encargo
     del menú y fallos (nunca se quitan; si no caben, se acortan sus listas y luego cada entrada de fallo); 2 aviso
-    de base; 3 lo pendiente: lo que se reintenta solo, sin pedir que se le diga al dev, o, sin la carpeta de la
-    base, lo que no corre solo y pide `/neb:migrate`; 4 lo aplicado, con el `detalle` y el respaldo de cada paso
+    de base; 3 lo pendiente: lo que se reintenta solo, sin pedir que se le diga al dev; 4 lo aplicado, con el
+    `detalle` y el respaldo de cada paso
     guiado (no los respaldos de los pasos de base: esos los dan `status` y `/neb:migrate`). La orden de decírselo
     al dev va una sola vez, al principio, si quedó alguna sección que lo pide. `requisitos` (desde 7.6.0) es el
     encargo de la oferta de instalar Python: prioridad 1 entre el encargo del menú y los fallos, todo en el texto
@@ -863,15 +968,10 @@ def _al_iniciar_text(report, db_text, guided_status, lock_note=None, no_folder=F
         sections.append({"prio": 1, "ord": 0.5, "pre": requisitos, "items": [], "post": "", "tell": False})
     if db_text:
         sections.append({"prio": 2, "pre": db_text.strip(), "items": [], "post": "", "tell": False})
-    if no_folder:
-        stuck = ["`%s` (%s)" % (r["id"], r["titulo"]) for r in rows if r["id"] not in dev_ids and not r.get("error")]
-        if stuck:
-            sections.append({"prio": 3, "pre": AL_INICIAR_NO_FOLDER, "items": stuck, "post": ".", "tell": True})
-    else:
-        pend = ["`%s` (%s): %s" % (p["id"], p["titulo"], p["detalle"])
-                for p in g.get("pendientes", []) if p["id"] not in dev_ids]
-        if pend:
-            sections.append({"prio": 3, "pre": AL_INICIAR_PEND, "items": pend, "post": ".", "tell": False})
+    pend = ["`%s` (%s): %s" % (p["id"], p["titulo"], p["detalle"])
+            for p in g.get("pendientes", []) if p["id"] not in dev_ids]
+    if pend:
+        sections.append({"prio": 3, "pre": AL_INICIAR_PEND, "items": pend, "post": ".", "tell": False})
     done = ["`%s` (%s)%s%s" % (a["id"], a["titulo"], ": %s" % a["detalle"] if a.get("detalle") else "",
                                ", respaldo `%s`" % a["respaldo"] if a.get("respaldo") else "")
             for a in g.get("aplicados", [])]

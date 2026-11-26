@@ -7,7 +7,7 @@ description: "Bitácora de relevo local: listar o retomar trabajos a medias (tu 
 
 El usuario invocó `/logbook` (opcionalmente con un subcomando). Opera la bitácora de relevo siguiendo el skill `logbook` (definición completa en `skills/logbook/SKILL.md` — no la dupliques aquí).
 
-Subcomandos: sin args o `list` (listar trabajos a medias) · `retomar <id>` o `retomar <ruta-del-Change-MD>` (desde otra máquina o sin work en la bitácora) · `renombrar <id> <nuevo-slug>` · `archivar <id>` · `vincular <ruta>` · `traza [<nombre>|<ruta>|<id>]` · `desvincular <id|nombre|ruta>`. Tomar, liberar o solicitar un trabajo y el estado de la sincronización se retiraron en neb 7.0.0; `search`, en 6.41.0. Si los piden, el skill explica el retiro y ofrece `retomar <ruta-del-Change-MD>`.
+Subcomandos: sin args o `list` (listar trabajos a medias) · `retomar <id>` o `retomar <ruta-del-Change-MD>` (desde otra máquina o sin work en la bitácora) · `renombrar <id> <nuevo-slug>` · `archivar <id>` · `vincular <ruta>` · `traza [<nombre>|<ruta>|<id>]` · `desvincular <id|nombre|ruta>`. `search` se retiró en neb 6.41.0.
 
 Resuelve el módulo (el clon de `NEB_HOME` si lo hay; si no, la raíz del plugin, que Claude Code sustituye al cargar este comando) y opera vía:
 

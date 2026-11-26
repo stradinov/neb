@@ -28,7 +28,8 @@ VACUUM_MIN_FREE_BYTES = 1024 * 1024   # menos de 1 MB libre no vale la pena
 VACUUM_MIN_FREE_RATIO = 0.25          # ni menos de una cuarta parte de las páginas
 
 # Copias que deja vacuum-neb-db: neb.pre-vacuum.<_machine._stamp()>.db. Tras un VACUUM exitoso se borran las que
-# casan con este patrón exacto, salvo la de esa corrida; ningún otro respaldo de neb-backups/ se toca.
+# casan con este patrón exacto, salvo la de esa corrida; ningún otro respaldo de la carpeta de respaldos (desde
+# 8.0.0, <datos>/backups/; hasta 7.x, neb-backups/) se toca.
 _VACUUM_BACKUP_RE = re.compile(r"^neb\.pre-vacuum\.\d{8}T\d{6}\d*Z\.db$")
 
 
@@ -71,6 +72,13 @@ _HEADER_PHRASES = (
 
 
 def _compas_path(ctx):
+    """compas.md de la carpeta de datos (desde 8.0.0) si existe; si no, el de ~/.claude: una máquina que todavía
+    no corre la mudanza de 8.0.0, o este paso pendiente cuando compas.md sigue sin mudar."""
+    data_dir = getattr(ctx, "data_dir", None)
+    if data_dir:
+        new = os.path.join(data_dir, COMPAS_NAME)
+        if os.path.isfile(new):
+            return new
     return os.path.join(ctx.claude_dir, COMPAS_NAME)
 
 
@@ -184,7 +192,7 @@ def _aplicar_compas(ctx):
         backup = os.path.join(ctx.backups_dir, f"compas.pre-7.3.0.{_stamp()}.md")
         with open(backup, "xb") as fh:          # archivo nuevo de esta corrida
             fh.write(raw)
-        tmp = os.path.join(ctx.claude_dir, f".{COMPAS_NAME}.tmp-{_stamp()}")
+        tmp = os.path.join(os.path.dirname(path), f".{COMPAS_NAME}.tmp-{_stamp()}")   # junto al original
         with open(tmp, "xb") as fh:
             fh.write(new)
             fh.flush()
@@ -320,7 +328,7 @@ def _sin_integridad(backup):
 
 
 def _existente(path):
-    """La ruta misma o su ancestro más cercano que exista (neb-backups/ puede no existir todavía)."""
+    """La ruta misma o su ancestro más cercano que exista (la carpeta de respaldos puede no existir todavía)."""
     p = os.path.abspath(path)
     while not os.path.exists(p):
         parent = os.path.dirname(p)
@@ -352,7 +360,7 @@ def _sqlite_temp_dir():
 
 def _falta_espacio(ctx, con, db_bytes):
     """Detalle si no alcanza el espacio libre para la copia y el VACUUM; None si alcanza. Por volumen se suma lo
-    que pide cada uso: la copia en neb-backups/ (1 vez la base, y la copia sigue ahí durante el VACUUM), el
+    que pide cada uso: la copia en la carpeta de respaldos (1 vez la base, y la copia sigue ahí durante el VACUUM), el
     journal del VACUUM en el volumen de la base (1 vez) y la base nueva en el volumen del temporal de SQLite
     (1 vez; nada si el temporal va en memoria). Si comparten volumen, se suman. Un volumen que no se puede medir no
     frena el paso: si el VACUUM se queda sin espacio, falla sin cambiar la base y sin dejar copia."""
@@ -387,7 +395,7 @@ def _falta_espacio(ctx, con, db_bytes):
 
 
 def _borrar_copias_anteriores(ctx, keep):
-    """Borra los neb.pre-vacuum.*.db de neb-backups/ salvo `keep` (la copia de esta corrida). Solo archivos
+    """Borra los neb.pre-vacuum.*.db de la carpeta de respaldos salvo `keep` (la copia de esta corrida). Solo archivos
     regulares que casan con el patrón exacto; ningún otro respaldo se toca. Devuelve (borradas, no borradas)."""
     keep_n = os.path.normcase(os.path.realpath(keep))
     borradas = fallidas = 0

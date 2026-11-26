@@ -2,7 +2,9 @@
 """approved_plan.py — hook `save-approved-plan` en Python (PostToolUse de ExitPlanMode).
 
 Port de `hooks/save-approved-plan.sh` para el dispatcher del plugin (`hooks/neb-hook.py`): misma ruta
-(`~/.claude/approved-plans/<ts>-<proyecto>-<slug>.md`) y mismo encabezado, sin `jq` (no viene en Git Bash).
+(`<datos>/approved-plans/<ts>-<proyecto>-<slug>.md`, con `<datos>` = la carpeta de datos de Neb que resuelve
+`neb_paths`: NEB_DATA o `~/.neb`) y mismo encabezado, sin `jq` (no viene en Git Bash). Hasta 7.x la ruta era
+`~/.claude/approved-plans/`; lo que quede ahí lo muda la migración 8.0.0.
 
 Dos diferencias deliberadas con el `.sh`:
 - El slug es ASCII completo (`ñ` → `n`, símbolos → `-`). `slugify.sh` usa `iconv //TRANSLIT`, que en Git Bash
@@ -13,6 +15,8 @@ import os
 import re
 import unicodedata
 from datetime import datetime
+
+import neb_paths
 
 
 def slugify(text, limit=50):
@@ -35,8 +39,8 @@ def save(event, home, now=None):
     project = re.sub(r'[<>:"|?*]', "-", project).strip("-") or "unknown"
     now = now or datetime.now()
 
-    dest = os.path.join(home, ".claude", "approved-plans")
-    os.makedirs(dest, exist_ok=True)
+    # ensure_dir crea con 0700 y rechaza un enlace (ValueError): el dispatcher lo deja en stderr y sale 0.
+    dest = neb_paths.ensure_dir(neb_paths.approved_plans_dir(home), root=neb_paths.data_dir(home))
     path = os.path.join(dest, "%s-%s-%s.md" % (
         now.strftime("%Y%m%d-%H%M%S"), project, slugify(plan.splitlines()[0])))
     with open(path, "w", encoding="utf-8", newline="\n") as f:

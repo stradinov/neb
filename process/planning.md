@@ -64,7 +64,7 @@ El plan de pruebas incluye: flujos a validar, criterios de éxito, orden, y qui�
 
 Cierre: **"¿De acuerdo con este plan?"**
 
-Al recibir aprobación, Claude crea o actualiza la memoria del proyecto y el MD del requerimiento. Ver [workflow/memory.md](../workflow/memory.md) y [workflow/changes.md](../workflow/changes.md). En complejidad **media/alta**, además persiste el plan literal en `changes/plans/` del repo, junto al Change MD, y lo confirma antes de la primera confirmación del entregable. Aprobado sin plan mode, lo escribe vía `Write`; en plan mode, el hook `save-approved-plan`, si está activado, lo deja primero en `~/.claude/approved-plans/` (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) y Claude lo mueve al repo; si no dejó archivo, también va por `Write` — ver [workflow/approved-plans.md](../workflow/approved-plans.md) § "Vías de persistencia".
+Al recibir aprobación, Claude crea o actualiza la memoria del proyecto y el MD del requerimiento. Ver [workflow/memory.md](../workflow/memory.md) y [workflow/changes.md](../workflow/changes.md). En complejidad **media/alta**, además persiste el plan literal en `changes/plans/` del repo, junto al Change MD, y lo confirma antes de la primera confirmación del entregable. Aprobado sin plan mode, lo escribe vía `Write`; en plan mode, el hook `save-approved-plan`, si está activado, lo deja primero en `<datos>/approved-plans/`, el lugar de caída (supuesto R2 de [`platform-assumptions.md`](../methodology/platform-assumptions.md)) y Claude lo mueve al repo; si no dejó archivo, también va por `Write` — ver [workflow/approved-plans.md](../workflow/approved-plans.md) § "Vías de persistencia".
 
 ## Propuesta de implementación
 

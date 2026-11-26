@@ -5,12 +5,14 @@ Cubre hooks/neb-hook.py y hooks/lib/approved_plan.py:
   • gate: unión de NEB_HOOKS y NEB_PROJECT_HOOKS; valores inválidos (desconocidos, con espacios)
   • main(): gate apagado, subsesión interna y stdin inválido no despachan
   • dispatch(): argumentos de cada hook (logbook-sync, notify-*, preprocess-prompt),
-    PYTHONIOENCODING en los hijos; notify-* recibe el sonido en NEB_NOTIFY_WAV (7.2.0), no se lanza sin
-    ruta y, si el resolvedor falla, corre sin la variable
-  • save-approved-plan: slug ASCII completo, ruta y encabezado, proyecto de un cwd de Windows
+    PYTHONIOENCODING en los hijos; notify-* recibe la config efectiva ya resuelta en variables NEB_NOTIFY_*
+    (sonido desde 7.2.0; enabled, min_seconds, max_chimes y scaling desde 8.0.0, leídos de config.json),
+    no se lanza sin ruta y, si el resolvedor falla, corre sin las variables
+  • save-approved-plan: slug ASCII completo, ruta (<datos>/approved-plans/) y encabezado, proyecto de un
+    cwd de Windows
   • extremo a extremo: neb-hook.py como proceso con un HOME temporal
 
-Framework: unittest (stdlib). HOME temporal; nunca toca ~/.claude.
+Framework: unittest (stdlib). HOME temporal y sin NEB_DATA (_entorno); nunca toca ~/.claude ni ~/.neb reales.
   py -m unittest discover -s hooks/tests -p test_neb_hook.py
 """
 import contextlib
@@ -28,9 +30,12 @@ from unittest import mock
 HERE = os.path.dirname(os.path.abspath(__file__))
 HOOKS_DIR = os.path.dirname(HERE)
 LIB = os.path.join(HOOKS_DIR, "lib")
+sys.path.insert(0, HERE)
 sys.path.insert(0, LIB)
 
+import _entorno  # noqa: E402 — quita NEB_DATA del entorno antes de todo
 import approved_plan  # noqa: E402
+import neb_paths  # noqa: E402
 import notify_sound  # noqa: E402 — el mismo módulo que importa dispatch() (sys.modules)
 
 SCRIPT = os.path.join(HOOKS_DIR, "neb-hook.py")
@@ -142,41 +147,77 @@ class TestDispatch(unittest.TestCase):
                     run, _, _ = self._dispatch("logbook-sync", event=event)
                     run.assert_not_called()
 
-    def _notify(self, hook, windows, resolved=("C:\\x\\neb-chime.wav", None), error=None):
-        kw = {"side_effect": error} if error else {"return_value": resolved}
-        with mock.patch.object(notify_sound, "resolve", **kw) as resolve:
+    STOP = {"enabled": True, "wav": "C:\\x\\neb-chime.wav", "reason": None, "min_seconds": 3,
+            "max_chimes": 7, "scaling": "fixed"}
+
+    def _notify(self, hook, windows, values=None, error=None):
+        kw = {"side_effect": error} if error else {"return_value": self.STOP if values is None else values}
+        with mock.patch.object(notify_sound, "effective", **kw) as effective:
             run, popen, payload = self._dispatch(hook, windows=windows)
-        return run, resolve
+        return run, effective
 
     def test_notify_windows_ps1(self):
-        run, resolve = self._notify("notify-on-stop", windows=True)
-        self.assertEqual(resolve.call_args[0][0], "notify-on-stop")
-        self.assertEqual(resolve.call_args[1]["home"], "HOME")
+        run, effective = self._notify("notify-on-stop", windows=True)
+        self.assertEqual(effective.call_args[0][0], "notify-on-stop")
+        self.assertEqual(effective.call_args[1]["home"], "HOME")
         argv = run.call_args[0][0]
         self.assertEqual(argv[:5], ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File"])
         self.assertEqual(argv[5], os.path.join(nh.HERE, "notify-on-stop.ps1"))
         self.assertEqual(run.call_args[1]["stdout"], subprocess.DEVNULL)
         self.assertEqual(run.call_args[1]["stderr"], subprocess.DEVNULL)
-        self.assertEqual(run.call_args[1]["env"]["NEB_NOTIFY_WAV"], "C:\\x\\neb-chime.wav")
         self.assertEqual(run.call_args[1]["env"]["PYTHONIOENCODING"], "utf-8")
 
+    def test_critico_notify_pasa_la_config_efectiva(self):
+        run, _ = self._notify("notify-on-stop", windows=True)
+        env = run.call_args[1]["env"]
+        self.assertEqual({k: env.get(k) for k in notify_sound.ENV_VARS.values()}, {
+            "NEB_NOTIFY_ENABLED": "true", "NEB_NOTIFY_WAV": "C:\\x\\neb-chime.wav",
+            "NEB_NOTIFY_MIN_SECONDS": "3", "NEB_NOTIFY_MAX_CHIMES": "7", "NEB_NOTIFY_SCALING": "fixed"})
+
     def test_notify_posix_sh(self):
-        run, _ = self._notify("notify-on-permission", windows=False, resolved=("/x/neb-chime.wav", "motivo"))
+        run, _ = self._notify("notify-on-permission", windows=False,
+                              values={"enabled": True, "wav": "/x/neb-chime.wav", "reason": "motivo"})
         self.assertEqual(run.call_args[0][0], ["bash", os.path.join(nh.HERE, "notify-on-permission.sh")])
         self.assertEqual(run.call_args[1]["env"]["NEB_NOTIFY_WAV"], "/x/neb-chime.wav")
+        self.assertEqual(run.call_args[1]["env"]["NEB_NOTIFY_ENABLED"], "true")
 
     def test_notify_sin_ruta_no_lanza_el_script(self):
-        for resolved in ((None, None), (None, "falta el sonido por defecto")):
-            with self.subTest(resolved=resolved):
-                run, _ = self._notify("notify-on-stop", windows=True, resolved=resolved)
+        for values in ({"enabled": False, "wav": None, "reason": None},
+                       {"enabled": True, "wav": None, "reason": "falta el sonido por defecto"}, {}):
+            with self.subTest(values=values):
+                run, _ = self._notify("notify-on-stop", windows=True, values=values)
                 run.assert_not_called()
 
-    def test_notify_falla_del_resolvedor_corre_el_script_sin_la_variable(self):
+    def test_notify_falla_del_resolvedor_corre_el_script_sin_las_variables(self):
         with mock.patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("NEB_NOTIFY_WAV", None)
+            for var in notify_sound.ENV_VARS.values():
+                os.environ.pop(var, None)
             run, _ = self._notify("notify-on-stop", windows=True, error=RuntimeError("roto"))
         run.assert_called_once()
-        self.assertNotIn("NEB_NOTIFY_WAV", run.call_args[1]["env"])
+        passed = run.call_args[1]["env"]
+        for var in notify_sound.ENV_VARS.values():
+            # Sin assertNotIn(var, env): su mensaje de falla imprimiría el entorno completo (llaves incluidas).
+            self.assertFalse(var in passed, f"{var} no debía pasar al script")
+
+    def test_critico_notify_lee_config_json_de_la_carpeta_de_datos(self):
+        # Sin mock del resolvedor: lo que llega al script sale de <home>/.neb/config.json, normalizado.
+        home = _entorno.home_temporal(self, claude=True)
+        neb_paths.set_value("notify.stop.max_chimes", 50, home=home, env={})
+        neb_paths.set_value("notify.stop.min_seconds", 30, home=home, env={})
+        with open(os.path.join(home, ".claude", "notify-on-stop.json"), "w", encoding="utf-8") as f:
+            json.dump({"enabled": False}, f)   # el suelto ya no cuenta: hay config.json
+        payload = json.dumps(self.EVENT).encode("utf-8")
+        with mock.patch.object(nh.subprocess, "run") as run, mock.patch.object(nh, "IS_WINDOWS", True):
+            nh.dispatch("notify-on-stop", payload, self.EVENT, home)
+        env = run.call_args[1]["env"]
+        self.assertEqual((env["NEB_NOTIFY_ENABLED"], env["NEB_NOTIFY_MIN_SECONDS"],
+                          env["NEB_NOTIFY_MAX_CHIMES"], env["NEB_NOTIFY_SCALING"]),
+                         ("true", "30", "20", "per-minute"))
+        self.assertEqual(env["NEB_NOTIFY_WAV"], notify_sound.DEFAULT_WAV)
+        neb_paths.set_value("notify.stop.enabled", False, home=home, env={})
+        with mock.patch.object(nh.subprocess, "run") as run:
+            nh.dispatch("notify-on-stop", payload, self.EVENT, home)
+        run.assert_not_called()
 
     def test_preprocess_hereda_stdout(self):
         run, _, payload = self._dispatch("preprocess-prompt")
@@ -209,7 +250,7 @@ class TestApprovedPlan(unittest.TestCase):
         ev = {"session_id": "sid-9", "cwd": "C:\\Users\\x\\tienda",
               "tool_input": {"plan": "# Reorden de pedidos\n\nPaso 1"}}
         path = approved_plan.save(ev, self.home, now=datetime(2026, 10, 23, 14, 5, 9))
-        self.assertEqual(path, os.path.join(self.home, ".claude", "approved-plans",
+        self.assertEqual(path, os.path.join(self.home, ".neb", "approved-plans",
                                             "20261023-140509-tienda-reorden-de-pedidos.md"))
         with open(path, encoding="utf-8") as f:
             self.assertEqual(f.read(), "# Plan aprobado — 2026-10-23 14:05:09\n\n**Proyecto:** tienda\n"
@@ -224,7 +265,7 @@ class TestApprovedPlan(unittest.TestCase):
 
     def test_save_sin_plan(self):
         self.assertIsNone(approved_plan.save({"tool_input": {}}, self.home))
-        self.assertFalse(os.path.exists(os.path.join(self.home, ".claude", "approved-plans")))
+        self.assertFalse(os.path.exists(neb_paths.approved_plans_dir(self.home)))
 
 
 class TestExtremoAExtremo(unittest.TestCase):
@@ -233,10 +274,8 @@ class TestExtremoAExtremo(unittest.TestCase):
     def setUp(self):
         self.home = tempfile.mkdtemp(prefix="neb-test-")
         self.addCleanup(shutil.rmtree, self.home, True)
-        self.env = {k: v for k, v in os.environ.items()
-                    if k not in ("NEB_HOOKS", "NEB_PROJECT_HOOKS", "NEB_HOME", "NEB_INTERNAL_SUBSESSION",
-                                 "CLAUDE_PREPROCESS_RECURSION")}
-        self.env.update(HOME=self.home, USERPROFILE=self.home)
+        self.env = _entorno.env_con_home(self.home, NEB_HOOKS=None, NEB_PROJECT_HOOKS=None, NEB_HOME=None,
+                                         NEB_INTERNAL_SUBSESSION=None, CLAUDE_PREPROCESS_RECURSION=None)
 
     def _run(self, hook, event, **env):
         e = dict(self.env, **env)
@@ -247,7 +286,8 @@ class TestExtremoAExtremo(unittest.TestCase):
         ev = {"session_id": "s", "cwd": "/w/demo", "tool_input": {"plan": "Plan de prueba"}}
         r = self._run("save-approved-plan", ev, NEB_PROJECT_HOOKS="save-approved-plan")
         self.assertEqual(r.returncode, 0)
-        files = os.listdir(os.path.join(self.home, ".claude", "approved-plans"))
+        files = os.listdir(os.path.join(self.home, ".neb", "approved-plans"))
+        self.assertFalse(os.path.exists(os.path.join(self.home, ".claude", "approved-plans")))
         self.assertEqual(len(files), 1)
         self.assertTrue(files[0].endswith("-demo-plan-de-prueba.md"))
 
@@ -255,11 +295,11 @@ class TestExtremoAExtremo(unittest.TestCase):
         ev = {"session_id": "s", "cwd": "/w/demo", "tool_input": {"plan": "Plan"}}
         r = self._run("save-approved-plan", ev, NEB_HOOKS="logbook-sync")
         self.assertEqual(r.returncode, 0)
-        self.assertFalse(os.path.exists(os.path.join(self.home, ".claude", "approved-plans")))
+        self.assertFalse(os.path.exists(os.path.join(self.home, ".neb", "approved-plans")))
 
     def test_falla_sale_0_con_rastro_en_stderr(self):
-        # ~/.claude es un archivo: approved_plan.save no puede crear approved-plans/.
-        open(os.path.join(self.home, ".claude"), "w").close()
+        # ~/.neb (la carpeta de datos) es un archivo: approved_plan.save no puede crear approved-plans/.
+        open(os.path.join(self.home, ".neb"), "w").close()
         ev = {"session_id": "s", "cwd": "/w/demo", "tool_input": {"plan": "Plan"}}
         r = self._run("save-approved-plan", ev, NEB_HOOKS="save-approved-plan")
         self.assertEqual(r.returncode, 0)

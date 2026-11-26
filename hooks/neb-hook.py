@@ -99,16 +99,17 @@ def dispatch(hook, payload, event, home):
         import approved_plan
         approved_plan.save(event, home)
     elif hook in ("notify-on-stop", "notify-on-permission"):
-        # El sonido lo resuelve hooks/lib/notify_sound.py (presets, ruta absoluta, respaldo) y llega al
-        # script en NEB_NOTIFY_WAV. Sin ruta (hook apagado en su JSON, o sin ningún WAV) no se lanza.
-        # Si el resolvedor falla, el script corre sin la variable y resuelve por su cuenta.
+        # La config efectiva (sección notify.* de config.json, ya normalizada) y el sonido los resuelve
+        # hooks/lib/notify_sound.py y llegan al script en variables NEB_NOTIFY_* (notify_sound.ENV_VARS):
+        # el script no lee config.json por su cuenta. Sin ruta (hook apagado, o sin ningún WAV) no se
+        # lanza. Si el resolvedor falla, el script corre sin las variables y le pregunta a la CLI.
         extra = None
         try:
             import notify_sound
-            wav, _ = notify_sound.resolve(hook, home=home)
-            if not wav:
+            values = notify_sound.effective(hook, home=home)
+            if not values.get("wav"):
                 return
-            extra = {"NEB_NOTIFY_WAV": wav}
+            extra = notify_sound.hook_env(values)
         except Exception as e:  # noqa: BLE001 — un hook no bloquea la sesión
             _log("%s: resolver: %r" % (hook, e))
         if IS_WINDOWS:

@@ -28,11 +28,12 @@ import sys
 import unicodedata
 
 from _db_shared import (
-    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable, raise_if_unmigrated, begin_immediate,
+    resolve_db_path, _connect, INITIAL_SCHEMA_PATH, DbUnavailable, prepare_default_db, begin_immediate,
     now_iso, posix_to_win, _whoami,
     with_write_tx as _with_write_tx, _safe_rollback,
 )
 from neb_root import resolve_neb_root
+import neb_paths
 
 
 _OBSOLETE_CAUSES = ("no-longer-applies", "resolved-otherwise")
@@ -52,11 +53,10 @@ _IN_CHUNK = 500   # máximo de parámetros por `IN (...)` (SQLite viejos topan e
 # --------------------------------------------------------------------------- conexión CLI
 
 def _db_for_cli():
-    # Esquema inicial del árbol de este módulo, con o sin NEB_HOME (6.48.0). Lanza UnmigratedDb, antes de
-    # crear nada, si la base sigue sin migrar; puede lanzar DbUnavailable: lo atrapa cli_main una sola vez.
-    home = os.path.expanduser("~")
-    raise_if_unmigrated(home)
-    return _connect(resolve_db_path(home), INITIAL_SCHEMA_PATH)
+    # Esquema inicial del árbol de este módulo, con o sin NEB_HOME (6.48.0). Lanza UnmovedDb, antes de
+    # crear nada, si la base sigue sin mudar, y crea la carpeta de datos si falta; puede lanzar DbUnavailable
+    # (UnmovedDb lo es): lo atrapa cli_main una sola vez.
+    return _connect(prepare_default_db(os.path.expanduser("~")), INITIAL_SCHEMA_PATH)
 
 
 # _with_write_tx / _safe_rollback se movieron a _db_shared (fuente única del patrón de escritura;
@@ -645,8 +645,22 @@ def triage_pass(con):
 # involucrados en una sola consulta (_topic_rows) y parsean compas.md una vez por llamada; los helpers
 # por pendiente aceptan esas filas ya leídas (`rows=`) y, sin ellas, consultan solo ese pendiente.
 
-COMPAS_NAME = "compas.md"
+COMPAS_NAME = neb_paths.COMPAS_NAME
 COMPAS_VERSION = 3
+
+
+def compas_read_path(home=None):
+    """Ruta de compas.md que se LEE: la de la carpeta de datos de Neb (`neb_paths.compas_path`) y, si ahí no
+    hay archivo pero sí en `~/.claude/compas.md` (máquina que todavía no corrió la migración 8.0.0), esa.
+    Si existen los dos manda el nuevo: el viejo es residuo. El respaldo a la ruta vieja sale en 9.0.0.
+    Sin ninguno de los dos devuelve la nueva (parse_compas la verá ausente).
+    La escritura (write_compas) va siempre a la nueva."""
+    new = neb_paths.compas_path(home)
+    if os.path.isfile(new):
+        return new
+    old = os.path.join(neb_paths.legacy_dir(home), COMPAS_NAME)
+    return old if os.path.isfile(old) else new
+
 
 # Mapeo presentación (español) <-> persistencia (inglés). El núcleo DEVUELVE español
 # (band/by_topic) para que el skill lo muestre; el caller TRADUCE a inglés antes de
@@ -712,7 +726,8 @@ def _parse_project_bonus(raw):
 
 
 def parse_compas(home=None):
-    """Parsea ~/.claude/compas.md (fuente única del peso de cada tema). Defensivo:
+    """Parsea `<datos>/compas.md` (fuente única del peso de cada tema; ruta en compas_read_path, que cae a
+    `~/.claude/compas.md` mientras la migración 8.0.0 no lo mude). Defensivo:
     archivo ausente/ilegible -> {'objectives': [], 'topic_weight': {}, 'project_bonus': {}, 'exists': False}.
     Formato v3: por objetivo `- **Peso:**`, `- **Temas:**` (slugs del eje tópico) y la línea opcional
     `- **Proyectos:** alpha=+15, beta=+10` (bonus aditivo por proyecto). Las líneas de versiones
@@ -724,7 +739,7 @@ def parse_compas(home=None):
        'project_bonus': {slug: int},   # max sobre los objetivos que bonifican al proyecto (eje proyecto)
        'exists': bool}"""
     home = home or os.path.expanduser("~")
-    path = os.path.join(home, ".claude", COMPAS_NAME)
+    path = compas_read_path(home)
     if not os.path.isfile(path):
         return dict(_EMPTY_COMPAS)
     try:
@@ -1109,17 +1124,18 @@ def _as_int(value, what):
 
 
 def write_compas(home, objectives):
-    """Materializa ~/.claude/compas.md (formato v3) con los objetivos confirmados por el dev.
+    """Materializa `<datos>/compas.md` (formato v3; `neb_paths.compas_path`) con los objetivos confirmados
+    por el dev. Siempre escribe en la carpeta de datos, aunque se haya leído el residuo de `~/.claude/`: desde
+    ese momento parse_compas lee el nuevo (el viejo lo retira la migración 8.0.0).
     objectives = [(name, weight, [topics][, {proyecto: bonus}]), ...] — el 4º elemento es opcional
     (bonus aditivo por proyecto, eje `proyecto`); sin él, la línea `Proyectos:` no se escribe.
     Cualquier otra forma (p. ej. la de 5 elementos con roadmap) es ValueError y no escribe nada.
     SOLO se invoca tras OK explícito del dev (lo dispara el skill, no un test ni el núcleo
-    autónomamente). Devuelve el path escrito."""
+    autónomamente). Devuelve el path escrito. ValueError si la carpeta de datos es un enlace (ensure_dir)."""
     parsed = [_validate_objective(o) for o in objectives]     # valida todo antes de tocar el archivo
     home = home or os.path.expanduser("~")
-    base = os.path.join(home, ".claude")
-    os.makedirs(base, exist_ok=True)
-    path = os.path.join(base, COMPAS_NAME)
+    path = neb_paths.compas_path(home)
+    neb_paths.ensure_dir(os.path.dirname(path), root=neb_paths.data_dir(home))
     today = now_iso()[:10]
     lines = [
         "# compas.md — Brújula de priorización personal",
@@ -1449,7 +1465,7 @@ def cli_infer_objectives(_args):
 
 
 def cli_write_compas(args):
-    """write-compas <json>  — escribe ~/.claude/compas.md (v3) con los objetivos confirmados.
+    """write-compas <json>  — escribe `<datos>/compas.md` (v3) con los objetivos confirmados.
     <json> = [["nombre", peso, ["topico",...]], ["nombre", peso, ["topico",...], {"proyecto": bonus}], ...]
     (el 4º elemento es opcional). Un error (JSON inválido, objetivo con otra forma —p. ej. la de 5
     elementos con roadmap, anterior a 7.3.0—) sale como {"ok": false, "error"} y no escribe nada.

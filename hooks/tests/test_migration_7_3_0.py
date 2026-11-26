@@ -5,7 +5,7 @@ test_migration_7_3_0.py — la migración guiada de neb 7.3.0 (migrations/7.3.0.
 Cubre, con el árbol real y homes temporales:
   • la migración carga con sus dos pasos (compas-proyectos y vacuum-neb-db) y sus atributos;
   • compas-proyectos de punta a punta con `apply --guiados`: `Clientes:` -> `Proyectos:` con el mismo
-    contenido (bonos idénticos), sin `Roadmap:`, `version: 3`, respaldo nuevo en neb-backups/ con los bytes
+    contenido (bonos idénticos), sin `Roadmap:`, `version: 3`, respaldo nuevo en la carpeta de respaldos con los bytes
     originales; la segunda corrida no lo marca; sin compas, sin-cambio; un compas solo con `version: 2` se
     marca; los fines de línea CRLF y el BOM se conservan;
   • compas.md de solo lectura (desde 7.4.0 se migra y conserva la protección) y de más de 1 MB (se migra);
@@ -26,7 +26,9 @@ Cubre, con el árbol real y homes temporales:
   • de punta a punta: una base de neb en esquema 2 (raíz 'cliente') y fragmentada; un solo `apply --guiados`
     corre el paso de base 3 y después vacuum-neb-db, sin dejar el exclusivo en pendiente.
 
-Nunca toca ~/.claude, neb.db ni compas.md reales.
+Disposición de 8.0.0: la base, compas.md y los respaldos en la carpeta de datos del home temporal (<home>/.neb,
+sin NEB_DATA: _entorno); con la de 7.x (en ~/.claude), la cubre test_migration_8_0_0.py. Nunca toca ~/.claude,
+~/.neb, neb.db ni compas.md reales.
   py -m unittest hooks.tests.test_migration_7_3_0
 """
 
@@ -47,6 +49,7 @@ import unittest
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import _sin_registro  # noqa: E402,F401 — sin el registro real de Windows
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 from unittest import mock
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -160,9 +163,11 @@ class Base(unittest.TestCase):
         self.addCleanup(self._rmtree)
         self.claude = os.path.join(self.home, ".claude")
         os.makedirs(self.claude)
-        self.db = os.path.join(self.claude, "neb.db")
-        self.compas = os.path.join(self.claude, "compas.md")
-        self.backups = os.path.join(self.claude, "neb-backups")
+        self.data = os.path.join(self.home, ".neb")      # carpeta de datos (8.0.0)
+        os.makedirs(self.data)
+        self.db = os.path.join(self.data, "neb.db")
+        self.compas = os.path.join(self.data, "compas.md")
+        self.backups = os.path.join(self.data, "backups")
         self.env = FakeUserEnv()
         p = mock.patch.object(_machine, "default_user_env", lambda: self.env)
         p.start()
@@ -261,12 +266,12 @@ class TestCompasProyectos(Base):
         self.assertEqual(parsed["topic_weight"],
                          {"seguridad": 90, "incidente": 90, "deuda": 40, "rendimiento": 40})
 
-        # respaldo: archivo nuevo en neb-backups/ con los bytes originales
+        # respaldo: archivo nuevo en la carpeta de respaldos con los bytes originales
         backups = self.backups_like("compas.pre-7.3.0.*.md")
         self.assertEqual(len(backups), 1)
         self.assertEqual(os.path.normcase(row["respaldo"]), os.path.normcase(backups[0]))
         self.assertEqual(self.read_bytes(backups[0]), original)
-        self.assertEqual([f for f in os.listdir(self.claude) if ".tmp-" in f], [])
+        self.assertEqual([f for f in os.listdir(self.data) if ".tmp-" in f], [])
 
         # segunda corrida: ya no se marca
         self.assertFalse(_step("compas-proyectos").detectar(self.ctx()))
@@ -338,7 +343,7 @@ class TestCompasProyectos(Base):
                          ["alpha=+15, beta=+10, gamma=+5"])
         self.assertFalse(os.access(self.compas, os.W_OK), "sigue de solo lectura")
         self.assertEqual([self.read_bytes(p) for p in self.backups_like("compas.pre-7.3.0.*.md")], [original])
-        self.assertEqual([f for f in os.listdir(self.claude) if ".tmp-" in f], [])
+        self.assertEqual([f for f in os.listdir(self.data) if ".tmp-" in f], [])
         self.assertFalse(_step("compas-proyectos").detectar(self.ctx()))
 
     def test_falla_sembrada_solo_lectura_y_error_al_reemplazar_deja_el_original_protegido(self):
@@ -351,7 +356,7 @@ class TestCompasProyectos(Base):
         self.assertEqual(self.read_bytes(self.compas), original)
         self.assertFalse(os.access(self.compas, os.W_OK), "el original vuelve a su protección")
         self.assertEqual(self.backups_like("compas.pre-7.3.0.*.md"), [])
-        self.assertEqual([f for f in os.listdir(self.claude) if ".tmp-" in f], [])
+        self.assertEqual([f for f in os.listdir(self.data) if ".tmp-" in f], [])
         self.assertTrue(_step("compas-proyectos").detectar(self.ctx()), "sigue pendiente")
 
     def test_compas_de_mas_de_1_mb_se_migra(self):
@@ -376,7 +381,7 @@ class TestCompasProyectos(Base):
         self.assertIn("PermissionError", r["detalle"])
         self.assertEqual(self.read_bytes(self.compas), original)
         self.assertEqual(self.backups_like("compas.pre-7.3.0.*.md"), [])
-        self.assertEqual([f for f in os.listdir(self.claude) if ".tmp-" in f], [])
+        self.assertEqual([f for f in os.listdir(self.data) if ".tmp-" in f], [])
 
     def test_compas_que_cambia_durante_la_migracion_no_se_pisa(self):
         self.write_compas(COMPAS_V2)
@@ -492,7 +497,7 @@ class TestVacuum(Base):
 
     def test_segunda_compactacion_borra_la_copia_anterior(self):
         """Mantenimiento recurrente: la base vuelve a acumular páginas libres, el paso se marca otra vez y, tras
-        compactar, deja solo la copia de esta corrida; los demás respaldos de neb-backups/ no se tocan."""
+        compactar, deja solo la copia de esta corrida; los demás respaldos de la carpeta no se tocan."""
         self.make_db()
         r1 = _guided.run(self.ctx(), _step("vacuum-neb-db"))
         self.assertEqual(r1["estado"], "aplicado", r1)
@@ -537,7 +542,7 @@ class TestVacuum(Base):
         self.assertIn("falta espacio", r["detalle"])
         self.assertRegex(r["detalle"], r"piden \d+\.\d MB libres")
         self.assertIsNone(r["respaldo"])
-        self.assertFalse(os.path.exists(self.backups), "no se creó neb-backups/ ni la copia")
+        self.assertFalse(os.path.exists(self.backups), "no se creó la carpeta de respaldos ni la copia")
         after = self.stats()
         self.assertEqual((after["page_count"], after["freelist_count"]),
                          (before["page_count"], before["freelist_count"]))
@@ -545,8 +550,8 @@ class TestVacuum(Base):
         self.assertTrue(_step("vacuum-neb-db").detectar(self.ctx()), "sigue pendiente")
 
     def test_espacio_se_suma_cuando_copia_y_base_comparten_volumen(self):
-        """Mismo volumen para neb-backups/ y la base (y el temporal): hace falta 1 vez la base para la copia más
-        2 para el VACUUM; con 2.5 veces no alcanza."""
+        """Mismo volumen para la carpeta de respaldos y la base (y el temporal): hace falta 1 vez la base para la
+        copia más 2 para el VACUUM; con 2.5 veces no alcanza."""
         self.make_db()
         size = os.path.getsize(self.db)
         du = collections.namedtuple("usage", "total used free")

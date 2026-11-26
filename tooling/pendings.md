@@ -1,6 +1,6 @@
 # Pendientes — backend, brújula y priorización
 
-Recurso del módulo `hooks/lib/pendings.py` que opera los **pendientes del dev** sobre la misma DB SQLite del logbook (`~/.claude/neb.db`). El skill que lo conduce es [`../skills/pendings-review/SKILL.md`](../skills/pendings-review/SKILL.md); el modelo de datos (6 tablas) vive en el esquema inicial [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql), en los pasos de base de [`migrations.md`](migrations.md) y los Change MD de los REQ (`neb-pendings-sqlite`, `pendings-taxonomia-cliente-topico`, `neb-eje-proyecto-sin-roadmap`). Aquí: los **ejes curados** (proyecto · tópico) y la curaduría, la **brújula `compas.md`** y la **jerarquía de fuentes** de priorización.
+Recurso del módulo `hooks/lib/pendings.py` que opera los **pendientes del dev** sobre la misma DB SQLite del logbook (`<datos>/neb.db`; `<datos>` es la carpeta de datos de Neb: `NEB_DATA` si es una ruta absoluta; si no, `~/.neb`). El skill que lo conduce es [`../skills/pendings-review/SKILL.md`](../skills/pendings-review/SKILL.md); el modelo de datos (6 tablas) vive en el esquema inicial [`../hooks/logbook-schema.sql`](../hooks/logbook-schema.sql), en los pasos de base de [`migrations.md`](migrations.md) y los Change MD de los REQ (`neb-pendings-sqlite`, `pendings-taxonomia-cliente-topico`, `neb-eje-proyecto-sin-roadmap`). Aquí: los **ejes curados** (proyecto · tópico) y la curaduría, la **brújula `compas.md`** y la **jerarquía de fuentes** de priorización.
 
 Un pendiente es de tipo `task` (seguimiento) o `session` (sesión pausada): `PD create <task|session> "<contexto>"`. `PD remember-session <work_id> [contexto]` crea un `session` ligado a un work exploratorio de la bitácora (`session_ref`). Cuándo se usa cada uno: [`../workflow/pendings.md`](../workflow/pendings.md).
 
@@ -28,7 +28,7 @@ El índice FTS5 `neb_fts` indexa **solo los temas** (`kind='topic'`): el matchin
 
 ## Qué es `compas.md`
 
-Brújula de priorización personal: archivo Markdown **local, no versionado, mantenido por Claude** en `~/.claude/compas.md`. Es la **fuente ÚNICA del peso de cada tema** — los `topic` de la DB no llevan peso. El recomendador la **parsea una vez por llamada** de `triage` o `rank` (no cachea el peso en la DB ni entre llamadas). Aplica solo a los pendientes **sin banda curada** (ver jerarquía abajo).
+Brújula de priorización personal: archivo Markdown **local, no versionado, mantenido por Claude** en `<datos>/compas.md` (ruta exacta: `neb_paths.py path compas`). Mientras no exista, el parser lee `~/.claude/compas.md`, donde vivía hasta 7.x, si sigue ahí: la migración 8.0.0 lo muda y esa lectura de respaldo sale en 9.0.0. `write_compas()` escribe siempre en `<datos>/`. Es la **fuente ÚNICA del peso de cada tema** — los `topic` de la DB no llevan peso. El recomendador la **parsea una vez por llamada** de `triage` o `rank` (no cachea el peso en la DB ni entre llamadas). Aplica solo a los pendientes **sin banda curada** (ver jerarquía abajo).
 
 **Formato v3 (objetivos → peso por tópico + bonus por proyecto):**
 

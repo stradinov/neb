@@ -29,7 +29,7 @@ Inspeccionando el repo, el primer indicador que coincide gana:
 |---|---|
 | **cwd dentro de `*/<neb>/profiles/<nombre>/`** (overlay sobre `self-applied`; `<neb>` = dir del checkout) | `profile-authoring` |
 | **cwd dentro de `*/<neb>/skills/<nombre>/`** (overlay sobre `self-applied`) | `skill-authoring` |
-| **cwd dentro de `*/<neb>/research/`** (overlay sobre `self-applied`); para investigación en `<proyecto>/research/` o `~/.claude/research/` la activación es **explícita** por el dev | `research` |
+| **cwd dentro de `*/<neb>/research/`** (overlay sobre `self-applied`); para investigación en `<proyecto>/research/` o `<datos>/research/` (carpeta de datos de Neb) la activación es **explícita** por el dev | `research` |
 | `methodology/principles.md` + `process/plan-review.md` + `general/index.md` con fases canónicas | `self-applied` |
 | `app/` + `composer.json` con `prestashop/prestashop` | `prestashop` (futuro) |
 | `app.json` + `expo` en deps | `react-native` (futuro) |

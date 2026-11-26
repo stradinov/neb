@@ -19,7 +19,8 @@ ficticios en lugar de los pasos 2 y 3 de producción; el paso 2 real lo prueba t
     corre), un tema 'proyecto' que aparece justo antes de aplicar (también se mueve), idempotencia, un código 7.2.x sobre la base migrada (opera sin migrar y su captura escribe) y la reparación
     que baja a 2 la mínima compatible que dejó 7.3.0 (solo esa fila; status y el arranque leen 2).
 
-Invariantes: homes y bases temporales; nunca ~/.claude; sin NEB_HOME ni NEB_LOGBOOK_* heredados.
+Invariantes: homes y bases temporales, con la base en la carpeta de datos del home (<home>/.neb, 8.0.0); nunca
+~/.claude ni ~/.neb reales; sin NEB_HOME, NEB_DATA (_entorno) ni NEB_LOGBOOK_* heredados.
   py -m unittest discover -s hooks/tests -p test_migrations_db.py
 """
 
@@ -48,6 +49,7 @@ LIB = os.path.join(HERE, "..", "lib")
 NEB_ROOT = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, LIB)
 
+import _entorno  # noqa: E402,F401 — quita NEB_DATA: la carpeta de datos es la del home temporal
 import _db_shared
 import _migrations
 from _migrations import Step
@@ -128,9 +130,10 @@ class Base(unittest.TestCase):
         self.home = tempfile.mkdtemp(prefix="neb-test-mig-")
         self.addCleanup(shutil.rmtree, self.home, True)
         os.makedirs(os.path.join(self.home, ".claude"))
-        self.db = os.path.join(self.home, ".claude", "neb.db")
+        self.db = os.path.join(self.home, ".neb", "neb.db")      # la carpeta de datos (8.0.0)
+        os.makedirs(os.path.dirname(self.db))
         env = {k: v for k, v in os.environ.items()
-               if k != "NEB_HOME" and not k.startswith("NEB_LOGBOOK_")}
+               if k not in ("NEB_HOME", _entorno.DATA_ENV) and not k.startswith("NEB_LOGBOOK_")}
         env.update(HOME=self.home, USERPROFILE=self.home)
         patcher = mock.patch.dict(os.environ, env, clear=True)
         patcher.start()
@@ -403,6 +406,28 @@ class TestDestructivo(Base):
             con.execute("ROLLBACK")
             con.close()
         self.assertTrue(os.path.isfile(bak))
+
+    def test_critico_respaldo_no_se_escribe_a_traves_de_un_enlace(self):
+        """La carpeta de respaldos es un enlace (symlink o junction): take_backup lanza OSError y no escribe la copia
+        de la base en el destino del enlace (8.0.0: Neb no escribe a través de enlaces)."""
+        legacy_647_db(self.db)
+        self.connect([STEP1]).close()
+        target = tempfile.mkdtemp(prefix="neb-test-destino-")
+        self.addCleanup(shutil.rmtree, target, True)
+        folder = _migrations.backup_dir(self.db)
+        shutil.rmtree(folder, True)
+        try:
+            os.symlink(target, folder, target_is_directory=True)
+        except (OSError, NotImplementedError):
+            try:
+                import _winapi
+                _winapi.CreateJunction(target, folder)
+            except (ImportError, AttributeError, OSError):
+                self.skipTest("sin permiso para crear enlaces")
+        self.addCleanup(lambda: os.path.lexists(folder) and (os.rmdir(folder) if os.name == "nt" else os.unlink(folder)))
+        with self.assertRaises(OSError):
+            _migrations.take_backup(self.db, "neb.pre-paso-9.prueba.db")
+        self.assertEqual(os.listdir(target), [])
 
 
 class TestEsperaYBloqueo(Base):
@@ -804,12 +829,16 @@ class TestNebMigrate(Base):
         self.assertEqual(json.loads(out)["motivo"], "respaldo-no-valido")
 
     def test_restore_acepta_un_enlace_en_una_carpeta_superior(self):
-        claude = os.path.join(self.home, ".claude")
-        real = os.path.join(self.home, "claude-real")
-        os.rmdir(claude)
-        os.makedirs(real)
-        self._link_dir(real, claude)
-        self.addCleanup(lambda: os.path.isdir(claude) and (os.rmdir(claude) if os.name == "nt" else os.unlink(claude)))
+        # La carpeta de datos no puede ser un enlace (neb_paths.ensure_dir), pero sí estar debajo de uno: NEB_DATA
+        # en <home>/enlace/datos, con <home>/enlace como enlace a otra carpeta.
+        enlace = os.path.join(self.home, "enlace")
+        real = os.path.join(self.home, "real")
+        os.makedirs(os.path.join(real, "datos"))
+        self._link_dir(real, enlace)
+        self.addCleanup(lambda: os.path.isdir(enlace) and (os.rmdir(enlace) if os.name == "nt" else os.unlink(enlace)))
+        os.environ[_entorno.DATA_ENV] = os.path.join(enlace, "datos")      # el patcher de Base restaura el entorno
+        self.db = _db_shared.resolve_db_path(self.home)
+        self.assertEqual(self.db, os.path.join(enlace, "datos", "neb.db"))
         bak, snapshot = self._destructive_backup()
         with mock.patch.object(_migrations, "STEPS", (STEP1,)):
             rc, out = self.run_nm("restore", bak)
@@ -910,14 +939,15 @@ class TestRutaConCorchetes(Base):
         self.home, self.decoy = os.path.join(parent, "x[1]"), os.path.join(parent, "x1")
         for h in (self.home, self.decoy):
             os.makedirs(os.path.join(h, ".claude"))
-        self.db = os.path.join(self.home, ".claude", "neb.db")
+            os.makedirs(os.path.join(h, ".neb"))
+        self.db = os.path.join(self.home, ".neb", "neb.db")
         os.environ.update(HOME=self.home, USERPROFILE=self.home)   # el patcher de Base restaura el entorno
 
     def plant(self, name):
-        """El mismo respaldo en neb-backups/ del home propio y del señuelo: (propio, señuelo)."""
+        """El mismo respaldo en la carpeta de respaldos del home propio y del señuelo: (propio, señuelo)."""
         out = []
         for h in (self.home, self.decoy):
-            d = os.path.join(h, ".claude", _migrations.BACKUP_DIR_NAME)
+            d = os.path.join(h, ".neb", _migrations.BACKUP_DIR_NAME)
             os.makedirs(d, exist_ok=True)
             out.append(os.path.join(d, name))
             with open(out[-1], "w", encoding="utf-8") as fh:

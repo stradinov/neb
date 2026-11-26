@@ -9,7 +9,8 @@ test_machine_config.py — catálogo de operaciones de los pasos guiados (hooks/
   • user_env_remove contra un registro inyectable (nunca el real): patrón de nombre (también con salto de
     línea al final), el valor nunca en la salida, máquina y fuera de Windows responden `manual`.
 
-Homes temporales; nunca ~/.claude ni el registro real.
+Homes temporales, sin NEB_DATA (_entorno); nunca ~/.claude, ~/.neb ni el registro real. Los respaldos de las
+operaciones van a la carpeta de respaldos de la base (<datos>/backups/, desde 8.0.0).
   py -m unittest discover -s hooks/tests -p test_machine_config.py
 """
 
@@ -26,6 +27,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 NEB = os.path.abspath(os.path.join(HERE, "..", ".."))
 sys.path.insert(0, os.path.join(NEB, "hooks", "lib"))
 
+import _entorno  # noqa: F401 — quita NEB_DATA: la carpeta de datos (y sus respaldos) es la del home temporal
 import _machine
 
 SECRET = "valor-secreto-9f3a"
@@ -207,7 +209,9 @@ class TestSettingsEnvRemove(Base):
         self.assertEqual(r["estado"], "aplicado")
         self.assertEqual(self.load(live), {"env": {"OTRA": "y"}})
         self.assertEqual(self.load(), {"env": {"NEB_PRUEBA_A": "home"}})
-        self.assertTrue(r["respaldo"].startswith(os.path.join(self.claude, "neb-backups")))
+        # El respaldo va a la carpeta de respaldos de Neb (<datos>/backups/, desde 8.0.0), no junto al settings.
+        self.assertTrue(r["respaldo"].startswith(os.path.join(self.home, ".neb", "backups")))
+        self.assertEqual(ctx.backups_dir, os.path.join(self.home, ".neb", "backups"))
 
     def test_cambio_entre_lectura_y_escritura_no_escribe(self):
         self.put({"env": {"NEB_PRUEBA_A": "uno"}})
@@ -365,7 +369,7 @@ class TestRutaConCorchetes(unittest.TestCase):
     def test_poda_de_respaldos_de_settings_no_sale_del_home_propio(self):
         ctx = _machine.Ctx(self.home, user_env=FakeUserEnv())
         past = ctx.started - 3600
-        own, decoy = (os.path.join(h, ".claude", _machine.BACKUP_DIR_NAME,
+        own, decoy = (os.path.join(h, ".neb", _machine.BACKUP_DIR_NAME,
                                    _machine.SETTINGS_BACKUP_PREFIX + "20200101T000000Z.json")
                       for h in (self.home, self.decoy))
         for f in (own, decoy):

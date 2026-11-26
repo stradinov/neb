@@ -96,14 +96,14 @@ El procedimiento completo (nombrado en kebab-case, `/rename`, registro como pend
 
 ## Idioma
 
-El **idioma base es español** en todo lo que el agente produce para el dev y el repo. La **variedad regional, el registro y la tolerancia a extranjerismos** son punto de customización (promesa 5), no baseline del núcleo.
+El **idioma base es español** en todo lo que el agente produce para el dev y el repo. En la conversación con el dev, **idioma, variedad regional, registro, tratamiento y tolerancia a extranjerismos** son punto de customización (promesa 5), no baseline del núcleo; hoy solo el español tiene lineamientos.
 
-- **Conversación dev↔Claude** y **mensajes de error Claude→dev**: español; variedad y registro según el punto de customización.
+- **Conversación dev↔Claude** y **mensajes de error Claude→dev**: según el punto de customización (por omisión, español).
 - **Prosa de los `.md`**: español; la variedad la fija la convención del repo/adoptante.
 - **Correspondencia a terceros**: ver [`correspondence.md`](correspondence.md) § "Idioma y registro".
 - **Commits, código, identifiers, comandos, paths y términos tecnológicos** (commit, prompt, hook, plugin, deploy…): inglés. El resto de anglicismos de prosa se traducen.
 
-> **Punto de customización** (promesa 5): variedad regional, registro y extranjerismos se ajustan sin tocar el núcleo. Un **individuo** los declara en `personal/<usuario>.md` § "Preferencias de comunicación" (o, solo para un proyecto, en `<proyecto>/.claude/personal.md`); un **adoptante**, en su overlay. Esquema y perillas (variedad, `permitir_voseo`, registro, extranjerismos): [`../tooling/redaccion-es.md`](../tooling/redaccion-es.md). Variedad de este repo: `variedad: mexico`, `permitir_voseo: false`, tuteo.
+> **Punto de customización** (promesa 5), sin tocar el núcleo. Precedencia: núcleo → overlay del adoptante → individuo; cada nivel sustituye lo que declara. El individuo declara `base`, `variedad`, `registro`, `tratamiento`, `permitir_voseo` y `extranjerismos` en la sección `language` de su `config.json` ([`../tooling/config.md`](../tooling/config.md) § "Sección language"; `null` = no declarada), que gana sobre la misma perilla en `personal/<usuario>.md`; `<proyecto>/.claude/personal.md` la sustituye en su proyecto. En prosa van las demás perillas de [`../tooling/redaccion-es.md`](../tooling/redaccion-es.md). Variedad de este repo: `variedad: mexico`, `permitir_voseo: false`, tuteo.
 
 ## Delegaciones
 

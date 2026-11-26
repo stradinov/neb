@@ -47,6 +47,13 @@ def _remove_quiet(path):
 
 
 def _compas_path(ctx):
+    """compas.md de la carpeta de datos (desde 8.0.0) si existe; si no, el de ~/.claude: una máquina que todavía
+    no corre la mudanza de 8.0.0, o este paso pendiente cuando compas.md sigue sin mudar."""
+    data_dir = getattr(ctx, "data_dir", None)
+    if data_dir:
+        new = os.path.join(data_dir, COMPAS_NAME)
+        if os.path.isfile(new):
+            return new
     return os.path.join(ctx.claude_dir, COMPAS_NAME)
 
 
@@ -147,7 +154,7 @@ def _aplicar(ctx):
         backup = os.path.join(ctx.backups_dir, f"compas.pre-7.4.0.{_machine._stamp()}.md")
         with open(backup, "xb") as fh:          # archivo nuevo de esta corrida
             fh.write(raw)
-        tmp = os.path.join(ctx.claude_dir, f".{COMPAS_NAME}.tmp-{_machine._stamp()}")
+        tmp = os.path.join(os.path.dirname(path), f".{COMPAS_NAME}.tmp-{_machine._stamp()}")   # junto al original
         with open(tmp, "xb") as fh:
             fh.write(new)
             fh.flush()
