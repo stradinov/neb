@@ -65,7 +65,7 @@ Además de los revisores de fase (tablas anteriores), existen **agentes funciona
 
 ## Cobertura mínima por fase
 
-**Regla**: cada profile debe tener ≥1 subagente formalizado activo en Fase 4 (cierre/gate) y Fase 7 (pre-ejecución/gate). Si el profile no tiene subagente disponible, el dev debe declarar override explícito antes de avanzar. Las fases 1, 2, 6, 8 son conducidas únicamente por el rol principal (persona) — sin gate de subagente.
+**Regla**: cada profile debe tener ≥1 subagente formalizado activo en Fase 4 (cierre/gate) y Fase 7 (pre-ejecución/gate). Si el profile no tiene subagente disponible, el dev debe declarar override explícito antes de avanzar. En Fase 3, un plan sujeto a plan-review ([`plan-review.md`](plan-review.md) § "Cuándo aplica") no va a OK sin ≥1 subagente (del profile o, si el paso 0 no detecta ninguna dimensión, el `context-completeness-reviewer` transversal), salvo override explícito del dev, que queda en su línea `**Plan-review:**` ([`plan-review.md`](plan-review.md) § "Flujo", paso 4). Las fases 1, 2, 6, 8 son conducidas únicamente por el rol principal (persona) — sin gate de subagente.
 
 ### Matriz de cobertura por profile × fase (subagentes específicos del profile)
 

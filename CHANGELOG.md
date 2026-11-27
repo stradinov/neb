@@ -4,6 +4,17 @@ Todos los cambios relevantes a esta metodología quedan registrados aquí. Forma
 
 ## [Unreleased]
 
+## [8.2.0] - 2026-11-26
+
+> **Minor**: un plan ya no se aprueba sin dejar constancia de su plan-review. Nada que hacer al actualizar; los planes aprobados antes no cambian.
+
+### Added
+- **Línea `**Plan-review:**` en el plan** (`process/plan-review.md` § "Flujo", paso 4): el plan que acompaña la petición de OK lleva, antes de su primera sección, los roles que lo revisaron y la fecha, `exento — <motivo> · override explícito del dev <fecha>` o `no aplica — <motivo>`. Rige en todo plan media/alta y en los de complejidad baja que el profile sujeta a plan-review. Un plan aprobado sin la línea pasa por plan-review retroactivo y re-aprobación antes de la primera confirmación del entregable. Origen: en noviembre, un plan de complejidad alta se aprobó sin plan-review (y probablemente otro), sin que la omisión quedara a la vista al aprobar (`[neb-plan-review-campo-obligatorio]`, PD-1011).
+
+### Changed
+- **Piso de Fase 3** (`process/roles-invocation.md` § "Cobertura mínima por fase"): un plan sujeto a plan-review no va a OK sin ≥1 subagente (del profile o, si no se detecta ninguna dimensión, el `context-completeness-reviewer`), salvo override explícito del dev. Antes, el piso cubría solo las Fases 4 y 7.
+- **Punteros a la línea** en `workflow/approved-plans.md` § "Contenido", `templates/approved-plan.md.template` y `docs/how-it-works.md` § "Gate de plan-review".
+
 ## [8.1.0] - 2026-11-25
 
 > **Minor**: el arranque que inyecta el plugin pesa menos. Los enlaces del núcleo ya no repiten la raíz de la instalación: la intro la anuncia una vez y los enlaces van relativos a ella. Nada que hacer al actualizar.

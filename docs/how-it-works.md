@@ -25,6 +25,9 @@ Antes de aprobar un plan de complejidad media o alta, uno o más revisores
 independientes lo auditan por dimensiones: proceso, lógica de datos, seguridad
 y convenciones de código. Los revisores son subagentes que el agente principal
 invoca; sus hallazgos se incorporan al plan antes de pasar a implementación.
+El plan que se aprueba lleva una línea `**Plan-review:**` con los revisores y la
+fecha, o la exención que autorizó el dev: si falta, el plan no pasa a
+implementación.
 
 ---
 

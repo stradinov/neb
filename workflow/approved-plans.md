@@ -25,7 +25,7 @@ En complejidad media/alta, el plan aprobado se guarda como archivo versionado en
 
 Formato: ver [`templates/approved-plan.md.template`](../templates/approved-plan.md.template) — header (`Proyecto` / `Sesión`) + plan literal. El archivo del repo no lleva la línea `**CWD:**` que escribe el hook: es una ruta absoluta de la máquina del dev.
 
-El plan trae la sección obligatoria `## Plan de pruebas` ([`process/planning.md`](../process/planning.md) § "Estimación, plan y plan de pruebas").
+El plan trae la sección obligatoria `## Plan de pruebas` ([`process/planning.md`](../process/planning.md) § "Estimación, plan y plan de pruebas") y, antes de su primera sección, la línea `**Plan-review:**` ([`process/plan-review.md`](../process/plan-review.md) § "Flujo", paso 4). Las dos van en el plan que el dev aprueba, no en el header que escribe el hook.
 
 ## Ciclo de vida
 

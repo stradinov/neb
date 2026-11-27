@@ -31,7 +31,12 @@ Output: tabla "Suposición | Tipo (`contexto` / `dominio`) | Cómo se resuelve |
    - **Persona** (rol sin `.md` en `agents/`): simular inline cambiando de sombrero dentro de la misma respuesta.
    - **Despacho desde el hilo principal**: el rol principal invoca a los revisores porque los hallazgos se consolidan y se le preguntan al dev en el hilo principal. Que la plataforma permita a un subagente lanzar otros (supuesto R13) no cambia este flujo.
 3. **Rol principal** consolida hallazgos (subagentes + personas) y presenta el plan revisado en la misma respuesta. Los hallazgos que sostengan una pregunta o una opción al dev, o una corrección del plan, siguen [`../methodology/principles.md`](../methodology/principles.md) § "Suposiciones explícitas antes de afirmar". Una alternativa que un revisor reporta contra la letra del pedido o contra un plan que daba una pieza por hecha llega al dev como opción, o el plan dice por qué no y cita el hallazgo; la letra del pedido, un plan previo o el criterio de un rol no son razón. El briefing no les pide a los revisores decidir qué opciones o decisiones le tocan al dev.
-4. Pide OK al dev.
+4. Pide OK al dev. El plan que acompaña la petición lleva, en una línea propia antes de su primera sección `##`, la constancia del plan-review en una de tres formas:
+   - `**Plan-review:** <rol>, <rol> · <AAAA-MM-DD>`: los roles que lo revisaron y la fecha.
+   - `**Plan-review:** exento — <motivo> · override explícito del dev <AAAA-MM-DD>`: solo con ese override; Claude no se exime solo.
+   - `**Plan-review:** no aplica — <motivo>`: cuando § "Cuándo aplica" no lo exige (cosmético en `self-applied`, research sin `propósito = decisión`).
+
+   Rige en todo plan de complejidad media/alta y en todo plan que § "Cuándo aplica" sujete a plan-review aunque no se persista (complejidad baja en `self-applied`). Una re-aprobación o un plan delta es una aprobación nueva y lleva su propia línea. El rol principal que detecte un plan aprobado sin la línea (p. ej. por un menú sin el plan a la vista) corre el plan-review retroactivo y pide re-aprobación antes de la primera confirmación del entregable.
 
 ## Plantilla de briefing para subagentes
 
@@ -63,7 +68,7 @@ Aplica tu mandato completo y reporta hallazgos. No decides qué opciones se le p
 
 Hallazgos breves por rol (bullets) + plan revisado consolidado. Todo inline en la propuesta — no se generan artefactos separados.
 
-Al abrir el registro del REQ tras aprobarse el plan, el rol principal anota en él cada hallazgo con el rol que lo levantó y su desenlace (incorporado al plan o descartado), como en [`execution.md`](execution.md) § "Cierre de Fase 4 (gate de subagente)": la propuesta vive en la conversación, y sin esa anotación el aporte de cada rol en Fase 9 se asigna de memoria.
+Al abrir el registro del REQ tras aprobarse el plan, el rol principal anota en él cada hallazgo con el rol que lo levantó y su desenlace (incorporado al plan o descartado), como en [`execution.md`](execution.md) § "Cierre de Fase 4 (gate de subagente)": la propuesta vive en la conversación, y sin esa anotación el aporte de cada rol en Fase 9 se asigna de memoria. La línea `**Plan-review:**` del paso 4 queda en el plan aprobado; el desglose por rol vive solo en el registro.
 
 ## Nota de alcance
 
